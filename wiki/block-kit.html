@@ -1,0 +1,80 @@
+<!doctype html>
+<html lang="en">
+<head>
+	<meta charset="utf-8">
+	<meta name="viewport" content="width=device-width, initial-scale=1">
+	<title>Block Kit &amp; the form-block fix</title>
+	<link rel="stylesheet" href="style.css">
+</head>
+<body>
+<div class="layout">
+	<aside class="sidebar">
+		<div class="brand">EmDash Admin Wiki<small>definemg migration · v0.16.1</small></div>
+		<nav>
+			<a href="index.html">Home</a>
+			<a href="admin-menu.html">Admin menu architecture</a>
+			<a href="customizing-admin.html">Customizing the admin</a>
+			<a href="pattern-routing.html">Pattern-driven routing</a>
+			<a href="plugins.html">Plugin capabilities &amp; limits</a>
+			<a href="block-kit.html" class="active">Block Kit &amp; the form-block fix</a>
+			<a href="building-a-wiki.html">Building a wiki in /admin</a>
+		</nav>
+	</aside>
+	<main>
+		<h1>Block Kit &amp; the form-block fix</h1>
+		<p class="lede">Block Kit is the declarative JSON UI that sandboxed plugins render with — the host draws the blocks, no plugin JavaScript runs in the browser.</p>
+
+		<h2>How it works</h2>
+		<ol>
+			<li>User opens a plugin admin page → admin sends a <code>page_load</code> interaction to the plugin's <code>admin</code> route.</li>
+			<li>Plugin returns <code>{ blocks: [...] }</code>.</li>
+			<li>Admin renders them with <code>BlockRenderer</code> (from <code>@emdash-cms/blocks</code>).</li>
+			<li>User interacts (button click / form submit) → interaction posts back → plugin returns new blocks.</li>
+		</ol>
+
+		<h2>Available blocks &amp; elements</h2>
+		<p><strong>Blocks:</strong> <code>header</code>, <code>section</code>, <code>divider</code>, <code>fields</code>, <code>table</code>, <code>actions</code>, <code>stats</code>, <code>form</code>, <code>image</code>, <code>context</code>, <code>columns</code>, <code>chart</code>, <code>code</code>, <code>meter</code>, <code>banner</code>.</p>
+		<p><strong>Form elements:</strong> <code>button</code>, <code>text_input</code>, <code>number_input</code>, <code>select</code>, <code>toggle</code>, <code>secret_input</code>, <code>checkbox</code>, <code>radio</code>, <code>date_input</code>, <code>combobox</code>.</p>
+		<p>Keys are <strong>snake_case</strong> throughout: <code>action_id</code>, <code>block_id</code>, <code>initial_value</code>.</p>
+
+		<h2>Case study: <code>fields is not iterable</code></h2>
+		<p>The demo plugin's admin page crashed with this exact error. Root cause, traced to the real renderer in <code>@emdash-cms/blocks/dist/index.js</code>:</p>
+		<pre><code>function getInitialValues(fields) {
+  for (const field of fields) /* ... */     // ← throws if `fields` is undefined
+}
+function FormBlockComponent({ block, onAction }) {
+  const [values] = useState(() => getInitialValues(block.fields));
+  // ...
+}</code></pre>
+		<p>A <code>form</code> block's inputs must live under <code>fields</code>. The demo passed them under <code>elements</code>, so <code>block.fields</code> was <code>undefined</code> → "fields is not iterable."</p>
+
+		<h3>The fix</h3>
+		<table>
+			<thead><tr><th>Wrong (crashes)</th><th>Correct</th></tr></thead>
+			<tbody>
+				<tr><td><code>elements: [ ... ]</code></td><td><code>fields: [ ... ]</code></td></tr>
+				<tr><td><code>blockId: "add-note"</code></td><td><code>block_id: "add-note"</code></td></tr>
+			</tbody>
+		</table>
+		<pre><code>{
+  type: "form",
+  block_id: "add-note",
+  fields: [
+    { type: "text_input", action_id: "note_text", label: "New note" }
+  ],
+  submit: { label: "Add note", action_id: "add_note" }
+}</code></pre>
+
+		<blockquote class="warn">
+			<strong>Why TypeScript didn't catch it:</strong> the blocks array is typed <code>any[]</code> in the handler, so <code>tsc</code> can't flag a wrong key name — only the runtime renderer does. Always reload the actual page to verify Block Kit changes.
+		</blockquote>
+
+		<blockquote class="bad-callout">
+			<strong>Dev-server gotcha that cost us time:</strong> a plugin's <code>sandbox-entry.ts</code> is imported <strong>once at dev-server startup</strong>. A browser hard-refresh reloads frontend assets but <em>not</em> the cached server-side plugin module. After editing plugin code, <strong>restart</strong> <code>npx emdash dev</code> — otherwise you keep seeing the old behavior.
+		</blockquote>
+
+		<footer>Sources: <code>FormBlockComponent</code> / <code>getInitialValues</code> in <code>@emdash-cms/blocks</code>; Block Kit reference in the <code>creating-plugins</code> skill · EmDash 0.16.1.</footer>
+	</main>
+</div>
+</body>
+</html>

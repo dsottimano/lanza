@@ -1,0 +1,77 @@
+<!doctype html>
+<html lang="en">
+<head>
+	<meta charset="utf-8">
+	<meta name="viewport" content="width=device-width, initial-scale=1">
+	<title>Plugin capabilities &amp; limits</title>
+	<link rel="stylesheet" href="style.css">
+</head>
+<body>
+<div class="layout">
+	<aside class="sidebar">
+		<div class="brand">EmDash Admin Wiki<small>definemg migration · v0.16.1</small></div>
+		<nav>
+			<a href="index.html">Home</a>
+			<a href="admin-menu.html">Admin menu architecture</a>
+			<a href="customizing-admin.html">Customizing the admin</a>
+			<a href="pattern-routing.html">Pattern-driven routing</a>
+			<a href="plugins.html" class="active">Plugin capabilities &amp; limits</a>
+			<a href="block-kit.html">Block Kit &amp; the form-block fix</a>
+			<a href="building-a-wiki.html">Building a wiki in /admin</a>
+		</nav>
+	</aside>
+	<main>
+		<h1>Plugin capabilities &amp; limits</h1>
+		<p class="lede">What an EmDash plugin can do to the admin — and the hard boundaries it can't cross.</p>
+
+		<h2>Two plugin formats</h2>
+		<table>
+			<thead><tr><th>Format</th><th>Admin UI</th><th>Where it runs</th><th>Marketplace?</th></tr></thead>
+			<tbody>
+				<tr><td><strong>Standard</strong> (default)</td><td>Block Kit (JSON blocks)</td><td>Sandboxed isolate on Cloudflare, in-process elsewhere</td><td><span class="yes">Yes</span></td></tr>
+				<tr><td><strong>Native</strong> (escape hatch)</td><td>React <em>or</em> Block Kit</td><td>Always in the host process (trusted)</td><td><span class="no">No</span></td></tr>
+			</tbody>
+		</table>
+		<p>Your site's plugins are declared in <code>astro.config.mjs</code> → trusted mode, so native (React) admin UIs are on the table if you need them.</p>
+
+		<h2>What a plugin CAN do</h2>
+		<ul>
+			<li><strong>Add admin pages.</strong> <code>adminPages: [{ path, label, icon }]</code> — each becomes a sidebar item routed to <code>/plugins/&lt;id&gt;&lt;path&gt;</code>.</li>
+			<li><strong>Add dashboard widgets</strong> via <code>adminWidgets</code> (Block Kit cards).</li>
+			<li><strong>Store data.</strong> Plugin-private document collections (auto-created, indexed queries) + a KV store. No capability needed; scoped to the plugin.</li>
+			<li><strong>React to events.</strong> Hooks like <code>content:afterSave</code>, <code>plugin:install</code>, email hooks, etc.</li>
+			<li><strong>Expose API routes</strong> at <code>/_emdash/api/plugins/&lt;id&gt;/&lt;route&gt;</code>.</li>
+			<li><strong>Read/write real CMS content</strong> — gated by declared capabilities (<code>content:read</code>, <code>content:write</code>, <code>media:*</code>, <code>users:read</code>, <code>network:request</code>, <code>email:send</code>, …).</li>
+			<li><strong>Ship a full React admin page</strong> — native format only.</li>
+		</ul>
+
+		<h2>What a plugin CANNOT do</h2>
+		<blockquote class="bad-callout">
+			A plugin <strong>cannot modify the default menu in any way</strong>. It can only <em>append</em> its own items.
+		</blockquote>
+		<p>Verified in <code>buildNavItems</code> — the core nav is a hardcoded array; plugin pages are pushed onto the end, namespaced so they can't even collide with a core route:</p>
+		<pre><code>for (const [pluginId, config] of Object.entries(manifest.plugins)) {
+  if (config.enabled === false) continue;
+  for (const page of config.adminPages)
+    items.push({
+      id: `plugin-${pluginId}-${page.path}`,
+      title: label,
+      to: `/plugins/${pluginId}${page.path}`,
+      icon: PuzzlePiece,        // ← see gotcha below
+      keywords: ["plugin", pluginId],
+    });
+}</code></pre>
+		<p>So a plugin can't rename, remove, reorder, or replace any default item.</p>
+
+		<blockquote class="warn">
+			<strong>Icon gotcha:</strong> the plugin's declared <code>icon</code> (e.g. the demo's <code>"sparkles"</code>) is <strong>ignored</strong> in the sidebar. Notice <code>icon: PuzzlePiece</code> is hardcoded above — every plugin page shows the puzzle-piece icon in this version.
+		</blockquote>
+
+		<h2>The demo plugin, as a reference</h2>
+		<p>The shipped <code>demo</code> plugin (<code>emdash/packages/plugins/demo/</code>) demonstrates the whole surface: a private <code>notes</code> storage collection, a <code>content:afterSave</code> hook that logs a note on every save, a read of real post counts via <code>content:read</code>, and a Block Kit admin page. It only <em>adds</em> a "Demo" sidebar item — it changes nothing on the public site. If it's not useful, remove <code>demoPlugin()</code> from the <code>plugins</code> array in <code>astro.config.mjs</code>.</p>
+
+		<footer>Sources: <code>PluginDescriptor</code> / <code>PluginAdminPage</code> in <code>emdash</code> types; <code>buildNavItems</code> in <code>@emdash-cms/admin</code> · EmDash 0.16.1.</footer>
+	</main>
+</div>
+</body>
+</html>

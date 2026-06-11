@@ -1,0 +1,91 @@
+/*
+  theme.css -- Editorial Authority
+
+  Minimalist-editorial / newsroom direction: Deep Ink + Classic Paper, a sparing
+  gold accent, serif headlines (Libre Caslon Text) over a sans body (Inter),
+  sharp 0-radius corners, depth via tonal layers + 1px rules (no soft shadows).
+
+  This file is unlayered, so every declaration here beats Base.astro's
+  @layer base defaults -- no specificity tricks needed. Light + dark palettes
+  are both overridden below.
+
+  New fonts (--font-serif, --font-label) are declared in astro.config.mjs and
+  emitted by <Font> tags in Base.astro.
+*/
+
+:root {
+	/* --- Colors: Deep Ink + Classic Paper (light) --- */
+	--color-bg: #ffffff;                 /* paper / floor */
+	--color-bg-subtle: #f8fafc;          /* level 1 subtle inset */
+	--color-text: #0f172a;               /* ink */
+	--color-text-secondary: #334155;     /* strong slate */
+	--color-muted: #64748b;              /* slate metadata */
+	--color-border: #cbd5e1;             /* hairline */
+	--color-border-subtle: #e2e8f0;
+	--color-surface: #f1f5f9;            /* chips / inset surfaces */
+	--color-accent: #b45309;             /* accent gold -- used sparingly */
+	--color-accent-hover: #92400e;
+	--color-on-accent: #ffffff;
+	--color-accent-ring: color-mix(in srgb, var(--color-accent) 25%, transparent);
+
+	/* --- Sharp shapes: mirror the edge of a printed page --- */
+	--radius: 0;
+	--radius-lg: 0;
+
+	/* --- Headline contrast tuned to the editorial scale --- */
+	--tracking-tight: -0.02em;           /* display */
+	--tracking-snug: -0.01em;            /* headlines */
+	--font-size-5xl: 4rem;               /* 64px display-lg */
+
+	/* --- Kill soft elevation; depth comes from tone + 1px rules --- */
+	--shadow-dropdown: 0 0 0 1px var(--color-border);
+	--shadow-btn-active: none;
+}
+
+/* Dark mode: inverted ink/paper. Base.astro sets explicit dark values, so we
+   must override both the system-preference and the .dark class. */
+@media (prefers-color-scheme: dark) {
+	:root:not(.light) {
+		--color-bg: #0f172a;
+		--color-bg-subtle: #131b2e;
+		--color-text: #f3f0f2;
+		--color-text-secondary: #cbd5e1;
+		--color-muted: #94a3b8;
+		--color-border: #334155;
+		--color-border-subtle: #1e293b;
+		--color-surface: #1e293b;
+		--color-accent: #e0a458;
+		--color-accent-hover: #eab676;
+		--color-on-accent: #0f172a;
+	}
+}
+:root.dark {
+	--color-bg: #0f172a;
+	--color-bg-subtle: #131b2e;
+	--color-text: #f3f0f2;
+	--color-text-secondary: #cbd5e1;
+	--color-muted: #94a3b8;
+	--color-border: #334155;
+	--color-border-subtle: #1e293b;
+	--color-surface: #1e293b;
+	--color-accent: #e0a458;
+	--color-accent-hover: #eab676;
+	--color-on-accent: #0f172a;
+}
+
+/* --- Serif headlines (Libre Caslon Text). Only 400/700 are loaded, so map
+   the display weight to h1 and keep the rest at the regular cut to avoid
+   faux-bold synthesis. --- */
+h1, h2, h3, h4, h5, h6 {
+	font-family: var(--font-serif, Georgia, serif);
+	font-weight: 400;
+}
+h1 {
+	font-weight: 700;
+}
+
+/* --- Functional UI / metadata uses the grotesk, uppercase + tracked --- */
+.site-header,
+.site-footer {
+	font-family: var(--font-label, var(--font-sans));
+}

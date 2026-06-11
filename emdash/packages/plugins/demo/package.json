@@ -1,0 +1,13 @@
+{
+	"name": "@local/plugin-demo",
+	"version": "1.0.0",
+	"type": "module",
+	"private": true,
+	"exports": {
+		".": "./src/index.ts",
+		"./sandbox": "./src/sandbox-entry.ts"
+	},
+	"peerDependencies": {
+		"emdash": "^0.16.0"
+	}
+}
