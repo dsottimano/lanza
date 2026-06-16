@@ -9,11 +9,19 @@
   @layer base defaults -- no specificity tricks needed. Light + dark palettes
   are both overridden below.
 
+  IMPORTANT -- scoped to `.site` (set on <html> in Base.astro), NOT bare :root.
+  The EmDash admin (/_emdash) renders WITHOUT the `.site` class, so these brand
+  tokens theme the public site only and never bleed into the admin UI. Defining
+  --color-* on bare :root (or a bare `body {}` rule in any page) leaks into the
+  admin -- under OS dark mode it darkens the admin chrome while its components
+  stay light, making it unreadable. Rule: never write a bare body/html/:root
+  style rule anywhere in this project; always scope to `.site`.
+
   New fonts (--font-serif, --font-label) are declared in astro.config.mjs and
   emitted by <Font> tags in Base.astro.
 */
 
-:root {
+.site {
 	/* --- Colors: Deep Ink + Classic Paper (light) --- */
 	--color-bg: #ffffff;                 /* paper / floor */
 	--color-bg-subtle: #f8fafc;          /* level 1 subtle inset */
@@ -45,7 +53,7 @@
 /* Dark mode: inverted ink/paper. Base.astro sets explicit dark values, so we
    must override both the system-preference and the .dark class. */
 @media (prefers-color-scheme: dark) {
-	:root:not(.light) {
+	.site:not(.light) {
 		--color-bg: #0f172a;
 		--color-bg-subtle: #131b2e;
 		--color-text: #f3f0f2;
@@ -59,7 +67,7 @@
 		--color-on-accent: #0f172a;
 	}
 }
-:root.dark {
+.site.dark {
 	--color-bg: #0f172a;
 	--color-bg-subtle: #131b2e;
 	--color-text: #f3f0f2;
@@ -76,11 +84,11 @@
 /* --- Serif headlines (Libre Caslon Text). Only 400/700 are loaded, so map
    the display weight to h1 and keep the rest at the regular cut to avoid
    faux-bold synthesis. --- */
-h1, h2, h3, h4, h5, h6 {
+.site h1, .site h2, .site h3, .site h4, .site h5, .site h6 {
 	font-family: var(--font-serif, Georgia, serif);
 	font-weight: 400;
 }
-h1 {
+.site h1 {
 	font-weight: 700;
 }
 

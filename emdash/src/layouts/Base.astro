@@ -78,7 +78,7 @@ const isLoggedIn = !!Astro.locals.user;
 ---
 
 <!doctype html>
-<html lang="en">
+<html lang="en" class="site">
 	<head>
 		<meta charset="UTF-8" />
 		<meta name="viewport" content="width=device-width, initial-scale=1.0" />
@@ -494,9 +494,11 @@ const isLoggedIn = !!Astro.locals.user;
 					--shadow-btn-active: 0 1px 2px rgba(0, 0, 0, 0.05);
 				}
 
-				/* Dark mode via system preference (when no explicit class) */
+				/* Dark-mode tokens scoped to `.site` so they never leak into the
+				   EmDash admin (no `.site` class). The admin keeps the bare :root
+				   light defaults above and drives its own dark mode. */
 				@media (prefers-color-scheme: dark) {
-					:root:not(.light) {
+					.site:not(.light) {
 						--color-bg: #0d0d0d;
 						--color-bg-subtle: #141414;
 						--color-text: #ededed;
@@ -511,7 +513,7 @@ const isLoggedIn = !!Astro.locals.user;
 				}
 
 				/* Explicit dark mode */
-				:root.dark {
+				.site.dark {
 					--color-bg: #0d0d0d;
 					--color-bg-subtle: #141414;
 					--color-text: #ededed;
