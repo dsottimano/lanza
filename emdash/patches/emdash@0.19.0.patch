@@ -1,0 +1,12 @@
+diff --git a/dist/astro/middleware.mjs b/dist/astro/middleware.mjs
+index 055b57d6c46acbff9303768c83c5b81ea4e68ff8..e847a4b29c8fa5f7ace1dd5b80a08c5c7f902f62 100644
+--- a/dist/astro/middleware.mjs
++++ b/dist/astro/middleware.mjs
+@@ -2638,6 +2638,7 @@ const onRequest = defineMiddleware(async (context, next) => {
+ 				locals.emdash = {
+ 					handleContentList: runtime.handleContentList.bind(runtime),
+ 					handleContentGet: runtime.handleContentGet.bind(runtime),
++					handleContentAuthors: runtime.handleContentAuthors.bind(runtime),
+ 					handleContentCreate: runtime.handleContentCreate.bind(runtime),
+ 					handleContentUpdate: runtime.handleContentUpdate.bind(runtime),
+ 					handleContentDelete: runtime.handleContentDelete.bind(runtime),

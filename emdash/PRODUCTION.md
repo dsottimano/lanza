@@ -129,11 +129,11 @@ EmDash core **hardcodes** content image URLs as `/_emdash/api/media/file/<storag
    `media.example.com` (Cloudflare adds the DNS automatically). Images are then served
    directly by the CDN from R2 — edge-cached, no Worker, no Access.
 2. Rewrite the hardcoded URLs to that domain at the project level (survives EmDash
-   upgrades — no core patch). See `src/middleware.media-example.ts` in this starter for
-   a ready-to-use `HTMLRewriter` middleware: set `MEDIA_PUBLIC_BASE` (wrangler var) and
-   it swaps `/_emdash/api/media/file/<key>` → `https://media.example.com/<key>` in
-   `<img>`/`<source>`/`og:image`/icon. It's a streaming rewrite (no buffering), runs
-   only on cache-miss renders, and no-ops when `MEDIA_PUBLIC_BASE` is unset.
+   upgrades — no core patch). **Already wired** in `src/middleware.ts`: set
+   `MEDIA_PUBLIC_BASE` (wrangler var, e.g. `https://media.example.com`) and it swaps
+   `/_emdash/api/media/file/<key>` → `https://media.example.com/<key>` in
+   `<img>`/`<source>`/`og:image`/icon. It's a streaming `HTMLRewriter` (no buffering),
+   runs only on cache-miss renders, and no-ops when `MEDIA_PUBLIC_BASE` is unset.
 
 Verify: `curl -I https://media.example.com/<key>` → 200, and a 2nd hit →
 `cf-cache-status: HIT`.

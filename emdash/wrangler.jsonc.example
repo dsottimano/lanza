@@ -1,0 +1,41 @@
+// Copy to `wrangler.jsonc` and fill in the placeholders, then `npm run deploy`.
+// Create the D1 database and R2 bucket first:
+//   wrangler d1 create my-emdash-site
+//   wrangler r2 bucket create my-emdash-site-media
+// then paste the returned database_id below. See PRODUCTION.md.
+{
+	"name": "my-emdash-site",
+	"compatibility_date": "2026-05-01",
+	"compatibility_flags": ["nodejs_compat"],
+	"assets": { "directory": "./dist" },
+	// Kills the unprotected *.workers.dev admin backdoor — admin is reachable
+	// only via your custom domain (behind Cloudflare Access).
+	"workers_dev": false,
+	"vars": {
+		// Zone id of your domain (Cloudflare dashboard > your domain > Overview).
+		// Used for cache purge-by-tag on publish.
+		"CF_ZONE_ID": "<your-zone-id>",
+		// Public R2 custom domain for media. src/middleware.ts rewrites the
+		// hardcoded /_emdash/api/media/file/<key> image URLs to this base so
+		// images are CDN-cached and NOT Cloudflare-Access-gated. Connect it under
+		// R2 bucket > Settings > Public access > Custom Domains.
+		"MEDIA_PUBLIC_BASE": "https://media.example.com"
+	},
+	"routes": [
+		{ "pattern": "example.com", "custom_domain": true },
+		{ "pattern": "www.example.com", "custom_domain": true }
+	],
+	"d1_databases": [
+		{
+			"binding": "DB",
+			"database_name": "my-emdash-site",
+			"database_id": "<your-d1-database-id>"
+		}
+	],
+	"r2_buckets": [
+		{
+			"binding": "MEDIA",
+			"bucket_name": "my-emdash-site-media"
+		}
+	]
+}

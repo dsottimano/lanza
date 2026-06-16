@@ -1,4 +1,4 @@
-import { defineMiddleware } from "astro:middleware";
+import { defineMiddleware, sequence } from "astro:middleware";
 
 /**
  * Coalesce inline visual-editor autosaves into a single draft revision and
@@ -14,51 +14,148 @@ import { defineMiddleware } from "astro:middleware";
  * Fix (no core changes): default the absent flag to `true` so inline saves
  * update the existing draft revision in place, and backfill `authorId` from
  * the session. Because we only fill when the key is ABSENT, the admin
- * editor's explicit choice is never overridden.
- *
- * Verified empirically: 3 inline-style PUTs produce 1 coalesced revision
- * (vs. 3 without this) and the revision carries the session user's id.
- *
- * Remove once upstream fixes are released:
- *   - inline toolbar should send `skipRevision` like the admin editor
- *   - revision author should derive from the session server-side
+ * editor's explicit choice is never overridden, and it self-disables if a
+ * future emdash release starts sending the flag itself.
  */
 const CONTENT_ITEM_PUT = /^\/_emdash\/api\/content\/[^/]+\/[^/]+$/;
 
-export const onRequest = defineMiddleware(async (context, next) => {
-  const { request, locals } = context;
+const autosaveCoalesce = defineMiddleware(async (context, next) => {
+	const { request, locals } = context;
 
-  if (
-    request.method === "PUT" &&
-    CONTENT_ITEM_PUT.test(new URL(request.url).pathname)
-  ) {
-    try {
-      const body = await request.clone().json();
+	if (
+		request.method === "PUT" &&
+		CONTENT_ITEM_PUT.test(new URL(request.url).pathname)
+	) {
+		try {
+			const body = await request.clone().json();
 
-      if (body && typeof body === "object") {
-        let changed = false;
-        if (body.skipRevision === undefined) {
-          body.skipRevision = true;
-          changed = true;
-        }
-        const userId = (locals as { user?: { id?: string } }).user?.id;
-        if (body.authorId === undefined && userId) {
-          body.authorId = userId;
-          changed = true;
-        }
+			if (body && typeof body === "object") {
+				let changed = false;
+				if (body.skipRevision === undefined) {
+					body.skipRevision = true;
+					changed = true;
+				}
+				const userId = (locals as { user?: { id?: string } }).user?.id;
+				if (body.authorId === undefined && userId) {
+					body.authorId = userId;
+					changed = true;
+				}
 
-        if (changed) {
-          context.request = new Request(request.url, {
-            method: request.method,
-            headers: request.headers,
-            body: JSON.stringify(body),
-          });
-        }
-      }
-    } catch {
-      // Non-JSON or unreadable body: leave the request untouched.
-    }
-  }
+				if (changed) {
+					context.request = new Request(request.url, {
+						method: request.method,
+						headers: request.headers,
+						body: JSON.stringify(body),
+					});
+				}
+			}
+		} catch {
+			// Non-JSON or unreadable body: leave the request untouched.
+		}
+	}
 
-  return next();
+	return next();
 });
+
+/**
+ * Public media URL rewrite (Cloudflare + R2).
+ *
+ * EmDash core hardcodes content image URLs as `/_emdash/api/media/file/<key>`,
+ * which lives under `/_emdash` (Cloudflare-Access-gated) and costs a Worker+R2
+ * read per request. We stream the rendered HTML through HTMLRewriter and swap
+ * those URLs to a public R2 custom domain (MEDIA_PUBLIC_BASE, e.g.
+ * https://media.example.com) so images are CDN-cached and not Access-gated.
+ *
+ * Project-level (not a core patch) so it survives EmDash upgrades. No-ops when
+ * MEDIA_PUBLIC_BASE is unset or HTMLRewriter is unavailable (Node dev). See
+ * PRODUCTION.md §4.
+ */
+interface RewriterElement {
+	getAttribute(name: string): string | null;
+	setAttribute(name: string, value: string): void;
+}
+interface ElementHandler {
+	element(el: RewriterElement): void;
+}
+interface HTMLRewriterInstance {
+	on(selector: string, handler: ElementHandler): HTMLRewriterInstance;
+	transform(response: Response): Response;
+}
+declare const HTMLRewriter: { new (): HTMLRewriterInstance };
+
+const MARKER = "/_emdash/api/media/file/";
+
+const mediaRewrite = defineMiddleware(async (context, next) => {
+	const response = await next();
+
+	const base = (
+		context.locals as { runtime?: { env?: Record<string, string> } }
+	).runtime?.env?.MEDIA_PUBLIC_BASE;
+	if (!base) return response;
+
+	if (context.url.pathname.startsWith("/_emdash")) return response;
+	if (!(response.headers.get("content-type") || "").includes("text/html")) {
+		return response;
+	}
+	if (typeof HTMLRewriter === "undefined") return response;
+
+	const publicBase = base.replace(/\/+$/, "");
+
+	const swap = (value: string | null): string | null => {
+		if (!value) return null;
+		const i = value.indexOf(MARKER);
+		if (i === -1) return null;
+		return `${publicBase}/${value.slice(i + MARKER.length)}`;
+	};
+
+	const swapSrcset = (value: string | null): string | null => {
+		if (!value || !value.includes(MARKER)) return null;
+		return value
+			.split(",")
+			.map((part) => {
+				const seg = part.trim();
+				const sp = seg.indexOf(" ");
+				const url = sp === -1 ? seg : seg.slice(0, sp);
+				const desc = sp === -1 ? "" : seg.slice(sp);
+				const next = swap(url);
+				return next ? `${next}${desc}` : seg;
+			})
+			.join(", ");
+	};
+
+	const rewriteAttr = (
+		el: RewriterElement,
+		attr: string,
+		fn: (v: string | null) => string | null,
+	) => {
+		const next = fn(el.getAttribute(attr));
+		if (next) el.setAttribute(attr, next);
+	};
+
+	return new HTMLRewriter()
+		.on("img", {
+			element(el) {
+				rewriteAttr(el, "src", swap);
+				rewriteAttr(el, "srcset", swapSrcset);
+			},
+		})
+		.on("source", {
+			element(el) {
+				rewriteAttr(el, "src", swap);
+				rewriteAttr(el, "srcset", swapSrcset);
+			},
+		})
+		.on("meta", {
+			element(el) {
+				rewriteAttr(el, "content", swap);
+			},
+		})
+		.on("link", {
+			element(el) {
+				rewriteAttr(el, "href", swap);
+			},
+		})
+		.transform(response);
+});
+
+export const onRequest = sequence(autosaveCoalesce, mediaRewrite);
