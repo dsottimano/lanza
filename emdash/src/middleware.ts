@@ -1,4 +1,41 @@
 import { defineMiddleware, sequence } from "astro:middleware";
+import { handleContentAuthors } from "emdash";
+
+/**
+ * Re-provide the `handleContentAuthors` runtime handler (hook, not a core patch).
+ *
+ * Why: EmDash 0.19's auth middleware builds `locals.emdash` with ~50 bound
+ * runtime handlers but forgets to bind `handleContentAuthors`. The admin
+ * author-filter dropdown GETs `/_emdash/api/content/:collection/authors`, whose
+ * route does `if (!emdash?.handleContentAuthors) return 500 "EmDash is not
+ * initialized"` — so the dropdown 500s. (Confirmed against 0.19's
+ * `dist/astro/middleware.mjs`; the handler IS a public `emdash` export and the
+ * runtime method is just `handleContentAuthors(this.db, collection)`.)
+ *
+ * Fix (Rule 5 — no core edit, replaces the old `patches/emdash@0.19.0.patch`):
+ * EmDash injects its middleware with `order: "pre"`, so it has already populated
+ * `locals.emdash` (including `.db`, the same Kysely instance the runtime method
+ * uses) by the time this runs. We graft the missing handler on, reconstructing
+ * it exactly. Idempotent and self-disabling: only fills when ABSENT, so a future
+ * EmDash release that binds it itself silently takes over.
+ */
+const restoreContentAuthors = defineMiddleware(async (context, next) => {
+	const emdash = (
+		context.locals as {
+			emdash?: {
+				db?: unknown;
+				handleContentAuthors?: (collection: string) => unknown;
+			};
+		}
+	).emdash;
+
+	if (emdash?.db && emdash.handleContentAuthors === undefined) {
+		emdash.handleContentAuthors = (collection: string) =>
+			handleContentAuthors(emdash.db as never, collection);
+	}
+
+	return next();
+});
 
 /**
  * Coalesce inline visual-editor autosaves into a single draft revision and
@@ -158,4 +195,8 @@ const mediaRewrite = defineMiddleware(async (context, next) => {
 		.transform(response);
 });
 
-export const onRequest = sequence(autosaveCoalesce, mediaRewrite);
+export const onRequest = sequence(
+	restoreContentAuthors,
+	autosaveCoalesce,
+	mediaRewrite,
+);

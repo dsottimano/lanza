@@ -3,7 +3,7 @@ import { getEmDashCollection, getSiteSettings } from "emdash";
 
 import { resolveBlogSiteIdentity } from "../utils/site-identity";
 
-export const GET: APIRoute = async ({ site, url }) => {
+export const GET: APIRoute = async ({ site, url, cache }) => {
 	const siteUrl = site?.toString() || url.origin;
 	const { siteTitle, siteTagline } = resolveBlogSiteIdentity(await getSiteSettings());
 
@@ -11,6 +11,12 @@ export const GET: APIRoute = async ({ site, url }) => {
 		orderBy: { published_at: "desc" },
 		limit: 20,
 	});
+
+	// Rule 4: this feed reads D1, so it must bust on publish. The `/rss.xml`
+	// routeRule supplies maxAge/swr; this tag is what purge-by-tag invalidates
+	// when a post is published. getEmDashCollection returns no cacheHint here, so
+	// set the tag manually, matching EmDash's `collection:<name>` convention.
+	if (cache?.enabled) cache.set({ tags: ["collection:posts"] });
 
 	const items = posts
 		.map((post) => {
@@ -45,10 +51,12 @@ ${items}
   </channel>
 </rss>`;
 
+	// No manual Cache-Control: the `/rss.xml` routeRule + cache provider own the
+	// cache headers (same as every other cached route). Hand-setting it here
+	// would duplicate/diverge from the route rule.
 	return new Response(rss, {
 		headers: {
 			"Content-Type": "application/rss+xml; charset=utf-8",
-			"Cache-Control": "public, max-age=3600",
 		},
 	});
 };

@@ -12,13 +12,17 @@
 		<div class="brand">EmDash Admin Wiki<small>definemg migration · v0.16.1</small></div>
 		<nav>
 			<a href="index.html" class="active">Home</a>
+			<a href="rules.html">Starter rules &amp; audit</a>
 			<a href="admin-menu.html">Admin menu architecture</a>
 			<a href="customizing-admin.html">Customizing the admin</a>
+			<a href="page-width.html">Per-entry page width</a>
 			<a href="pattern-routing.html">Pattern-driven routing</a>
 			<a href="revisions-autosave.html">Revisions, autosave &amp; discarding drafts</a>
 			<a href="plugins.html">Plugin capabilities &amp; limits</a>
 			<a href="block-kit.html">Block Kit &amp; the form-block fix</a>
 			<a href="building-a-wiki.html">Building a wiki in /admin</a>
+			<a href="cloudflare-dev.html">Cloudflare dev &amp; the reload loop</a>
+			<a href="cloudflare-auth-email.html">Admin auth &amp; email on Cloudflare</a>
 		</nav>
 	</aside>
 	<main>
@@ -32,12 +36,20 @@
 		<h2>Start here</h2>
 		<div class="cards">
 			<div class="card">
+				<h3><a href="rules.html">Starter rules &amp; live audit</a></h3>
+				<p>The five rules this starter enforces — never fork core, limit D1/R2, standard Workers only, cache always, fix via hooks — plus a live audit of where the codebase keeps or breaks them.</p>
+			</div>
+			<div class="card">
 				<h3><a href="admin-menu.html">Admin menu architecture</a></h3>
 				<p>How the sidebar is actually built: a hardcoded core, your collections injected in the middle, plugin pages appended last.</p>
 			</div>
 			<div class="card">
 				<h3><a href="customizing-admin.html">Customizing the admin</a></h3>
 				<p>Make the admin feel like a real-estate CMS or a pizza backend — by modeling collections and fields. What's free vs. what needs a fork.</p>
+			</div>
+			<div class="card">
+				<h3><a href="page-width.html">Per-entry page width</a></h3>
+				<p>Give every entry an admin-editable page width / margin — full, wide, default, narrow, or a custom side-padding %. Two fields + a shared renderer helper, no core edits, zero extra D1/R2 reads.</p>
 			</div>
 			<div class="card">
 				<h3><a href="pattern-routing.html">Pattern-driven routing</a></h3>
@@ -58,6 +70,14 @@
 			<div class="card">
 				<h3><a href="building-a-wiki.html">Building a wiki in /admin</a></h3>
 				<p>Three ways to put a wiki inside EmDash, ranked by effort vs. authoring richness.</p>
+			</div>
+			<div class="card">
+				<h3><a href="cloudflare-dev.html">Cloudflare dev &amp; the reload loop</a></h3>
+				<p>Why <code>pnpm dev</code> melts into endless reloads after switching to the Cloudflare adapter — miniflare state churn — and the one-line watch-ignore that fixes it.</p>
+			</div>
+			<div class="card">
+				<h3><a href="cloudflare-auth-email.html">Admin auth &amp; email on Cloudflare</a></h3>
+				<p>Securing the admin with Cloudflare Access — and wiring back the two things Access disables: sending email (a Resend provider plugin) and the Invite button.</p>
 			</div>
 		</div>
 

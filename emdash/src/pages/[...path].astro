@@ -14,6 +14,7 @@
 import { resolveEmDashPath, getEmDashEntry } from "emdash";
 import { PortableText } from "emdash/ui";
 import Base from "../layouts/Base.astro";
+import { resolveLayout } from "../utils/layout-width";
 
 const path = `/${Astro.params.path ?? ""}`;
 
@@ -40,10 +41,13 @@ if (Astro.cache?.enabled) Astro.cache.set(cacheHint);
 
 const title = typeof entry.data.title === "string" ? entry.data.title : slug;
 const entryId = String(entry.data.id);
+
+// Per-entry width / margin (admin-configurable; see utils/layout-width.ts).
+const layout = resolveLayout(entry.data as Record<string, unknown>);
 ---
 
 <Base title={title} content={{ collection, id: entryId, slug }}>
-	<article class="page-article">
+	<article class="page-article" {...layout}>
 		<header class="page-header">
 			<h1 class="page-title" {...entry.edit.title}>{title}</h1>
 		</header>
@@ -60,9 +64,21 @@ const entryId = String(entry.data.id);
 
 <style>
 	.page-article {
-		max-width: var(--max-width);
+		max-width: var(--page-max-width, var(--content-width));
 		margin: 0 auto;
-		padding: var(--spacing-16) var(--spacing-6) var(--spacing-16);
+		padding: var(--spacing-16) var(--page-pad-x, var(--spacing-6))
+			var(--spacing-16);
+	}
+
+	/* Per-entry width presets (the `data-width` attr from resolveLayout). */
+	.page-article[data-width="wide"] {
+		--page-max-width: var(--wide-width);
+	}
+	.page-article[data-width="narrow"] {
+		--page-max-width: 36rem;
+	}
+	.page-article[data-width="full"] {
+		--page-max-width: none;
 	}
 
 	.page-header {

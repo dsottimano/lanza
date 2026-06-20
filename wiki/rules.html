@@ -1,0 +1,79 @@
+<!doctype html>
+<html lang="en">
+<head>
+	<meta charset="utf-8">
+	<meta name="viewport" content="width=device-width, initial-scale=1">
+	<title>Starter rules &amp; live audit</title>
+	<link rel="stylesheet" href="style.css">
+</head>
+<body>
+<div class="layout">
+	<aside class="sidebar">
+		<div class="brand">EmDash Admin Wiki<small>definemg migration · v0.16.1</small></div>
+		<nav>
+			<a href="index.html">Home</a>
+			<a href="rules.html" class="active">Starter rules &amp; audit</a>
+			<a href="admin-menu.html">Admin menu architecture</a>
+			<a href="customizing-admin.html">Customizing the admin</a>
+			<a href="page-width.html">Per-entry page width</a>
+			<a href="pattern-routing.html">Pattern-driven routing</a>
+			<a href="revisions-autosave.html">Revisions, autosave &amp; discarding drafts</a>
+			<a href="plugins.html">Plugin capabilities &amp; limits</a>
+			<a href="block-kit.html">Block Kit &amp; the form-block fix</a>
+			<a href="building-a-wiki.html">Building a wiki in /admin</a>
+			<a href="cloudflare-dev.html">Cloudflare dev &amp; the reload loop</a>
+			<a href="cloudflare-auth-email.html">Admin auth &amp; email on Cloudflare</a>
+		</nav>
+	</aside>
+	<main>
+		<h1>Starter rules &amp; live audit</h1>
+		<p class="lede">This starter exists to <strong>correct EmDash</strong> and keep a Cloudflare deployment cheap and upgrade-proof. Five rules enforce that. They are also encoded in the repo's <code>CLAUDE.md</code> so any agent working here obeys them. Below: each rule, how it is enforced today, and the audit that brought the codebase into line.</p>
+
+		<blockquote class="note">
+			<strong>The one idea:</strong> never fork EmDash. Every correction is a <strong>project-level hook</strong> — middleware, an injected route, config, or a local plugin — so <code>pnpm update emdash</code> never clobbers your fixes.
+		</blockquote>
+
+		<h2>The five rules</h2>
+		<ol>
+			<li><strong>Never touch EmDash core.</strong> No edits to <code>node_modules/emdash</code>, <code>@emdash-cms/*</code>, or <code>pnpm patch</code>es of their <code>dist/</code>. Work around core bugs with hooks (Rule 5).</li>
+			<li><strong>Optimize aggressively to limit D1 &amp; R2 queries.</strong> Cache first, serve media straight from R2's public domain, use D1 read replicas (<code>session: "auto"</code>), coalesce writes.</li>
+			<li><strong>Only standard Workers — never Dynamic Workers, no third-party plugins.</strong> Plugins run in-process (<code>plugins:</code>, not <code>sandboxed:</code>). First-party (<code>@emdash-cms/*</code>) and local (<code>@local/*</code>) only.</li>
+			<li><strong>Leverage Cloudflare caching at all times.</strong> Every public route gets a <code>routeRules</code> entry <em>and</em> an <code>Astro.cache.set(cacheHint)</code> call so publishing purges by tag.</li>
+			<li><strong>Use hooks to modify EmDash.</strong> Astro middleware (<code>onRequest</code>) and integration hooks (<code>astro:config:setup</code> → <code>injectRoute</code>) are the sanctioned mechanism — they are how Rule 1 stays true.</li>
+		</ol>
+
+		<h2>How each rule is enforced today</h2>
+		<table>
+			<thead><tr><th>Rule</th><th>Where it lives</th><th>Status</th></tr></thead>
+			<tbody>
+				<tr><td>1 — no core edits</td><td>All fixes are in <code>src/middleware.ts</code>, <code>astro.config.mjs</code>, <code>src/server/emdash-invite.ts</code>. Nothing edits <code>node_modules</code>.</td><td>✅ (breach remediated — see below)</td></tr>
+				<tr><td>2 — fewer D1/R2 hits</td><td>Edge cache (Rule 4); <code>d1({ session: "auto" })</code> read replicas; media served from R2 public domain not a Worker; autosave middleware collapses dozens of revision INSERTs into one.</td><td>✅</td></tr>
+				<tr><td>3 — standard Workers only</td><td>Plugins (<code>auditLog</code>, <code>demoPlugin</code>, <code>emailResendPlugin</code>) are all in the <code>plugins:</code> array — in-process, no <code>sandboxed:</code> list, so no Dynamic Workers. All first-party or <code>@local/*</code>.</td><td>✅ (1 note)</td></tr>
+				<tr><td>4 — cache always</td><td><code>cloudflareCache()</code> provider + a <code>routeRules</code> entry per public route; <code>cache.set</code> with a purge tag in every content page <em>and</em> the RSS feed. No <code>/[...path]</code> catch-all rule. <code>/search</code> + 404 left uncached.</td><td>✅</td></tr>
+				<tr><td>5 — hooks, not forks</td><td><code>autosaveCoalesce</code> + <code>mediaRewrite</code> middleware; <code>inviteOverride</code> injected route via <code>astro:config:setup</code>.</td><td>✅</td></tr>
+			</tbody>
+		</table>
+
+		<h2>Audit findings</h2>
+
+		<h3>✅ Rule 1 — fixed: the core patch is gone</h3>
+		<p>The repo used to carry a <code>pnpm patch</code> that edited <code>dist/astro/middleware.mjs</code> inside the <code>emdash</code> package to add one missing binding — <code>handleContentAuthors</code>, which EmDash 0.19 forgot to wire, 500-ing the admin author-filter dropdown. That was a direct modification of core and broke Rule 1. <strong>It has been replaced by a hook</strong> (Rule 5): <code>src/middleware.ts</code> now runs a <code>restoreContentAuthors</code> middleware that grafts the handler back onto <code>locals.emdash</code>. It works because EmDash injects its middleware with <code>order: "pre"</code>, so <code>locals.emdash</code> (including <code>.db</code>) is already populated when ours runs; the handler is just the public <code>handleContentAuthors(db, collection)</code> export, exactly as the runtime method calls it. It fills the slot only when ABSENT, so a future EmDash that binds it itself silently takes over. The <code>patches/</code> dir and the <code>patchedDependencies</code> entry in <code>pnpm-workspace.yaml</code> are removed.</p>
+
+		<h3>✅ Rule 4 — fixed: <code>rss.xml.ts</code> now busts on publish</h3>
+		<p><code>src/pages/rss.xml.ts</code> queries D1 and was edge-cached via its <code>routeRules</code> entry but carried no <code>Cache-Tag</code>, so publishing a post never purged it (stale ≤1h). It now calls <code>cache.set({ tags: ["collection:posts"] })</code> (the <code>cache</code> object on the endpoint's <code>APIContext</code>, the endpoint-side equivalent of <code>Astro.cache</code>) so publish-purge invalidates it. The redundant hand-set <code>Cache-Control</code> header was dropped — the route rule + provider own cache headers.</p>
+
+		<h3>✅ Rule 3 — fixed: the demo plugin is removed</h3>
+		<p><code>packages/plugins/demo</code> shipped a <code>sandbox-entry.ts</code> (<code>SandboxedPlugin</code>). Registered in the <code>plugins:</code> array it ran in-process (no Dynamic Worker), so it wasn't an active breach — but it was demo cruft carrying a sandbox adapter that had no place in a hardened starter and could tempt a future move to <code>sandboxed:</code>. It has been deleted: the package, its <code>@local/plugin-demo</code> dependency, its <code>astro.config.mjs</code> import, and its entry in the <code>plugins</code> array are all gone. The production build now ships only first-party plugins plus the local <code>email-resend</code> provider (<code>format: "native"</code>, in-process — the model for any new plugin).</p>
+
+		<h2>Working in this repo</h2>
+		<p>Before committing, run the checklist from <code>CLAUDE.md</code>:</p>
+		<pre><code>- Touched node_modules / @emdash-cms / patches/?   → stop, use a hook
+- New public page?   → routeRules entry + Astro.cache.set(cacheHint)
+- New plugin?        → local or @emdash-cms only, in-process, never sandboxed
+- New content query? → can it be cached or avoided?</code></pre>
+
+		<footer>Audited against the working tree on 2026-06-19 — EmDash 0.19, Cloudflare Workers + D1 + R2 + Access.</footer>
+	</main>
+</div>
+</body>
+</html>

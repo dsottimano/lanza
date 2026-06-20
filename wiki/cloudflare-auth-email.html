@@ -1,0 +1,132 @@
+<!doctype html>
+<html lang="en">
+<head>
+	<meta charset="utf-8">
+	<meta name="viewport" content="width=device-width, initial-scale=1">
+	<title>Admin auth &amp; email on Cloudflare (Access, invites, Resend)</title>
+	<link rel="stylesheet" href="style.css">
+</head>
+<body>
+<div class="layout">
+	<aside class="sidebar">
+		<div class="brand">EmDash Admin Wiki<small>starter · v0.19.0</small></div>
+		<nav>
+			<a href="index.html">Home</a>
+			<a href="rules.html">Starter rules &amp; audit</a>
+			<a href="admin-menu.html">Admin menu architecture</a>
+			<a href="customizing-admin.html">Customizing the admin</a>
+			<a href="page-width.html">Per-entry page width</a>
+			<a href="pattern-routing.html">Pattern-driven routing</a>
+			<a href="revisions-autosave.html">Revisions, autosave &amp; discarding drafts</a>
+			<a href="plugins.html">Plugin capabilities &amp; limits</a>
+			<a href="block-kit.html">Block Kit &amp; the form-block fix</a>
+			<a href="building-a-wiki.html">Building a wiki in /admin</a>
+			<a href="cloudflare-dev.html">Cloudflare dev &amp; the reload loop</a>
+			<a href="cloudflare-auth-email.html" class="active">Admin auth &amp; email on Cloudflare</a>
+		</nav>
+	</aside>
+	<main>
+		<h1>Admin auth &amp; email on Cloudflare (Access, invites, Resend)</h1>
+		<p class="lede">Securing the EmDash admin with <strong>Cloudflare Access</strong> is the clean way to deploy on Workers — one sign-on, no passwords in the CMS. But Access is <strong>all-or-nothing</strong>: turning it on makes EmDash drop its <em>entire</em> built-in auth surface. Two things you took for granted then stop working and must be wired back: <strong>sending email</strong> and <strong>inviting users</strong>.</p>
+
+		<blockquote class="note">
+			<strong>The one idea:</strong> setting <code>auth: access({…})</code> flips EmDash into <em>external auth</em> mode. In that mode it does <strong>not inject its built-in auth routes</strong> — passkey, invite, magic-link, recovery all vanish — because identity now comes from the Access JWT. You get seamless SSO; you lose the invite/passkey UI. Plan for it.
+		</blockquote>
+
+		<h2>1. Access cannot gate <code>*.workers.dev</code></h2>
+		<p>Access applications only protect hostnames that belong to a <strong>zone on your account</strong>. A <code>*.workers.dev</code> URL is Cloudflare's shared domain, so Access never sits in front of it — the request reaches the Worker with no JWT and admin hard-fails (a bare <code>401</code> from EmDash, no Access challenge).</p>
+		<p>Fix: give the Worker a <strong>custom domain</strong> (a real zone you control) and point the Access app at <em>that</em> hostname.</p>
+		<pre><code>// wrangler.jsonc — route the Worker to a custom domain
+"routes": [{ "pattern": "cms.example.com", "custom_domain": true }],
+// keep workers.dev alive for staging if you like (admin there just 401s — safe):
+"workers_dev": true</code></pre>
+		<p>Then create the Access application on <code>cms.example.com</code>, copy its <strong>AUD</strong> tag and team domain, and wire them at build time:</p>
+		<pre><code>auth = access({
+  teamDomain: process.env.CF_ACCESS_TEAM_DOMAIN, // &lt;team&gt;.cloudflareaccess.com
+  audience:   process.env.CF_ACCESS_AUD,         // Application Audience (AUD) tag
+  autoProvision: true,                           // create a user row on first login
+});</code></pre>
+		<blockquote class="note">
+			<strong>How login works now:</strong> Access validates the visitor, then EmDash matches/creates a <code>users</code> row <strong>by email</strong> and mints the session. New users land at the <code>defaultRole</code> (Editor/Author). The built-in EmDash sign-in screen is gone in prod. In <code>dev</code> external auth is bypassed — you fall back to the dev login.
+		</blockquote>
+
+		<h2>2. Email: register an exclusive provider plugin</h2>
+		<p>EmDash routes every outbound message (invites, magic-link, recovery) through one <strong>exclusive <code>email:deliver</code> provider</strong>. With no provider, those features fail silently — only a dev-console logger ships built in. A provider is just a <strong>trusted in-process plugin</strong> (listed under <code>plugins:</code>, not <code>sandboxed:</code>), so it runs in the host Worker with <strong>no sandbox and no paid Dynamic Workers</strong>.</p>
+		<blockquote class="note">
+			<strong>Why Resend, not Cloudflare Email Sending:</strong> CF Email Sending requires the Workers <strong>Paid</strong> plan. Resend has a free tier and is a plain HTTP API. The starter ships <code>@local/plugin-email-resend</code>; swapping providers is a one-file change in its <code>runtime.ts</code>.
+		</blockquote>
+		<p>The provider runtime hides five non-obvious traps. Get any wrong and the Worker 500s or email quietly never sends:</p>
+		<ol>
+			<li><strong>Never import a <em>value</em> from <code>"emdash"</code> in the plugin runtime.</strong> EmDash calls your <code>createPlugin()</code> at module-eval time while it is still initializing; a value import (even <code>definePlugin</code>) creates a circular dependency → a <code>Cannot access 'X' before initialization</code> TDZ that 500s the whole Worker. Return the resolved-plugin object <strong>literally</strong> instead. (Types are fine — they erase.)</li>
+			<li><strong>Capability must be <code>hooks.email-transport:register</code></strong> (the canonical gate for <code>email:deliver</code>). Without it, EmDash silently skips the hook.</li>
+			<li><strong>The hook must be <code>exclusive: true</code></strong> — EmDash auto-selects the sole exclusive provider; otherwise <code>email.isAvailable()</code> stays <code>false</code>.</li>
+			<li><strong>Read env inside the handler.</strong> <code>import { env } from "cloudflare:workers"</code> forbids property access at module/global scope — touch <code>env.RESEND_API_KEY</code> only inside <code>deliver()</code>.</li>
+			<li><strong>Use <code>format: "native"</code></strong> in the descriptor, not <code>"standard"</code> (standard runs the TDZ-prone <code>adaptSandboxEntry</code>).</li>
+		</ol>
+		<pre><code>// packages/plugins/email-resend/src/runtime.ts — the shape that survives
+import { env } from "cloudflare:workers";
+import type { EmailDeliverEvent, PluginContext } from "emdash"; // type-only!
+
+async function deliver(event, ctx) {
+  const e = env as Record&lt;string, unknown&gt;;          // read INSIDE the handler
+  const apiKey = e.RESEND_API_KEY, from = e.EMAIL_FROM;
+  const res = await fetch("https://api.resend.com/emails", {
+    method: "POST",
+    headers: { Authorization: `Bearer ${apiKey}`, "Content-Type": "application/json" },
+    body: JSON.stringify({ from, to: event.message.to, subject: event.message.subject,
+                           text: event.message.text, html: event.message.html ?? event.message.text }),
+  });
+  if (!res.ok) throw new Error(`Resend ${res.status}: ${await res.text()}`);
+}
+
+export function createPlugin() {
+  return {                                            // LITERAL object — no definePlugin()
+    id: "email-resend", version: "1.0.0",
+    capabilities: ["hooks.email-transport:register"], // the gate
+    allowedHosts: [], storage: {}, routes: {}, admin: {},
+    hooks: { "email:deliver": { priority: 100, timeout: 5000, dependencies: [],
+      errorPolicy: "abort", exclusive: true, handler: deliver, pluginId: "email-resend" } },
+  };
+}</code></pre>
+		<p>Then it's gated to Cloudflare in <code>astro.config.mjs</code> (the runtime needs the <code>cloudflare:workers</code> env), and configured with a secret + a var:</p>
+		<pre><code>const plugins = [auditLog];
+if (isCf) plugins.push(emailResendPlugin());
+
+# wrangler secret put RESEND_API_KEY        # your Resend key
+# EMAIL_FROM = "My Site &lt;noreply@mail.example.com&gt;"   (a Worker var)
+# + verify that sending domain in Resend (adds DKIM/SPF/MX DNS records)</code></pre>
+
+		<h2>3. Bring back the Invite button</h2>
+		<p>Because external auth drops the built-in auth routes, the admin's <strong>Invite User</strong> button POSTs to a route that no longer exists — it 404s and the modal hangs on <em>"Sending…"</em>. There is also no "create user" endpoint, so otherwise there's <em>no</em> UI way to onboard someone <strong>at a chosen role</strong> (auto-provisioned logins default to Editor/Author).</p>
+		<p>Under Access there is no passkey to register, so an "invite" just means <strong>create (or re-role) the user row</strong> at the chosen role and optionally email them a sign-in link. Re-provide the endpoint yourself:</p>
+		<blockquote class="note">
+			<strong>Astro gotcha:</strong> you cannot drop the handler in <code>src/pages/_emdash/api/auth/invite.ts</code> — Astro <strong>silently ignores any <code>src/pages</code> path starting with <code>_</code></strong>. Put it outside <code>src/pages</code> and <code>injectRoute</code> it from a tiny integration (the same mechanism EmDash uses).
+		</blockquote>
+		<pre><code>// astro.config.mjs — only when external auth is on
+const inviteOverride = {
+  name: "emdash-invite-override",
+  hooks: {
+    "astro:config:setup": ({ injectRoute }) => {
+      injectRoute({
+        pattern: "/_emdash/api/auth/invite",
+        entrypoint: fileURLToPath(new URL("./src/server/emdash-invite.ts", import.meta.url)),
+      });
+    },
+  },
+};
+// integrations: [ react(), ...(auth ? [inviteOverride] : []), emdash({ … }) ]</code></pre>
+		<p>The handler runs through EmDash's auth middleware like any <code>/_emdash</code> route, so <code>locals.user</code> is the authenticated admin and <code>locals.emdash</code> is the runtime. It validates the caller is an admin, then inserts/updates the <code>users</code> row (id = a ULID, <code>email_verified: 1</code>, the chosen role) and sends a best-effort sign-in email via <code>locals.emdash.email</code>. The invitee then signs in through Access and is matched to the row. See <code>src/server/emdash-invite.ts</code>.</p>
+
+		<h2>Operational gotchas</h2>
+		<ul>
+			<li><strong>The plugin-runtime TDZ has a second cause.</strong> EmDash 0.19 splits its runtime across chunks; the Cloudflare build can evaluate the plugin-registration array before a const it depends on initializes. The starter collapses emdash into one chunk via <code>vite.build.rollupOptions.output.manualChunks</code>. That covers emdash's own chunks — it does <em>not</em> cover your <code>@local/*</code> plugin chunks, which is the other reason the "return a literal object, no value imports" rule (§2.1) matters.</li>
+			<li><strong><code>wrangler email …</code> needs the Email Service permission.</strong> A delegated/OAuth token without it returns <code>Unauthorized [code: 2036]</code> — onboard the sending domain from the dashboard instead. (Moot if you use Resend: domain verification happens in Resend, not Cloudflare.)</li>
+			<li><strong>Never run <code>pnpm build</code> from inside <code>node_modules/emdash</code>.</strong> Its own build script is <code>tsdown</code>; you'll get <code>tsdown: not found</code> and think your app broke. Always build from the app root.</li>
+			<li><strong>If you ever turn external auth off,</strong> delete <code>src/server/emdash-invite.ts</code> and its <code>injectRoute</code> entry — EmDash will re-inject its real invite route and the two would collide.</li>
+		</ul>
+
+		<footer>Verified against <code>@astrojs/cloudflare</code> 13.7 + <code>@emdash-cms/cloudflare</code> 0.19 (EmDash 0.19) + Resend · 2026-06-19.</footer>
+	</main>
+</div>
+</body>
+</html>

@@ -184,6 +184,10 @@ Rules:
   serves 200 with no redirect) and enable **HSTS**.
 - `/_astro/*` and other hashed assets are served `immutable` — never purge by
   filename; a poisoned/truncated edge entry is escaped by bumping the bundle hash.
-- If the admin author-filter dropdown 500s with "EmDash is not initialized", EmDash
-  0.19 forgot to bind `handleContentAuthors` in the auth middleware locals — apply it
-  via `pnpm patch emdash` (one added line in `dist/astro/middleware.mjs`).
+- The admin author-filter dropdown 500s with "EmDash is not initialized" because
+  EmDash 0.19 forgot to bind `handleContentAuthors` in the auth middleware locals.
+  **Do NOT `pnpm patch emdash`** (that edits core — Rule 1). It's fixed with a hook:
+  `src/middleware.ts`'s `restoreContentAuthors` grafts the public
+  `handleContentAuthors(db, collection)` export back onto `locals.emdash` (EmDash's
+  middleware runs `order: "pre"`, so `locals.emdash.db` already exists when ours
+  runs). Fills only when absent, so it self-disables once EmDash binds it upstream.

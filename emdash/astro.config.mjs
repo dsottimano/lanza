@@ -1,7 +1,8 @@
+import { fileURLToPath } from "node:url";
 import react from "@astrojs/react";
 import tailwindcss from "@tailwindcss/vite";
 import auditLog from "@emdash-cms/plugin-audit-log";
-import { demoPlugin } from "@local/plugin-demo";
+import { emailResendPlugin } from "@local/plugin-email-resend";
 import { defineConfig, fontProviders } from "astro/config";
 import emdash, { local } from "emdash/astro";
 import { sqlite } from "emdash/db";
@@ -41,6 +42,29 @@ if (isCf) {
 	database = sqlite({ url: "file:./data.db" });
 	storage = local({ directory: "./uploads", baseUrl: "/_emdash/api/media/file" });
 }
+
+// Transactional email (Resend). Only under Cloudflare — the runtime reads the
+// `cloudflare:workers` env for RESEND_API_KEY (secret) + EMAIL_FROM (var), and a
+// domain verified in Resend matching EMAIL_FROM. EmDash sends invites/magic-link/
+// recovery through this provider; without it those features fail.
+const plugins = [auditLog];
+if (isCf) plugins.push(emailResendPlugin());
+
+// Under external (Access) auth, EmDash drops its built-in auth routes, so the
+// admin Invite button's POST /_emdash/api/auth/invite 404s. Re-provide it via an
+// injected route (a src/pages/_emdash/* file would be ignored — Astro skips paths
+// starting with "_"). Only needed when external auth is active.
+const inviteOverride = {
+	name: "emdash-invite-override",
+	hooks: {
+		"astro:config:setup": ({ injectRoute }) => {
+			injectRoute({
+				pattern: "/_emdash/api/auth/invite",
+				entrypoint: fileURLToPath(new URL("./src/server/emdash-invite.ts", import.meta.url)),
+			});
+		},
+	},
+};
 
 export default defineConfig({
 	output: "server",
@@ -110,10 +134,12 @@ export default defineConfig({
 	},
 	integrations: [
 		react(),
+		// Re-provide the invite route only when external auth is on (see above).
+		...(auth ? [inviteOverride] : []),
 		emdash({
 			database,
 			storage,
-			plugins: [auditLog, demoPlugin()],
+			plugins,
 			...(auth ? { auth } : {}),
 		}),
 	],

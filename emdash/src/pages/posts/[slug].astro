@@ -19,6 +19,7 @@ import Base from "../../layouts/Base.astro";
 import PostCard from "../../components/PostCard.astro";
 import { getReadingTime } from "../../utils/reading-time";
 import { resolveBlogSiteIdentity } from "../../utils/site-identity";
+import { resolveLayout } from "../../utils/layout-width";
 
 const slug = decodeSlug(Astro.params.slug);
 
@@ -105,6 +106,10 @@ const publishDate =
 		month: "long",
 		day: "numeric",
 	}) ?? null;
+
+// Per-entry width / margin. On a post this widens the centre reading column
+// rather than flattening the editorial three-column layout (the gutters stay).
+const layout = resolveLayout(post.data as unknown as Record<string, unknown>);
 ---
 
 <Base
@@ -119,7 +124,7 @@ const publishDate =
 	modifiedTime={post.data.updatedAt.toISOString()}
 	content={{ collection: "posts", id: post.data.id, slug }}
 >
-	<article class="article">
+	<article class="article" {...layout}>
 		{/* Breadcrumb */}
 		<div class="article-topbar">
 			<nav class="breadcrumb" aria-label="Breadcrumb">
@@ -423,8 +428,21 @@ const publishDate =
 <style>
 	/* Article container */
 	.article {
-		max-width: var(--wide-width);
+		max-width: var(--article-max-width, var(--wide-width));
 		margin: 0 auto;
+	}
+
+	/* Per-entry width presets (the `data-width` attr from resolveLayout).
+	   These widen the centre reading column; the meta/TOC gutters stay. */
+	.article[data-width="wide"] {
+		--article-body-col: minmax(0, 900px);
+	}
+	.article[data-width="narrow"] {
+		--article-body-col: minmax(0, 36rem);
+	}
+	.article[data-width="full"] {
+		--article-max-width: none;
+		--article-body-col: minmax(0, 1fr);
 	}
 
 	/* Breadcrumb */
@@ -529,11 +547,12 @@ const publishDate =
 	.article-grid {
 		display: grid;
 		grid-template-columns:
-			var(--meta-col-width) minmax(0, var(--content-width))
+			var(--meta-col-width)
+			var(--article-body-col, minmax(0, var(--content-width)))
 			var(--gutter-width);
 		gap: var(--spacing-10);
 		justify-content: center;
-		padding: 0 var(--spacing-6);
+		padding: 0 var(--page-pad-x, var(--spacing-6));
 		margin: var(--spacing-12) 0 var(--spacing-16);
 	}
 

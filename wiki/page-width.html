@@ -1,0 +1,96 @@
+<!doctype html>
+<html lang="en">
+<head>
+	<meta charset="utf-8">
+	<meta name="viewport" content="width=device-width, initial-scale=1">
+	<title>Per-entry page width</title>
+	<link rel="stylesheet" href="style.css">
+</head>
+<body>
+<div class="layout">
+	<aside class="sidebar">
+		<div class="brand">EmDash Admin Wiki<small>definemg migration · v0.16.1</small></div>
+		<nav>
+			<a href="index.html">Home</a>
+			<a href="rules.html">Starter rules &amp; audit</a>
+			<a href="admin-menu.html">Admin menu architecture</a>
+			<a href="customizing-admin.html">Customizing the admin</a>
+			<a href="page-width.html" class="active">Per-entry page width</a>
+			<a href="pattern-routing.html">Pattern-driven routing</a>
+			<a href="revisions-autosave.html">Revisions, autosave &amp; discarding drafts</a>
+			<a href="plugins.html">Plugin capabilities &amp; limits</a>
+			<a href="block-kit.html">Block Kit &amp; the form-block fix</a>
+			<a href="building-a-wiki.html">Building a wiki in /admin</a>
+			<a href="cloudflare-dev.html">Cloudflare dev &amp; the reload loop</a>
+			<a href="cloudflare-auth-email.html">Admin auth &amp; email on Cloudflare</a>
+		</nav>
+	</aside>
+	<main>
+		<h1>Per-entry page width</h1>
+		<p class="lede">Every entry can choose its own page width / margin from the admin — full screen, wide, the default reading column, narrow, or a custom side-padding percentage. It's a content-type feature: two fields on the collection plus a shared renderer helper. No EmDash core edits, no extra D1/R2 reads.</p>
+
+		<blockquote class="note">
+			<strong>The one idea:</strong> layout can be content. A <code>select</code> field on the collection becomes a width dropdown in the admin; the renderer maps the chosen value to a CSS width. Because the value rides along in the entry data that's already in the cached render, the control costs <strong>zero</strong> extra database hits.
+		</blockquote>
+
+		<h2>The two fields</h2>
+		<p>Add these to any collection's <code>fields</code> array in <code>seed/seed.json</code> (they're already on <code>posts</code> and <code>pages</code>):</p>
+		<pre><code>{ "slug": "layout_width", "label": "Page width", "type": "select",
+  "options": [
+    { "value": "default", "label": "Default reading column" },
+    { "value": "wide",    "label": "Wide" },
+    { "value": "full",    "label": "Full screen" },
+    { "value": "narrow",  "label": "Narrow" } ] },
+{ "slug": "layout_padding", "label": "Custom side padding (%)", "type": "number" }</code></pre>
+		<p><code>layout_width</code> renders as a dropdown; <code>layout_padding</code> as a number input. A custom padding value <strong>overrides</strong> the preset — it means "full-bleed, inset by this much on each side" (your 20%-margin case), clamped to 45% so an editor can't collapse the column to nothing.</p>
+
+		<h2>How it renders</h2>
+		<p>One shared helper does the mapping — <code>src/utils/layout-width.ts</code>:</p>
+		<pre><code>const layout = resolveLayout(entry.data);
+// → { "data-width": "wide" }                         (preset)
+// → { "data-width": "full", style: "--page-pad-x: 20%" }  (custom padding)</code></pre>
+		<p>Renderers spread that onto the article wrapper (<code>&lt;article ...{...layout}&gt;</code>). Scoped CSS keys off the <code>data-width</code> attribute and reads the optional <code>--page-pad-x</code> custom property:</p>
+		<pre><code>.page-article { max-width: var(--page-max-width, var(--content-width));
+                padding-inline: var(--page-pad-x, var(--spacing-6)); }
+.page-article[data-width="wide"]   { --page-max-width: var(--wide-width); }
+.page-article[data-width="narrow"] { --page-max-width: 36rem; }
+.page-article[data-width="full"]   { --page-max-width: none; }</code></pre>
+
+		<h2>It applies to every content type — including new ones</h2>
+		<p>Collections served by the pattern-routed catch-all (<a href="pattern-routing.html"><code>src/pages/[...path].astro</code></a>) consume <code>resolveLayout</code> already, so <strong>a content type you add later inherits the control for free</strong> — just paste the two fields into its schema. Only the bespoke <code>posts/[slug].astro</code> template wires it by hand, and deliberately differently:</p>
+		<blockquote class="warn">
+			<strong>Posts keep their gutters.</strong> On a post, the width setting grows the <em>centre reading column</em> (the grid's body track) rather than flattening the three-column editorial layout — the author/meta column and the TOC gutter stay. "Full" lets the body fill the remaining space; it does not delete the gutters. (See <a href="customizing-admin.html">Customizing the admin</a> for why that layout is intentional.)
+		</blockquote>
+
+		<h2>What each setting looks like</h2>
+		<p>Verified on the running app against a seeded post:</p>
+		<table>
+			<thead><tr><th>Setting</th><th>Result</th></tr></thead>
+			<tbody>
+				<tr><td><code>default</code></td><td>680px centred reading column, left meta + right TOC gutters (the baseline).</td></tr>
+				<tr><td><code>wide</code></td><td>Body column grows to ~900px; gutters retained.</td></tr>
+				<tr><td><code>full</code></td><td>Body fills the container edge-to-edge, hero full-bleed; gutters retained (not flattened).</td></tr>
+				<tr><td><code>narrow</code></td><td>Tight ~576px column with more surrounding whitespace.</td></tr>
+				<tr><td><code>layout_padding = 20</code></td><td>Full width inset 20% on each side (overrides the preset; clamped at 45%).</td></tr>
+			</tbody>
+		</table>
+
+		<h2>Turning it on</h2>
+		<p>The two fields are columns on the collection's table, so they need a schema migration before they appear in the admin:</p>
+		<pre><code>npx emdash dev      # runs migrations — adds layout_width / layout_padding</code></pre>
+		<blockquote class="note">
+			<strong>Safe before you migrate.</strong> If the columns don't exist yet, <code>entry.data.layout_width</code> is <code>undefined</code>, <code>resolveLayout</code> returns <code>default</code>, and pages render exactly as before — no errors. The migration is additive (it only adds the two columns), so it won't touch existing content.
+		</blockquote>
+
+		<h2>Why it's rule-compliant</h2>
+		<ul>
+			<li><strong>No core edits</strong> — fields live in <code>seed.json</code>, logic in <code>src/utils/</code> + the page templates.</li>
+			<li><strong>No extra D1/R2 reads</strong> — the values are part of the entry already fetched and edge-cached.</li>
+			<li><strong>Cache-safe</strong> — width is baked into the cached HTML and purges with the entry's normal cache tag on publish.</li>
+		</ul>
+
+		<footer>Verified against the running starter (EmDash 0.19, Node dev adapter) · 2026-06-20.</footer>
+	</main>
+</div>
+</body>
+</html>

@@ -8,7 +8,7 @@ migration. It bundles the EmDash app (`emdash/`) and a documentation **wiki**
 
 | Area | Fix |
 | --- | --- |
-| **Demo plugin** | Block Kit `form` block used `elements`/`blockId`; the renderer iterates `fields`/`block_id` → "fields is not iterable". Corrected. |
+| **Block Kit form block** | A `form` block's inputs must live under `fields`/`block_id`, not `elements`/`blockId`, or the renderer throws "fields is not iterable". The fix is documented in `wiki/block-kit.html`. (The demo plugin that showcased it was removed to keep the production build clean — Rule 3.) |
 | **Theme** | "Editorial Authority" — Deep Ink + Paper + gold, sharp 0-radius, serif headlines (Libre Caslon Text), Inter body, Hanken Grotesk labels. |
 | **Tailwind v4** | Added via `@tailwindcss/vite` (utilities only, **no preflight** — doesn't reset existing styles). |
 | **Blog post template** | `src/pages/posts/[slug].astro` restyled: centered serif header, breadcrumb, meta column with share, boxed TOC, pull-quotes, end CTA. |

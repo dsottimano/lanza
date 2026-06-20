@@ -12,13 +12,17 @@
 		<div class="brand">EmDash Admin Wiki<small>definemg migration · v0.16.1</small></div>
 		<nav>
 			<a href="index.html">Home</a>
+			<a href="rules.html">Starter rules &amp; audit</a>
 			<a href="admin-menu.html">Admin menu architecture</a>
 			<a href="customizing-admin.html" class="active">Customizing the admin</a>
+			<a href="page-width.html">Per-entry page width</a>
 			<a href="pattern-routing.html">Pattern-driven routing</a>
 			<a href="revisions-autosave.html">Revisions, autosave &amp; discarding drafts</a>
 			<a href="plugins.html">Plugin capabilities &amp; limits</a>
 			<a href="block-kit.html">Block Kit &amp; the form-block fix</a>
 			<a href="building-a-wiki.html">Building a wiki in /admin</a>
+			<a href="cloudflare-dev.html">Cloudflare dev &amp; the reload loop</a>
+			<a href="cloudflare-auth-email.html">Admin auth &amp; email on Cloudflare</a>
 		</nav>
 	</aside>
 	<main>
@@ -73,6 +77,9 @@
 				<tr><td>Fully white-labeled, restructured admin shell</td><td><span class="no">No</span> — fork only</td></tr>
 			</tbody>
 		</table>
+
+		<h2>Layout can be content, too</h2>
+		<p>A content type can carry <em>layout</em> controls, not just content. This starter gives every entry an admin-editable <strong>page width / margin</strong> — a <code>select</code> preset plus an optional custom side-padding number — applied by a shared renderer helper with no core edits. It's the cleanest worked example of "model it as a field." See <a href="page-width.html">Per-entry page width</a> for the full write-up.</p>
 
 		<h2>Verdict</h2>
 		<blockquote class="note">
