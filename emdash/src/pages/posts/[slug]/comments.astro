@@ -1,0 +1,91 @@
+---
+/**
+ * Comments-only fragment, embedded by the post page via a lazy <iframe>.
+ *
+ * Why: emdash's Comments/CommentForm components, when SSR'd into a page, make
+ * Astro inject their hoisted client script — which pulls in a large slice of the
+ * emdash client surface (incl. the TipTap editor, several MB). Rendering them in
+ * a `loading="lazy"` iframe keeps that weight OUT of the article's main document
+ * (TBT/LCP unaffected); it loads only if/when the reader scrolls to comments.
+ */
+import { Comments, CommentForm, EmDashBodyEnd } from "emdash/ui";
+import { getEmDashEntry, decodeSlug } from "emdash";
+import { createPublicPageContext } from "emdash/page";
+
+const slug = decodeSlug(Astro.params.slug);
+if (!slug) return new Response("Not found", { status: 404 });
+
+const { entry: post } = await getEmDashEntry("posts", slug);
+if (!post) return new Response("Not found", { status: 404 });
+
+const pageCtx = createPublicPageContext({
+	Astro,
+	kind: "custom",
+	pageType: "website",
+	title: "Comments",
+	seo: { robots: "noindex,nofollow" },
+});
+---
+
+<!doctype html>
+<html lang="en" class="site">
+	<head>
+		<meta charset="UTF-8" />
+		<meta name="viewport" content="width=device-width, initial-scale=1.0" />
+		<meta name="robots" content="noindex,nofollow" />
+		<title>Comments</title>
+		<script is:inline>
+			// Match the parent's theme so the embedded form isn't a light box on dark.
+			(function () {
+				var c = document.cookie;
+				var i = c.indexOf("theme=");
+				var t = i >= 0 ? c.slice(i + 6).split(";")[0] : null;
+				if (t === "dark" || t === "light") document.documentElement.classList.add(t);
+				else if (window.matchMedia("(prefers-color-scheme: dark)").matches)
+					document.documentElement.classList.add("dark");
+			})();
+		</script>
+	</head>
+	<body>
+		<div class="ec-frame">
+			<Comments collection="posts" contentId={post.data.id} threaded />
+			<CommentForm collection="posts" contentId={post.data.id} />
+		</div>
+		<EmDashBodyEnd page={pageCtx} />
+		<script is:inline>
+			// Report height to the parent so the iframe can size to content.
+			function report() {
+				parent.postMessage(
+					{ type: "ec-comments-height", height: document.documentElement.scrollHeight },
+					"*",
+				);
+			}
+			window.addEventListener("load", report);
+			new ResizeObserver(report).observe(document.body);
+		</script>
+	</body>
+</html>
+
+<style is:global>
+	:root {
+		--color-bg: #ffffff;
+		--color-text: #1a1a1a;
+		--color-muted: #8b8b8b;
+		--color-border: #e5e5e5;
+		--color-surface: #f7f7f7;
+	}
+	.site.dark {
+		--color-bg: #0d0d0d;
+		--color-text: #ededed;
+		--color-muted: #6b6b6b;
+		--color-border: #2a2a2a;
+		--color-surface: #181818;
+	}
+	html,
+	body {
+		margin: 0;
+		background: transparent;
+		color: var(--color-text);
+		font-family: system-ui, sans-serif;
+	}
+</style>

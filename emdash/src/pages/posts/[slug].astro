@@ -8,13 +8,7 @@ import {
 	decodeSlug,
 	getSiteSettings,
 } from "emdash";
-import {
-	Image,
-	PortableText,
-	Comments,
-	CommentForm,
-	WidgetArea,
-} from "emdash/ui";
+import { Image, PortableText, WidgetArea } from "emdash/ui";
 import Base from "../../layouts/Base.astro";
 import PostCard from "../../components/PostCard.astro";
 import { getReadingTime } from "../../utils/reading-time";
@@ -283,9 +277,25 @@ const layout = resolveLayout(post.data as unknown as Record<string, unknown>);
 				</aside>
 
 				<div class="article-comments">
-					<Comments collection="posts" contentId={post.data.id} threaded />
-					<CommentForm collection="posts" contentId={post.data.id} />
+					<iframe
+						class="comments-frame"
+						src={`/posts/${slug}/comments`}
+						loading="lazy"
+						title="Comments"
+					></iframe>
 				</div>
+				<style is:inline>
+					.comments-frame { width: 100%; border: 0; min-height: 320px; display: block; }
+				</style>
+				<script is:inline>
+					window.addEventListener("message", function (e) {
+						if (e.data && e.data.type === "ec-comments-height") {
+							var f = document.querySelector(".comments-frame");
+							if (f && typeof e.data.height === "number")
+								f.style.height = e.data.height + "px";
+						}
+					});
+				</script>
 			</div>
 
 			{/* Right gutter: TOC + Sidebar widgets */}

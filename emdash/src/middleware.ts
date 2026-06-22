@@ -189,6 +189,23 @@ const mediaRewrite = defineMiddleware(async (context, next) => {
 		})
 		.on("link", {
 			element(el) {
+				// Defer the emdash runtime stylesheet on public pages: it's mostly
+				// admin/widget CSS the public above-the-fold render doesn't need, but
+				// Astro injects it as a render-blocking <link>. Load it non-blocking
+				// (print media + onload swap). The site's own CSS stays blocking, and
+				// admin (/_emdash) never reaches this rewriter, so its CSS is intact.
+				const rel = el.getAttribute("rel");
+				const href = el.getAttribute("href");
+				if (
+					rel === "stylesheet" &&
+					href &&
+					href.includes("emdash-runtime") &&
+					href.endsWith(".css")
+				) {
+					el.setAttribute("media", "print");
+					el.setAttribute("onload", "this.media='all'");
+					return;
+				}
 				rewriteAttr(el, "href", swap);
 			},
 		})
