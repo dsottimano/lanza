@@ -25,6 +25,12 @@ collections:
       - { name: title, label: Title, widget: string }
       - { name: pubDate, label: Publish date, widget: datetime }
       - {
+          name: updatedDate,
+          label: Last updated,
+          widget: datetime,
+          required: false,
+        }
+      - {
           name: draft,
           label: Draft (uncheck to publish),
           widget: boolean,
@@ -37,14 +43,37 @@ collections:
         required: false
         collapsed: true
         fields:
-          - { name: metaTitle, label: Meta title, widget: string, required: false }
+          - { name: metaTitle, label: Meta title (overrides title), widget: string, required: false }
           - {
               name: metaDescription,
               label: Meta description,
               widget: text,
               required: false,
             }
-          - { name: ogImage, label: OG image, widget: image, required: false }
+          - { name: ogImage, label: OG / social image, widget: image, required: false }
+          - {
+              name: canonical,
+              label: Canonical URL (override),
+              widget: string,
+              required: false,
+              hint: "Leave blank to auto-derive from the page path",
+            }
+          - {
+              name: ogType,
+              label: OG type,
+              widget: select,
+              options: ["website", "article"],
+              default: "article",
+              required: false,
+            }
+          - {
+              name: noindex,
+              label: Hide from search engines (noindex),
+              widget: boolean,
+              default: false,
+              required: false,
+            }
+          - { name: author, label: Author (JSON-LD), widget: string, required: false }
       - { name: body, label: Body, widget: markdown }
 
   - name: settings
@@ -69,7 +98,38 @@ collections:
               widget: image,
               required: false,
             }
-          - { name: twitter, label: Twitter handle, widget: string, required: false }
+          - {
+              name: locale,
+              label: Locale,
+              widget: string,
+              default: "en_US",
+              hint: "og:locale, e.g. en_US",
+            }
+          - {
+              name: twitter,
+              label: Twitter @site handle,
+              widget: string,
+              required: false,
+            }
+          - {
+              name: twitterCreator,
+              label: Twitter @creator handle,
+              widget: string,
+              required: false,
+            }
+          - label: Organization (JSON-LD)
+            name: organization
+            widget: object
+            fields:
+              - { name: name, label: Name, widget: string }
+              - { name: logo, label: Logo, widget: image, required: false }
+              - {
+                  name: sameAs,
+                  label: Social profile URLs,
+                  widget: list,
+                  required: false,
+                  hint: "One URL per item (sameAs)",
+                }
 
       - name: redirects
         label: Redirects

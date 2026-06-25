@@ -4,5 +4,12 @@
   "defaultTitle": "My Site",
   "defaultDescription": "A Cloudflare-hosted static site, edited with Sveltia CMS.",
   "defaultOgImage": "",
-  "twitter": ""
+  "locale": "en_US",
+  "twitter": "",
+  "twitterCreator": "",
+  "organization": {
+    "name": "My Site",
+    "logo": "",
+    "sameAs": []
+  }
 }

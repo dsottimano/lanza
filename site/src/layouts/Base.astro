@@ -1,12 +1,14 @@
 ---
-import { buildSeo, type PageSeo } from "../lib/seo";
+import Seo from "../components/Seo.astro";
+import type { PageSeo } from "../lib/seo";
+import type { ArticleInput } from "../lib/jsonld";
 
 interface Props {
   seo?: PageSeo;
+  article?: ArticleInput | null;
 }
 
-const { seo = {} } = Astro.props;
-const s = buildSeo(seo);
+const { seo = {}, article = null } = Astro.props;
 ---
 
 <!doctype html>
@@ -14,14 +16,7 @@ const s = buildSeo(seo);
   <head>
     <meta charset="utf-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1" />
-    <title>{s.title}</title>
-    <meta name="description" content={s.description} />
-    <meta property="og:title" content={s.title} />
-    <meta property="og:description" content={s.description} />
-    <meta property="og:site_name" content={s.siteName} />
-    {s.ogImage && <meta property="og:image" content={s.ogImage} />}
-    <meta name="twitter:card" content="summary_large_image" />
-    {s.twitter && <meta name="twitter:site" content={s.twitter} />}
+    <Seo seo={seo} article={article} />
   </head>
   <body>
     <slot />

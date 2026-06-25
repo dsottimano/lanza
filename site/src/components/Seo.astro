@@ -1,0 +1,48 @@
+---
+import { resolveSeo, type PageSeo } from "../lib/seo";
+import {
+  organizationSchema,
+  websiteSchema,
+  articleSchema,
+  buildGraph,
+  jsonLdString,
+  type ArticleInput,
+} from "../lib/jsonld";
+
+interface Props {
+  seo?: PageSeo;
+  /** When set, adds a BlogPosting node to the JSON-LD graph. */
+  article?: ArticleInput | null;
+}
+
+const { seo = {}, article = null } = Astro.props;
+
+// Origin comes from astro.config `site` (set per deploy), not the CMS.
+const siteUrl = (Astro.site ?? new URL("/", Astro.url)).href.replace(/\/$/, "");
+const s = resolveSeo(seo, Astro.url.pathname, siteUrl);
+
+const graph = buildGraph([
+  websiteSchema(siteUrl),
+  organizationSchema(siteUrl),
+  article ? articleSchema(article, siteUrl) : null,
+]);
+---
+
+<title>{s.title}</title>
+<link rel="canonical" href={s.canonical} />
+<meta name="description" content={s.description} />
+{s.noindex && <meta name="robots" content="noindex, nofollow" />}
+
+<meta property="og:type" content={s.ogType} />
+<meta property="og:title" content={s.title} />
+<meta property="og:description" content={s.description} />
+<meta property="og:url" content={s.canonical} />
+<meta property="og:site_name" content={s.siteName} />
+<meta property="og:locale" content={s.locale} />
+{s.ogImage && <meta property="og:image" content={s.ogImage} />}
+
+<meta name="twitter:card" content="summary_large_image" />
+{s.twitter && <meta name="twitter:site" content={s.twitter} />}
+{s.twitterCreator && <meta name="twitter:creator" content={s.twitterCreator} />}
+
+<script type="application/ld+json" set:html={jsonLdString(graph)} />

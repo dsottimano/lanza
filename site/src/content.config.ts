@@ -7,6 +7,10 @@ const seoSchema = z
     metaTitle: z.string().optional(),
     metaDescription: z.string().optional(),
     ogImage: z.string().optional(),
+    canonical: z.string().optional(),
+    ogType: z.enum(["website", "article"]).optional(),
+    noindex: z.boolean().optional(),
+    author: z.string().optional(),
   })
   .optional();
 
@@ -15,6 +19,7 @@ const posts = defineCollection({
   schema: z.object({
     title: z.string(),
     pubDate: z.coerce.date(),
+    updatedDate: z.coerce.date().optional(),
     // New entries (incl. everything the bot creates) default to draft and are
     // excluded from the production build until an editor flips this in the CMS.
     draft: z.boolean().default(false),
