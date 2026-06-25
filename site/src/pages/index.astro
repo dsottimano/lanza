@@ -1,0 +1,27 @@
+---
+import { getCollection } from "astro:content";
+import Base from "../layouts/Base.astro";
+
+// Drafts are visible in dev, hidden in the production build.
+const posts = (
+  await getCollection("posts", ({ data }) =>
+    import.meta.env.PROD ? data.draft !== true : true,
+  )
+).sort((a, b) => b.data.pubDate.valueOf() - a.data.pubDate.valueOf());
+---
+
+<Base>
+  <main>
+    <h1>Posts</h1>
+    <ul>
+      {
+        posts.map((p) => (
+          <li>
+            <a href={`/posts/${p.id}/`}>{p.data.title}</a>
+            {p.data.draft && <em> (draft)</em>}
+          </li>
+        ))
+      }
+    </ul>
+  </main>
+</Base>

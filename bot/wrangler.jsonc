@@ -1,0 +1,17 @@
+{
+  "name": "telegram-bot",
+  "main": "src/index.ts",
+  "compatibility_date": "2026-06-01",
+  "compatibility_flags": ["nodejs_compat"],
+  "observability": { "enabled": true },
+  "vars": {
+    "GITHUB_REPO": "dsottimano/emdash-starter",
+    "GITHUB_BRANCH": "main",
+    "CONTENT_DIR": "site/src/content/posts"
+  }
+  // Secrets (set with `wrangler secret put <NAME>`):
+  //   BOT_TOKEN       - Telegram bot token from @BotFather
+  //   BOT_INFO        - JSON from https://api.telegram.org/bot<TOKEN>/getMe (the `result` object)
+  //   WEBHOOK_SECRET  - random string; also passed to Telegram setWebhook
+  //   GITHUB_TOKEN    - fine-grained PAT with Contents: read+write on this repo
+}

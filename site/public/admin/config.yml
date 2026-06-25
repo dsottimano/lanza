@@ -1,0 +1,90 @@
+# Sveltia CMS — git-based. Commits straight to the content in this repo.
+# Auth: use "Sign in with Token" (a GitHub fine-grained PAT) — no auth Worker needed
+# for a solo/technical editor. Add the sveltia-cms-auth Worker later if non-technical
+# editors join. Editorial workflow is not supported in Sveltia yet, so the `draft`
+# boolean below IS the review gate (Astro hides drafts from the production build).
+backend:
+  name: github
+  repo: dsottimano/emdash-starter
+  branch: main # change to your deploy branch
+
+# Media lives in the site's public dir and ships as static assets.
+media_folder: site/public/images/uploads
+public_folder: /images/uploads
+
+collections:
+  - name: posts
+    label: Posts
+    label_singular: Post
+    folder: site/src/content/posts
+    create: true
+    slug: "{{slug}}"
+    extension: md
+    format: frontmatter
+    fields:
+      - { name: title, label: Title, widget: string }
+      - { name: pubDate, label: Publish date, widget: datetime }
+      - {
+          name: draft,
+          label: Draft (uncheck to publish),
+          widget: boolean,
+          default: true,
+        }
+      - { name: description, label: Short description, widget: text, required: false }
+      - label: SEO
+        name: seo
+        widget: object
+        required: false
+        collapsed: true
+        fields:
+          - { name: metaTitle, label: Meta title, widget: string, required: false }
+          - {
+              name: metaDescription,
+              label: Meta description,
+              widget: text,
+              required: false,
+            }
+          - { name: ogImage, label: OG image, widget: image, required: false }
+      - { name: body, label: Body, widget: markdown }
+
+  - name: settings
+    label: Settings
+    files:
+      - name: seo_defaults
+        label: SEO defaults
+        file: site/src/data/seo.json
+        fields:
+          - { name: siteName, label: Site name, widget: string }
+          - {
+              name: titleTemplate,
+              label: Title template,
+              widget: string,
+              hint: "Use %s where the page title goes, e.g. '%s · My Site'",
+            }
+          - { name: defaultTitle, label: Default title, widget: string }
+          - { name: defaultDescription, label: Default description, widget: text }
+          - {
+              name: defaultOgImage,
+              label: Default OG image,
+              widget: image,
+              required: false,
+            }
+          - { name: twitter, label: Twitter handle, widget: string, required: false }
+
+      - name: redirects
+        label: Redirects
+        file: site/src/data/redirects.json
+        fields:
+          - name: redirects
+            label: Redirects
+            widget: list
+            fields:
+              - { name: from, label: From path, widget: string }
+              - { name: to, label: To path / URL, widget: string }
+              - {
+                  name: status,
+                  label: Status code,
+                  widget: number,
+                  default: 301,
+                  value_type: int,
+                }

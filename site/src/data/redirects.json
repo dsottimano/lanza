@@ -1,0 +1,5 @@
+{
+  "redirects": [
+    { "from": "/old-home", "to": "/", "status": 301 }
+  ]
+}
