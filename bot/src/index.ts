@@ -8,6 +8,17 @@ export interface Env {
   GITHUB_REPO: string;
   GITHUB_BRANCH: string;
   CONTENT_DIR: string;
+  /** Comma-separated Telegram chat IDs allowed to use the bot. Empty = deny all. */
+  ALLOWED_CHAT_IDS: string;
+}
+
+function allowedChatIds(env: Env): Set<number> {
+  return new Set(
+    (env.ALLOWED_CHAT_IDS ?? "")
+      .split(",")
+      .map((s) => Number(s.trim()))
+      .filter((n) => Number.isFinite(n) && n !== 0),
+  );
 }
 
 function slugify(input: string): string {
@@ -77,6 +88,14 @@ async function createDraft(env: Env, title: string, body: string): Promise<strin
 function buildBot(env: Env): Bot {
   const bot = new Bot(env.BOT_TOKEN, { botInfo: JSON.parse(env.BOT_INFO) });
 
+  // Authorization: only allow-listed chats reach the handlers. Fail closed —
+  // an empty/unset allowlist drops every update (silently, to avoid being a
+  // reply amplifier for unknown senders).
+  const allowed = allowedChatIds(env);
+  bot.use(async (ctx, next) => {
+    if (ctx.chat && allowed.has(ctx.chat.id)) await next();
+  });
+
   bot.command("start", (ctx) =>
     ctx.reply(
       "Send me a message to create a *draft* post.\n\n" +
@@ -101,7 +120,9 @@ function buildBot(env: Env): Bot {
         parse_mode: "Markdown",
       });
     } catch (err) {
-      await ctx.reply(`⚠️ Failed: ${(err as Error).message}`);
+      // Log details server-side; never echo internal/API errors to the user.
+      console.error("createDraft failed:", err);
+      await ctx.reply("⚠️ Couldn't create the draft. Try again later.");
     }
   });
 
@@ -111,9 +132,10 @@ function buildBot(env: Env): Bot {
 export default {
   async fetch(request: Request, env: Env): Promise<Response> {
     if (request.method !== "POST") return new Response("ok");
-    // Verify Telegram's secret-token header before doing any work.
+    // Verify Telegram's secret-token header before doing any work. Fail closed:
+    // a missing/empty WEBHOOK_SECRET rejects every request rather than waving it through.
     if (
-      env.WEBHOOK_SECRET &&
+      !env.WEBHOOK_SECRET ||
       request.headers.get("X-Telegram-Bot-Api-Secret-Token") !== env.WEBHOOK_SECRET
     ) {
       return new Response("unauthorized", { status: 401 });

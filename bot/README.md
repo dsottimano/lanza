@@ -26,9 +26,19 @@ automatically — the draft is reviewed and published in the CMS.
    curl "https://api.telegram.org/bot<TOKEN>/setWebhook?url=https://telegram-bot.<subdomain>.workers.dev&secret_token=<WEBHOOK_SECRET>"
    ```
 
-Non-secret config (`GITHUB_REPO`, `GITHUB_BRANCH`, `CONTENT_DIR`) lives in
-`wrangler.jsonc`. The bot is the only request-consumer on the free tier
-(100k req/day, account-wide).
+Non-secret config (`GITHUB_REPO`, `GITHUB_BRANCH`, `CONTENT_DIR`,
+`ALLOWED_CHAT_IDS`) lives in `wrangler.jsonc`. The bot is the only
+request-consumer on the free tier (100k req/day, account-wide).
+
+## Security model
+
+This bot holds a repo-write token, so it's locked down three ways (all fail closed):
+
+- **`WEBHOOK_SECRET`** must be set — Telegram's secret-token header is verified on
+  every request; a missing secret rejects everything.
+- **`ALLOWED_CHAT_IDS`** — only listed Telegram chat IDs reach the handlers; an
+  empty list silently drops all updates. Set it to your chat ID before use.
+- Internal/API errors are logged server-side only; users get a generic message.
 
 ## Extending to full CRUD
 
