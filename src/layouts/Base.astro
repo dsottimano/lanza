@@ -1,6 +1,7 @@
 ---
 import Seo from "../components/Seo.astro";
 import { getCollection } from "astro:content";
+import menu from "../data/menu.json";
 import type { PageSeo } from "../lib/seo";
 import type { ArticleInput } from "../lib/jsonld";
 
@@ -11,12 +12,20 @@ interface Props {
 
 const { seo = {}, article = null } = Astro.props;
 
-// Pages appear in the site nav (WordPress-style menu). Build-time only.
-const pages = (
-  await getCollection("pages", ({ data }) =>
-    import.meta.env.PROD ? data.draft !== true : true,
-  )
-).sort((a, b) => a.data.title.localeCompare(b.data.title));
+// Nav comes from the editable Settings → Menu (WordPress-style). If it's empty,
+// fall back to auto-listing published Pages so the nav is never blank.
+let navItems = menu.items ?? [];
+if (navItems.length === 0) {
+  const pages = (
+    await getCollection("pages", ({ data }) =>
+      import.meta.env.PROD ? data.draft !== true : true,
+    )
+  ).sort((a, b) => a.data.title.localeCompare(b.data.title));
+  navItems = [
+    { label: "Home", url: "/" },
+    ...pages.map((p) => ({ label: p.data.title, url: `/${p.id}/` })),
+  ];
+}
 ---
 
 <!doctype html>
@@ -29,8 +38,7 @@ const pages = (
   <body>
     <header>
       <nav>
-        <a href="/">Home</a>
-        {pages.map((p) => <a href={`/${p.id}/`}>{p.data.title}</a>)}
+        {navItems.map((item) => <a href={item.url}>{item.label}</a>)}
       </nav>
     </header>
     <slot />

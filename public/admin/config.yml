@@ -256,6 +256,24 @@ collections:
                   hint: "One URL per item (sameAs)",
                 }
 
+      - name: menu
+        label: Menu
+        file: src/data/menu.json
+        fields:
+          - name: items
+            label: Menu items
+            widget: list
+            label_singular: Menu item
+            summary: "{{label}} → {{url}}"
+            fields:
+              - { name: label, label: Label, widget: string }
+              - {
+                  name: url,
+                  label: URL / path,
+                  widget: string,
+                  hint: "e.g. /, /about/, or https://example.com",
+                }
+
       - name: redirects
         label: Redirects
         file: src/data/redirects.json
