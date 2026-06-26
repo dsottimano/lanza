@@ -1,10 +1,18 @@
 {
-	"name": "definemg-emdash-wiki",
-	"version": "1.0.0",
-	"private": true,
-	"type": "module",
-	"description": "Internal how-to wiki for the definemg EmDash migration",
-	"scripts": {
-		"dev": "node server.mjs"
-	}
+  "name": "site",
+  "private": true,
+  "type": "module",
+  "scripts": {
+    "dev": "astro dev",
+    "build": "node scripts/gen-redirects.mjs && astro build",
+    "preview": "astro preview",
+    "check": "astro check"
+  },
+  "dependencies": {
+    "astro": "7.0.3"
+  },
+  "devDependencies": {
+    "@astrojs/check": "0.9.9",
+    "typescript": "6.0.3"
+  }
 }

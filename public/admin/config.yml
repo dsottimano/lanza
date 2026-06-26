@@ -9,14 +9,14 @@ backend:
   branch: main # change to your deploy branch
 
 # Media lives in the site's public dir and ships as static assets.
-media_folder: site/public/images/uploads
+media_folder: public/images/uploads
 public_folder: /images/uploads
 
 collections:
   - name: posts
     label: Posts
     label_singular: Post
-    folder: site/src/content/posts
+    folder: src/content/posts
     create: true
     slug: "{{slug}}"
     extension: md
@@ -81,7 +81,7 @@ collections:
     files:
       - name: seo_defaults
         label: SEO defaults
-        file: site/src/data/seo.json
+        file: src/data/seo.json
         fields:
           - { name: siteName, label: Site name, widget: string }
           - {
@@ -133,7 +133,7 @@ collections:
 
       - name: redirects
         label: Redirects
-        file: site/src/data/redirects.json
+        file: src/data/redirects.json
         fields:
           - name: redirects
             label: Redirects

@@ -15,3 +15,6 @@ uploads/
 # OS / editor
 .DS_Store
 *.log
+
+# Tooling working dir
+.superpowers/

@@ -1,46 +1,38 @@
-# EmDash Starter — project rules
+# Project rules
 
-This repo *corrects* EmDash and ships a hardened Cloudflare-production starter. The
-EmDash app lives in `emdash/`; its own instructions are in `emdash/AGENTS.md`
-(symlinked as `emdash/CLAUDE.md`). The rules below are the starter's law and
-**override convenience**. Full rationale + the live audit are in the wiki
-(`wiki/rules.html`).
+Static Astro site (repo root) + Sveltia CMS (`/admin`) + a Telegram draft bot
+(`bot/`), all on Cloudflare's free tier. Content is git-based markdown under
+`src/content/posts`; `draft: true` is the publish gate (the build hides drafts).
 
-## The five rules
+## Rules
 
-1. **Never touch EmDash core.** No edits to `node_modules/emdash`,
-   `@emdash-cms/*`, or `pnpm patch`es of their `dist/`. Every fix is project-level:
-   Astro middleware (`src/middleware.ts`), injected routes, config, or a plugin.
-   This is what lets the starter survive EmDash upgrades. Any core bug gets worked
-   around with a hook (Rule 5), never a fork.
+1. **Stay free-tier and all-Cloudflare.** Pages for the static site, Workers for
+   the bot. D1/R2 only when listings need them (see Rule 4). Page views are
+   unmetered; Workers free tier is 100k req/day account-wide — the bot is the
+   only request-consumer, keep it that way.
 
-2. **Optimize aggressively to limit D1 and R2 queries.** D1 reads/writes and R2
-   reads cost money and latency. Cache first (Rule 4), serve media straight from R2's
-   public domain (never through a Worker), use `d1({ session: "auto" })` read
-   replicas, coalesce writes (the autosave middleware collapses dozens of revision
-   INSERTs into one). New code that queries content must justify the query or cache it.
+2. **Cache public routes.** Every public page is static and cacheable. Don't add
+   handlers or middleware that defeat caching. `/admin/*` and the bot are never
+   cached. When listings move to on-demand routes, give each a `routeRules` entry
+   and cache by tag — never a `/[...path]` catch-all cache rule (it would cache
+   the admin).
 
-3. **Only standard Workers — never Dynamic Workers, and no third-party plugins.**
-   Plugins run in-process (listed under `plugins:`, `format: "native"`/`"standard"`),
-   never `sandboxed:` (which requires the paid Dynamic Workers product). Only
-   first-party (`@emdash-cms/*`) and local (`@local/*`) plugins are allowed — never an
-   untrusted npm plugin. Adding a plugin = writing it in `emdash/packages/plugins/`.
+3. **Minimize D1/R2 once added.** Reads/writes cost money and latency. Cache or
+   avoid queries; serve media straight from R2's public domain, never through a
+   Worker. New content queries must justify themselves.
 
-4. **Leverage Cloudflare caching at all times.** Every public route gets a
-   `routeRules` entry (`maxAge`/`swr`) AND each page calls
-   `Astro.cache.set(cacheHint)` so publishing purges by tag. Helpers that return a
-   bare array (no `cacheHint`) need a manual `{ tags: ["collection:x", "term:y"] }`.
-   **Never** add a `/[...path]` catch-all route rule — it would cache `/_emdash/*`
-   (the admin). `/search` and `404` stay uncached.
+4. **Sveltia is config-only.** The CMS is configured in `public/admin/config.yml`
+   and runs from the self-hosted `public/admin/sveltia-cms.js` (not a CDN — see
+   README for why and how to upgrade). No CMS forks or runtime patches.
 
-5. **Use hooks to modify EmDash, never forks.** Behavioural changes go through Astro
-   middleware (`onRequest`) and integration hooks (`astro:config:setup` →
-   `injectRoute`), e.g. the autosave-coalesce + media-rewrite middleware and the
-   invite-route re-injection. This is the sanctioned mechanism for Rule 1.
+5. **Bot secrets via wrangler, never in the repo.** `BOT_TOKEN`, `BOT_INFO`,
+   `WEBHOOK_SECRET`, `GITHUB_TOKEN` are `wrangler secret put`. The bot fails
+   closed (webhook secret + chat allowlist required). See `bot/README.md`.
 
 ## Before you commit
 
-- Did you touch anything under `node_modules`, `@emdash-cms`, or `patches/`? → stop, use a hook.
-- New public page? → add a `routeRules` entry **and** `Astro.cache.set(cacheHint)`.
-- New plugin? → local or `@emdash-cms` only, in-process, never `sandboxed:`.
-- New content query? → can it be cached or avoided?
+- New public page? → keep it static/cacheable; no catch-all cache rule.
+- New content query (D1/R2)? → can it be cached or avoided?
+- Touching the bot? → secrets stay out of the repo; keep it fail-closed.
+- Path moved? → update `config.yml`, `bot/wrangler.jsonc` (`CONTENT_DIR`), and
+  `scripts/gen-redirects.mjs` together.
