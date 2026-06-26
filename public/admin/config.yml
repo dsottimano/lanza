@@ -190,6 +190,14 @@ collections:
     fields:
       - { name: title, label: Name, widget: string }
       - { name: description, label: Description, widget: text, required: false }
+      - name: parent
+        label: Parent category
+        widget: relation
+        collection: categories
+        value_field: "{{slug}}"
+        display_fields: [title]
+        search_fields: [title]
+        required: false
 
   - name: tags
     label: Tags

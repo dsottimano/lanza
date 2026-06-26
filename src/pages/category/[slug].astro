@@ -19,6 +19,15 @@ const posts = (
       data.categories.includes(category.id),
   )
 ).sort((a, b) => b.data.pubDate.valueOf() - a.data.pubDate.valueOf());
+
+// Hierarchy: resolve the parent (breadcrumb) and any child categories.
+const allCategories = await getCollection("categories");
+const parent = category.data.parent
+  ? allCategories.find((c) => c.id === category.data.parent)
+  : undefined;
+const children = allCategories
+  .filter((c) => c.data.parent === category.id)
+  .sort((a, b) => a.data.title.localeCompare(b.data.title));
 ---
 
 <Base
@@ -28,8 +37,29 @@ const posts = (
   }}
 >
   <main>
+    {
+      parent && (
+        <p class="breadcrumb">
+          <a href={`/category/${parent.id}/`}>{parent.data.title}</a> /
+        </p>
+      )
+    }
     <h1>Category: {category.data.title}</h1>
     {category.data.description && <p>{category.data.description}</p>}
+    {
+      children.length > 0 && (
+        <nav class="subcategories">
+          <strong>Subcategories:</strong>
+          <ul>
+            {children.map((c) => (
+              <li>
+                <a href={`/category/${c.id}/`}>{c.data.title}</a>
+              </li>
+            ))}
+          </ul>
+        </nav>
+      )
+    }
     {
       posts.length > 0 ? (
         <ul>

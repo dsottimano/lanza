@@ -62,7 +62,8 @@ const authors = defineCollection({
 
 const categories = defineCollection({
   loader: glob({ pattern: "**/*.{md,mdx}", base: "./src/content/categories" }),
-  schema: termSchema,
+  // Categories nest (WordPress-style); tags don't. `parent` is a category slug.
+  schema: termSchema.extend({ parent: z.string().optional() }),
 });
 
 const tags = defineCollection({
