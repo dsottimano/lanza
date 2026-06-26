@@ -1,5 +1,5 @@
 ---
-import { getCollection, render } from "astro:content";
+import { getCollection, getEntry, render } from "astro:content";
 import Base from "../../layouts/Base.astro";
 import type { ArticleInput } from "../../lib/jsonld";
 
@@ -19,13 +19,19 @@ const url = new URL(Astro.url.pathname, siteUrl + "/").href;
 // Featured image doubles as the social/og image and JSON-LD article image.
 const ogImage = post.data.seo?.ogImage || post.data.featuredImage;
 
+// Resolve the author relation to its display name (falls back to seo.author).
+const authorEntry = post.data.author
+  ? await getEntry("authors", post.data.author)
+  : undefined;
+const authorName = authorEntry?.data.title || post.data.seo?.author;
+
 const article: ArticleInput = {
   title: post.data.title,
   description: post.data.description,
   image: ogImage,
   datePublished: post.data.pubDate.toISOString(),
   dateModified: (post.data.updatedDate ?? post.data.pubDate).toISOString(),
-  author: post.data.seo?.author,
+  author: authorName,
   url,
 };
 ---
@@ -42,6 +48,18 @@ const article: ArticleInput = {
 >
   <main>
     <h1>{post.data.title}</h1>
+    {
+      authorName && (
+        <p class="byline">
+          By{" "}
+          {authorEntry ? (
+            <a href={`/author/${post.data.author}/`}>{authorName}</a>
+          ) : (
+            authorName
+          )}
+        </p>
+      )
+    }
     {
       post.data.featuredImage && (
         <img src={post.data.featuredImage} alt={post.data.title} />

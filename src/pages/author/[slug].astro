@@ -1,0 +1,43 @@
+---
+import { getCollection } from "astro:content";
+import Base from "../../layouts/Base.astro";
+
+export async function getStaticPaths() {
+  const authors = await getCollection("authors");
+  return authors.map((author) => ({
+    params: { slug: author.id },
+    props: { author },
+  }));
+}
+
+const { author } = Astro.props;
+const posts = (
+  await getCollection(
+    "posts",
+    ({ data }) =>
+      (import.meta.env.PROD ? data.draft !== true : true) &&
+      data.author === author.id,
+  )
+).sort((a, b) => b.data.pubDate.valueOf() - a.data.pubDate.valueOf());
+---
+
+<Base seo={{ title: author.data.title, description: author.data.bio }}>
+  <main>
+    <h1>{author.data.title}</h1>
+    {author.data.avatar && <img src={author.data.avatar} alt={author.data.title} />}
+    {author.data.bio && <p>{author.data.bio}</p>}
+    {
+      posts.length > 0 ? (
+        <ul>
+          {posts.map((p) => (
+            <li>
+              <a href={`/posts/${p.id}/`}>{p.data.title}</a>
+            </li>
+          ))}
+        </ul>
+      ) : (
+        <p>No posts by this author yet.</p>
+      )
+    }
+  </main>
+</Base>

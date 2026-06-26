@@ -68,6 +68,14 @@ collections:
         search_fields: [title]
         multiple: true
         required: false
+      - name: author
+        label: Author
+        widget: relation
+        collection: authors
+        value_field: "{{slug}}"
+        display_fields: [title]
+        search_fields: [title]
+        required: false
       - label: SEO
         name: seo
         widget: object
@@ -196,6 +204,22 @@ collections:
     fields:
       - { name: title, label: Name, widget: string }
       - { name: description, label: Description, widget: text, required: false }
+
+  - name: authors
+    label: Authors
+    label_singular: Author
+    icon: person
+    folder: src/content/authors
+    create: true
+    slug: "{{slug}}"
+    extension: md
+    format: frontmatter
+    summary: "{{title}}"
+    thumbnail: avatar
+    fields:
+      - { name: title, label: Name, widget: string }
+      - { name: bio, label: Bio, widget: text, required: false }
+      - { name: avatar, label: Avatar, widget: image, required: false }
 
   - divider: true
 

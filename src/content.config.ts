@@ -28,6 +28,8 @@ const posts = defineCollection({
     // Taxonomy slugs referencing the categories/tags collections (CMS relation).
     categories: z.array(z.string()).default([]),
     tags: z.array(z.string()).default([]),
+    // Author slug referencing the authors collection (CMS relation).
+    author: z.string().optional(),
     seo: seoSchema,
   }),
 });
@@ -49,6 +51,15 @@ const termSchema = z.object({
   description: z.string().optional(),
 });
 
+const authors = defineCollection({
+  loader: glob({ pattern: "**/*.{md,mdx}", base: "./src/content/authors" }),
+  schema: z.object({
+    title: z.string(),
+    bio: z.string().optional(),
+    avatar: z.string().optional(),
+  }),
+});
+
 const categories = defineCollection({
   loader: glob({ pattern: "**/*.{md,mdx}", base: "./src/content/categories" }),
   schema: termSchema,
@@ -59,4 +70,4 @@ const tags = defineCollection({
   schema: termSchema,
 });
 
-export const collections = { posts, pages, categories, tags };
+export const collections = { posts, pages, authors, categories, tags };
