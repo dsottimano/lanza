@@ -12,10 +12,14 @@ backend:
 media_folder: public/images/uploads
 public_folder: /images/uploads
 
+# WordPress-style sidebar: Posts / Pages, then taxonomies, then Settings.
+# `icon` uses Material Symbols names; `divider: true` groups the rail.
 collections:
+  # ── Content ────────────────────────────────────────────────────────────
   - name: posts
     label: Posts
     label_singular: Post
+    icon: push_pin
     folder: src/content/posts
     create: true
     slug: "{{slug}}"
@@ -37,6 +41,24 @@ collections:
           default: true,
         }
       - { name: description, label: Short description, widget: text, required: false }
+      - name: categories
+        label: Categories
+        widget: relation
+        collection: categories
+        value_field: "{{slug}}"
+        display_fields: [title]
+        search_fields: [title]
+        multiple: true
+        required: false
+      - name: tags
+        label: Tags
+        widget: relation
+        collection: tags
+        value_field: "{{slug}}"
+        display_fields: [title]
+        search_fields: [title]
+        multiple: true
+        required: false
       - label: SEO
         name: seo
         widget: object
@@ -76,8 +98,99 @@ collections:
           - { name: author, label: Author (JSON-LD), widget: string, required: false }
       - { name: body, label: Body, widget: markdown }
 
+  - name: pages
+    label: Pages
+    label_singular: Page
+    icon: description
+    folder: src/content/pages
+    create: true
+    slug: "{{slug}}"
+    extension: md
+    format: frontmatter
+    fields:
+      - { name: title, label: Title, widget: string }
+      - {
+          name: draft,
+          label: Draft (uncheck to publish),
+          widget: boolean,
+          default: true,
+        }
+      - { name: description, label: Short description, widget: text, required: false }
+      - label: SEO
+        name: seo
+        widget: object
+        required: false
+        collapsed: true
+        fields:
+          - { name: metaTitle, label: Meta title (overrides title), widget: string, required: false }
+          - {
+              name: metaDescription,
+              label: Meta description,
+              widget: text,
+              required: false,
+            }
+          - { name: ogImage, label: OG / social image, widget: image, required: false }
+          - {
+              name: canonical,
+              label: Canonical URL (override),
+              widget: string,
+              required: false,
+              hint: "Leave blank to auto-derive from the page path",
+            }
+          - {
+              name: ogType,
+              label: OG type,
+              widget: select,
+              options: ["website", "article"],
+              default: "website",
+              required: false,
+            }
+          - {
+              name: noindex,
+              label: Hide from search engines (noindex),
+              widget: boolean,
+              default: false,
+              required: false,
+            }
+      - { name: body, label: Body, widget: markdown }
+
+  - divider: true
+
+  # ── Taxonomies ─────────────────────────────────────────────────────────
+  - name: categories
+    label: Categories
+    label_singular: Category
+    icon: category
+    folder: src/content/categories
+    create: true
+    slug: "{{slug}}"
+    extension: md
+    format: frontmatter
+    summary: "{{title}}"
+    fields:
+      - { name: title, label: Name, widget: string }
+      - { name: description, label: Description, widget: text, required: false }
+
+  - name: tags
+    label: Tags
+    label_singular: Tag
+    icon: sell
+    folder: src/content/tags
+    create: true
+    slug: "{{slug}}"
+    extension: md
+    format: frontmatter
+    summary: "{{title}}"
+    fields:
+      - { name: title, label: Name, widget: string }
+      - { name: description, label: Description, widget: text, required: false }
+
+  - divider: true
+
+  # ── Settings ───────────────────────────────────────────────────────────
   - name: settings
     label: Settings
+    icon: settings
     files:
       - name: seo_defaults
         label: SEO defaults

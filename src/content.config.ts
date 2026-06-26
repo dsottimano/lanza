@@ -24,8 +24,37 @@ const posts = defineCollection({
     // excluded from the production build until an editor flips this in the CMS.
     draft: z.boolean().default(false),
     description: z.string().optional(),
+    // Taxonomy slugs referencing the categories/tags collections (CMS relation).
+    categories: z.array(z.string()).default([]),
+    tags: z.array(z.string()).default([]),
     seo: seoSchema,
   }),
 });
 
-export const collections = { posts };
+const pages = defineCollection({
+  loader: glob({ pattern: "**/*.{md,mdx}", base: "./src/content/pages" }),
+  schema: z.object({
+    title: z.string(),
+    draft: z.boolean().default(false),
+    description: z.string().optional(),
+    seo: seoSchema,
+  }),
+});
+
+// Taxonomy terms — one markdown file per term; the file slug IS the term slug.
+const termSchema = z.object({
+  title: z.string(),
+  description: z.string().optional(),
+});
+
+const categories = defineCollection({
+  loader: glob({ pattern: "**/*.{md,mdx}", base: "./src/content/categories" }),
+  schema: termSchema,
+});
+
+const tags = defineCollection({
+  loader: glob({ pattern: "**/*.{md,mdx}", base: "./src/content/tags" }),
+  schema: termSchema,
+});
+
+export const collections = { posts, pages, categories, tags };
