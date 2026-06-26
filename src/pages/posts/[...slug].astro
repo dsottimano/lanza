@@ -38,6 +38,18 @@ const article: ArticleInput = {
 >
   <main>
     <h1>{post.data.title}</h1>
+    {
+      (post.data.categories.length > 0 || post.data.tags.length > 0) && (
+        <p class="taxonomy">
+          {post.data.categories.map((c) => (
+            <a href={`/category/${c}/`}>{c}</a>
+          ))}
+          {post.data.tags.map((t) => (
+            <a href={`/tag/${t}/`}>#{t}</a>
+          ))}
+        </p>
+      )
+    }
     <Content />
   </main>
 </Base>

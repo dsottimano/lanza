@@ -1,5 +1,6 @@
 ---
 import Seo from "../components/Seo.astro";
+import { getCollection } from "astro:content";
 import type { PageSeo } from "../lib/seo";
 import type { ArticleInput } from "../lib/jsonld";
 
@@ -9,6 +10,13 @@ interface Props {
 }
 
 const { seo = {}, article = null } = Astro.props;
+
+// Pages appear in the site nav (WordPress-style menu). Build-time only.
+const pages = (
+  await getCollection("pages", ({ data }) =>
+    import.meta.env.PROD ? data.draft !== true : true,
+  )
+).sort((a, b) => a.data.title.localeCompare(b.data.title));
 ---
 
 <!doctype html>
@@ -19,6 +27,12 @@ const { seo = {}, article = null } = Astro.props;
     <Seo seo={seo} article={article} />
   </head>
   <body>
+    <header>
+      <nav>
+        <a href="/">Home</a>
+        {pages.map((p) => <a href={`/${p.id}/`}>{p.data.title}</a>)}
+      </nav>
+    </header>
     <slot />
   </body>
 </html>

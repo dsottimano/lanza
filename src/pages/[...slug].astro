@@ -1,0 +1,30 @@
+---
+import { getCollection, render } from "astro:content";
+import Base from "../layouts/Base.astro";
+
+// Standalone Pages (About, Contact, …) render at /<slug>. Static paths only —
+// this is not a runtime catch-all; getStaticPaths emits exactly the page slugs.
+export async function getStaticPaths() {
+  const pages = await getCollection("pages", ({ data }) =>
+    import.meta.env.PROD ? data.draft !== true : true,
+  );
+  return pages.map((page) => ({ params: { slug: page.id }, props: { page } }));
+}
+
+const { page } = Astro.props;
+const { Content } = await render(page);
+---
+
+<Base
+  seo={{
+    title: page.data.title,
+    description: page.data.description,
+    ogType: "website",
+    ...(page.data.seo ?? {}),
+  }}
+>
+  <main>
+    <h1>{page.data.title}</h1>
+    <Content />
+  </main>
+</Base>

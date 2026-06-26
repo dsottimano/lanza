@@ -1,0 +1,47 @@
+---
+import { getCollection } from "astro:content";
+import Base from "../../layouts/Base.astro";
+
+export async function getStaticPaths() {
+  const categories = await getCollection("categories");
+  return categories.map((category) => ({
+    params: { slug: category.id },
+    props: { category },
+  }));
+}
+
+const { category } = Astro.props;
+const posts = (
+  await getCollection(
+    "posts",
+    ({ data }) =>
+      (import.meta.env.PROD ? data.draft !== true : true) &&
+      data.categories.includes(category.id),
+  )
+).sort((a, b) => b.data.pubDate.valueOf() - a.data.pubDate.valueOf());
+---
+
+<Base
+  seo={{
+    title: `Category: ${category.data.title}`,
+    description: category.data.description,
+  }}
+>
+  <main>
+    <h1>Category: {category.data.title}</h1>
+    {category.data.description && <p>{category.data.description}</p>}
+    {
+      posts.length > 0 ? (
+        <ul>
+          {posts.map((p) => (
+            <li>
+              <a href={`/posts/${p.id}/`}>{p.data.title}</a>
+            </li>
+          ))}
+        </ul>
+      ) : (
+        <p>No posts in this category yet.</p>
+      )
+    }
+  </main>
+</Base>
