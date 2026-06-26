@@ -1,0 +1,63 @@
+---
+import type { CollectionEntry } from "astro:content";
+
+type Block = CollectionEntry<"pages">["data"]["blocks"][number];
+
+interface Props {
+  blocks: Block[];
+}
+
+const { blocks } = Astro.props;
+---
+
+{
+  blocks.map((block) => (
+    <>
+      {block.type === "hero" && (
+        <section class="block block-hero">
+          {block.image && <img src={block.image} alt="" />}
+          <h2>{block.heading}</h2>
+          {block.subheading && <p>{block.subheading}</p>}
+          {block.ctaText && block.ctaUrl && (
+            <a class="button" href={block.ctaUrl}>
+              {block.ctaText}
+            </a>
+          )}
+        </section>
+      )}
+
+      {block.type === "text" && (
+        <section class="block block-text">
+          {block.body.split(/\n{2,}/).map((para) => (
+            <p>{para}</p>
+          ))}
+        </section>
+      )}
+
+      {block.type === "image" && (
+        <figure class="block block-image">
+          <img src={block.image} alt={block.alt ?? ""} />
+          {block.caption && <figcaption>{block.caption}</figcaption>}
+        </figure>
+      )}
+
+      {block.type === "gallery" && (
+        <div class="block block-gallery">
+          {block.images.map((img) => (
+            <img src={img.image} alt={img.alt ?? ""} />
+          ))}
+        </div>
+      )}
+
+      {block.type === "cta" && (
+        <section class="block block-cta">
+          {block.heading && <h2>{block.heading}</h2>}
+          {block.text && <p>{block.text}</p>}
+          <a class="button" href={block.buttonUrl}>
+            {block.buttonText}
+          </a>
+        </section>
+      )}
+    </>
+  ))
+}

@@ -34,6 +34,42 @@ const posts = defineCollection({
   }),
 });
 
+// Page-builder blocks (Gutenberg-style). `type` is the discriminator key the
+// CMS list widget writes for each block.
+const blockSchema = z.discriminatedUnion("type", [
+  z.object({
+    type: z.literal("hero"),
+    heading: z.string(),
+    subheading: z.string().optional(),
+    image: z.string().optional(),
+    ctaText: z.string().optional(),
+    ctaUrl: z.string().optional(),
+  }),
+  z.object({
+    type: z.literal("text"),
+    body: z.string(),
+  }),
+  z.object({
+    type: z.literal("image"),
+    image: z.string(),
+    alt: z.string().optional(),
+    caption: z.string().optional(),
+  }),
+  z.object({
+    type: z.literal("gallery"),
+    images: z
+      .array(z.object({ image: z.string(), alt: z.string().optional() }))
+      .default([]),
+  }),
+  z.object({
+    type: z.literal("cta"),
+    heading: z.string().optional(),
+    text: z.string().optional(),
+    buttonText: z.string(),
+    buttonUrl: z.string(),
+  }),
+]);
+
 const pages = defineCollection({
   loader: glob({ pattern: "**/*.{md,mdx}", base: "./src/content/pages" }),
   schema: z.object({
@@ -41,6 +77,7 @@ const pages = defineCollection({
     draft: z.boolean().default(false),
     description: z.string().optional(),
     featuredImage: z.string().optional(),
+    blocks: z.array(blockSchema).default([]),
     seo: seoSchema,
   }),
 });

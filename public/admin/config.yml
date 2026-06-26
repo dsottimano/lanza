@@ -172,6 +172,58 @@ collections:
               default: false,
               required: false,
             }
+      # Page builder: a reorderable list of typed blocks (Gutenberg-style).
+      # Rendered above the Body. Rich prose lives in the Body field below.
+      - name: blocks
+        label: Content blocks
+        label_singular: Block
+        widget: list
+        required: false
+        types:
+          - name: hero
+            label: Hero
+            widget: object
+            summary: "Hero — {{fields.heading}}"
+            fields:
+              - { name: heading, label: Heading, widget: string }
+              - { name: subheading, label: Subheading, widget: text, required: false }
+              - { name: image, label: Background image, widget: image, required: false }
+              - { name: ctaText, label: Button text, widget: string, required: false }
+              - { name: ctaUrl, label: Button URL, widget: string, required: false }
+          - name: text
+            label: Text
+            widget: object
+            summary: "Text block"
+            fields:
+              - { name: body, label: Text, widget: text }
+          - name: image
+            label: Image
+            widget: object
+            summary: "Image"
+            fields:
+              - { name: image, label: Image, widget: image }
+              - { name: alt, label: Alt text, widget: string, required: false }
+              - { name: caption, label: Caption, widget: string, required: false }
+          - name: gallery
+            label: Gallery
+            widget: object
+            summary: "Gallery"
+            fields:
+              - name: images
+                label: Images
+                widget: list
+                fields:
+                  - { name: image, label: Image, widget: image }
+                  - { name: alt, label: Alt text, widget: string, required: false }
+          - name: cta
+            label: Call to action
+            widget: object
+            summary: "CTA — {{fields.heading}}"
+            fields:
+              - { name: heading, label: Heading, widget: string, required: false }
+              - { name: text, label: Text, widget: text, required: false }
+              - { name: buttonText, label: Button text, widget: string }
+              - { name: buttonUrl, label: Button URL, widget: string }
       - { name: body, label: Body, widget: markdown }
 
   - divider: true
