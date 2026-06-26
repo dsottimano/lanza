@@ -16,10 +16,13 @@ const { Content } = await render(post);
 const siteUrl = (Astro.site ?? new URL("/", Astro.url)).href.replace(/\/$/, "");
 const url = new URL(Astro.url.pathname, siteUrl + "/").href;
 
+// Featured image doubles as the social/og image and JSON-LD article image.
+const ogImage = post.data.seo?.ogImage || post.data.featuredImage;
+
 const article: ArticleInput = {
   title: post.data.title,
   description: post.data.description,
-  image: post.data.seo?.ogImage,
+  image: ogImage,
   datePublished: post.data.pubDate.toISOString(),
   dateModified: (post.data.updatedDate ?? post.data.pubDate).toISOString(),
   author: post.data.seo?.author,
@@ -33,11 +36,17 @@ const article: ArticleInput = {
     description: post.data.description,
     ogType: "article",
     ...(post.data.seo ?? {}),
+    ogImage,
   }}
   article={article}
 >
   <main>
     <h1>{post.data.title}</h1>
+    {
+      post.data.featuredImage && (
+        <img src={post.data.featuredImage} alt={post.data.title} />
+      )
+    }
     {
       (post.data.categories.length > 0 || post.data.tags.length > 0) && (
         <p class="taxonomy">

@@ -25,6 +25,14 @@ collections:
     slug: "{{slug}}"
     extension: md
     format: frontmatter
+    # WordPress posts-screen ergonomics: status tabs, sort, group, thumbnail.
+    thumbnail: featuredImage
+    sortable_fields: [title, pubDate]
+    view_filters:
+      - { label: Published, field: draft, pattern: false }
+      - { label: Drafts, field: draft, pattern: true }
+    view_groups:
+      - { label: Year, field: pubDate, pattern: '\d{4}' }
     fields:
       - { name: title, label: Title, widget: string }
       - { name: pubDate, label: Publish date, widget: datetime }
@@ -40,7 +48,8 @@ collections:
           widget: boolean,
           default: true,
         }
-      - { name: description, label: Short description, widget: text, required: false }
+      - { name: description, label: Excerpt, widget: text, required: false }
+      - { name: featuredImage, label: Featured image, widget: image, required: false }
       - name: categories
         label: Categories
         widget: relation
@@ -107,6 +116,8 @@ collections:
     slug: "{{slug}}"
     extension: md
     format: frontmatter
+    thumbnail: featuredImage
+    sortable_fields: [title]
     fields:
       - { name: title, label: Title, widget: string }
       - {
@@ -115,7 +126,8 @@ collections:
           widget: boolean,
           default: true,
         }
-      - { name: description, label: Short description, widget: text, required: false }
+      - { name: description, label: Excerpt, widget: text, required: false }
+      - { name: featuredImage, label: Featured image, widget: image, required: false }
       - label: SEO
         name: seo
         widget: object

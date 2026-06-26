@@ -21,10 +21,16 @@ const { Content } = await render(page);
     description: page.data.description,
     ogType: "website",
     ...(page.data.seo ?? {}),
+    ogImage: page.data.seo?.ogImage || page.data.featuredImage,
   }}
 >
   <main>
     <h1>{page.data.title}</h1>
+    {
+      page.data.featuredImage && (
+        <img src={page.data.featuredImage} alt={page.data.title} />
+      )
+    }
     <Content />
   </main>
 </Base>

@@ -24,6 +24,7 @@ const posts = defineCollection({
     // excluded from the production build until an editor flips this in the CMS.
     draft: z.boolean().default(false),
     description: z.string().optional(),
+    featuredImage: z.string().optional(),
     // Taxonomy slugs referencing the categories/tags collections (CMS relation).
     categories: z.array(z.string()).default([]),
     tags: z.array(z.string()).default([]),
@@ -37,6 +38,7 @@ const pages = defineCollection({
     title: z.string(),
     draft: z.boolean().default(false),
     description: z.string().optional(),
+    featuredImage: z.string().optional(),
     seo: seoSchema,
   }),
 });
