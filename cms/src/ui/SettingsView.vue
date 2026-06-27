@@ -3,6 +3,7 @@
 // Same field renderer as everything else; persists via the JSON file helpers.
 import { reactive, ref, watch } from "vue";
 import FieldForm from "../fields/FieldForm.vue";
+import SaveButton from "./SaveButton.vue";
 import { GitHubClient } from "../backend/github";
 import type { FileEntry } from "../schema";
 
@@ -10,9 +11,7 @@ const props = defineProps<{ client: GitHubClient; file: FileEntry }>();
 const emit = defineEmits<{ (e: "back"): void }>();
 
 const loading = ref(true);
-const saving = ref(false);
 const error = ref("");
-const status = ref("");
 
 const data = reactive<Record<string, unknown>>({});
 let sha: string | undefined;
@@ -20,7 +19,6 @@ let sha: string | undefined;
 async function load() {
   loading.value = true;
   error.value = "";
-  status.value = "";
   for (const k of Object.keys(data)) delete data[k];
   try {
     const loaded = await props.client.loadJson(props.file.file);
@@ -36,23 +34,12 @@ async function load() {
 watch(() => props.file.name, load, { immediate: true });
 
 async function save() {
-  if (saving.value) return;
-  error.value = "";
-  status.value = "";
-  saving.value = true;
-  try {
-    sha = await props.client.saveJson(
-      props.file.file,
-      { ...data },
-      `cms: update ${props.file.file}`,
-      sha,
-    );
-    status.value = "Saved ✓";
-  } catch (e) {
-    error.value = e instanceof Error ? e.message : "Save failed.";
-  } finally {
-    saving.value = false;
-  }
+  sha = await props.client.saveJson(
+    props.file.file,
+    { ...data },
+    `cms: update ${props.file.file}`,
+    sha,
+  );
 }
 </script>
 
@@ -62,11 +49,13 @@ async function save() {
       <button class="ghost" @click="emit('back')">← Back</button>
       <span class="status">
         <span v-if="error" class="err">{{ error }}</span>
-        <span v-else-if="status">{{ status }}</span>
       </span>
-      <button class="save" :disabled="saving || loading" @click="save">
-        {{ saving ? "Saving…" : "Save" }}
-      </button>
+      <SaveButton
+        :action="save"
+        :disabled="loading"
+        @saved="error = ''"
+        @error="(m) => (error = m)"
+      />
     </header>
 
     <main class="sheet">
@@ -111,18 +100,6 @@ async function save() {
 }
 .muted {
   color: #999;
-}
-.save {
-  padding: 0.45rem 1rem;
-  border: none;
-  border-radius: 7px;
-  background: #1a1a1a;
-  color: #fff;
-  cursor: pointer;
-}
-.save:disabled {
-  opacity: 0.5;
-  cursor: default;
 }
 .sheet {
   max-width: 40rem;

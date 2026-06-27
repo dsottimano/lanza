@@ -3,6 +3,7 @@
 // No writing canvas — just the schema fields. Any existing body is preserved.
 import { onMounted, reactive, ref } from "vue";
 import FieldForm from "../fields/FieldForm.vue";
+import SaveButton from "./SaveButton.vue";
 import { GitHubClient } from "../backend/github";
 import type { FolderCollection } from "../schema";
 import { slugify } from "../backend/auth";
@@ -15,9 +16,7 @@ const props = defineProps<{
 const emit = defineEmits<{ (e: "back", changed: boolean): void }>();
 
 const loading = ref(true);
-const saving = ref(false);
 const error = ref("");
-const status = ref("");
 let committedSomething = false;
 
 const data = reactive<Record<string, unknown>>({});
@@ -45,28 +44,17 @@ onMounted(async () => {
 });
 
 async function save() {
-  if (saving.value) return;
-  error.value = "";
-  status.value = "";
-  saving.value = true;
-  try {
-    if (!currentPath) {
-      currentPath = `${props.collection.folder}/${slugify(String(data.title ?? ""))}.md`;
-    }
-    sha = await props.client.saveEntry(
-      currentPath,
-      { ...data },
-      body,
-      `${sha ? "cms: update" : "cms: create"} ${currentPath}`,
-      sha,
-    );
-    committedSomething = true;
-    status.value = "Saved ✓";
-  } catch (e) {
-    error.value = e instanceof Error ? e.message : "Save failed.";
-  } finally {
-    saving.value = false;
+  if (!currentPath) {
+    currentPath = `${props.collection.folder}/${slugify(String(data.title ?? ""))}.md`;
   }
+  sha = await props.client.saveEntry(
+    currentPath,
+    { ...data },
+    body,
+    `${sha ? "cms: update" : "cms: create"} ${currentPath}`,
+    sha,
+  );
+  committedSomething = true;
 }
 </script>
 
@@ -76,11 +64,13 @@ async function save() {
       <button class="ghost" @click="emit('back', committedSomething)">← {{ collection.label }}</button>
       <span class="status">
         <span v-if="error" class="err">{{ error }}</span>
-        <span v-else-if="status">{{ status }}</span>
       </span>
-      <button class="save" :disabled="saving || loading" @click="save">
-        {{ saving ? "Saving…" : "Save" }}
-      </button>
+      <SaveButton
+        :action="save"
+        :disabled="loading"
+        @saved="error = ''"
+        @error="(m) => (error = m)"
+      />
     </header>
 
     <main class="sheet">
@@ -124,18 +114,6 @@ async function save() {
 }
 .muted {
   color: #999;
-}
-.save {
-  padding: 0.45rem 1rem;
-  border: none;
-  border-radius: 7px;
-  background: #1a1a1a;
-  color: #fff;
-  cursor: pointer;
-}
-.save:disabled {
-  opacity: 0.5;
-  cursor: default;
 }
 .sheet {
   max-width: 40rem;

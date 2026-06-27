@@ -6,6 +6,7 @@
 import { computed, onMounted, reactive, ref, useTemplateRef } from "vue";
 import Editor from "../editor/Editor.vue";
 import FieldForm from "../fields/FieldForm.vue";
+import SaveButton from "./SaveButton.vue";
 import { GitHubClient } from "../backend/github";
 import type { FolderCollection, Field } from "../schema";
 import { toEditorHtml } from "../backend/markdown";
@@ -21,9 +22,7 @@ const emit = defineEmits<{ (e: "back", changed: boolean): void }>();
 const editorRef = useTemplateRef<InstanceType<typeof Editor>>("editorRef");
 
 const loading = ref(true);
-const saving = ref(false);
 const error = ref("");
-const status = ref("");
 const dirty = ref(false);
 const drawerOpen = ref(false);
 let committedSomething = false;
@@ -67,38 +66,26 @@ onMounted(async () => {
 });
 
 async function save() {
-  if (saving.value) return;
-  error.value = "";
-  status.value = "";
-  saving.value = true;
-  try {
-    const body = editorRef.value?.getHTML() ?? "";
-    if (props.collection.name === "posts") data.updatedDate = new Date().toISOString();
+  const body = editorRef.value?.getHTML() ?? "";
+  if (props.collection.name === "posts") data.updatedDate = new Date().toISOString();
 
-    if (!currentPath) {
-      const slug = slugify(String(data.title ?? ""));
-      currentPath = `${props.collection.folder}/${slug}.md`;
-    }
-    sha = await props.client.saveEntry(
-      currentPath,
-      { ...data },
-      body,
-      `${sha ? "cms: update" : "cms: create"} ${currentPath}`,
-      sha,
-    );
-    dirty.value = false;
-    committedSomething = true;
-    status.value = "Saved ✓";
-  } catch (e) {
-    error.value = e instanceof Error ? e.message : "Save failed.";
-  } finally {
-    saving.value = false;
+  if (!currentPath) {
+    const slug = slugify(String(data.title ?? ""));
+    currentPath = `${props.collection.folder}/${slug}.md`;
   }
+  sha = await props.client.saveEntry(
+    currentPath,
+    { ...data },
+    body,
+    `${sha ? "cms: update" : "cms: create"} ${currentPath}`,
+    sha,
+  );
+  dirty.value = false;
+  committedSomething = true;
 }
 
 function markDirty() {
   dirty.value = true;
-  status.value = "";
 }
 </script>
 
@@ -110,7 +97,6 @@ function markDirty() {
       </button>
       <span class="status">
         <span v-if="error" class="err">{{ error }}</span>
-        <span v-else-if="status">{{ status }}</span>
         <span v-else-if="dirty" class="muted">Unsaved changes</span>
       </span>
       <div class="actions">
@@ -123,9 +109,12 @@ function markDirty() {
           Published
         </label>
         <button class="ghost gear" @click="drawerOpen = true" title="Settings">⚙ Settings</button>
-        <button class="save" :disabled="saving || loading" @click="save">
-          {{ saving ? "Saving…" : "Save" }}
-        </button>
+        <SaveButton
+          :action="save"
+          :disabled="loading"
+          @saved="error = ''"
+          @error="(m) => (error = m)"
+        />
       </div>
     </header>
 
@@ -208,18 +197,6 @@ function markDirty() {
   font-size: 0.85rem;
   color: #555;
   cursor: pointer;
-}
-.save {
-  padding: 0.45rem 1rem;
-  border: none;
-  border-radius: 7px;
-  background: #1a1a1a;
-  color: #fff;
-  cursor: pointer;
-}
-.save:disabled {
-  opacity: 0.5;
-  cursor: default;
 }
 .canvas {
   flex: 1;
