@@ -4,7 +4,8 @@
   "type": "module",
   "scripts": {
     "dev": "astro dev",
-    "build": "node scripts/gen-redirects.mjs && astro build",
+    "build:studio": "npm --prefix cms ci && npm --prefix cms run build",
+    "build": "npm run build:studio && node scripts/gen-redirects.mjs && astro build",
     "preview": "astro preview",
     "check": "astro check"
   },
