@@ -1,12 +1,21 @@
 <script setup lang="ts">
-import { onMounted, ref, useTemplateRef } from "vue";
+// Rich-body entry editor (posts & pages). The writing canvas stays front and
+// centre; every structured field lives in a Ghost-style slide-in drawer driven
+// by the collection schema. Title and the draft/publish toggle are surfaced in
+// the chrome, so they're excluded from the drawer.
+import { computed, onMounted, reactive, ref, useTemplateRef } from "vue";
 import Editor from "../editor/Editor.vue";
+import FieldForm from "../fields/FieldForm.vue";
 import { GitHubClient } from "../backend/github";
-import { POSTS_DIR } from "../backend/config";
+import type { FolderCollection, Field } from "../schema";
 import { toEditorHtml } from "../backend/markdown";
 import { slugify } from "../backend/auth";
 
-const props = defineProps<{ client: GitHubClient; path: string | null }>();
+const props = defineProps<{
+  client: GitHubClient;
+  collection: FolderCollection;
+  path: string | null;
+}>();
 const emit = defineEmits<{ (e: "back", changed: boolean): void }>();
 
 const editorRef = useTemplateRef<InstanceType<typeof Editor>>("editorRef");
@@ -16,33 +25,42 @@ const saving = ref(false);
 const error = ref("");
 const status = ref("");
 const dirty = ref(false);
+const drawerOpen = ref(false);
 let committedSomething = false;
 
-// Frontmatter we edit in Phase 2; everything else is preserved verbatim.
-const title = ref("");
-const draft = ref(true);
-const description = ref("");
+// All editable frontmatter lives here; unknown keys are preserved verbatim.
+const data = reactive<Record<string, unknown>>({});
 const bodyHtml = ref("<p></p>");
-let data: Record<string, unknown> = {};
 let sha: string | undefined;
 let currentPath = props.path;
+
+// Drawer shows every field except the ones promoted into the chrome.
+const drawerFields = computed<Field[]>(() =>
+  props.collection.fields.filter((f) => f.name !== "title" && f.name !== "draft"),
+);
+
+function applyDefaults() {
+  for (const f of props.collection.fields) {
+    if (f.default !== undefined && data[f.name] === undefined) data[f.name] = f.default;
+  }
+}
 
 onMounted(async () => {
   try {
     if (props.path) {
-      const post = await props.client.loadPost(props.path);
-      data = post.data;
-      sha = post.sha;
-      title.value = String(data.title ?? "");
-      draft.value = data.draft !== false;
-      description.value = String(data.description ?? "");
-      bodyHtml.value = toEditorHtml(post.body);
+      const entry = await props.client.loadEntry(props.path);
+      Object.assign(data, entry.data);
+      sha = entry.sha;
+      bodyHtml.value = toEditorHtml(entry.body);
     } else {
-      data = { pubDate: new Date().toISOString(), draft: true };
+      applyDefaults();
+      if (props.collection.fields.some((f) => f.name === "pubDate") && !data.pubDate) {
+        data.pubDate = new Date().toISOString();
+      }
       bodyHtml.value = "<p></p>";
     }
   } catch (e) {
-    error.value = e instanceof Error ? e.message : "Failed to load post.";
+    error.value = e instanceof Error ? e.message : "Failed to load entry.";
   } finally {
     loading.value = false;
   }
@@ -55,26 +73,19 @@ async function save() {
   saving.value = true;
   try {
     const body = editorRef.value?.getHTML() ?? "";
-    const merged: Record<string, unknown> = {
-      ...data,
-      title: title.value,
-      draft: draft.value,
-      description: description.value,
-      updatedDate: new Date().toISOString(),
-    };
-    if (!merged.pubDate) merged.pubDate = new Date().toISOString();
+    if (props.collection.name === "posts") data.updatedDate = new Date().toISOString();
 
     if (!currentPath) {
-      currentPath = `${POSTS_DIR}/${slugify(title.value)}.md`;
+      const slug = slugify(String(data.title ?? ""));
+      currentPath = `${props.collection.folder}/${slug}.md`;
     }
-    sha = await props.client.savePost(
+    sha = await props.client.saveEntry(
       currentPath,
-      merged,
+      { ...data },
       body,
       `${sha ? "cms: update" : "cms: create"} ${currentPath}`,
       sha,
     );
-    data = merged;
     dirty.value = false;
     committedSomething = true;
     status.value = "Saved ✓";
@@ -94,7 +105,9 @@ function markDirty() {
 <template>
   <div class="editor-view">
     <header class="bar">
-      <button class="ghost" @click="emit('back', committedSomething)">← Posts</button>
+      <button class="ghost" @click="emit('back', committedSomething)">
+        ← {{ collection.label }}
+      </button>
       <span class="status">
         <span v-if="error" class="err">{{ error }}</span>
         <span v-else-if="status">{{ status }}</span>
@@ -102,9 +115,14 @@ function markDirty() {
       </span>
       <div class="actions">
         <label class="toggle">
-          <input type="checkbox" :checked="!draft" @change="draft = !draft; markDirty()" />
+          <input
+            type="checkbox"
+            :checked="data.draft === false"
+            @change="data.draft = (($event.target as HTMLInputElement).checked ? false : true); markDirty()"
+          />
           Published
         </label>
+        <button class="ghost gear" @click="drawerOpen = true" title="Settings">⚙ Settings</button>
         <button class="save" :disabled="saving || loading" @click="save">
           {{ saving ? "Saving…" : "Save" }}
         </button>
@@ -115,14 +133,26 @@ function markDirty() {
       <div v-if="loading" class="muted center">Loading…</div>
       <div v-else class="sheet">
         <input
-          v-model="title"
+          v-model="data.title"
           class="title"
-          placeholder="Post title"
+          :placeholder="`${collection.labelSingular} title`"
           @input="markDirty"
         />
         <Editor ref="editorRef" :initial-html="bodyHtml" @change="markDirty" />
       </div>
     </main>
+
+    <!-- Ghost-style settings drawer -->
+    <div v-if="drawerOpen" class="scrim" @click="drawerOpen = false" />
+    <aside class="drawer" :class="{ open: drawerOpen }" @input="markDirty" @change="markDirty">
+      <div class="drawerhead">
+        <strong>{{ collection.labelSingular }} settings</strong>
+        <button class="ghost" @click="drawerOpen = false">✕</button>
+      </div>
+      <div class="drawerbody">
+        <FieldForm v-if="!loading" :fields="drawerFields" :data="data" :client="client" />
+      </div>
+    </aside>
   </div>
 </template>
 
@@ -151,6 +181,9 @@ function markDirty() {
   color: #555;
   cursor: pointer;
   font: inherit;
+}
+.gear {
+  color: #444;
 }
 .status {
   flex: 1;
@@ -215,5 +248,41 @@ function markDirty() {
 }
 .title::placeholder {
   color: #cfcfcf;
+}
+.scrim {
+  position: fixed;
+  inset: 0;
+  background: rgba(0, 0, 0, 0.18);
+  z-index: 40;
+}
+.drawer {
+  position: fixed;
+  top: 0;
+  right: 0;
+  z-index: 50;
+  width: min(420px, 92vw);
+  height: 100vh;
+  background: #fff;
+  border-left: 1px solid #e6e6e6;
+  box-shadow: -12px 0 32px rgba(0, 0, 0, 0.08);
+  transform: translateX(100%);
+  transition: transform 0.18s ease;
+  display: flex;
+  flex-direction: column;
+}
+.drawer.open {
+  transform: translateX(0);
+}
+.drawerhead {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 1rem 1.1rem;
+  border-bottom: 1px solid #eee;
+}
+.drawerbody {
+  flex: 1;
+  overflow-y: auto;
+  padding: 1.1rem;
 }
 </style>

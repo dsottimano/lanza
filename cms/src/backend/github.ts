@@ -1,19 +1,25 @@
-import { REPO, POSTS_DIR } from "./config";
+import { REPO } from "./config";
 import { parseFrontmatter, serializeFrontmatter } from "./frontmatter";
 
 const API = "https://api.github.com";
 
-export interface PostEntry {
+export interface RepoFile {
   name: string; // file name, e.g. hello-world.md
   path: string; // full repo path
   sha: string; // blob sha (needed for update/delete)
 }
 
-export interface LoadedPost {
+export interface LoadedEntry {
   path: string;
   sha: string;
   data: Record<string, unknown>;
-  body: string; // raw body as stored in the file
+  body: string; // raw markdown body as stored in the file
+}
+
+export interface LoadedJson {
+  path: string;
+  sha: string;
+  data: Record<string, unknown>;
 }
 
 // ── base64 <-> UTF-8 (GitHub content is base64 of UTF-8 bytes) ──
@@ -63,12 +69,14 @@ export class GitHubClient {
     return user.login;
   }
 
-  private repoPath(p: string): string {
-    return `/repos/${REPO.owner}/${REPO.name}/contents/${p}?ref=${REPO.branch}`;
+  private contentsUrl(p: string, withRef = true): string {
+    const base = `/repos/${REPO.owner}/${REPO.name}/contents/${p}`;
+    return withRef ? `${base}?ref=${REPO.branch}` : base;
   }
 
-  async listPosts(): Promise<PostEntry[]> {
-    const items = (await this.req(this.repoPath(POSTS_DIR))) as Array<{
+  /** List markdown files in a folder-collection directory. */
+  async listDir(dir: string): Promise<RepoFile[]> {
+    const items = (await this.req(this.contentsUrl(dir))) as Array<{
       name: string;
       path: string;
       sha: string;
@@ -79,8 +87,9 @@ export class GitHubClient {
       .map(({ name, path, sha }) => ({ name, path, sha }));
   }
 
-  async loadPost(path: string): Promise<LoadedPost> {
-    const file = (await this.req(this.repoPath(path))) as {
+  /** Load a markdown entry: parsed frontmatter + raw body. */
+  async loadEntry(path: string): Promise<LoadedEntry> {
+    const file = (await this.req(this.contentsUrl(path))) as {
       content: string;
       sha: string;
     };
@@ -89,27 +98,52 @@ export class GitHubClient {
     return { path, sha: file.sha, data, body };
   }
 
-  /** Create or update a post. Omit `sha` to create; pass it to update. */
-  async savePost(
+  /** Create or update a markdown entry. Omit `sha` to create. */
+  async saveEntry(
     path: string,
     data: Record<string, unknown>,
     body: string,
     message: string,
     sha?: string,
   ): Promise<string> {
-    const content = utf8ToB64(serializeFrontmatter(data, body));
-    const result = (await this.req(
-      `/repos/${REPO.owner}/${REPO.name}/contents/${path}`,
-      {
-        method: "PUT",
-        body: JSON.stringify({ message, content, branch: REPO.branch, sha }),
-      },
-    )) as { content: { sha: string } };
+    return this.putFile(path, serializeFrontmatter(data, body), message, sha);
+  }
+
+  /** Load a JSON settings file. */
+  async loadJson(path: string): Promise<LoadedJson> {
+    const file = (await this.req(this.contentsUrl(path))) as {
+      content: string;
+      sha: string;
+    };
+    const data = JSON.parse(b64ToUtf8(file.content)) as Record<string, unknown>;
+    return { path, sha: file.sha, data };
+  }
+
+  /** Save a JSON settings file (2-space indented, trailing newline). */
+  async saveJson(
+    path: string,
+    data: Record<string, unknown>,
+    message: string,
+    sha?: string,
+  ): Promise<string> {
+    return this.putFile(path, `${JSON.stringify(data, null, 2)}\n`, message, sha);
+  }
+
+  private async putFile(
+    path: string,
+    text: string,
+    message: string,
+    sha?: string,
+  ): Promise<string> {
+    const result = (await this.req(this.contentsUrl(path, false), {
+      method: "PUT",
+      body: JSON.stringify({ message, content: utf8ToB64(text), branch: REPO.branch, sha }),
+    })) as { content: { sha: string } };
     return result.content.sha;
   }
 
-  async deletePost(path: string, sha: string, message: string): Promise<void> {
-    await this.req(`/repos/${REPO.owner}/${REPO.name}/contents/${path}`, {
+  async deleteFile(path: string, sha: string, message: string): Promise<void> {
+    await this.req(this.contentsUrl(path, false), {
       method: "DELETE",
       body: JSON.stringify({ message, sha, branch: REPO.branch }),
     });

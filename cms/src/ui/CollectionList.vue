@@ -1,14 +1,17 @@
 <script setup lang="ts">
-import { onMounted, ref } from "vue";
-import { GitHubClient, type PostEntry } from "../backend/github";
+// Generic entry list for any folder collection. Entries are listed by filename
+// (the slug); titles would need a per-file fetch, which isn't worth it here.
+import { ref, watch } from "vue";
+import { GitHubClient, type RepoFile } from "../backend/github";
+import type { FolderCollection } from "../schema";
 
-const props = defineProps<{ client: GitHubClient }>();
+const props = defineProps<{ client: GitHubClient; collection: FolderCollection }>();
 const emit = defineEmits<{
   (e: "open", path: string): void;
   (e: "new"): void;
 }>();
 
-const posts = ref<PostEntry[]>([]);
+const entries = ref<RepoFile[]>([]);
 const loading = ref(true);
 const error = ref("");
 
@@ -16,35 +19,35 @@ async function load() {
   loading.value = true;
   error.value = "";
   try {
-    posts.value = (await props.client.listPosts()).sort((a, b) =>
+    entries.value = (await props.client.listDir(props.collection.folder)).sort((a, b) =>
       a.name.localeCompare(b.name),
     );
   } catch (e) {
-    error.value = e instanceof Error ? e.message : "Failed to load posts.";
+    error.value = e instanceof Error ? e.message : "Failed to load entries.";
   } finally {
     loading.value = false;
   }
 }
 
-onMounted(load);
+watch(() => props.collection.name, load, { immediate: true });
 defineExpose({ reload: load });
 </script>
 
 <template>
   <div class="list">
     <div class="head">
-      <h2>Posts</h2>
-      <button class="new" @click="emit('new')">+ New post</button>
+      <h2>{{ collection.label }}</h2>
+      <button class="new" @click="emit('new')">+ New {{ collection.labelSingular.toLowerCase() }}</button>
     </div>
 
     <p v-if="loading" class="muted">Loading…</p>
     <p v-else-if="error" class="err">{{ error }}</p>
-    <p v-else-if="!posts.length" class="muted">No posts yet.</p>
+    <p v-else-if="!entries.length" class="muted">No entries yet.</p>
 
     <ul v-else>
-      <li v-for="p in posts" :key="p.path">
-        <button class="row" @click="emit('open', p.path)">
-          <span class="name">{{ p.name }}</span>
+      <li v-for="e in entries" :key="e.path">
+        <button class="row" @click="emit('open', e.path)">
+          <span class="name">{{ e.name.replace(/\.md$/, "") }}</span>
           <span class="arrow">→</span>
         </button>
       </li>

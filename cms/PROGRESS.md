@@ -14,11 +14,14 @@ markdown files to this repo via the GitHub API. Full plan + rationale:
 - [x] **Phase 2 — GitHub backend.** Token sign-in, list/load/edit/**commit** posts
       via Contents API, frontmatter preserved, markdown→HTML on load.
       **Verified live**: edit committed to origin as `f5cce18`.
-- [ ] **Phase 3 — Structured fields + other collections.** ← NEXT
-      Ghost-style settings drawer (pubDate / featuredImage / categories / tags /
-      author / full SEO) + editors for pages (incl. blocks), categories, tags,
-      authors, and the settings files (`seo.json`, `menu.json`, `redirects.json`).
-      Use a typed schema module in `cms/src/` (replaces `config.yml`).
+- [x] **Phase 3 — Structured fields + other collections.** Typed schema module
+      (`cms/src/schema.ts`) replaces `config.yml`. Schema-driven, recursive field
+      renderer (`cms/src/fields/`). Posts/pages get a Ghost-style **settings
+      drawer** (pubDate / featuredImage / categories / tags / author / full SEO,
+      plus page blocks). Form-only editors for categories/tags/authors. JSON
+      editors for `seo.json` / `menu.json` / `redirects.json`. Collection rail in
+      the sidebar. **Build + typecheck pass; needs live commit round-trip check**
+      (esp. relation pickers, page blocks, and the 3 settings files).
 - [ ] **Phase 4 — Media.** Image upload → commit to `public/images/uploads`
       (Git Data API for atomic post+image commit) → insert `/images/uploads/…` URL.
       Replaces the Phase-1 "paste a URL" placeholder in the Figure card.
@@ -82,11 +85,22 @@ publishes).
 
 ## Key files
 
+- `cms/src/schema.ts` — the content model (collections + fields). **Single source
+  of truth; replaces `config.yml`.** Folder collections (posts/pages/taxonomies/
+  authors) + the `files` collection (settings JSON). Edit here to add fields.
 - `cms/src/editor/` — TipTap editor, card nodes (`extensions/`), node-views
   (`nodeviews/`), slash menu.
-- `cms/src/backend/` — `github.ts` (Contents API client), `frontmatter.ts`
-  (js-yaml), `markdown.ts` (md→html via marked), `auth.ts`, `config.ts` (repo coords).
-- `cms/src/ui/` — `LoginView`, `PostList`, `EditorView`. `App.vue` switches views.
+- `cms/src/fields/` — schema-driven form: `FieldForm.vue` (root, provides client),
+  `FieldInput.vue` (recursive, one field), `ListInput.vue` (array/blocks/scalar
+  lists), `RelationInput.vue` (slug picker), `context.ts` (client inject key).
+- `cms/src/backend/` — `github.ts` (generic Contents API: `listDir`/`loadEntry`/
+  `saveEntry` for markdown, `loadJson`/`saveJson` for settings, `deleteFile`),
+  `frontmatter.ts` (js-yaml), `markdown.ts` (md→html via marked), `auth.ts`,
+  `config.ts` (repo coords).
+- `cms/src/ui/` — `LoginView`, `Sidebar` (collection rail), `CollectionList`
+  (generic list), `EditorView` (rich body + settings drawer, posts/pages),
+  `RecordEditor` (form-only, taxonomies/authors), `SettingsView` (JSON files).
+  `App.vue` is the shell/router.
 
 ## Pinned versions (no `^`)
 
