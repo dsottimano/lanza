@@ -49,7 +49,7 @@ const article: ArticleInput = {
   }}
   article={article}
 >
-  <main>
+  <main class={post.data.layout && post.data.layout !== "default" ? `layout-${post.data.layout}` : undefined}>
     <h1>{post.data.title}</h1>
     {
       authorName && (

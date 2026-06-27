@@ -212,6 +212,15 @@ export const COLLECTIONS: Collection[] = [
         collection: "authors",
         required: false,
       },
+      {
+        name: "layout",
+        label: "Layout",
+        widget: "select",
+        options: ["default", "wide", "landing"],
+        default: "default",
+        required: false,
+        hint: "Overrides the site theme's default width for this entry.",
+      },
       seoField({ ogTypeDefault: "article", withAuthor: true }),
     ],
   },
@@ -228,6 +237,15 @@ export const COLLECTIONS: Collection[] = [
       { name: "draft", label: "Draft (uncheck to publish)", widget: "boolean", default: true },
       { name: "description", label: "Excerpt", widget: "text", required: false },
       { name: "featuredImage", label: "Featured image", widget: "image", required: false },
+      {
+        name: "layout",
+        label: "Layout",
+        widget: "select",
+        options: ["default", "wide", "landing"],
+        default: "default",
+        required: false,
+        hint: "Overrides the site theme's default width for this entry.",
+      },
       PAGE_BLOCKS,
       seoField({ ogTypeDefault: "website", withAuthor: false }),
     ],
@@ -282,6 +300,21 @@ export const COLLECTIONS: Collection[] = [
     name: "settings",
     label: "Settings",
     files: [
+      {
+        name: "appearance",
+        label: "Appearance",
+        file: "src/data/appearance.json",
+        fields: [
+          {
+            name: "theme",
+            label: "Site theme",
+            widget: "select",
+            options: ["editorial", "magazine", "landing", "classic"],
+            default: "editorial",
+            hint: "The public site's look. Per-entry Layout can still override the width.",
+          },
+        ],
+      },
       {
         name: "seo_defaults",
         label: "SEO defaults",

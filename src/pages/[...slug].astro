@@ -26,7 +26,7 @@ const body = sanitizeBody(page.body ?? "");
     ogImage: page.data.seo?.ogImage || page.data.featuredImage,
   }}
 >
-  <main>
+  <main class={page.data.layout && page.data.layout !== "default" ? `layout-${page.data.layout}` : undefined}>
     <h1>{page.data.title}</h1>
     {
       page.data.featuredImage && (

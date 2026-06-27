@@ -1,0 +1,424 @@
+/* Lanza public-site themes.
+   One stylesheet, driven by CSS variables. The shared element rules below use
+   the variables; each `[data-theme="…"]` block (further down) re-skins the site
+   by overriding them. <html data-theme> is set in Base.astro from
+   src/data/appearance.json. Per-page `layout` adds a class on <main>. */
+
+/* ── tokens (defaults = Editorial) ─────────────────────────────────────── */
+:root {
+  --font-ui: ui-sans-serif, system-ui, -apple-system, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
+  --font-prose: Georgia, "Times New Roman", serif;
+  --font-heading: Georgia, "Times New Roman", serif;
+
+  --bg: #ffffff;
+  --surface: #faf9f7;
+  --ink: #1a1a1a;
+  --muted: #6b6b6b;
+  --accent: #1a1a1a;
+  --border: #e7e5e1;
+
+  --content: 44rem; /* reading column */
+  --wide: 64rem;
+  --radius: 10px;
+
+  --h1-size: 2.7rem;
+  --h1-weight: 700;
+  --prose-size: 1.2rem;
+  --prose-leading: 1.75;
+  --header-border: 1px solid var(--border);
+  --nav-transform: none;
+  --nav-weight: 500;
+}
+
+/* ── base ──────────────────────────────────────────────────────────────── */
+*,
+*::before,
+*::after {
+  box-sizing: border-box;
+}
+html {
+  -webkit-text-size-adjust: 100%;
+}
+body {
+  margin: 0;
+  background: var(--bg);
+  color: var(--ink);
+  font-family: var(--font-ui);
+  line-height: 1.6;
+  -webkit-font-smoothing: antialiased;
+  text-rendering: optimizeLegibility;
+}
+img {
+  max-width: 100%;
+  height: auto;
+}
+a {
+  color: var(--accent);
+  text-underline-offset: 2px;
+}
+
+/* ── site header / footer ──────────────────────────────────────────────── */
+.site-header {
+  border-bottom: var(--header-border);
+}
+.site-header .bar {
+  max-width: var(--wide);
+  margin: 0 auto;
+  padding: 1.1rem 1.25rem;
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: 1.5rem;
+  flex-wrap: wrap;
+}
+.brand {
+  font-family: var(--font-heading);
+  font-size: 1.4rem;
+  font-weight: 700;
+  letter-spacing: -0.01em;
+  color: var(--ink);
+  text-decoration: none;
+}
+.site-nav {
+  display: flex;
+  gap: 1.2rem;
+  flex-wrap: wrap;
+}
+.site-nav a {
+  color: var(--muted);
+  text-decoration: none;
+  font-size: 0.95rem;
+  font-weight: var(--nav-weight);
+  text-transform: var(--nav-transform);
+  letter-spacing: 0.01em;
+}
+.site-nav a:hover {
+  color: var(--ink);
+}
+.site-footer {
+  border-top: 1px solid var(--border);
+  margin-top: 5rem;
+}
+.site-footer .bar {
+  max-width: var(--wide);
+  margin: 0 auto;
+  padding: 2rem 1.25rem;
+  color: var(--muted);
+  font-size: 0.85rem;
+}
+
+/* ── content column + per-page layout ──────────────────────────────────── */
+main {
+  max-width: var(--content);
+  margin: 0 auto;
+  padding: 3.5rem 1.25rem 1rem;
+}
+main.layout-wide {
+  max-width: var(--wide);
+}
+main.layout-landing {
+  max-width: none;
+  padding: 0;
+}
+main.layout-landing > h1:first-child {
+  max-width: var(--wide);
+  margin-inline: auto;
+  padding-inline: 1.25rem;
+}
+
+/* ── headings + entry meta ─────────────────────────────────────────────── */
+h1 {
+  font-family: var(--font-heading);
+  font-size: var(--h1-size);
+  font-weight: var(--h1-weight);
+  line-height: 1.12;
+  letter-spacing: -0.02em;
+  margin: 0 0 0.6rem;
+}
+.byline,
+.taxonomy {
+  color: var(--muted);
+  font-size: 0.9rem;
+  margin: 0 0 0.4rem;
+}
+.byline a,
+.taxonomy a {
+  color: var(--muted);
+}
+.taxonomy a {
+  margin-right: 0.6rem;
+}
+main > img {
+  border-radius: var(--radius);
+  margin: 1.4rem 0;
+}
+
+/* ── prose (the rendered post/page body) ───────────────────────────────── */
+.post-body {
+  font-family: var(--font-prose);
+  font-size: var(--prose-size);
+  line-height: var(--prose-leading);
+  color: var(--ink);
+  margin-top: 2rem;
+}
+.post-body > * + * {
+  margin-top: 1.15em;
+}
+.post-body h2 {
+  font-family: var(--font-heading);
+  font-size: 1.6rem;
+  margin-top: 1.9em;
+}
+.post-body h3 {
+  font-family: var(--font-heading);
+  font-size: 1.3rem;
+  margin-top: 1.5em;
+}
+.post-body a {
+  text-decoration: underline;
+}
+.post-body ul,
+.post-body ol {
+  padding-left: 1.4em;
+}
+.post-body ul { list-style: disc; }
+.post-body ol { list-style: decimal; }
+.post-body blockquote {
+  margin: 1.5em 0;
+  padding-left: 1.1rem;
+  border-left: 3px solid var(--accent);
+  font-style: italic;
+  color: var(--muted);
+}
+.post-body hr {
+  border: none;
+  border-top: 1px solid var(--border);
+  margin: 2.4em 0;
+}
+.post-body code {
+  font-family: ui-monospace, SFMono-Regular, Menlo, monospace;
+  font-size: 0.88em;
+  background: var(--surface);
+  padding: 0.1em 0.35em;
+  border-radius: 4px;
+}
+.post-body pre {
+  background: #18181b;
+  color: #e4e4e7;
+  padding: 1rem 1.1rem;
+  border-radius: var(--radius);
+  overflow-x: auto;
+  font-size: 0.92rem;
+  line-height: 1.6;
+}
+.post-body pre code {
+  background: none;
+  padding: 0;
+}
+
+/* ── cards (Lanza editor output) ───────────────────────────────────────── */
+.post-body .callout {
+  display: flex;
+  gap: 0.7rem;
+  padding: 1rem 1.2rem;
+  margin: 1.5em 0;
+  background: var(--surface);
+  border-radius: var(--radius);
+}
+.post-body .callout::before {
+  content: attr(data-emoji);
+  flex: 0 0 auto;
+  font-size: 1.2rem;
+  line-height: 1.6;
+}
+.post-body .figure {
+  margin: 1.8em 0;
+  text-align: center;
+}
+.post-body .figure img {
+  border-radius: var(--radius);
+}
+.post-body .figure figcaption {
+  margin-top: 0.6em;
+  font-size: 0.9rem;
+  color: var(--muted);
+}
+.post-body .embed {
+  margin: 1.8em 0;
+}
+.post-body .embed iframe {
+  display: block;
+  width: 100%;
+  aspect-ratio: 16 / 9;
+  border: 0;
+  border-radius: var(--radius);
+}
+
+/* ── index post list ───────────────────────────────────────────────────── */
+main > ul {
+  list-style: none;
+  padding: 0;
+  margin: 1.5rem 0 0;
+}
+main > ul > li {
+  padding: 0.9rem 0;
+  border-bottom: 1px solid var(--border);
+}
+main > ul > li > a {
+  font-family: var(--font-heading);
+  font-size: 1.25rem;
+  text-decoration: none;
+}
+main > ul > li > a:hover {
+  text-decoration: underline;
+}
+
+/* ── page-builder blocks ───────────────────────────────────────────────── */
+.block {
+  margin: 2.5rem 0;
+}
+.block-hero {
+  text-align: center;
+  padding: 3rem 1rem;
+}
+.block-hero img {
+  border-radius: var(--radius);
+  margin-bottom: 1.2rem;
+}
+.block-hero h2 {
+  font-family: var(--font-heading);
+  font-size: 2.2rem;
+  margin: 0 0 0.5rem;
+}
+.block-gallery {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(180px, 1fr));
+  gap: 0.8rem;
+}
+.block-gallery img {
+  width: 100%;
+  border-radius: var(--radius);
+}
+.block-image figcaption {
+  text-align: center;
+  color: var(--muted);
+  font-size: 0.9rem;
+  margin-top: 0.5rem;
+}
+.block-cta {
+  text-align: center;
+  padding: 2.5rem 1rem;
+  background: var(--surface);
+  border-radius: var(--radius);
+}
+.button {
+  display: inline-block;
+  margin-top: 1rem;
+  padding: 0.7rem 1.4rem;
+  background: var(--accent);
+  color: #fff;
+  text-decoration: none;
+  border-radius: var(--radius);
+  font-family: var(--font-ui);
+  font-weight: 600;
+}
+
+/* ═══ THEME: Editorial (default — values live in :root) ═════════════════ */
+
+/* ═══ THEME: Magazine — heavy sans headlines, serif body, red accent ════ */
+[data-theme="magazine"] {
+  --font-heading: var(--font-ui);
+  --ink: #111111;
+  --muted: #555555;
+  --accent: #d6232a;
+  --surface: #f4f4f4;
+  --border: #dddddd;
+  --content: 46rem;
+  --h1-size: 3.2rem;
+  --h1-weight: 800;
+  --header-border: 3px solid #111111;
+  --nav-transform: uppercase;
+  --nav-weight: 700;
+  --radius: 4px;
+}
+[data-theme="magazine"] .brand {
+  text-transform: uppercase;
+  font-weight: 800;
+  letter-spacing: -0.02em;
+}
+[data-theme="magazine"] h1 {
+  letter-spacing: -0.03em;
+}
+[data-theme="magazine"] .post-body h2,
+[data-theme="magazine"] .post-body h3,
+[data-theme="magazine"] main > ul > li > a,
+[data-theme="magazine"] .block-hero h2 {
+  font-family: var(--font-ui);
+  font-weight: 800;
+  letter-spacing: -0.01em;
+}
+
+/* ═══ THEME: Landing — all-sans, indigo gradients, rounded, big hero ════ */
+[data-theme="landing"] {
+  --font-heading: var(--font-ui);
+  --font-prose: var(--font-ui);
+  --ink: #0f172a;
+  --muted: #64748b;
+  --accent: #6366f1;
+  --bg: #ffffff;
+  --surface: #f8fafc;
+  --border: #e2e8f0;
+  --radius: 16px;
+  --content: 48rem;
+  --h1-size: 3.4rem;
+  --h1-weight: 800;
+  --prose-size: 1.12rem;
+  --prose-leading: 1.7;
+}
+[data-theme="landing"] .brand {
+  font-weight: 800;
+  letter-spacing: -0.02em;
+}
+[data-theme="landing"] h1 {
+  letter-spacing: -0.025em;
+}
+[data-theme="landing"] .block-hero,
+[data-theme="landing"] .block-cta {
+  background: linear-gradient(135deg, #eef2ff, #faf5ff);
+  border: 1px solid #e9e3ff;
+}
+[data-theme="landing"] .block-hero {
+  padding: 4rem 1.5rem;
+}
+[data-theme="landing"] .block-hero h2 {
+  font-size: 2.8rem;
+  font-weight: 800;
+  letter-spacing: -0.02em;
+}
+[data-theme="landing"] .button {
+  background: linear-gradient(135deg, #6366f1, #8b5cf6);
+  box-shadow: 0 10px 24px -8px rgba(99, 102, 241, 0.55);
+}
+
+/* ═══ THEME: Classic — sans headings, serif body, blue underlined links ══ */
+[data-theme="classic"] {
+  --font-heading: var(--font-ui);
+  --font-prose: Georgia, "Times New Roman", serif;
+  --ink: #222222;
+  --muted: #666666;
+  --accent: #2563eb;
+  --surface: #f6f7f9;
+  --border: #e3e3e3;
+  --content: 42rem;
+  --radius: 6px;
+  --h1-size: 2.3rem;
+  --h1-weight: 700;
+}
+[data-theme="classic"] .site-nav a,
+[data-theme="classic"] .post-body a {
+  text-decoration: underline;
+}
+[data-theme="classic"] main > ul > li > a {
+  font-family: var(--font-ui);
+  font-weight: 600;
+}
