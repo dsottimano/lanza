@@ -20,6 +20,9 @@ const collection = shallowRef<FolderCollection>(getCollection("posts") as Folder
 const editingPath = ref<string | null>(null);
 const settingsFile = shallowRef<FileEntry | null>(null);
 const accountOpen = ref(false);
+// Bumped on token re-save to remount the active view so any stale GitHub error
+// (e.g. a 404 from the old bad token) clears and data re-fetches.
+const refreshKey = ref(0);
 const listRef = useTemplateRef<InstanceType<typeof CollectionList>>("listRef");
 
 // Resume an existing session if a token is already stored.
@@ -65,7 +68,7 @@ function backToList(changed: boolean) {
 // any failed-auth state recovers without a full sign-out.
 function onTokenSaved() {
   client.value = new GitHubClient(getToken()!);
-  listRef.value?.reload();
+  refreshKey.value++; // remount the active view → clears stale errors, refetches
 }
 
 function signOut() {
@@ -92,7 +95,7 @@ function signOut() {
     <main class="min-w-0 flex-1">
       <EditorView
         v-if="pane === 'editRich'"
-        :key="editingPath ?? 'new'"
+        :key="`${editingPath ?? 'new'}#${refreshKey}`"
         :client="client"
         :collection="collection"
         :path="editingPath"
@@ -100,7 +103,7 @@ function signOut() {
       />
       <RecordEditor
         v-else-if="pane === 'editRecord'"
-        :key="editingPath ?? 'new'"
+        :key="`${editingPath ?? 'new'}#${refreshKey}`"
         :client="client"
         :collection="collection"
         :path="editingPath"
@@ -108,7 +111,7 @@ function signOut() {
       />
       <SettingsView
         v-else-if="pane === 'settings' && settingsFile"
-        :key="settingsFile.name"
+        :key="`${settingsFile.name}#${refreshKey}`"
         :client="client"
         :file="settingsFile"
         @back="pane = 'list'"
@@ -116,6 +119,7 @@ function signOut() {
       <CollectionList
         v-else
         ref="listRef"
+        :key="`list#${refreshKey}`"
         :client="client"
         :collection="collection"
         @open="openEntry"
