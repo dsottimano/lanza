@@ -1,7 +1,8 @@
 ---
-import { getCollection, render } from "astro:content";
+import { getCollection } from "astro:content";
 import Base from "../layouts/Base.astro";
 import Blocks from "../components/Blocks.astro";
+import { sanitizeBody } from "../lib/sanitize";
 
 // Standalone Pages (About, Contact, …) render at /<slug>. Static paths only —
 // this is not a runtime catch-all; getStaticPaths emits exactly the page slugs.
@@ -13,7 +14,7 @@ export async function getStaticPaths() {
 }
 
 const { page } = Astro.props;
-const { Content } = await render(page);
+const body = sanitizeBody(page.body ?? "");
 ---
 
 <Base
@@ -33,6 +34,6 @@ const { Content } = await render(page);
       )
     }
     {page.data.blocks.length > 0 && <Blocks blocks={page.data.blocks} />}
-    <Content />
+    <article class="post-body" set:html={body} />
   </main>
 </Base>
