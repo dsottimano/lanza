@@ -8,7 +8,7 @@ import { computed, onBeforeUnmount, ref } from "vue";
 const props = defineProps<{ action: () => Promise<void>; disabled?: boolean }>();
 const emit = defineEmits<{
   (e: "saved"): void;
-  (e: "error", message: string): void;
+  (e: "error", err: unknown): void;
 }>();
 
 type State = "idle" | "saving" | "saved" | "error";
@@ -26,7 +26,7 @@ async function run() {
     revertTimer = setTimeout(() => (state.value = "idle"), 1800);
   } catch (e) {
     state.value = "error";
-    emit("error", e instanceof Error ? e.message : "Save failed.");
+    emit("error", e);
     revertTimer = setTimeout(() => (state.value = "idle"), 2800);
   }
 }

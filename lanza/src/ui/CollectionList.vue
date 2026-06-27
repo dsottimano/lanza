@@ -4,6 +4,7 @@
 import { ref, watch } from "vue";
 import { GitHubClient, type RepoFile } from "../backend/github";
 import type { FolderCollection } from "../schema";
+import { reportError } from "../errors";
 
 const props = defineProps<{ client: GitHubClient; collection: FolderCollection }>();
 const emit = defineEmits<{
@@ -13,17 +14,18 @@ const emit = defineEmits<{
 
 const entries = ref<RepoFile[]>([]);
 const loading = ref(true);
-const error = ref("");
+const failed = ref(false);
 
 async function load() {
   loading.value = true;
-  error.value = "";
+  failed.value = false;
   try {
     entries.value = (await props.client.listDir(props.collection.folder)).sort((a, b) =>
       a.name.localeCompare(b.name),
     );
   } catch (e) {
-    error.value = e instanceof Error ? e.message : "Failed to load entries.";
+    failed.value = true;
+    reportError(e, "Failed to load entries.");
   } finally {
     loading.value = false;
   }
@@ -38,7 +40,7 @@ defineExpose({ reload: load });
     <div class="mb-7 flex items-end justify-between">
       <div>
         <h1 class="font-serif text-3xl font-bold tracking-tight text-zinc-900">{{ collection.label }}</h1>
-        <p v-if="!loading && !error" class="mt-1 text-sm text-zinc-500">
+        <p v-if="!loading && !failed" class="mt-1 text-sm text-zinc-500">
           {{ entries.length }} {{ entries.length === 1 ? "entry" : "entries" }}
         </p>
       </div>
@@ -52,7 +54,13 @@ defineExpose({ reload: load });
     </div>
 
     <p v-if="loading" class="text-sm text-zinc-400">Loading…</p>
-    <p v-else-if="error" class="break-words text-sm text-rose-600">{{ error }}</p>
+
+    <div v-else-if="failed" class="rounded-2xl border border-dashed border-zinc-300 bg-white py-12 text-center">
+      <p class="text-sm text-zinc-500">Couldn't load {{ collection.label.toLowerCase() }}.</p>
+      <button class="mt-3 text-sm font-medium text-zinc-900 underline-offset-2 hover:underline" @click="load">
+        Try again
+      </button>
+    </div>
 
     <div
       v-else-if="!entries.length"

@@ -11,6 +11,7 @@ import { GitHubClient } from "../backend/github";
 import type { FolderCollection, Field } from "../schema";
 import { toEditorHtml } from "../backend/markdown";
 import { slugify } from "../backend/auth";
+import { reportError, clearError } from "../errors";
 
 const props = defineProps<{
   client: GitHubClient;
@@ -22,7 +23,6 @@ const emit = defineEmits<{ (e: "back", changed: boolean): void }>();
 const editorRef = useTemplateRef<InstanceType<typeof Editor>>("editorRef");
 
 const loading = ref(true);
-const error = ref("");
 const dirty = ref(false);
 const drawerOpen = ref(false);
 let committedSomething = false;
@@ -59,7 +59,7 @@ onMounted(async () => {
       bodyHtml.value = "<p></p>";
     }
   } catch (e) {
-    error.value = e instanceof Error ? e.message : "Failed to load entry.";
+    reportError(e, "Failed to load entry.");
   } finally {
     loading.value = false;
   }
@@ -100,8 +100,7 @@ function markDirty() {
       </button>
 
       <span class="flex-1 text-center text-sm">
-        <span v-if="error" class="text-rose-600">{{ error }}</span>
-        <span v-else-if="dirty" class="text-zinc-400">Unsaved changes</span>
+        <span v-if="dirty" class="text-zinc-400">Unsaved changes</span>
       </span>
 
       <div class="flex items-center gap-3">
@@ -136,8 +135,8 @@ function markDirty() {
         <SaveButton
           :action="save"
           :disabled="loading"
-          @saved="error = ''"
-          @error="(m) => (error = m)"
+          @saved="clearError"
+          @error="(e) => reportError(e, 'Save failed.')"
         />
       </div>
     </header>

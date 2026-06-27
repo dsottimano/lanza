@@ -7,6 +7,7 @@ import SaveButton from "./SaveButton.vue";
 import { GitHubClient } from "../backend/github";
 import type { FolderCollection } from "../schema";
 import { slugify } from "../backend/auth";
+import { reportError, clearError } from "../errors";
 
 const props = defineProps<{
   client: GitHubClient;
@@ -16,7 +17,6 @@ const props = defineProps<{
 const emit = defineEmits<{ (e: "back", changed: boolean): void }>();
 
 const loading = ref(true);
-const error = ref("");
 let committedSomething = false;
 
 const data = reactive<Record<string, unknown>>({});
@@ -37,7 +37,7 @@ onMounted(async () => {
       }
     }
   } catch (e) {
-    error.value = e instanceof Error ? e.message : "Failed to load entry.";
+    reportError(e, "Failed to load entry.");
   } finally {
     loading.value = false;
   }
@@ -64,14 +64,12 @@ async function save() {
       <button class="text-sm text-zinc-500 transition hover:text-zinc-900" @click="emit('back', committedSomething)">
         ← {{ collection.label }}
       </button>
-      <span class="flex-1 text-center text-sm">
-        <span v-if="error" class="text-rose-600">{{ error }}</span>
-      </span>
+      <span class="flex-1 text-center text-sm"></span>
       <SaveButton
         :action="save"
         :disabled="loading"
-        @saved="error = ''"
-        @error="(m) => (error = m)"
+        @saved="clearError"
+        @error="(e) => reportError(e, 'Save failed.')"
       />
     </header>
 

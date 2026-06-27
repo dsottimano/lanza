@@ -58,7 +58,17 @@ export class GitHubClient {
       },
     });
     if (!res.ok) {
-      throw new GitHubError(res.status, `GitHub ${res.status}: ${await res.text()}`);
+      // GitHub returns JSON like {"message":"Not Found", ...}. Surface that
+      // human string, not the raw JSON, to the error dialog.
+      const raw = await res.text();
+      let detail = raw;
+      try {
+        const parsed = JSON.parse(raw);
+        if (parsed && typeof parsed.message === "string") detail = parsed.message;
+      } catch {
+        /* non-JSON body — keep raw text */
+      }
+      throw new GitHubError(res.status, detail);
     }
     return res.status === 204 ? null : res.json();
   }

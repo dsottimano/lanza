@@ -5,12 +5,12 @@
 import { computed, inject, ref } from "vue";
 import { uploadImage } from "../backend/media";
 import { CLIENT_KEY } from "./context";
+import { reportError } from "../errors";
 
 const model = defineModel<string>();
 const client = inject(CLIENT_KEY);
 
 const uploading = ref(false);
-const error = ref("");
 
 const hasPreview = computed(
   () => typeof model.value === "string" && /^(https?:\/\/|\/)/.test(model.value),
@@ -23,16 +23,15 @@ async function onPick(e: Event) {
   const input = e.target as HTMLInputElement;
   const file = input.files?.[0];
   if (!file) return;
-  error.value = "";
   if (!client) {
-    error.value = "Not connected.";
+    reportError("Not connected to GitHub.");
     return;
   }
   uploading.value = true;
   try {
     model.value = await uploadImage(client, file);
   } catch (err) {
-    error.value = err instanceof Error ? err.message : "Upload failed.";
+    reportError(err, "Image upload failed.");
   } finally {
     uploading.value = false;
     input.value = ""; // allow re-picking the same file
@@ -72,6 +71,5 @@ async function onPick(e: Event) {
     </div>
 
     <input type="text" v-model="model" placeholder="…or paste a URL / path" :class="inputCls" />
-    <p v-if="error" class="text-xs text-rose-600">{{ error }}</p>
   </div>
 </template>

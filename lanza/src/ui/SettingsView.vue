@@ -6,26 +6,25 @@ import FieldForm from "../fields/FieldForm.vue";
 import SaveButton from "./SaveButton.vue";
 import { GitHubClient } from "../backend/github";
 import type { FileEntry } from "../schema";
+import { reportError, clearError } from "../errors";
 
 const props = defineProps<{ client: GitHubClient; file: FileEntry }>();
 const emit = defineEmits<{ (e: "back"): void }>();
 
 const loading = ref(true);
-const error = ref("");
 
 const data = reactive<Record<string, unknown>>({});
 let sha: string | undefined;
 
 async function load() {
   loading.value = true;
-  error.value = "";
   for (const k of Object.keys(data)) delete data[k];
   try {
     const loaded = await props.client.loadJson(props.file.file);
     Object.assign(data, loaded.data);
     sha = loaded.sha;
   } catch (e) {
-    error.value = e instanceof Error ? e.message : "Failed to load settings.";
+    reportError(e, "Failed to load settings.");
   } finally {
     loading.value = false;
   }
@@ -47,14 +46,12 @@ async function save() {
   <div class="min-h-screen bg-zinc-50">
     <header class="sticky top-0 z-30 flex items-center justify-between gap-4 border-b border-zinc-200 bg-white/85 px-5 py-2.5 backdrop-blur">
       <button class="text-sm text-zinc-500 transition hover:text-zinc-900" @click="emit('back')">← Back</button>
-      <span class="flex-1 text-center text-sm">
-        <span v-if="error" class="text-rose-600">{{ error }}</span>
-      </span>
+      <span class="flex-1 text-center text-sm"></span>
       <SaveButton
         :action="save"
         :disabled="loading"
-        @saved="error = ''"
-        @error="(m) => (error = m)"
+        @saved="clearError"
+        @error="(e) => reportError(e, 'Save failed.')"
       />
     </header>
 

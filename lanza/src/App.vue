@@ -7,8 +7,10 @@ import EditorView from "./ui/EditorView.vue";
 import RecordEditor from "./ui/RecordEditor.vue";
 import SettingsView from "./ui/SettingsView.vue";
 import TokenDialog from "./ui/TokenDialog.vue";
+import ErrorDialog from "./ui/ErrorDialog.vue";
 import { GitHubClient } from "./backend/github";
 import { getToken, clearToken } from "./backend/auth";
+import { clearError } from "./errors";
 import { getCollection, type FolderCollection, type FileEntry } from "./schema";
 
 type Pane = "list" | "editRich" | "editRecord" | "settings";
@@ -68,6 +70,7 @@ function backToList(changed: boolean) {
 // any failed-auth state recovers without a full sign-out.
 function onTokenSaved() {
   client.value = new GitHubClient(getToken()!);
+  clearError();
   refreshKey.value++; // remount the active view → clears stale errors, refetches
 }
 
@@ -132,5 +135,7 @@ function signOut() {
       @saved="onTokenSaved"
       @close="accountOpen = false"
     />
+
+    <ErrorDialog @fix-token="accountOpen = true" />
   </div>
 </template>
