@@ -7,6 +7,7 @@ defineProps<{ activeCollection: string; activeSettings: string | null }>();
 const emit = defineEmits<{
   (e: "select", name: string): void;
   (e: "openSettings", file: FileEntry): void;
+  (e: "account"): void;
   (e: "signout"): void;
 }>();
 
@@ -66,11 +67,19 @@ const itemActive = "bg-zinc-900 text-white hover:bg-zinc-900 hover:text-white";
       </button>
     </div>
 
-    <button
-      class="mt-auto rounded-lg px-2.5 py-2 text-left text-sm text-zinc-400 transition hover:bg-zinc-100 hover:text-zinc-700"
-      @click="emit('signout')"
-    >
-      Sign out
-    </button>
+    <div class="mt-auto flex flex-col gap-0.5 border-t border-zinc-100 pt-3">
+      <button
+        class="flex items-center gap-1.5 rounded-lg px-2.5 py-2 text-left text-sm text-zinc-500 transition hover:bg-zinc-100 hover:text-zinc-900"
+        @click="emit('account')"
+      >
+        <span aria-hidden="true">🔑</span> GitHub token
+      </button>
+      <button
+        class="rounded-lg px-2.5 py-2 text-left text-sm text-zinc-400 transition hover:bg-zinc-100 hover:text-zinc-700"
+        @click="emit('signout')"
+      >
+        Sign out
+      </button>
+    </div>
   </nav>
 </template>

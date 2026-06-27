@@ -6,6 +6,7 @@ import CollectionList from "./ui/CollectionList.vue";
 import EditorView from "./ui/EditorView.vue";
 import RecordEditor from "./ui/RecordEditor.vue";
 import SettingsView from "./ui/SettingsView.vue";
+import TokenDialog from "./ui/TokenDialog.vue";
 import { GitHubClient } from "./backend/github";
 import { getToken, clearToken } from "./backend/auth";
 import { getCollection, type FolderCollection, type FileEntry } from "./schema";
@@ -18,6 +19,7 @@ const pane = ref<Pane>("list");
 const collection = shallowRef<FolderCollection>(getCollection("posts") as FolderCollection);
 const editingPath = ref<string | null>(null);
 const settingsFile = shallowRef<FileEntry | null>(null);
+const accountOpen = ref(false);
 const listRef = useTemplateRef<InstanceType<typeof CollectionList>>("listRef");
 
 // Resume an existing session if a token is already stored.
@@ -59,10 +61,18 @@ function backToList(changed: boolean) {
   if (changed) listRef.value?.reload();
 }
 
+// Token re-saved: swap in a client using the new token and refresh the list so
+// any failed-auth state recovers without a full sign-out.
+function onTokenSaved() {
+  client.value = new GitHubClient(getToken()!);
+  listRef.value?.reload();
+}
+
 function signOut() {
   clearToken();
   client.value = null;
   authed.value = false;
+  accountOpen.value = false;
 }
 </script>
 
@@ -76,6 +86,7 @@ function signOut() {
       :active-settings="pane === 'settings' ? (settingsFile?.name ?? null) : null"
       @select="selectCollection"
       @open-settings="openSettings"
+      @account="accountOpen = true"
       @signout="signOut"
     />
     <main class="min-w-0 flex-1">
@@ -111,5 +122,11 @@ function signOut() {
         @new="newEntry"
       />
     </main>
+
+    <TokenDialog
+      v-if="accountOpen"
+      @saved="onTokenSaved"
+      @close="accountOpen = false"
+    />
   </div>
 </template>
