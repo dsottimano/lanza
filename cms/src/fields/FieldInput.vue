@@ -12,6 +12,10 @@ const model = defineModel<any>();
 
 const isRequired = computed(() => props.field.required !== false);
 
+// Shared control styling (text / number / datetime / select / image inputs).
+const inputCls =
+  "w-full rounded-lg border border-zinc-300 bg-white px-3 py-2 text-sm text-zinc-900 transition placeholder:text-zinc-400 focus:border-zinc-900 focus:outline-none focus:ring-4 focus:ring-zinc-900/5";
+
 // datetime-local <-> ISO string. Stored value stays an ISO string.
 function isoToLocal(v: unknown): string {
   if (typeof v !== "string" || !v) return "";
@@ -57,11 +61,15 @@ const open = ref(props.field.collapsed !== true);
 
 <template>
   <!-- object: a collapsible group of nested fields -->
-  <fieldset v-if="field.widget === 'object'" class="group">
-    <legend class="grouphead" @click="open = !open">
-      <span class="caret" :class="{ open }">▸</span> {{ field.label }}
+  <fieldset v-if="field.widget === 'object'" class="mb-4 rounded-xl border border-zinc-200 px-3.5">
+    <legend
+      class="flex cursor-pointer items-center gap-1.5 py-2.5 text-xs font-bold tracking-wide text-zinc-700 uppercase select-none"
+      @click="open = !open"
+    >
+      <span class="inline-block transition-transform" :class="{ 'rotate-90': open }">▸</span>
+      {{ field.label }}
     </legend>
-    <div v-show="open" class="groupbody">
+    <div v-show="open" class="pb-1">
       <FieldInput
         v-for="sub in field.fields"
         :key="sub.name"
@@ -72,22 +80,22 @@ const open = ref(props.field.collapsed !== true);
   </fieldset>
 
   <!-- list: handled by the dedicated array editor -->
-  <div v-else-if="field.widget === 'list'" class="row">
-    <label class="lbl">{{ field.label }}</label>
+  <div v-else-if="field.widget === 'list'" class="mb-4">
+    <label class="mb-1.5 block text-xs font-semibold text-zinc-600">{{ field.label }}</label>
     <ListInput :field="field" v-model="model" />
-    <p v-if="field.hint" class="hint">{{ field.hint }}</p>
+    <p v-if="field.hint" class="mt-1.5 text-xs text-zinc-400">{{ field.hint }}</p>
   </div>
 
   <!-- relation: pick slug(s) from a target collection -->
-  <div v-else-if="field.widget === 'relation'" class="row">
-    <label class="lbl">{{ field.label }}</label>
+  <div v-else-if="field.widget === 'relation'" class="mb-4">
+    <label class="mb-1.5 block text-xs font-semibold text-zinc-600">{{ field.label }}</label>
     <RelationInput :field="field" v-model="model" />
-    <p v-if="field.hint" class="hint">{{ field.hint }}</p>
+    <p v-if="field.hint" class="mt-1.5 text-xs text-zinc-400">{{ field.hint }}</p>
   </div>
 
   <!-- scalar widgets -->
-  <div v-else class="row">
-    <label class="lbl" :for="field.name">{{ field.label }}</label>
+  <div v-else class="mb-4">
+    <label class="mb-1.5 block text-xs font-semibold text-zinc-600" :for="field.name">{{ field.label }}</label>
 
     <textarea
       v-if="field.widget === 'text'"
@@ -95,6 +103,7 @@ const open = ref(props.field.collapsed !== true);
       v-model="model"
       rows="3"
       :required="isRequired"
+      :class="[inputCls, 'resize-y']"
     />
 
     <input
@@ -102,11 +111,12 @@ const open = ref(props.field.collapsed !== true);
       :id="field.name"
       type="datetime-local"
       v-model="localDate"
+      :class="inputCls"
     />
 
-    <label v-else-if="field.widget === 'boolean'" class="check">
-      <input type="checkbox" v-model="model" />
-      <span class="muted">{{ model ? "Yes" : "No" }}</span>
+    <label v-else-if="field.widget === 'boolean'" class="flex cursor-pointer items-center gap-2">
+      <input type="checkbox" v-model="model" class="size-4 rounded border-zinc-300 accent-zinc-900" />
+      <span class="text-sm text-zinc-500">{{ model ? "Yes" : "No" }}</span>
     </label>
 
     <input
@@ -114,6 +124,7 @@ const open = ref(props.field.collapsed !== true);
       :id="field.name"
       type="number"
       :value="model"
+      :class="inputCls"
       @input="onNumber"
     />
 
@@ -122,6 +133,7 @@ const open = ref(props.field.collapsed !== true);
       :id="field.name"
       v-model="model"
       :multiple="field.multiple"
+      :class="inputCls"
     >
       <option v-if="!field.multiple && !isRequired" :value="undefined">—</option>
       <option v-for="opt in field.options" :key="opt" :value="opt">{{ opt }}</option>
@@ -133,92 +145,14 @@ const open = ref(props.field.collapsed !== true);
         type="text"
         v-model="model"
         placeholder="/images/uploads/… or https://…"
+        :class="inputCls"
       />
-      <img v-if="showImagePreview" :src="model" class="preview" alt="" />
+      <img v-if="showImagePreview" :src="model" class="mt-2 max-h-32 rounded-lg border border-zinc-200" alt="" />
     </template>
 
     <!-- string (default) -->
-    <input v-else :id="field.name" type="text" v-model="model" :required="isRequired" />
+    <input v-else :id="field.name" type="text" v-model="model" :required="isRequired" :class="inputCls" />
 
-    <p v-if="field.hint" class="hint">{{ field.hint }}</p>
+    <p v-if="field.hint" class="mt-1.5 text-xs text-zinc-400">{{ field.hint }}</p>
   </div>
 </template>
-
-<style scoped>
-.row {
-  margin-bottom: 1rem;
-}
-.lbl {
-  display: block;
-  font-size: 0.8rem;
-  font-weight: 600;
-  color: #444;
-  margin-bottom: 0.3rem;
-}
-input[type="text"],
-input[type="number"],
-input[type="datetime-local"],
-textarea,
-select {
-  width: 100%;
-  box-sizing: border-box;
-  padding: 0.5rem 0.6rem;
-  border: 1px solid #ddd;
-  border-radius: 6px;
-  font: inherit;
-  background: #fff;
-  color: #1a1a1a;
-}
-textarea {
-  resize: vertical;
-}
-.check {
-  display: inline-flex;
-  align-items: center;
-  gap: 0.4rem;
-  cursor: pointer;
-}
-.check input {
-  width: auto;
-}
-.hint {
-  margin: 0.3rem 0 0;
-  font-size: 0.75rem;
-  color: #999;
-}
-.muted {
-  color: #888;
-  font-size: 0.85rem;
-}
-.preview {
-  display: block;
-  max-width: 100%;
-  max-height: 120px;
-  margin-top: 0.5rem;
-  border-radius: 6px;
-}
-.group {
-  border: 1px solid #e6e6e6;
-  border-radius: 8px;
-  padding: 0 0.9rem;
-  margin: 0 0 1rem;
-}
-.grouphead {
-  font-size: 0.8rem;
-  font-weight: 700;
-  color: #333;
-  cursor: pointer;
-  padding: 0.6rem 0;
-  user-select: none;
-}
-.caret {
-  display: inline-block;
-  transition: transform 0.12s;
-}
-.caret.open {
-  transform: rotate(90deg);
-}
-.groupbody {
-  padding-bottom: 0.4rem;
-}
-</style>

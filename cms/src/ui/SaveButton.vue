@@ -3,7 +3,7 @@
 // saved (green ✓, auto-reverts) or error (red, click to retry). Owns the
 // async run; the parent passes an `action` that does the work and throws on
 // failure, and listens for `saved` / `error` to update its own status line.
-import { onBeforeUnmount, ref } from "vue";
+import { computed, onBeforeUnmount, ref } from "vue";
 
 const props = defineProps<{ action: () => Promise<void>; disabled?: boolean }>();
 const emit = defineEmits<{
@@ -32,73 +32,40 @@ async function run() {
 }
 
 onBeforeUnmount(() => clearTimeout(revertTimer));
+
+const label = computed(() =>
+  state.value === "saving"
+    ? "Saving…"
+    : state.value === "saved"
+      ? "Saved"
+      : state.value === "error"
+        ? "Retry"
+        : "Save",
+);
+
+const tone = computed(() => {
+  if (state.value === "saved") return "bg-emerald-600";
+  if (state.value === "error") return "bg-rose-600 hover:bg-rose-500";
+  return "bg-zinc-900 hover:bg-zinc-700";
+});
 </script>
 
 <template>
   <button
-    class="savebtn"
-    :class="state"
+    :class="[
+      'inline-flex min-w-[6.5rem] items-center justify-center gap-2 rounded-lg px-4 py-2 text-sm font-medium text-white shadow-sm transition-colors disabled:cursor-default disabled:opacity-60',
+      tone,
+    ]"
     :disabled="disabled || state === 'saving'"
     @click="run"
   >
-    <span v-if="state === 'saving'" class="spinner" aria-hidden="true" />
-    <span v-else-if="state === 'saved'" class="glyph" aria-hidden="true">✓</span>
-    <span v-else-if="state === 'error'" class="glyph" aria-hidden="true">!</span>
-    <span>{{
-      state === "saving"
-        ? "Saving…"
-        : state === "saved"
-          ? "Saved"
-          : state === "error"
-            ? "Retry"
-            : "Save"
-    }}</span>
+    <span
+      v-if="state === 'saving'"
+      class="size-3.5 animate-spin rounded-full border-2 border-white/40 border-t-white"
+      aria-hidden="true"
+    />
+    <span v-else-if="state === 'saved'" class="font-bold leading-none" aria-hidden="true">✓</span>
+    <span v-else-if="state === 'error'" class="font-bold leading-none" aria-hidden="true">!</span>
+    <span>{{ label }}</span>
   </button>
 </template>
-
-<style scoped>
-.savebtn {
-  display: inline-flex;
-  align-items: center;
-  gap: 0.45rem;
-  min-width: 6.2rem;
-  justify-content: center;
-  padding: 0.45rem 1rem;
-  border: none;
-  border-radius: 7px;
-  background: #1a1a1a;
-  color: #fff;
-  cursor: pointer;
-  font: inherit;
-  transition: background-color 0.2s ease;
-}
-.savebtn:disabled {
-  cursor: default;
-}
-.savebtn.saving {
-  opacity: 0.85;
-}
-.savebtn.saved {
-  background: #18794e; /* green */
-}
-.savebtn.error {
-  background: #c0392b; /* red */
-}
-.glyph {
-  font-weight: 700;
-  line-height: 1;
-}
-.spinner {
-  width: 0.85rem;
-  height: 0.85rem;
-  border: 2px solid rgba(255, 255, 255, 0.4);
-  border-top-color: #fff;
-  border-radius: 50%;
-  animation: spin 0.6s linear infinite;
-}
-@keyframes spin {
-  to {
-    transform: rotate(360deg);
-  }
-}
-</style>

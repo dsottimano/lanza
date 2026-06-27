@@ -213,6 +213,45 @@ function link() {
   border-top: 1px solid #e2e2e2;
   margin: 2em 0;
 }
+/* Lists + code — re-asserted because Tailwind's preflight strips list markers
+   and inline-code styling that the writing canvas relies on. */
+.prose :deep(ul),
+.prose :deep(ol) {
+  padding-left: 1.4em;
+}
+.prose :deep(ul) {
+  list-style: disc;
+}
+.prose :deep(ol) {
+  list-style: decimal;
+}
+.prose :deep(li) {
+  margin-top: 0.3em;
+}
+.prose :deep(li > p) {
+  margin: 0;
+}
+.prose :deep(code) {
+  font-family: ui-monospace, SFMono-Regular, Menlo, monospace;
+  font-size: 0.88em;
+  background: #f4f4f5;
+  padding: 0.1em 0.35em;
+  border-radius: 4px;
+}
+.prose :deep(pre) {
+  background: #18181b;
+  color: #e4e4e7;
+  padding: 1rem 1.1rem;
+  border-radius: 10px;
+  overflow-x: auto;
+  font-size: 0.92rem;
+  line-height: 1.6;
+}
+.prose :deep(pre code) {
+  background: none;
+  padding: 0;
+  font-size: inherit;
+}
 .prose :deep(a) {
   color: #1a1a1a;
   text-decoration: underline;

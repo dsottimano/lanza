@@ -105,4 +105,14 @@ publishes).
 ## Pinned versions (no `^`)
 
 Vue 3.5.39 · Vite 8.1.0 · TypeScript 6.0.3 · TipTap 3.27.1 · js-yaml 5.2.0 ·
-marked 18.0.5. Lockfile committed.
+marked 18.0.5 · Tailwind CSS 4.3.1 (+ @tailwindcss/vite). Lockfile committed.
+
+## Styling
+
+The chrome/UI is **Tailwind v4** (CSS-first: `@tailwindcss/vite` plugin +
+`@import "tailwindcss"` in `src/styles.css`, design tokens in an `@theme` block —
+serif headings, sans chrome, zinc palette, emerald=saved / rose=error). No
+`tailwind.config.js` (v4 auto-detects sources). The **writing canvas**
+(`src/editor/`) keeps its own scoped CSS — it predates Tailwind and was already
+dialled in; note Tailwind's preflight strips list markers / inline-code styling,
+so those are re-asserted in `Editor.vue`'s prose block.

@@ -17,7 +17,7 @@ provide(CLIENT_KEY, props.client);
 </script>
 
 <template>
-  <div class="form">
+  <div class="flex flex-col">
     <FieldInput
       v-for="f in fields"
       :key="f.name"
@@ -26,10 +26,3 @@ provide(CLIENT_KEY, props.client);
     />
   </div>
 </template>
-
-<style scoped>
-.form {
-  display: flex;
-  flex-direction: column;
-}
-</style>

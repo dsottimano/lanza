@@ -59,11 +59,13 @@ async function save() {
 </script>
 
 <template>
-  <div class="record">
-    <header class="bar">
-      <button class="ghost" @click="emit('back', committedSomething)">← {{ collection.label }}</button>
-      <span class="status">
-        <span v-if="error" class="err">{{ error }}</span>
+  <div class="min-h-screen bg-zinc-50">
+    <header class="sticky top-0 z-30 flex items-center justify-between gap-4 border-b border-zinc-200 bg-white/85 px-5 py-2.5 backdrop-blur">
+      <button class="text-sm text-zinc-500 transition hover:text-zinc-900" @click="emit('back', committedSomething)">
+        ← {{ collection.label }}
+      </button>
+      <span class="flex-1 text-center text-sm">
+        <span v-if="error" class="text-rose-600">{{ error }}</span>
       </span>
       <SaveButton
         :action="save"
@@ -73,51 +75,14 @@ async function save() {
       />
     </header>
 
-    <main class="sheet">
-      <div v-if="loading" class="muted">Loading…</div>
-      <FieldForm v-else :fields="collection.fields" :data="data" :client="client" />
+    <main class="mx-auto max-w-2xl px-6 pt-10 pb-24">
+      <h1 class="mb-6 font-serif text-3xl font-bold tracking-tight text-zinc-900">
+        {{ path ? "Edit" : "New" }} {{ collection.labelSingular.toLowerCase() }}
+      </h1>
+      <div v-if="loading" class="text-sm text-zinc-400">Loading…</div>
+      <div v-else class="rounded-2xl border border-zinc-200 bg-white p-6 shadow-sm">
+        <FieldForm :fields="collection.fields" :data="data" :client="client" />
+      </div>
     </main>
   </div>
 </template>
-
-<style scoped>
-.record {
-  min-height: 100vh;
-}
-.bar {
-  position: sticky;
-  top: 0;
-  z-index: 30;
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-  gap: 1rem;
-  padding: 0.7rem 1.25rem;
-  background: rgba(255, 255, 255, 0.9);
-  backdrop-filter: blur(6px);
-  border-bottom: 1px solid #ececec;
-}
-.ghost {
-  border: none;
-  background: none;
-  color: #555;
-  cursor: pointer;
-  font: inherit;
-}
-.status {
-  flex: 1;
-  text-align: center;
-  font-size: 0.85rem;
-}
-.err {
-  color: #c0392b;
-}
-.muted {
-  color: #999;
-}
-.sheet {
-  max-width: 40rem;
-  margin: 0 auto;
-  padding: 2.5rem 1.25rem 6rem;
-}
-</style>

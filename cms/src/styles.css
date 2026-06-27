@@ -1,23 +1,27 @@
-:root {
-  --bg: #ffffff;
-  --fg: #1a1a1a;
-  --muted: #8a8a8a;
-  --border: #ececec;
-  --accent: #1a1a1a;
-  font-family:
+@import "tailwindcss";
+
+/* ── Design tokens (Studio) ────────────────────────────────────────────────
+   Editorial + premium: a serif for headings/brand/writing, a clean sans for
+   the chrome. Neutral zinc palette with emerald (saved) / rose (error) accents
+   inherited from Tailwind's defaults. No web-font dependency — system stacks
+   only, so the admin loads instantly and works offline. */
+@theme {
+  --font-sans:
     ui-sans-serif, system-ui, -apple-system, "Segoe UI", Roboto, Helvetica,
     Arial, sans-serif;
-}
-
-* {
-  box-sizing: border-box;
+  --font-serif: Georgia, "Times New Roman", serif;
 }
 
 html,
 body {
   margin: 0;
-  background: var(--bg);
-  color: var(--fg);
+}
+
+body {
+  background: var(--color-white);
+  color: var(--color-zinc-900);
+  -webkit-font-smoothing: antialiased;
+  text-rendering: optimizeLegibility;
 }
 
 #app {

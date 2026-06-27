@@ -96,7 +96,7 @@ function signOut() {
     />
 
     <!-- List view keeps the collection rail. -->
-    <div v-else class="layout">
+    <div v-else class="flex min-h-screen bg-zinc-50">
       <Sidebar
         :active-collection="collection.name"
         :active-settings="null"
@@ -104,7 +104,7 @@ function signOut() {
         @open-settings="openSettings"
         @signout="signOut"
       />
-      <main class="content">
+      <main class="min-w-0 flex-1">
         <CollectionList
           ref="listRef"
           :client="client"
@@ -116,14 +116,3 @@ function signOut() {
     </div>
   </template>
 </template>
-
-<style scoped>
-.layout {
-  display: flex;
-  min-height: 100vh;
-}
-.content {
-  flex: 1;
-  min-width: 0;
-}
-</style>

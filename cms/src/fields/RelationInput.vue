@@ -45,65 +45,32 @@ function toggle(slug: string) {
 </script>
 
 <template>
-  <p v-if="loading" class="muted">Loading…</p>
-  <p v-else-if="error" class="err">{{ error }}</p>
-  <p v-else-if="!slugs.length" class="muted">No entries yet.</p>
+  <p v-if="loading" class="text-sm text-zinc-400">Loading…</p>
+  <p v-else-if="error" class="text-sm text-rose-600">{{ error }}</p>
+  <p v-else-if="!slugs.length" class="text-sm text-zinc-400">No entries yet.</p>
 
   <!-- multiple: checkbox chips -->
-  <div v-else-if="field.multiple" class="chips">
-    <label v-for="s in slugs" :key="s" class="chip" :class="{ on: selected.includes(s) }">
-      <input type="checkbox" :checked="selected.includes(s)" @change="toggle(s)" />
+  <div v-else-if="field.multiple" class="flex flex-wrap gap-1.5">
+    <label
+      v-for="s in slugs"
+      :key="s"
+      class="inline-flex cursor-pointer items-center rounded-full border px-3 py-1 text-sm transition"
+      :class="selected.includes(s)
+        ? 'border-zinc-900 bg-zinc-900 text-white'
+        : 'border-zinc-300 text-zinc-600 hover:border-zinc-400'"
+    >
+      <input type="checkbox" class="hidden" :checked="selected.includes(s)" @change="toggle(s)" />
       {{ s }}
     </label>
   </div>
 
   <!-- single: dropdown -->
-  <select v-else v-model="model">
+  <select
+    v-else
+    v-model="model"
+    class="w-full rounded-lg border border-zinc-300 bg-white px-3 py-2 text-sm text-zinc-900 transition focus:border-zinc-900 focus:outline-none focus:ring-4 focus:ring-zinc-900/5"
+  >
     <option :value="undefined">—</option>
     <option v-for="s in slugs" :key="s" :value="s">{{ s }}</option>
   </select>
 </template>
-
-<style scoped>
-.chips {
-  display: flex;
-  flex-wrap: wrap;
-  gap: 0.4rem;
-}
-.chip {
-  display: inline-flex;
-  align-items: center;
-  gap: 0.3rem;
-  padding: 0.3rem 0.6rem;
-  border: 1px solid #ddd;
-  border-radius: 999px;
-  font-size: 0.85rem;
-  cursor: pointer;
-  color: #555;
-}
-.chip.on {
-  background: #1a1a1a;
-  border-color: #1a1a1a;
-  color: #fff;
-}
-.chip input {
-  display: none;
-}
-select {
-  width: 100%;
-  box-sizing: border-box;
-  padding: 0.5rem 0.6rem;
-  border: 1px solid #ddd;
-  border-radius: 6px;
-  font: inherit;
-  background: #fff;
-}
-.muted {
-  color: #999;
-  font-size: 0.85rem;
-}
-.err {
-  color: #c0392b;
-  font-size: 0.85rem;
-}
-</style>
