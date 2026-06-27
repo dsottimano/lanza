@@ -19,7 +19,12 @@ const posts = defineCollection({
   schema: z.object({
     title: z.string(),
     pubDate: z.coerce.date(),
-    updatedDate: z.coerce.date().optional(),
+    // Tolerate a blank value (e.g. Sveltia writes `updatedDate: ''`) — treat it
+    // as "no date" rather than crashing the content build.
+    updatedDate: z.preprocess(
+      (v) => (v === "" || v === null ? undefined : v),
+      z.coerce.date().optional(),
+    ),
     // New entries (incl. everything the bot creates) default to draft and are
     // excluded from the production build until an editor flips this in the CMS.
     draft: z.boolean().default(false),
