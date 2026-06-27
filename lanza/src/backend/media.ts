@@ -30,6 +30,6 @@ function fileToBase64(file: File): Promise<string> {
 export async function uploadImage(client: GitHubClient, file: File): Promise<string> {
   const name = fileSlug(file.name);
   const path = `${MEDIA.dir}/${name}`;
-  await client.uploadBinary(path, await fileToBase64(file), `cms: upload ${name}`);
+  await client.uploadBinary(path, await fileToBase64(file), `lanza: upload ${name}`);
   return `${MEDIA.publicPrefix}/${name}`;
 }

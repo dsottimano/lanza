@@ -77,7 +77,7 @@ async function save() {
     currentPath,
     { ...data },
     body,
-    `${sha ? "cms: update" : "cms: create"} ${currentPath}`,
+    `${sha ? "lanza: update" : "lanza: create"} ${currentPath}`,
     sha,
   );
   dirty.value = false;

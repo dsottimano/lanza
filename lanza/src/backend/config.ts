@@ -2,7 +2,7 @@
 // and the posts folder Astro reads. We are NOT moving the folder.
 export const REPO = {
   owner: "dsottimano",
-  name: "emdash-starter",
+  name: "lanza",
   branch: "main",
 } as const;
 

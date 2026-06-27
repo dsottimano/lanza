@@ -27,7 +27,7 @@ const itemActive = "bg-zinc-900 text-white hover:bg-zinc-900 hover:text-white";
 <template>
   <nav class="sticky top-0 flex h-screen w-60 flex-shrink-0 flex-col gap-6 border-r border-zinc-200 bg-white px-3 py-5">
     <div class="px-2.5">
-      <span class="font-serif text-xl font-bold tracking-tight text-zinc-900">Studio</span>
+      <span class="font-serif text-xl font-bold tracking-tight text-zinc-900">Lanza</span>
     </div>
 
     <div class="flex flex-col gap-0.5">

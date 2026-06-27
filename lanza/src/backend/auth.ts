@@ -1,7 +1,7 @@
 // Token-only auth: a GitHub fine-grained PAT (Contents: read/write on the repo)
 // kept in localStorage. No OAuth Worker — same model Sveltia endorses for a solo
 // editor. The token never leaves the browser except as a GitHub Bearer header.
-const TOKEN_KEY = "studio:token";
+const TOKEN_KEY = "lanza:token";
 
 export function getToken(): string | null {
   return localStorage.getItem(TOKEN_KEY);

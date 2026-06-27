@@ -37,7 +37,7 @@ async function save() {
   sha = await props.client.saveJson(
     props.file.file,
     { ...data },
-    `cms: update ${props.file.file}`,
+    `lanza: update ${props.file.file}`,
     sha,
   );
 }

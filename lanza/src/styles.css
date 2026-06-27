@@ -1,6 +1,6 @@
 @import "tailwindcss";
 
-/* ── Design tokens (Studio) ────────────────────────────────────────────────
+/* ── Design tokens (Lanza) ────────────────────────────────────────────────
    Editorial + premium: a serif for headings/brand/writing, a clean sans for
    the chrome. Neutral zinc palette with emerald (saved) / rose (error) accents
    inherited from Tailwind's defaults. No web-font dependency — system stacks

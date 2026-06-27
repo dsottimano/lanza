@@ -5,7 +5,7 @@
   "compatibility_flags": ["nodejs_compat"],
   "observability": { "enabled": true },
   "vars": {
-    "GITHUB_REPO": "dsottimano/emdash-starter",
+    "GITHUB_REPO": "dsottimano/lanza",
     "GITHUB_BRANCH": "main",
     "CONTENT_DIR": "src/content/posts",
     // Comma-separated Telegram chat IDs allowed to use the bot. Empty = deny all.

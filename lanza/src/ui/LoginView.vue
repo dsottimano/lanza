@@ -31,7 +31,7 @@ async function signIn() {
   <div class="grid min-h-screen place-items-center bg-zinc-50 p-6">
     <div class="w-full max-w-sm">
       <div class="mb-8 text-center">
-        <h1 class="font-serif text-4xl font-bold tracking-tight text-zinc-900">Studio</h1>
+        <h1 class="font-serif text-4xl font-bold tracking-tight text-zinc-900">Lanza</h1>
         <p class="mt-1 text-sm text-zinc-500">Your writing, in your repo.</p>
       </div>
 

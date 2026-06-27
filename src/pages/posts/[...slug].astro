@@ -12,7 +12,7 @@ export async function getStaticPaths() {
 }
 
 const { post } = Astro.props;
-// Body is HTML authored in Studio; render it directly (sanitized), not through
+// Body is HTML authored in Lanza; render it directly (sanitized), not through
 // the markdown pipeline. HTML is the source of truth (see lib/sanitize.ts).
 const body = sanitizeBody(post.body ?? "");
 
