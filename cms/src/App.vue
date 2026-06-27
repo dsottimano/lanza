@@ -69,50 +69,47 @@ function signOut() {
 <template>
   <LoginView v-if="!authed" @authed="onAuthed" />
 
-  <template v-else-if="client">
-    <!-- Full-screen editors replace the layout; each has its own back button. -->
-    <EditorView
-      v-if="pane === 'editRich'"
-      :key="editingPath ?? 'new'"
-      :client="client"
-      :collection="collection"
-      :path="editingPath"
-      @back="backToList"
+  <!-- The collection rail is permanent; only the main column swaps. -->
+  <div v-else-if="client" class="flex min-h-screen bg-zinc-50">
+    <Sidebar
+      :active-collection="collection.name"
+      :active-settings="pane === 'settings' ? (settingsFile?.name ?? null) : null"
+      @select="selectCollection"
+      @open-settings="openSettings"
+      @signout="signOut"
     />
-    <RecordEditor
-      v-else-if="pane === 'editRecord'"
-      :key="editingPath ?? 'new'"
-      :client="client"
-      :collection="collection"
-      :path="editingPath"
-      @back="backToList"
-    />
-    <SettingsView
-      v-else-if="pane === 'settings' && settingsFile"
-      :key="settingsFile.name"
-      :client="client"
-      :file="settingsFile"
-      @back="pane = 'list'"
-    />
-
-    <!-- List view keeps the collection rail. -->
-    <div v-else class="flex min-h-screen bg-zinc-50">
-      <Sidebar
-        :active-collection="collection.name"
-        :active-settings="null"
-        @select="selectCollection"
-        @open-settings="openSettings"
-        @signout="signOut"
+    <main class="min-w-0 flex-1">
+      <EditorView
+        v-if="pane === 'editRich'"
+        :key="editingPath ?? 'new'"
+        :client="client"
+        :collection="collection"
+        :path="editingPath"
+        @back="backToList"
       />
-      <main class="min-w-0 flex-1">
-        <CollectionList
-          ref="listRef"
-          :client="client"
-          :collection="collection"
-          @open="openEntry"
-          @new="newEntry"
-        />
-      </main>
-    </div>
-  </template>
+      <RecordEditor
+        v-else-if="pane === 'editRecord'"
+        :key="editingPath ?? 'new'"
+        :client="client"
+        :collection="collection"
+        :path="editingPath"
+        @back="backToList"
+      />
+      <SettingsView
+        v-else-if="pane === 'settings' && settingsFile"
+        :key="settingsFile.name"
+        :client="client"
+        :file="settingsFile"
+        @back="pane = 'list'"
+      />
+      <CollectionList
+        v-else
+        ref="listRef"
+        :client="client"
+        :collection="collection"
+        @open="openEntry"
+        @new="newEntry"
+      />
+    </main>
+  </div>
 </template>
