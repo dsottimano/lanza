@@ -24,8 +24,9 @@ markdown files to this repo via the GitHub API. Full plan + rationale:
       Replaces the Phase-1 "paste a URL" placeholder in the Figure card.
 - [ ] **Phase 5 — Render switch + cutover.** Flip the 2 Astro detail templates
       (`src/pages/posts/[...slug].astro`, `src/pages/[...slug].astro`) to
-      `set:html` from `entry.body`; add public-site CSS/JS for the cards; point the
-      build at `public/admin/`; delete `sveltia-cms.js` + `config.yml`; update
+      `set:html` from `entry.body`; **sanitize on render** (rehype-sanitize /
+      DOMPurify — see Security posture); add public-site CSS/JS for the cards; point
+      the build at `public/admin/`; delete `sveltia-cms.js` + `config.yml`; update
       `CLAUDE.md` + `README` ("markdown" → "HTML").
 
 ## How to run
@@ -52,6 +53,32 @@ markdown files to this repo via the GitHub API. Full plan + rationale:
 - **Body format:** posts are `.md` with **HTML bodies** now. Astro still renders
   them via the markdown pipeline (raw HTML passes through) until the Phase 5
   `set:html` switch.
+
+## Security posture
+
+Threat model: solo, technical author; the *only* writers are (a) the
+authenticated author via Studio and (b) the Telegram bot, which commits whatever
+an allowlisted user sends (raw HTML included) as a **draft** (hidden until a human
+publishes).
+
+- **Fixed — iframe/img src validation** (`cms/src/editor/url.ts`). A crafted draft
+  with `<div data-embed data-src="javascript:…">` would, when opened in Studio,
+  run an iframe in the admin origin and steal the GitHub token from localStorage.
+  Embed/Figure now allow only `http(s)` (+ local paths for images) at both the
+  in-editor preview and the committed `renderHTML`. Verified against
+  `javascript:`/`data:`/`vbscript:` inputs.
+- **By design — author HTML on the author's own public site.** A CMS exists to let
+  the owner put HTML on their site; the author is trusted on their own property.
+  Editor output is also safe-by-construction: TipTap `setContent` parses to its
+  schema, dropping `<script>`/`onerror`/unknown tags on load.
+- **Accepted — GitHub PAT in localStorage.** Standard for a no-backend git CMS
+  (Sveltia/Decap do the same); the token is repo-scoped Contents only. Mitigated by
+  the two points above (no XSS sink left to read it). The alternative (OAuth +
+  Worker + httpOnly cookie) is explicitly out of scope for v1.
+- **TODO (Phase 5) — sanitize on the public render.** When the bot commits raw
+  HTML in a draft and an editor publishes it *without* opening it in Studio (which
+  would sanitize it), that HTML reaches the public site. Human-review + draft-gated,
+  but add `rehype-sanitize` / DOMPurify at the `set:html` switch for defense-in-depth.
 
 ## Key files
 

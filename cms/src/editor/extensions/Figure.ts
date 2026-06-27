@@ -1,6 +1,7 @@
 import { Node, mergeAttributes } from "@tiptap/core";
 import { VueNodeViewRenderer } from "@tiptap/vue-3";
 import FigureView from "../nodeviews/FigureView.vue";
+import { safeImageUrl } from "../url";
 
 // Image-with-caption card. Caption is editable rich text; the image src is an
 // attribute. Phase 1 takes a URL; real uploads (commit to the repo) land in
@@ -37,7 +38,7 @@ export const Figure = Node.create({
     return [
       "figure",
       mergeAttributes(rest, { class: "figure" }),
-      ["img", { src, alt }],
+      ["img", { src: safeImageUrl(src as string), alt }],
       ["figcaption", {}, 0],
     ];
   },

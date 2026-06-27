@@ -1,6 +1,7 @@
 import { Node, mergeAttributes } from "@tiptap/core";
 import { VueNodeViewRenderer } from "@tiptap/vue-3";
 import EmbedView from "../nodeviews/EmbedView.vue";
+import { safeEmbedUrl } from "../url";
 
 // Generic embed card: stores a URL, renders it in an iframe. An empty embed
 // shows a URL input in the editor. Serializes to
@@ -27,7 +28,7 @@ export const Embed = Node.create({
   },
 
   renderHTML({ HTMLAttributes, node }) {
-    const src = (node.attrs.src as string) || "";
+    const src = safeEmbedUrl(node.attrs.src as string);
     return [
       "div",
       mergeAttributes(HTMLAttributes, { "data-embed": "", class: "embed" }),

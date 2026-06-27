@@ -1,22 +1,33 @@
 <script setup lang="ts">
-import { ref } from "vue";
+import { computed, ref } from "vue";
 import { type NodeViewProps, NodeViewWrapper } from "@tiptap/vue-3";
+import { safeEmbedUrl } from "../url";
 
 const props = defineProps<NodeViewProps>();
 
 const draft = ref(props.node.attrs.src || "");
+const error = ref("");
+
+// Never bind a raw, unvalidated URL to the iframe — a `javascript:`/`data:` src
+// would execute in the admin origin and could read the stored GitHub token.
+const safeSrc = computed(() => safeEmbedUrl(props.node.attrs.src));
 
 function apply() {
-  const url = draft.value.trim();
-  if (url) props.updateAttributes({ src: url });
+  const url = safeEmbedUrl(draft.value);
+  if (!url) {
+    error.value = "Enter a valid http(s) URL.";
+    return;
+  }
+  error.value = "";
+  props.updateAttributes({ src: url });
 }
 </script>
 
 <template>
   <NodeViewWrapper class="embed" data-embed contenteditable="false">
     <iframe
-      v-if="node.attrs.src"
-      :src="node.attrs.src"
+      v-if="safeSrc"
+      :src="safeSrc"
       loading="lazy"
       allowfullscreen
       frameborder="0"
@@ -29,6 +40,7 @@ function apply() {
         @keydown.enter.prevent="apply"
       />
       <button @click="apply">Embed</button>
+      <span v-if="error" class="embed-error">{{ error }}</span>
     </div>
   </NodeViewWrapper>
 </template>
@@ -71,5 +83,10 @@ function apply() {
   background: #1a1a1a;
   color: #fff;
   cursor: pointer;
+}
+.embed-error {
+  color: #c0392b;
+  font-size: 0.8rem;
+  white-space: nowrap;
 }
 </style>

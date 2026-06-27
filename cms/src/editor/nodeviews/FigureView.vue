@@ -1,19 +1,23 @@
 <script setup lang="ts">
+import { computed } from "vue";
 import { type NodeViewProps, NodeViewWrapper, NodeViewContent } from "@tiptap/vue-3";
+import { safeImageUrl } from "../url";
 
 const props = defineProps<NodeViewProps>();
 
+const safeSrc = computed(() => safeImageUrl(props.node.attrs.src));
+
 function setUrl() {
   const next = window.prompt("Image URL", props.node.attrs.src || "");
-  if (next !== null) props.updateAttributes({ src: next.trim() });
+  if (next !== null) props.updateAttributes({ src: safeImageUrl(next) });
 }
 </script>
 
 <template>
   <NodeViewWrapper class="figure" data-drag-handle>
     <img
-      v-if="node.attrs.src"
-      :src="node.attrs.src"
+      v-if="safeSrc"
+      :src="safeSrc"
       :alt="node.attrs.alt"
       contenteditable="false"
       @click="setUrl"
