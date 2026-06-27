@@ -1,6 +1,8 @@
 <script setup lang="ts">
-import { onBeforeUnmount, onMounted, ref, shallowRef } from "vue";
+import { onBeforeUnmount, onMounted, provide, ref, shallowRef } from "vue";
 import { useEditor, EditorContent } from "@tiptap/vue-3";
+import type { GitHubClient } from "../backend/github";
+import { CLIENT_KEY } from "../fields/context";
 import StarterKit from "@tiptap/starter-kit";
 import Link from "@tiptap/extension-link";
 import Placeholder from "@tiptap/extension-placeholder";
@@ -11,10 +13,15 @@ import { Embed } from "./extensions/Embed";
 import { SlashCommand, filterSlashItems, type SlashItem } from "./extensions/slash";
 import SlashMenu from "./SlashMenu.vue";
 
-const props = withDefaults(defineProps<{ initialHtml?: string }>(), {
-  initialHtml: "<p></p>",
-});
+const props = withDefaults(
+  defineProps<{ initialHtml?: string; client?: GitHubClient }>(),
+  { initialHtml: "<p></p>", client: undefined },
+);
 const emit = defineEmits<{ (e: "change"): void }>();
+
+// Expose the client to node views (Figure upload). TipTap vue-3 mounts node
+// views with this component's app context, so inject() reaches them here.
+provide(CLIENT_KEY, props.client as GitHubClient);
 
 const bubbleEl = ref<HTMLElement>();
 

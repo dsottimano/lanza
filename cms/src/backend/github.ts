@@ -129,15 +129,42 @@ export class GitHubClient {
     return this.putFile(path, `${JSON.stringify(data, null, 2)}\n`, message, sha);
   }
 
+  /**
+   * Upload a binary file (image) given its raw base64 content. Creates the file,
+   * or overwrites in place if a file with the same path already exists (a
+   * re-upload of the same name replaces it). Its own commit — see Phase 4 notes.
+   */
+  async uploadBinary(path: string, base64: string, message: string): Promise<void> {
+    try {
+      await this.putRaw(path, base64, message);
+    } catch (e) {
+      if (e instanceof GitHubError && e.status === 422) {
+        const existing = (await this.req(this.contentsUrl(path))) as { sha: string };
+        await this.putRaw(path, base64, message, existing.sha);
+        return;
+      }
+      throw e;
+    }
+  }
+
   private async putFile(
     path: string,
     text: string,
     message: string,
     sha?: string,
   ): Promise<string> {
+    return this.putRaw(path, utf8ToB64(text), message, sha);
+  }
+
+  private async putRaw(
+    path: string,
+    base64: string,
+    message: string,
+    sha?: string,
+  ): Promise<string> {
     const result = (await this.req(this.contentsUrl(path, false), {
       method: "PUT",
-      body: JSON.stringify({ message, content: utf8ToB64(text), branch: REPO.branch, sha }),
+      body: JSON.stringify({ message, content: base64, branch: REPO.branch, sha }),
     })) as { content: { sha: string } };
     return result.content.sha;
   }

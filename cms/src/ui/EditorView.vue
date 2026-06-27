@@ -151,7 +151,7 @@ function markDirty() {
           :placeholder="`${collection.labelSingular} title`"
           @input="markDirty"
         />
-        <Editor ref="editorRef" :initial-html="bodyHtml" @change="markDirty" />
+        <Editor ref="editorRef" :initial-html="bodyHtml" :client="client" @change="markDirty" />
       </div>
     </main>
 

@@ -22,9 +22,16 @@ markdown files to this repo via the GitHub API. Full plan + rationale:
       editors for `seo.json` / `menu.json` / `redirects.json`. Collection rail in
       the sidebar. **Build + typecheck pass; needs live commit round-trip check**
       (esp. relation pickers, page blocks, and the 3 settings files).
-- [ ] **Phase 4 — Media.** Image upload → commit to `public/images/uploads`
-      (Git Data API for atomic post+image commit) → insert `/images/uploads/…` URL.
-      Replaces the Phase-1 "paste a URL" placeholder in the Figure card.
+- [x] **Phase 4 — Media.** Image upload → commit to `public/images/uploads` →
+      store the `/images/uploads/…` public path. Covers every `image` field
+      (featured/avatar/OG/block/gallery/logo) via `fields/ImageInput.vue` and the
+      editor's **Figure card** (`nodeviews/FigureView.vue`); both share
+      `backend/media.ts` (`uploadImage`). Paste-a-URL kept as a fallback for
+      external images. **Build passes; needs live upload verify.**
+      **Deviation from the original plan:** each image is its own commit (simple
+      Contents API `uploadBinary`), *not* an atomic post+image commit via the Git
+      Data API — far less code; only cost is a possible orphaned image if a draft
+      is abandoned. Upgrade to atomic later if desired.
 - [ ] **Phase 5 — Render switch + cutover.** Flip the 2 Astro detail templates
       (`src/pages/posts/[...slug].astro`, `src/pages/[...slug].astro`) to
       `set:html` from `entry.body`; **sanitize on render** (rehype-sanitize /
@@ -92,11 +99,13 @@ publishes).
   (`nodeviews/`), slash menu.
 - `cms/src/fields/` — schema-driven form: `FieldForm.vue` (root, provides client),
   `FieldInput.vue` (recursive, one field), `ListInput.vue` (array/blocks/scalar
-  lists), `RelationInput.vue` (slug picker), `context.ts` (client inject key).
+  lists), `RelationInput.vue` (slug picker), `ImageInput.vue` (upload + URL),
+  `context.ts` (client inject key).
 - `cms/src/backend/` — `github.ts` (generic Contents API: `listDir`/`loadEntry`/
   `saveEntry` for markdown, `loadJson`/`saveJson` for settings, `deleteFile`),
-  `frontmatter.ts` (js-yaml), `markdown.ts` (md→html via marked), `auth.ts`,
-  `config.ts` (repo coords).
+  `frontmatter.ts` (js-yaml), `markdown.ts` (md→html via marked), `media.ts`
+  (`uploadImage` → commit under `MEDIA.dir`), `auth.ts`, `config.ts` (repo +
+  `MEDIA` coords).
 - `cms/src/ui/` — `LoginView`, `Sidebar` (collection rail), `CollectionList`
   (generic list), `EditorView` (rich body + settings drawer, posts/pages),
   `RecordEditor` (form-only, taxonomies/authors), `SettingsView` (JSON files).

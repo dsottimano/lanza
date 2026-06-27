@@ -6,6 +6,7 @@ import { computed, ref } from "vue";
 import type { Field } from "../schema";
 import ListInput from "./ListInput.vue";
 import RelationInput from "./RelationInput.vue";
+import ImageInput from "./ImageInput.vue";
 
 const props = defineProps<{ field: Field }>();
 const model = defineModel<any>();
@@ -51,10 +52,6 @@ if (
 function objVal(): Record<string, unknown> {
   return model.value as Record<string, unknown>;
 }
-
-const showImagePreview = computed(
-  () => typeof model.value === "string" && /^(https?:\/\/|\/)/.test(model.value),
-);
 
 const open = ref(props.field.collapsed !== true);
 </script>
@@ -139,16 +136,7 @@ const open = ref(props.field.collapsed !== true);
       <option v-for="opt in field.options" :key="opt" :value="opt">{{ opt }}</option>
     </select>
 
-    <template v-else-if="field.widget === 'image'">
-      <input
-        :id="field.name"
-        type="text"
-        v-model="model"
-        placeholder="/images/uploads/… or https://…"
-        :class="inputCls"
-      />
-      <img v-if="showImagePreview" :src="model" class="mt-2 max-h-32 rounded-lg border border-zinc-200" alt="" />
-    </template>
+    <ImageInput v-else-if="field.widget === 'image'" v-model="model" />
 
     <!-- string (default) -->
     <input v-else :id="field.name" type="text" v-model="model" :required="isRequired" :class="inputCls" />

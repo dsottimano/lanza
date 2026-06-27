@@ -7,3 +7,12 @@ export const REPO = {
 } as const;
 
 export const POSTS_DIR = "src/content/posts";
+
+// Media: uploaded images are committed under MEDIA.dir and served as static
+// assets at MEDIA.publicPrefix. Must match public/admin/config.yml
+// (media_folder / public_folder). Images ship straight from the static build —
+// never through a Worker (see CLAUDE.md Rule 3).
+export const MEDIA = {
+  dir: "public/images/uploads",
+  publicPrefix: "/images/uploads",
+} as const;
