@@ -8,6 +8,12 @@ import tailwindcss from "@tailwindcss/vite";
 export default defineConfig({
   base: "/admin/",
   plugins: [vue(), tailwindcss()],
+  // Dev server serves the SPA under the `/admin/` base. `open` lands the browser
+  // on the working URL (the bare root 404s because of the base). Vite picks the
+  // next free port automatically if 5173 is taken (strictPort defaults false).
+  server: {
+    open: "/admin/",
+  },
   build: {
     outDir: "../public/admin",
     emptyOutDir: true,
