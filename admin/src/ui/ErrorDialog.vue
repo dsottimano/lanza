@@ -1,14 +1,8 @@
 <script setup lang="ts">
 // The single, app-wide error dialog. Renders whatever reportError() last set.
-// For auth-ish failures (401/403/404) it offers a shortcut to fix the token.
+// The GitHub token is server-side now, so auth-ish failures (401/403/404) point
+// at the server/proxy config rather than a token the editor can fix in-browser.
 import { errorState, clearError, isAuthError } from "../errors";
-
-const emit = defineEmits<{ (e: "fix-token"): void }>();
-
-function fixToken() {
-  clearError();
-  emit("fix-token");
-}
 </script>
 
 <template>
@@ -29,17 +23,12 @@ function fixToken() {
       <p v-if="errorState.status" class="mt-1 text-xs text-zinc-400">GitHub status {{ errorState.status }}</p>
 
       <p v-if="isAuthError(errorState.status)" class="mt-3 text-sm text-zinc-500">
-        Your token may be expired or missing <strong>Contents: read &amp; write</strong> on this repo.
+        The server's GitHub token may be missing, expired, or lacking
+        <strong>Contents: read &amp; write</strong> on this repo. Contact the site
+        admin to check the <code class="rounded bg-zinc-100 px-1.5 py-0.5 font-mono text-[0.85em] text-zinc-700">GITHUB_TOKEN</code> setting.
       </p>
 
       <div class="mt-5 flex justify-end gap-2">
-        <button
-          v-if="isAuthError(errorState.status)"
-          class="rounded-lg bg-zinc-900 px-4 py-2 text-sm font-medium text-white transition hover:bg-zinc-700"
-          @click="fixToken"
-        >
-          Update token
-        </button>
         <button
           class="rounded-lg px-4 py-2 text-sm text-zinc-600 transition hover:bg-zinc-100"
           @click="clearError"

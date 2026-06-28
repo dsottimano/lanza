@@ -1,7 +1,10 @@
 import { REPO } from "./config";
 import { parseFrontmatter, serializeFrontmatter } from "./frontmatter";
 
-const API = "https://api.github.com";
+// All GitHub traffic goes through our own proxy (prod: Pages Function at
+// functions/admin/api/gh/[[path]].ts; dev: the vite middleware in vite.config.ts).
+// The proxy injects the token server-side, so it never touches the browser.
+const API = "/admin/api/gh";
 
 export interface RepoFile {
   name: string; // file name, e.g. hello-world.md
@@ -45,13 +48,15 @@ export class GitHubError extends Error {
 }
 
 export class GitHubClient {
-  constructor(private token: string) {}
+  // The token is no longer held client-side — the proxy injects it. The optional
+  // param is kept so existing call sites compile until Phase 2 removes the login
+  // flow that still constructs the client with a pasted token.
+  constructor(_token?: string) {}
 
   private async req(path: string, init: RequestInit = {}): Promise<unknown> {
     const res = await fetch(`${API}${path}`, {
       ...init,
       headers: {
-        Authorization: `Bearer ${this.token}`,
         Accept: "application/vnd.github+json",
         "X-GitHub-Api-Version": "2022-11-28",
         ...(init.body ? { "Content-Type": "application/json" } : {}),

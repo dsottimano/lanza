@@ -15,8 +15,6 @@ const emit = defineEmits<{
   (e: "selectLocale", locale: Locale): void;
   (e: "openSettings", file: FileEntry): void;
   (e: "help"): void;
-  (e: "account"): void;
-  (e: "signout"): void;
 }>();
 
 const folders = COLLECTIONS.filter(
@@ -107,18 +105,6 @@ const itemActive = "bg-zinc-900 text-white hover:bg-zinc-900 hover:text-white";
         @click="emit('help')"
       >
         <span aria-hidden="true">📖</span> Guide
-      </button>
-      <button
-        class="flex items-center gap-1.5 rounded-lg px-2.5 py-2 text-left text-sm text-zinc-500 transition hover:bg-zinc-100 hover:text-zinc-900"
-        @click="emit('account')"
-      >
-        <span aria-hidden="true">🔑</span> GitHub token
-      </button>
-      <button
-        class="rounded-lg px-2.5 py-2 text-left text-sm text-zinc-400 transition hover:bg-zinc-100 hover:text-zinc-700"
-        @click="emit('signout')"
-      >
-        Sign out
       </button>
     </div>
   </nav>

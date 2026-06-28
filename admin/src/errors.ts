@@ -3,8 +3,7 @@ import { GitHubError } from "./backend/github";
 
 // Global error channel. Operational failures anywhere in the CMS (load / save /
 // list / upload) call reportError(); a single ErrorDialog (mounted in App.vue)
-// renders the latest one. Auth-form validation (login, token dialog) stays
-// inline — a modal over a credential form is the wrong place for it.
+// renders the latest one.
 export const errorState = reactive<{ message: string | null; status: number | null }>({
   message: null,
   status: null,
@@ -31,8 +30,9 @@ export function clearError(): void {
   errorState.status = null;
 }
 
-// 401/403/404 from GitHub almost always mean the token is missing/expired or
-// lacks access to the repo — surface a shortcut to fix it.
+// 401/403/404 from GitHub almost always mean the server-side token is missing/
+// expired or lacks access to the repo — surface that hint (the editor can't fix
+// it in-browser; it's a server/proxy config issue).
 export function isAuthError(status: number | null): boolean {
   return status === 401 || status === 403 || status === 404;
 }

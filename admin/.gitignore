@@ -1,0 +1,10 @@
+node_modules/
+dist/
+*.local
+.DS_Store
+
+# Dev secrets (GitHub proxy token). The .sample.env template is committed; the
+# real .env is not. (Named .sample.env, not .env.example, so tooling that guards
+# .env* files still lets the template be edited.)
+.env
+.env.*
