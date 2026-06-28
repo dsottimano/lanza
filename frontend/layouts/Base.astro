@@ -20,8 +20,10 @@ interface Props {
 
 const { seo = {}, article = null, locale = DEFAULT_LOCALE, alternates = [] } = Astro.props;
 
-// Site-wide theme (Settings → Appearance). Drives the public CSS via data-theme.
+// Site-wide theme + logo (Settings → Appearance / onboarding). Theme drives the
+// public CSS via data-theme; logo (if set) replaces the text wordmark.
 const theme = appearance.theme ?? "editorial";
+const logo = appearance.logo || "";
 const siteName = getSeoDefaults(locale).siteName || "Site";
 const year = new Date().getFullYear();
 const homeUrl = localeUrl(locale, "");
@@ -55,7 +57,9 @@ if (navItems.length === 0) {
   <body>
     <header class="site-header">
       <div class="bar">
-        <a class="brand" href={homeUrl}>{siteName}</a>
+        <a class="brand" href={homeUrl}>
+          {logo ? <img class="brand-logo" src={logo} alt={siteName} /> : siteName}
+        </a>
         <nav class="site-nav">
           {navItems.map((item) => <a href={item.url}>{item.label}</a>)}
         </nav>

@@ -6,6 +6,7 @@ import EditorView from "./ui/EditorView.vue";
 import RecordEditor from "./ui/RecordEditor.vue";
 import SettingsView from "./ui/SettingsView.vue";
 import HelpView from "./ui/HelpView.vue";
+import OnboardingWizard from "./ui/OnboardingWizard.vue";
 import ErrorDialog from "./ui/ErrorDialog.vue";
 import { GitHubClient } from "./backend/github";
 import type { Locale } from "./backend/config";
@@ -81,6 +82,12 @@ function backToList(changed: boolean) {
   pane.value = "list";
   if (changed) listRef.value?.reload();
 }
+
+// Onboarding just finished: config was reloaded, so adopt the new default locale
+// and fall through to the CMS (site.onboarded is now true).
+function onOnboarded() {
+  locale.value = site.defaultLocale;
+}
 </script>
 
 <template>
@@ -90,6 +97,9 @@ function backToList(changed: boolean) {
   >
     Loading…
   </div>
+
+  <!-- First run (no site.json / not onboarded yet): the setup wizard. -->
+  <OnboardingWizard v-else-if="!site.onboarded" :client="client" @done="onOnboarded" />
 
   <!-- The collection rail is permanent; only the main column swaps. -->
   <div v-else class="flex min-h-screen bg-zinc-50">

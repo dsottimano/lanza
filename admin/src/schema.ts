@@ -326,6 +326,13 @@ export const COLLECTIONS: Collection[] = [
             default: "editorial",
             hint: "The public site's look. Per-entry Layout can still override the width.",
           },
+          {
+            name: "logo",
+            label: "Logo",
+            widget: "image",
+            required: false,
+            hint: "Shown in the site header in place of the text wordmark. Leave empty to use the site name.",
+          },
         ],
       },
       {
