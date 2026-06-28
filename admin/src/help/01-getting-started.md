@@ -16,6 +16,20 @@ that's a server-side setting, not something you can fix here — the site's GitH
 token may be missing, expired, or lacking **Contents: Read & write** on the repo.
 Contact whoever administers the site to check it.
 
+## First-run setup
+
+The very first time you open a brand-new site, Lanza shows a short **setup wizard**
+instead of the editor:
+
+1. **Logo** — upload one now, or skip and add it later (Settings → Appearance).
+2. **Starter theme** — pick the public look (`editorial`, `magazine`, `landing`,
+   `classic`). Changeable any time in Settings → Appearance.
+3. **Languages** — choose one language or several, and the default.
+
+Click **Finish** and Lanza saves these to your repo and opens the editor. The
+wizard only appears once — afterwards you go straight to your content. Everything
+it sets is editable later under **Settings** (Appearance, Languages).
+
 ## The layout
 
 - **Left rail** — the language switcher, your collections (Posts, Pages,

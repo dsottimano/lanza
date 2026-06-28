@@ -32,6 +32,25 @@ Post and page **bodies are stored as HTML** (Lanza is the source of truth); the
 content model — which collections exist and what fields they have — is defined in
 one file, `admin/src/schema.ts`.
 
+## Configuration is data too
+
+The site's setup isn't hard-coded — it's committed JSON the CMS edits, read by both
+the Astro front-end and the CMS:
+
+- **`frontend/data/site.json`** — the **languages** (which locales exist + the
+  default) and an `onboarded` flag. Written by the first-run wizard and by
+  Settings → Languages. Astro reads it (`astro.config.mjs`, `frontend/lib/i18n.ts`)
+  to build the right locale routes; the CMS reads it at boot for the language rail.
+  Disabled locales are excluded from the build, so removing a language genuinely
+  hides it (leftover content files are ignored, not published).
+- **`frontend/data/appearance.json`** — the **theme** and optional **logo**.
+  Written by the wizard and Settings → Appearance; `Base.astro` applies them.
+
+Because these are normal repo files written through the proxy, a change is just a
+commit → a rebuild → live. The **first-run wizard** is simply the UI that writes
+these files when `onboarded` isn't set yet; afterwards the same values are editable
+under Settings.
+
 ## How saving works (the GitHub proxy)
 
 When you save, Lanza calls the GitHub Contents API to commit the file. The
