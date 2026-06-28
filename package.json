@@ -3,7 +3,7 @@
   "private": true,
   "type": "module",
   "scripts": {
-    "dev": "astro dev",
+    "dev": "node scripts/dev.mjs",
     "build:lanza": "npm --prefix lanza ci && npm --prefix lanza run build",
     "build": "npm run build:lanza && node scripts/gen-redirects.mjs && astro build",
     "preview": "astro preview",
