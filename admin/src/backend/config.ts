@@ -8,18 +8,11 @@ export const REPO = {
 
 export const POSTS_DIR = "frontend/content/posts";
 
-// Multilingual content. Mirrors the public site's frontend/lib/i18n.ts: English is
-// the default/source language; Spanish and French are translations. Localized
-// collections (see schema `localized: true`) store one subfolder per locale,
-// e.g. frontend/content/posts/es/<slug>.md. Authors and media are not localized.
-export const LOCALES = ["en", "es", "fr"] as const;
-export type Locale = (typeof LOCALES)[number];
-export const DEFAULT_LOCALE: Locale = "en";
-export const LOCALE_LABEL: Record<Locale, string> = {
-  en: "EN",
-  es: "ES",
-  fr: "FR",
-};
+// A locale is its short code. The actual set is data-driven and loaded at runtime
+// from frontend/data/site.json — see backend/site.ts (`site`, loadSiteConfig).
+// Localized collections (schema `localized: true`) store one subfolder per
+// locale, e.g. frontend/content/posts/es/<slug>.md. Authors and media are shared.
+export type Locale = string;
 
 // Media: uploaded images are committed under MEDIA.dir and served as static
 // assets at MEDIA.publicPrefix. Must match public/admin/config.yml

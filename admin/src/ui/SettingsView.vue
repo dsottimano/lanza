@@ -6,7 +6,8 @@ import FieldForm from "../fields/FieldForm.vue";
 import SaveButton from "./SaveButton.vue";
 import { GitHubClient } from "../backend/github";
 import { fileEntryPath, type FileEntry } from "../schema";
-import { LOCALE_LABEL, type Locale } from "../backend/config";
+import type { Locale } from "../backend/config";
+import { localeLabel } from "../backend/site";
 import { reportError, clearError } from "../errors";
 
 const props = defineProps<{
@@ -67,7 +68,7 @@ async function save() {
       <h1 class="mb-6 font-serif text-3xl font-bold tracking-tight text-zinc-900">
         {{ file.label }}
         <span v-if="file.localized" class="ml-2 align-middle text-base font-medium text-zinc-400">
-          · {{ LOCALE_LABEL[locale] }}
+          · {{ localeLabel(locale) }}
         </span>
       </h1>
       <div v-if="loading" class="text-sm text-zinc-400">Loading…</div>

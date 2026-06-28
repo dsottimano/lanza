@@ -2,7 +2,8 @@
 // Collection rail: content collections, taxonomies, then the settings files.
 // Grouping is derived from the schema (folder vs files collection).
 import { COLLECTIONS, type FolderCollection, type FileEntry } from "../schema";
-import { LOCALES, LOCALE_LABEL, type Locale } from "../backend/config";
+import type { Locale } from "../backend/config";
+import { site } from "../backend/site";
 
 defineProps<{
   activeCollection: string;
@@ -38,22 +39,23 @@ const itemActive = "bg-zinc-900 text-white hover:bg-zinc-900 hover:text-white";
     </div>
 
     <!-- Active editing language. Scopes localized collections to their per-locale
-         subfolder; switching resets to the list (App.setLocale). -->
-    <div class="px-1.5">
+         subfolder; switching resets to the list (App.setLocale). Hidden for a
+         single-language site. -->
+    <div v-if="site.locales.length > 1" class="px-1.5">
       <p :class="groupLabel">Language</p>
       <div class="flex gap-1 rounded-lg bg-zinc-100 p-1">
         <button
-          v-for="l in LOCALES"
-          :key="l"
+          v-for="l in site.locales"
+          :key="l.code"
           :class="[
             'flex-1 rounded-md px-2 py-1 text-xs font-semibold transition',
-            locale === l
+            locale === l.code
               ? 'bg-white text-zinc-900 shadow-sm'
               : 'text-zinc-500 hover:text-zinc-800',
           ]"
-          @click="emit('selectLocale', l)"
+          @click="emit('selectLocale', l.code)"
         >
-          {{ LOCALE_LABEL[l] }}
+          {{ l.label }}
         </button>
       </div>
     </div>

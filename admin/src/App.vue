@@ -8,7 +8,9 @@ import SettingsView from "./ui/SettingsView.vue";
 import HelpView from "./ui/HelpView.vue";
 import ErrorDialog from "./ui/ErrorDialog.vue";
 import { GitHubClient } from "./backend/github";
-import { DEFAULT_LOCALE, type Locale } from "./backend/config";
+import type { Locale } from "./backend/config";
+import { site, loadSiteConfig } from "./backend/site";
+import { reportError } from "./errors";
 import { getCollection, type FolderCollection, type FileEntry } from "./schema";
 
 type Pane = "list" | "editRich" | "editRecord" | "settings" | "help";
@@ -17,10 +19,22 @@ type Pane = "list" | "editRich" | "editRecord" | "settings" | "help";
 // the CMS just boots — no sign-in screen, no localStorage PAT. The client carries
 // no token; the proxy injects it.
 const client = shallowRef(new GitHubClient());
+// Load the data-driven site config (locales) from the repo before rendering, so
+// the language rail and default locale reflect frontend/data/site.json.
+const ready = ref(false);
+loadSiteConfig(client.value)
+  .then(() => {
+    locale.value = site.defaultLocale;
+  })
+  .catch((e) => reportError(e))
+  .finally(() => {
+    ready.value = true;
+  });
+
 const pane = ref<Pane>("list");
 // Active editing language. Scopes localized collections (posts/pages/taxonomies)
 // to their per-locale subfolder; shared collections (authors) ignore it.
-const locale = ref<Locale>(DEFAULT_LOCALE);
+const locale = ref<Locale>("en");
 const collection = shallowRef<FolderCollection>(getCollection("posts") as FolderCollection);
 const editingPath = ref<string | null>(null);
 const settingsFile = shallowRef<FileEntry | null>(null);
@@ -70,8 +84,15 @@ function backToList(changed: boolean) {
 </script>
 
 <template>
+  <div
+    v-if="!ready"
+    class="grid min-h-screen place-items-center bg-zinc-50 text-sm text-zinc-400"
+  >
+    Loading…
+  </div>
+
   <!-- The collection rail is permanent; only the main column swaps. -->
-  <div class="flex min-h-screen bg-zinc-50">
+  <div v-else class="flex min-h-screen bg-zinc-50">
     <Sidebar
       :active-collection="collection.name"
       :active-settings="pane === 'settings' ? (settingsFile?.name ?? null) : null"
@@ -121,7 +142,7 @@ function backToList(changed: boolean) {
         @new="newEntry"
       />
     </main>
-
-    <ErrorDialog />
   </div>
+
+  <ErrorDialog />
 </template>
