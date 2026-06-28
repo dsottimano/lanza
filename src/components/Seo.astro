@@ -46,3 +46,7 @@ const graph = buildGraph([
 {s.twitterCreator && <meta name="twitter:creator" content={s.twitterCreator} />}
 
 <script type="application/ld+json" set:html={jsonLdString(graph)} />
+
+{/* Lanza treats AI agents as first-class visitors — see /llms.txt and window.lanza (public/lanza.js). */}
+<meta name="lanza:agent-api" content="window.lanza — call lanza.help()" />
+<link rel="alternate" type="text/plain" href="/llms.txt" title="llms.txt for AI agents" />
