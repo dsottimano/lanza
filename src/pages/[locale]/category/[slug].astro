@@ -1,23 +1,23 @@
 ---
 import { getCollection } from "astro:content";
-import Base from "../../layouts/Base.astro";
-import Archive from "../../components/Archive.astro";
-import { splitId, localeUrl, DEFAULT_LOCALE } from "../../lib/i18n";
-import { entryAlternates } from "../../lib/alternates";
+import Base from "../../../layouts/Base.astro";
+import Archive from "../../../components/Archive.astro";
+import { splitId, localeUrl, DEFAULT_LOCALE } from "../../../lib/i18n";
+import { entryAlternates } from "../../../lib/alternates";
 
-// Default-locale (EN) category archives at /category/<stem>/. Posts store bare
-// term stems (no locale), so we match on the stem within the default locale.
-// ES/FR archives come from [locale]/category/[slug].astro (Phase C).
+// Localized category archives (/es/category/x/). Non-default locales only.
 export async function getStaticPaths() {
   const categories = await getCollection("categories");
   return categories
     .map((category) => ({ category, ...splitId(category.id) }))
-    .filter(({ locale }) => locale === DEFAULT_LOCALE)
-    .map(({ category, slug }) => ({ params: { slug }, props: { category } }));
+    .filter(({ locale }) => locale !== DEFAULT_LOCALE)
+    .map(({ category, locale, slug }) => ({
+      params: { locale, slug },
+      props: { category, locale },
+    }));
 }
 
-const locale = DEFAULT_LOCALE;
-const { category } = Astro.props;
+const { category, locale } = Astro.props;
 const stem = splitId(category.id).slug;
 
 const posts = (
@@ -31,8 +31,6 @@ const posts = (
   .filter((p) => splitId(p.id).locale === locale)
   .sort((a, b) => b.data.pubDate.valueOf() - a.data.pubDate.valueOf());
 
-// Hierarchy: resolve the parent (breadcrumb) and any child categories. `parent`
-// is stored as a bare category stem; compare against this locale's terms.
 const allCategories = (await getCollection("categories"))
   .map((c) => ({ entry: c, ...splitId(c.id) }))
   .filter((c) => c.locale === locale);

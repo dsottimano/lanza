@@ -9,17 +9,30 @@ import {
   type ArticleInput,
 } from "../lib/jsonld";
 
+import { absUrl } from "../lib/seo";
+import { DEFAULT_LOCALE, type Locale } from "../lib/i18n";
+import type { Alternate } from "../lib/alternates";
+
 interface Props {
   seo?: PageSeo;
   /** When set, adds a BlogPosting node to the JSON-LD graph. */
   article?: ArticleInput | null;
+  /** Active locale — selects per-locale SEO defaults and og:locale. */
+  locale?: Locale;
+  /** This page's other-language URLs — emitted as hreflang alternates. */
+  alternates?: Alternate[];
 }
 
-const { seo = {}, article = null } = Astro.props;
+const { seo = {}, article = null, locale = DEFAULT_LOCALE, alternates = [] } = Astro.props;
 
 // Origin comes from astro.config `site` (set per deploy), not the CMS.
 const siteUrl = (Astro.site ?? new URL("/", Astro.url)).href.replace(/\/$/, "");
-const s = resolveSeo(seo, Astro.url.pathname, siteUrl);
+const s = resolveSeo(seo, Astro.url.pathname, siteUrl, locale);
+
+// hreflang only helps when a page has more than one language. x-default points at
+// the default locale's version when present.
+const hreflangs = alternates.length > 1 ? alternates : [];
+const xDefault = hreflangs.find((a) => a.locale === DEFAULT_LOCALE);
 
 const graph = buildGraph([
   websiteSchema(siteUrl),
@@ -31,6 +44,9 @@ const graph = buildGraph([
 <title>{s.title}</title>
 <link rel="canonical" href={s.canonical} />
 <meta name="description" content={s.description} />
+
+{hreflangs.map((a) => <link rel="alternate" hreflang={a.locale} href={absUrl(a.url, siteUrl)} />)}
+{xDefault && <link rel="alternate" hreflang="x-default" href={absUrl(xDefault.url, siteUrl)} />}
 {s.noindex && <meta name="robots" content="noindex, nofollow" />}
 
 <meta property="og:type" content={s.ogType} />

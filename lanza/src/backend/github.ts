@@ -84,14 +84,19 @@ export class GitHubClient {
     return withRef ? `${base}?ref=${REPO.branch}` : base;
   }
 
-  /** List markdown files in a folder-collection directory. */
+  /**
+   * List markdown files in a folder-collection directory. A 404 means the
+   * directory doesn't exist yet (GitHub has no empty folders, so a locale
+   * subfolder with no entries 404s) — treat that as an empty list, not an error.
+   */
   async listDir(dir: string): Promise<RepoFile[]> {
-    const items = (await this.req(this.contentsUrl(dir))) as Array<{
-      name: string;
-      path: string;
-      sha: string;
-      type: string;
-    }>;
+    let items: Array<{ name: string; path: string; sha: string; type: string }>;
+    try {
+      items = (await this.req(this.contentsUrl(dir))) as typeof items;
+    } catch (e) {
+      if (e instanceof GitHubError && e.status === 404) return [];
+      throw e;
+    }
     return items
       .filter((it) => it.type === "file" && it.name.endsWith(".md"))
       .map(({ name, path, sha }) => ({ name, path, sha }));

@@ -1,0 +1,6 @@
+{
+  "items": [
+    { "label": "Accueil", "url": "/fr/" },
+    { "label": "À propos", "url": "/fr/about/" }
+  ]
+}

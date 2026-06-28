@@ -8,7 +8,8 @@ import Editor from "../editor/Editor.vue";
 import FieldForm from "../fields/FieldForm.vue";
 import SaveButton from "./SaveButton.vue";
 import { GitHubClient } from "../backend/github";
-import type { FolderCollection, Field } from "../schema";
+import { entryFolder, type FolderCollection, type Field } from "../schema";
+import type { Locale } from "../backend/config";
 import { toEditorHtml } from "../backend/markdown";
 import { slugify } from "../backend/auth";
 import { reportError, clearError } from "../errors";
@@ -16,6 +17,7 @@ import { reportError, clearError } from "../errors";
 const props = defineProps<{
   client: GitHubClient;
   collection: FolderCollection;
+  locale: Locale;
   path: string | null;
 }>();
 const emit = defineEmits<{ (e: "back", changed: boolean): void }>();
@@ -71,7 +73,7 @@ async function save() {
 
   if (!currentPath) {
     const slug = slugify(String(data.title ?? ""));
-    currentPath = `${props.collection.folder}/${slug}.md`;
+    currentPath = `${entryFolder(props.collection, props.locale)}/${slug}.md`;
   }
   sha = await props.client.saveEntry(
     currentPath,

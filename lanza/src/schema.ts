@@ -7,6 +7,8 @@
 //     `body` decides whether the entry gets the TipTap writing canvas.
 //   - "files": a fixed set of JSON files (Settings → seo / menu / redirects).
 
+import type { Locale } from "./backend/config";
+
 export type Widget =
   | "string"
   | "text"
@@ -56,13 +58,20 @@ export interface FolderCollection {
   folder: string;
   body: "rich" | "none"; // "rich" => TipTap canvas; "none" => form only
   thumbnail?: string; // field name used as the list thumbnail
+  // When true, entries live in one subfolder per locale (folder/<locale>/<slug>.md)
+  // and the active locale (App.vue) scopes the list + new-entry path. When false/
+  // omitted the collection is shared across languages (e.g. authors).
+  localized?: boolean;
   fields: Field[]; // frontmatter fields (excludes the body)
 }
 
 export interface FileEntry {
   name: string;
   label: string;
-  file: string; // repo path to the JSON file
+  file: string; // repo path to the JSON file (the base; see `localized`)
+  // When true, the file has one variant per locale: `file` is the base name and
+  // the active locale is spliced in before `.json` (menu.json → menu.es.json).
+  localized?: boolean;
   fields: Field[];
 }
 
@@ -182,6 +191,7 @@ export const COLLECTIONS: Collection[] = [
     labelSingular: "Post",
     folder: "src/content/posts",
     body: "rich",
+    localized: true,
     thumbnail: "featuredImage",
     fields: [
       { name: "title", label: "Title", widget: "string" },
@@ -231,6 +241,7 @@ export const COLLECTIONS: Collection[] = [
     labelSingular: "Page",
     folder: "src/content/pages",
     body: "rich",
+    localized: true,
     thumbnail: "featuredImage",
     fields: [
       { name: "title", label: "Title", widget: "string" },
@@ -257,6 +268,7 @@ export const COLLECTIONS: Collection[] = [
     labelSingular: "Category",
     folder: "src/content/categories",
     body: "none",
+    localized: true,
     fields: [
       { name: "title", label: "Name", widget: "string" },
       { name: "description", label: "Description", widget: "text", required: false },
@@ -276,6 +288,7 @@ export const COLLECTIONS: Collection[] = [
     labelSingular: "Tag",
     folder: "src/content/tags",
     body: "none",
+    localized: true,
     fields: [
       { name: "title", label: "Name", widget: "string" },
       { name: "description", label: "Description", widget: "text", required: false },
@@ -319,6 +332,7 @@ export const COLLECTIONS: Collection[] = [
         name: "seo_defaults",
         label: "SEO defaults",
         file: "src/data/seo.json",
+        localized: true,
         fields: [
           { name: "siteName", label: "Site name", widget: "string" },
           {
@@ -366,6 +380,7 @@ export const COLLECTIONS: Collection[] = [
         name: "menu",
         label: "Menu",
         file: "src/data/menu.json",
+        localized: true,
         fields: [
           {
             name: "items",
@@ -412,4 +427,17 @@ export function getCollection(name: string): Collection | undefined {
 
 export function folderCollections(): FolderCollection[] {
   return COLLECTIONS.filter((c): c is FolderCollection => c.kind === "folder");
+}
+
+// Repo folder for a collection in the active locale. Localized collections live
+// in a per-locale subfolder (folder/<locale>); shared ones (authors) don't.
+export function entryFolder(c: FolderCollection, locale: Locale): string {
+  return c.localized ? `${c.folder}/${locale}` : c.folder;
+}
+
+// Repo path for a settings file in the active locale. Localized files splice the
+// locale before `.json` (src/data/menu.json → src/data/menu.es.json); shared
+// files (appearance, redirects) keep their path.
+export function fileEntryPath(f: FileEntry, locale: Locale): string {
+  return f.localized ? f.file.replace(/\.json$/, `.${locale}.json`) : f.file;
 }

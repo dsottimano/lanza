@@ -1,0 +1,78 @@
+---
+// Shared list page — the homepage and every archive (category / tag / author)
+// render through this. Post links carry the locale prefix via localeUrl, so one
+// component serves EN at the root and ES/FR under their prefix.
+import type { CollectionEntry } from "astro:content";
+import { splitId, localeUrl, type Locale } from "../lib/i18n";
+
+interface Link {
+  url: string;
+  label: string;
+}
+
+interface Props {
+  heading: string;
+  locale: Locale;
+  posts: CollectionEntry<"posts">[];
+  description?: string;
+  emptyText?: string;
+  // Category hierarchy (optional): a parent breadcrumb and/or child terms.
+  breadcrumb?: Link;
+  childLinks?: Link[];
+  // Show a "(draft)" marker (homepage in dev). Off for archives.
+  showDrafts?: boolean;
+}
+
+const {
+  heading,
+  locale,
+  posts,
+  description,
+  emptyText = "No posts yet.",
+  breadcrumb,
+  childLinks = [],
+  showDrafts = false,
+} = Astro.props;
+---
+
+<main>
+  {
+    breadcrumb && (
+      <p class="breadcrumb">
+        <a href={breadcrumb.url}>{breadcrumb.label}</a> /
+      </p>
+    )
+  }
+  <h1>{heading}</h1>
+  {description && <p>{description}</p>}
+  {
+    childLinks.length > 0 && (
+      <nav class="subcategories">
+        <strong>Subcategories:</strong>
+        <ul>
+          {childLinks.map((c) => (
+            <li>
+              <a href={c.url}>{c.label}</a>
+            </li>
+          ))}
+        </ul>
+      </nav>
+    )
+  }
+  {
+    posts.length > 0 ? (
+      <ul>
+        {posts.map((p) => (
+          <li>
+            <a href={localeUrl(locale, `posts/${splitId(p.id).slug}/`)}>
+              {p.data.title}
+            </a>
+            {showDrafts && p.data.draft && <em> (draft)</em>}
+          </li>
+        ))}
+      </ul>
+    ) : (
+      <p>{emptyText}</p>
+    )
+  }
+</main>

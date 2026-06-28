@@ -1,0 +1,15 @@
+{
+  "siteName": "My Site",
+  "titleTemplate": "%s · My Site",
+  "defaultTitle": "My Site",
+  "defaultDescription": "Un site statique hébergé sur Cloudflare, édité avec Lanza.",
+  "defaultOgImage": "",
+  "locale": "fr_FR",
+  "twitter": "",
+  "twitterCreator": "",
+  "organization": {
+    "name": "My Site",
+    "logo": "",
+    "sameAs": []
+  }
+}
