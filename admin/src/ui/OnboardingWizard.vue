@@ -4,9 +4,9 @@
 // (theme/logo) + site.json (locale set + `onboarded: true`). Once onboarded is
 // true the CMS skips this on future loads (see App.vue / backend/site.ts).
 import { ref, computed } from "vue";
-import { GitHubClient } from "../backend/github";
+import { GitHubClient, GitHubError } from "../backend/github";
 import { uploadImage } from "../backend/media";
-import { site, loadSiteConfig, SITE_CONFIG_PATH, type LocaleDef } from "../backend/site";
+import { loadSiteConfig, SITE_CONFIG_PATH, type LocaleDef } from "../backend/site";
 import { reportError } from "../errors";
 
 const props = defineProps<{ client: GitHubClient }>();
@@ -67,6 +67,35 @@ const langValid = computed(() =>
   multilingual.value ? chosen.value.length >= 1 : !!single.value,
 );
 
+// Write a JSON file with a fresh sha fetched immediately before the PUT, retrying
+// once on a 409 (sha conflict). `build` receives the current file data (or {} if
+// the file is absent) and returns what to write. Keeps onboarding error-free even
+// if the file changed since boot.
+async function putJson(
+  path: string,
+  build: (current: Record<string, unknown>) => Record<string, unknown>,
+  message: string,
+): Promise<void> {
+  for (let attempt = 0; attempt < 2; attempt++) {
+    let current: Record<string, unknown> = {};
+    let sha: string | undefined;
+    try {
+      const j = await props.client.loadJson(path);
+      current = j.data;
+      sha = j.sha;
+    } catch (e) {
+      if (!(e instanceof GitHubError && e.status === 404)) throw e;
+    }
+    try {
+      await props.client.saveJson(path, build(current), message, sha);
+      return;
+    } catch (e) {
+      if (e instanceof GitHubError && e.status === 409 && attempt === 0) continue;
+      throw e;
+    }
+  }
+}
+
 async function finish() {
   busy.value = true;
   try {
@@ -75,30 +104,26 @@ async function finish() {
     if (logoFile.value) logoPath = await uploadImage(props.client, logoFile.value);
 
     // 2. appearance.json — merge onto whatever's there (preserve unknown keys).
-    let apData: Record<string, unknown> = {};
-    let apSha: string | undefined;
-    try {
-      const ap = await props.client.loadJson(APPEARANCE_PATH);
-      apData = ap.data;
-      apSha = ap.sha;
-    } catch {
-      /* no appearance.json yet — create it */
-    }
-    apData.theme = theme.value;
-    if (logoPath) apData.logo = logoPath;
-    await props.client.saveJson(APPEARANCE_PATH, apData, "lanza: onboarding — appearance", apSha);
+    await putJson(
+      APPEARANCE_PATH,
+      (cur) => {
+        const next: Record<string, unknown> = { ...cur, theme: theme.value };
+        if (logoPath) next.logo = logoPath;
+        return next;
+      },
+      "lanza: onboarding — appearance",
+    );
 
-    // 3. site.json — the chosen locale set + onboarded flag.
+    // 3. site.json — the chosen locale set + onboarded flag (full overwrite).
     const codes = multilingual.value ? chosen.value : [single.value];
     const def = multilingual.value ? defaultLocale.value : single.value;
     const locales = codes
       .map((c) => LANG_CATALOG.find((l) => l.code === c))
       .filter((l): l is LocaleDef => Boolean(l));
-    await props.client.saveJson(
+    await putJson(
       SITE_CONFIG_PATH,
-      { defaultLocale: def, locales, onboarded: true },
+      () => ({ defaultLocale: def, locales, onboarded: true }),
       "lanza: onboarding — site config",
-      site.sha ?? undefined,
     );
 
     // 4. Refresh the in-memory config and hand off to the CMS.

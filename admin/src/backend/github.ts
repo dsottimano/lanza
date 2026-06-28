@@ -48,14 +48,14 @@ export class GitHubError extends Error {
 }
 
 export class GitHubClient {
-  // The token is no longer held client-side — the proxy injects it. The optional
-  // param is kept so existing call sites compile until Phase 2 removes the login
-  // flow that still constructs the client with a pasted token.
-  constructor(_token?: string) {}
+  // No token held client-side — the proxy injects it server-side.
 
   private async req(path: string, init: RequestInit = {}): Promise<unknown> {
     const res = await fetch(`${API}${path}`, {
       ...init,
+      // Never serve API reads from the browser cache: a stale GET returns a stale
+      // blob sha, which makes the next write fail with a 409 conflict.
+      cache: "no-store",
       headers: {
         Accept: "application/vnd.github+json",
         "X-GitHub-Api-Version": "2022-11-28",
