@@ -4,7 +4,7 @@
 // and the exact same draft filter as the public pages. Static + cacheable.
 import type { APIRoute } from "astro";
 import { getCollection } from "astro:content";
-import { splitId, localeUrl, DEFAULT_LOCALE } from "../lib/i18n";
+import { splitId, localeUrl, isLocale, DEFAULT_LOCALE } from "../lib/i18n";
 import { getSeoDefaults } from "../lib/site";
 
 const seoDefaults = getSeoDefaults(DEFAULT_LOCALE);
@@ -46,6 +46,7 @@ export const GET: APIRoute = async ({ site }) => {
     sections.push(``, `## Posts`, ``);
     for (const p of posts) {
       const { locale, slug } = splitId(p.id);
+      if (!isLocale(locale)) continue; // skip content for disabled locales
       const url = `${origin}${localeUrl(locale, `posts/${slug}/`)}`;
       sections.push(item(p.data.title, url, p.data.description));
     }
@@ -55,6 +56,7 @@ export const GET: APIRoute = async ({ site }) => {
     sections.push(``, `## Pages`, ``);
     for (const p of pages) {
       const { locale, slug } = splitId(p.id);
+      if (!isLocale(locale)) continue; // skip content for disabled locales
       const url = `${origin}${localeUrl(locale, `${slug}/`)}`;
       sections.push(item(p.data.title, url, p.data.description));
     }

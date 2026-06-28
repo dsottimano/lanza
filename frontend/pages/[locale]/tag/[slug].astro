@@ -2,7 +2,7 @@
 import { getCollection } from "astro:content";
 import Base from "../../../layouts/Base.astro";
 import Archive from "../../../components/Archive.astro";
-import { splitId, DEFAULT_LOCALE } from "../../../lib/i18n";
+import { splitId, isLocale, DEFAULT_LOCALE } from "../../../lib/i18n";
 import { entryAlternates } from "../../../lib/alternates";
 
 // Localized tag archives (/es/tag/x/). Non-default locales only.
@@ -10,7 +10,7 @@ export async function getStaticPaths() {
   const tags = await getCollection("tags");
   return tags
     .map((tag) => ({ tag, ...splitId(tag.id) }))
-    .filter(({ locale }) => locale !== DEFAULT_LOCALE)
+    .filter(({ locale }) => locale !== DEFAULT_LOCALE && isLocale(locale))
     .map(({ tag, locale, slug }) => ({
       params: { locale, slug },
       props: { tag, locale },

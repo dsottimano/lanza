@@ -2,7 +2,7 @@
 import { getCollection } from "astro:content";
 import Base from "../../../layouts/Base.astro";
 import Archive from "../../../components/Archive.astro";
-import { splitId, localeUrl, DEFAULT_LOCALE } from "../../../lib/i18n";
+import { splitId, localeUrl, isLocale, DEFAULT_LOCALE } from "../../../lib/i18n";
 import { entryAlternates } from "../../../lib/alternates";
 
 // Localized category archives (/es/category/x/). Non-default locales only.
@@ -10,7 +10,7 @@ export async function getStaticPaths() {
   const categories = await getCollection("categories");
   return categories
     .map((category) => ({ category, ...splitId(category.id) }))
-    .filter(({ locale }) => locale !== DEFAULT_LOCALE)
+    .filter(({ locale }) => locale !== DEFAULT_LOCALE && isLocale(locale))
     .map(({ category, locale, slug }) => ({
       params: { locale, slug },
       props: { category, locale },

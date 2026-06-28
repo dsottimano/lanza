@@ -2,7 +2,7 @@
 import { getCollection, getEntry } from "astro:content";
 import Base from "../../../layouts/Base.astro";
 import PostArticle from "../../../components/PostArticle.astro";
-import { splitId, DEFAULT_LOCALE } from "../../../lib/i18n";
+import { splitId, isLocale, DEFAULT_LOCALE } from "../../../lib/i18n";
 import { entryAlternates } from "../../../lib/alternates";
 import type { ArticleInput } from "../../../lib/jsonld";
 
@@ -13,7 +13,7 @@ export async function getStaticPaths() {
   );
   return posts
     .map((post) => ({ post, ...splitId(post.id) }))
-    .filter(({ locale }) => locale !== DEFAULT_LOCALE)
+    .filter(({ locale }) => locale !== DEFAULT_LOCALE && isLocale(locale))
     .map(({ post, locale, slug }) => ({
       params: { locale, slug },
       props: { post, locale },

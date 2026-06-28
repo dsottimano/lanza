@@ -72,3 +72,45 @@ export async function loadSiteConfig(client: GitHubClient): Promise<void> {
 export function localeLabel(code: string): string {
   return site.locales.find((l) => l.code === code)?.label ?? code.toUpperCase();
 }
+
+// Languages the onboarding wizard / Languages settings offer to enable.
+export const LANG_CATALOG: LocaleDef[] = [
+  { code: "en", label: "English", ogLocale: "en_US" },
+  { code: "es", label: "Español", ogLocale: "es_ES" },
+  { code: "fr", label: "Français", ogLocale: "fr_FR" },
+  { code: "de", label: "Deutsch", ogLocale: "de_DE" },
+  { code: "it", label: "Italiano", ogLocale: "it_IT" },
+  { code: "pt", label: "Português", ogLocale: "pt_PT" },
+  { code: "nl", label: "Nederlands", ogLocale: "nl_NL" },
+  { code: "ja", label: "日本語", ogLocale: "ja_JP" },
+];
+
+// Resilient JSON write through the proxy: re-fetch the sha immediately before the
+// PUT and retry once on a 409 (stale-sha conflict). `build` receives the current
+// file data (or {} if absent) so callers can merge and preserve unknown keys
+// (e.g. `onboarded`). Used by the onboarding wizard and the Languages settings.
+export async function putJsonSafe(
+  client: GitHubClient,
+  path: string,
+  build: (current: Record<string, unknown>) => Record<string, unknown>,
+  message: string,
+): Promise<void> {
+  for (let attempt = 0; attempt < 2; attempt++) {
+    let current: Record<string, unknown> = {};
+    let sha: string | undefined;
+    try {
+      const j = await client.loadJson(path);
+      current = j.data;
+      sha = j.sha;
+    } catch (e) {
+      if (!(e instanceof GitHubError && e.status === 404)) throw e;
+    }
+    try {
+      await client.saveJson(path, build(current), message, sha);
+      return;
+    } catch (e) {
+      if (e instanceof GitHubError && e.status === 409 && attempt === 0) continue;
+      throw e;
+    }
+  }
+}

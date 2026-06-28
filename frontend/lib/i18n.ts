@@ -32,20 +32,31 @@ export const LOCALE_LABEL: Record<Locale, string> = Object.fromEntries(
   site.locales.map((l) => [l.code, l.label]),
 );
 
+// Every locale code the platform knows about (mirrors the CMS language catalog in
+// admin/src/backend/site.ts). Used to RECOGNISE a content subfolder as a locale —
+// even one currently disabled in site.json — so its content is excluded from the
+// build rather than mis-read as a default-locale slug (e.g. a leftover
+// `pages/es/about.md` after Spanish is turned off must NOT render at /es/about).
+const KNOWN_LOCALE_CODES = new Set([
+  "en", "es", "fr", "de", "it", "pt", "nl", "ja",
+]);
+
+/** True if `v` is a currently-ENABLED locale (in site.json). */
 export function isLocale(v: string): v is Locale {
   return (LOCALES as readonly string[]).includes(v);
 }
 
 /**
  * Split a content collection `id` into its locale and stem.
- * `"es/about"` → `{ locale: "es", slug: "about" }`.
+ * `"es/about"` → `{ locale: "es", slug: "about" }` (es recognised as a locale
+ * folder even if disabled — callers filter on isLocale/DEFAULT_LOCALE).
  * `"about"` (legacy, no locale folder) → `{ locale: "en", slug: "about" }`.
  */
 export function splitId(id: string): { locale: Locale; slug: string } {
   const idx = id.indexOf("/");
   if (idx > 0) {
     const head = id.slice(0, idx);
-    if (isLocale(head)) return { locale: head, slug: id.slice(idx + 1) };
+    if (KNOWN_LOCALE_CODES.has(head)) return { locale: head, slug: id.slice(idx + 1) };
   }
   return { locale: DEFAULT_LOCALE, slug: id };
 }

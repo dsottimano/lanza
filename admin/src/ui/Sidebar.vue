@@ -8,6 +8,7 @@ import { site } from "../backend/site";
 defineProps<{
   activeCollection: string;
   activeSettings: string | null;
+  languagesOpen: boolean;
   locale: Locale;
   helpOpen: boolean;
 }>();
@@ -15,6 +16,7 @@ const emit = defineEmits<{
   (e: "select", name: string): void;
   (e: "selectLocale", locale: Locale): void;
   (e: "openSettings", file: FileEntry): void;
+  (e: "languages"): void;
   (e: "help"): void;
 }>();
 
@@ -86,6 +88,12 @@ const itemActive = "bg-zinc-900 text-white hover:bg-zinc-900 hover:text-white";
 
     <div class="flex flex-col gap-0.5">
       <p :class="groupLabel">Settings</p>
+      <button
+        :class="[item, languagesOpen ? itemActive : '']"
+        @click="emit('languages')"
+      >
+        Languages
+      </button>
       <button
         v-for="f in settingsFiles"
         :key="f.name"

@@ -4,9 +4,9 @@
 // (theme/logo) + site.json (locale set + `onboarded: true`). Once onboarded is
 // true the CMS skips this on future loads (see App.vue / backend/site.ts).
 import { ref, computed } from "vue";
-import { GitHubClient, GitHubError } from "../backend/github";
+import { GitHubClient } from "../backend/github";
 import { uploadImage } from "../backend/media";
-import { loadSiteConfig, SITE_CONFIG_PATH, type LocaleDef } from "../backend/site";
+import { loadSiteConfig, SITE_CONFIG_PATH, putJsonSafe, LANG_CATALOG, type LocaleDef } from "../backend/site";
 import { reportError } from "../errors";
 
 const props = defineProps<{ client: GitHubClient }>();
@@ -21,18 +21,6 @@ const THEMES = [
   { id: "magazine", name: "Magazine", desc: "Bold, dense, editorial", swatch: ["#0a0a0a", "#f5f5f4", "#d97706"] },
   { id: "landing", name: "Landing", desc: "Marketing one-pager", swatch: ["#0f172a", "#ffffff", "#2563eb"] },
   { id: "classic", name: "Classic", desc: "Traditional and understated", swatch: ["#1c1917", "#fafaf9", "#15803d"] },
-];
-
-// Languages offered by the wizard. The chosen subset becomes site.json.locales.
-const LANG_CATALOG: LocaleDef[] = [
-  { code: "en", label: "English", ogLocale: "en_US" },
-  { code: "es", label: "Español", ogLocale: "es_ES" },
-  { code: "fr", label: "Français", ogLocale: "fr_FR" },
-  { code: "de", label: "Deutsch", ogLocale: "de_DE" },
-  { code: "it", label: "Italiano", ogLocale: "it_IT" },
-  { code: "pt", label: "Português", ogLocale: "pt_PT" },
-  { code: "nl", label: "Nederlands", ogLocale: "nl_NL" },
-  { code: "ja", label: "日本語", ogLocale: "ja_JP" },
 ];
 
 const step = ref(1);
@@ -67,35 +55,6 @@ const langValid = computed(() =>
   multilingual.value ? chosen.value.length >= 1 : !!single.value,
 );
 
-// Write a JSON file with a fresh sha fetched immediately before the PUT, retrying
-// once on a 409 (sha conflict). `build` receives the current file data (or {} if
-// the file is absent) and returns what to write. Keeps onboarding error-free even
-// if the file changed since boot.
-async function putJson(
-  path: string,
-  build: (current: Record<string, unknown>) => Record<string, unknown>,
-  message: string,
-): Promise<void> {
-  for (let attempt = 0; attempt < 2; attempt++) {
-    let current: Record<string, unknown> = {};
-    let sha: string | undefined;
-    try {
-      const j = await props.client.loadJson(path);
-      current = j.data;
-      sha = j.sha;
-    } catch (e) {
-      if (!(e instanceof GitHubError && e.status === 404)) throw e;
-    }
-    try {
-      await props.client.saveJson(path, build(current), message, sha);
-      return;
-    } catch (e) {
-      if (e instanceof GitHubError && e.status === 409 && attempt === 0) continue;
-      throw e;
-    }
-  }
-}
-
 async function finish() {
   busy.value = true;
   try {
@@ -104,7 +63,8 @@ async function finish() {
     if (logoFile.value) logoPath = await uploadImage(props.client, logoFile.value);
 
     // 2. appearance.json — merge onto whatever's there (preserve unknown keys).
-    await putJson(
+    await putJsonSafe(
+      props.client,
       APPEARANCE_PATH,
       (cur) => {
         const next: Record<string, unknown> = { ...cur, theme: theme.value };
@@ -114,15 +74,16 @@ async function finish() {
       "lanza: onboarding — appearance",
     );
 
-    // 3. site.json — the chosen locale set + onboarded flag (full overwrite).
+    // 3. site.json — the chosen locale set + onboarded flag (preserve other keys).
     const codes = multilingual.value ? chosen.value : [single.value];
     const def = multilingual.value ? defaultLocale.value : single.value;
     const locales = codes
       .map((c) => LANG_CATALOG.find((l) => l.code === c))
       .filter((l): l is LocaleDef => Boolean(l));
-    await putJson(
+    await putJsonSafe(
+      props.client,
       SITE_CONFIG_PATH,
-      () => ({ defaultLocale: def, locales, onboarded: true }),
+      (cur) => ({ ...cur, defaultLocale: def, locales, onboarded: true }),
       "lanza: onboarding — site config",
     );
 
