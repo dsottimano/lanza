@@ -316,7 +316,7 @@ export const COLLECTIONS: Collection[] = [
       {
         name: "appearance",
         label: "Appearance",
-        file: "src/data/appearance.json",
+        file: "frontend/data/appearance.json",
         fields: [
           {
             name: "theme",
@@ -331,7 +331,7 @@ export const COLLECTIONS: Collection[] = [
       {
         name: "seo_defaults",
         label: "SEO defaults",
-        file: "src/data/seo.json",
+        file: "frontend/data/seo.json",
         localized: true,
         fields: [
           { name: "siteName", label: "Site name", widget: "string" },
@@ -379,7 +379,7 @@ export const COLLECTIONS: Collection[] = [
       {
         name: "menu",
         label: "Menu",
-        file: "src/data/menu.json",
+        file: "frontend/data/menu.json",
         localized: true,
         fields: [
           {
@@ -402,7 +402,7 @@ export const COLLECTIONS: Collection[] = [
       {
         name: "redirects",
         label: "Redirects",
-        file: "src/data/redirects.json",
+        file: "frontend/data/redirects.json",
         fields: [
           {
             name: "redirects",
@@ -436,7 +436,7 @@ export function entryFolder(c: FolderCollection, locale: Locale): string {
 }
 
 // Repo path for a settings file in the active locale. Localized files splice the
-// locale before `.json` (src/data/menu.json → src/data/menu.es.json); shared
+// locale before `.json` (frontend/data/menu.json → frontend/data/menu.es.json); shared
 // files (appearance, redirects) keep their path.
 export function fileEntryPath(f: FileEntry, locale: Locale): string {
   return f.localized ? f.file.replace(/\.json$/, `.${locale}.json`) : f.file;
