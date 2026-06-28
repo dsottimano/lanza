@@ -1,7 +1,7 @@
 # bot — Telegram → draft post (Cloudflare Worker)
 
 Receives a Telegram message and commits a `draft: true` markdown file to
-`src/content/posts/` via the GitHub Contents API. Nothing publishes
+`frontend/content/posts/` via the GitHub Contents API. Nothing publishes
 automatically — the draft is reviewed and published in the CMS.
 
 **Flow:** message (first line = title, rest = body) → commit draft → reply with path.

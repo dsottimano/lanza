@@ -7,7 +7,7 @@
   "vars": {
     "GITHUB_REPO": "dsottimano/lanza",
     "GITHUB_BRANCH": "main",
-    "CONTENT_DIR": "src/content/posts",
+    "CONTENT_DIR": "frontend/content/posts",
     // Comma-separated Telegram chat IDs allowed to use the bot. Empty = deny all.
     // Find yours by messaging @userinfobot, or via getUpdates after texting the bot.
     "ALLOWED_CHAT_IDS": ""

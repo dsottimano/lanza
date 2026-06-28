@@ -1,5 +1,5 @@
 <script setup lang="ts">
-// In-CMS Guide: bundled help docs (lanza/src/help/*.md) rendered with marked.
+// In-CMS Guide: bundled help docs (admin/src/help/*.md) rendered with marked.
 // No GitHub calls — works offline. A table-of-contents rail + the rendered doc.
 import { computed, ref } from "vue";
 import { marked } from "marked";

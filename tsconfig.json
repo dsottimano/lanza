@@ -1,5 +1,7 @@
 {
   "extends": "astro/tsconfigs/strict",
   "include": [".astro/types.d.ts", "**/*"],
-  "exclude": ["dist", "public/admin"]
+  // admin/ is the Vue CMS — a separate package with its own tsconfig + vue-tsc
+  // check; exclude it so `astro check` only validates the Astro front-end.
+  "exclude": ["dist", "public/admin", "admin"]
 }

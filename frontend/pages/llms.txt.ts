@@ -41,7 +41,7 @@ export const GET: APIRoute = async ({ site }) => {
       `(headings), \`lanza.content()\` (main text), \`lanza.site\` (site info).`,
   ];
 
-  // URLs carry the locale prefix (EN at root, /es, /fr) — see src/lib/i18n.ts.
+  // URLs carry the locale prefix (EN at root, /es, /fr) — see frontend/lib/i18n.ts.
   if (posts.length) {
     sections.push(``, `## Posts`, ``);
     for (const p of posts) {

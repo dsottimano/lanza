@@ -2,7 +2,7 @@
 // languages exist and how a content `id` maps to a locale + slug.
 //
 // Storage convention: localized collections keep one subfolder per locale, e.g.
-// `src/content/posts/en/about.md`. The Astro glob loader turns that into
+// `frontend/content/posts/en/about.md`. The Astro glob loader turns that into
 // `id = "en/about"`, so the locale is the first path segment. Legacy flat files
 // (`posts/about.md`, no locale folder) are treated as the default locale.
 //

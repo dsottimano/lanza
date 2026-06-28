@@ -6,12 +6,12 @@ export const REPO = {
   branch: "main",
 } as const;
 
-export const POSTS_DIR = "src/content/posts";
+export const POSTS_DIR = "frontend/content/posts";
 
-// Multilingual content. Mirrors the public site's src/lib/i18n.ts: English is the
-// default/source language; Spanish and French are translations. Localized
+// Multilingual content. Mirrors the public site's frontend/lib/i18n.ts: English is
+// the default/source language; Spanish and French are translations. Localized
 // collections (see schema `localized: true`) store one subfolder per locale,
-// e.g. src/content/posts/es/<slug>.md. Authors and media are not localized.
+// e.g. frontend/content/posts/es/<slug>.md. Authors and media are not localized.
 export const LOCALES = ["en", "es", "fr"] as const;
 export type Locale = (typeof LOCALES)[number];
 export const DEFAULT_LOCALE: Locale = "en";

@@ -2,7 +2,7 @@
    One stylesheet, driven by CSS variables. The shared element rules below use
    the variables; each `[data-theme="…"]` block (further down) re-skins the site
    by overriding them. <html data-theme> is set in Base.astro from
-   src/data/appearance.json. Per-page `layout` adds a class on <main>. */
+   frontend/data/appearance.json. Per-page `layout` adds a class on <main>. */
 
 /* ── tokens (defaults = Editorial) ─────────────────────────────────────── */
 :root {

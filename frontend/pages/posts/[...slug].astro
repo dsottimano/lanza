@@ -7,7 +7,7 @@ import { entryAlternates } from "../../lib/alternates";
 import type { ArticleInput } from "../../lib/jsonld";
 
 // Default-locale (EN) posts only — they live at the root /posts/<stem>/.
-// ES/FR posts are emitted by src/pages/[locale]/posts/[...slug].astro (Phase C).
+// ES/FR posts are emitted by frontend/pages/[locale]/posts/[...slug].astro (Phase C).
 export async function getStaticPaths() {
   const posts = await getCollection("posts", ({ data }) =>
     import.meta.env.PROD ? data.draft !== true : true,

@@ -66,7 +66,12 @@ const open = ref(props.field.collapsed !== true);
       <span class="inline-block transition-transform" :class="{ 'rotate-90': open }">▸</span>
       {{ field.label }}
     </legend>
-    <div v-show="open" class="pb-1">
+    <!-- v-if (not v-show): keeping the nested recursive FieldInputs mounted under
+         a v-show triggers a Vue 3.5 dev-mode unmount crash ("Cannot destructure
+         property 'type' of 'vnode'") when this view is torn down on a collection
+         switch. v-if gives the subtree its own block boundary and avoids it.
+         Collapsed values are safe — they live in the model object, not the DOM. -->
+    <div v-if="open" class="pb-1">
       <FieldInput
         v-for="sub in field.fields"
         :key="sub.name"

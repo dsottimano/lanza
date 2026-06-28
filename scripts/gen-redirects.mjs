@@ -1,9 +1,9 @@
-// Compiles the CMS-editable src/data/redirects.json into Cloudflare's native
+// Compiles the CMS-editable frontend/data/redirects.json into Cloudflare's native
 // public/_redirects file. Runs before `astro build`.
 import { readFileSync, writeFileSync } from "node:fs";
 import { fileURLToPath } from "node:url";
 
-const dataPath = fileURLToPath(new URL("../src/data/redirects.json", import.meta.url));
+const dataPath = fileURLToPath(new URL("../frontend/data/redirects.json", import.meta.url));
 const outPath = fileURLToPath(new URL("../public/_redirects", import.meta.url));
 
 const { redirects = [] } = JSON.parse(readFileSync(dataPath, "utf8"));

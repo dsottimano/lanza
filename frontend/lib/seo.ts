@@ -38,7 +38,7 @@ export function absUrl(url: string, siteUrl: string): string {
 
 /**
  * Merge per-page SEO with the editable per-locale defaults
- * (src/data/seo.<locale>.json). `og:locale` comes from the locale itself, not
+ * (frontend/data/seo.<locale>.json). `og:locale` comes from the locale itself, not
  * the editable field, so it's always correct.
  */
 export function resolveSeo(

@@ -4,7 +4,7 @@ import { glob } from "astro/loaders";
 
 // Localized collections (posts/pages/categories/tags) store one subfolder per
 // locale, so the glob loader yields `id = "<locale>/<stem>"` (e.g. "en/about",
-// "es/about"). Routing parses that via src/lib/i18n.ts `splitId`. Authors are
+// "es/about"). Routing parses that via frontend/lib/i18n.ts `splitId`. Authors are
 // not localized and stay flat (`id = "<stem>"`).
 
 const seoSchema = z
@@ -20,7 +20,7 @@ const seoSchema = z
   .optional();
 
 const posts = defineCollection({
-  loader: glob({ pattern: "**/*.{md,mdx}", base: "./src/content/posts" }),
+  loader: glob({ pattern: "**/*.{md,mdx}", base: "./frontend/content/posts" }),
   schema: z.object({
     title: z.string(),
     pubDate: z.coerce.date(),
@@ -83,7 +83,7 @@ const blockSchema = z.discriminatedUnion("type", [
 ]);
 
 const pages = defineCollection({
-  loader: glob({ pattern: "**/*.{md,mdx}", base: "./src/content/pages" }),
+  loader: glob({ pattern: "**/*.{md,mdx}", base: "./frontend/content/pages" }),
   schema: z.object({
     title: z.string(),
     draft: z.boolean().default(false),
@@ -102,7 +102,7 @@ const termSchema = z.object({
 });
 
 const authors = defineCollection({
-  loader: glob({ pattern: "**/*.{md,mdx}", base: "./src/content/authors" }),
+  loader: glob({ pattern: "**/*.{md,mdx}", base: "./frontend/content/authors" }),
   schema: z.object({
     title: z.string(),
     bio: z.string().optional(),
@@ -111,13 +111,13 @@ const authors = defineCollection({
 });
 
 const categories = defineCollection({
-  loader: glob({ pattern: "**/*.{md,mdx}", base: "./src/content/categories" }),
+  loader: glob({ pattern: "**/*.{md,mdx}", base: "./frontend/content/categories" }),
   // Categories nest (WordPress-style); tags don't. `parent` is a category slug.
   schema: termSchema.extend({ parent: z.string().optional() }),
 });
 
 const tags = defineCollection({
-  loader: glob({ pattern: "**/*.{md,mdx}", base: "./src/content/tags" }),
+  loader: glob({ pattern: "**/*.{md,mdx}", base: "./frontend/content/tags" }),
   schema: termSchema,
 });
 
