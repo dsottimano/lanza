@@ -1,4 +1,13 @@
 import { defineConfig } from "astro/config";
+import { readFileSync } from "node:fs";
+
+// Locale set is data-driven — single source of truth is frontend/data/site.json
+// (also read by frontend/lib/i18n.ts). Read it here so Astro's i18n routing and
+// the app agree on which languages exist.
+const site = JSON.parse(
+  readFileSync(new URL("./frontend/data/site.json", import.meta.url), "utf8"),
+);
+const locales = site.locales.map((l) => l.code);
 
 // Pure static output (default) — deployable straight to Cloudflare Pages.
 // `draft: true` entries are filtered out of the production build (see frontend/pages).
@@ -9,12 +18,12 @@ export default defineConfig({
   // The Astro front-end source lives in frontend/ (not the default src/), paired
   // with the CMS in admin/. Astro reads pages/content/layouts/etc. from here.
   srcDir: "./frontend",
-  // Multilingual: English is the default and stays at the root (`/posts/x/`);
-  // Spanish and French are prefixed (`/es/...`, `/fr/...`). `prefixDefaultLocale:
-  // false` keeps existing EN URLs unchanged. Locale list mirrors frontend/lib/i18n.ts.
+  // Multilingual: the default locale stays at the root (`/posts/x/`); others are
+  // prefixed (`/es/...`, `/fr/...`). `prefixDefaultLocale: false` keeps the
+  // default-language URLs unprefixed. Locale set comes from site.json (above).
   i18n: {
-    defaultLocale: "en",
-    locales: ["en", "es", "fr"],
+    defaultLocale: site.defaultLocale,
+    locales,
     routing: { prefixDefaultLocale: false },
   },
 });

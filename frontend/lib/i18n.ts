@@ -1,5 +1,7 @@
-// Locale model for the public site. The single source of truth for which
-// languages exist and how a content `id` maps to a locale + slug.
+// Locale model for the public site. Which languages exist is data-driven —
+// edited in the CMS and stored in frontend/data/site.json (read here and by
+// astro.config.mjs). This module derives the runtime helpers from it and defines
+// how a content `id` maps to a locale + slug.
 //
 // Storage convention: localized collections keep one subfolder per locale, e.g.
 // `frontend/content/posts/en/about.md`. The Astro glob loader turns that into
@@ -10,25 +12,25 @@
 // `posts/es/about.md` are the same entry in two languages.
 
 import { getRelativeLocaleUrl } from "astro:i18n";
+import site from "../data/site.json";
 
-export const LOCALES = ["en", "es", "fr"] as const;
-export type Locale = (typeof LOCALES)[number];
+// A locale is just its short code. The set comes from site.json, so `Locale` is
+// a string rather than a fixed union.
+export type Locale = string;
 
-export const DEFAULT_LOCALE: Locale = "en";
+export const LOCALES: readonly Locale[] = site.locales.map((l) => l.code);
+
+export const DEFAULT_LOCALE: Locale = site.defaultLocale;
 
 /** og:locale tags (BCP-47-ish) keyed by our short codes. */
-export const OG_LOCALE: Record<Locale, string> = {
-  en: "en_US",
-  es: "es_ES",
-  fr: "fr_FR",
-};
+export const OG_LOCALE: Record<Locale, string> = Object.fromEntries(
+  site.locales.map((l) => [l.code, l.ogLocale]),
+);
 
 /** Human label for each locale (used by the language switcher UI). */
-export const LOCALE_LABEL: Record<Locale, string> = {
-  en: "English",
-  es: "Español",
-  fr: "Français",
-};
+export const LOCALE_LABEL: Record<Locale, string> = Object.fromEntries(
+  site.locales.map((l) => [l.code, l.label]),
+);
 
 export function isLocale(v: string): v is Locale {
   return (LOCALES as readonly string[]).includes(v);
