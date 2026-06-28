@@ -1,0 +1,15 @@
+{
+  "siteName": "My Site",
+  "titleTemplate": "%s · My Site",
+  "defaultTitle": "My Site",
+  "defaultDescription": "Un sitio estático alojado en Cloudflare, editado con Lanza.",
+  "defaultOgImage": "",
+  "locale": "es_ES",
+  "twitter": "",
+  "twitterCreator": "",
+  "organization": {
+    "name": "My Site",
+    "logo": "",
+    "sameAs": []
+  }
+}

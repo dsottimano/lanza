@@ -6,4 +6,12 @@ import { defineConfig } from "astro/config";
 // here and set `export const prerender = false` on those routes only.
 export default defineConfig({
   site: "https://example.com",
+  // Multilingual: English is the default and stays at the root (`/posts/x/`);
+  // Spanish and French are prefixed (`/es/...`, `/fr/...`). `prefixDefaultLocale:
+  // false` keeps existing EN URLs unchanged. Locale list mirrors src/lib/i18n.ts.
+  i18n: {
+    defaultLocale: "en",
+    locales: ["en", "es", "fr"],
+    routing: { prefixDefaultLocale: false },
+  },
 });

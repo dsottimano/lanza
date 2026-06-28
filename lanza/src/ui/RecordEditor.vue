@@ -5,13 +5,15 @@ import { onMounted, reactive, ref } from "vue";
 import FieldForm from "../fields/FieldForm.vue";
 import SaveButton from "./SaveButton.vue";
 import { GitHubClient } from "../backend/github";
-import type { FolderCollection } from "../schema";
+import { entryFolder, type FolderCollection } from "../schema";
+import type { Locale } from "../backend/config";
 import { slugify } from "../backend/auth";
 import { reportError, clearError } from "../errors";
 
 const props = defineProps<{
   client: GitHubClient;
   collection: FolderCollection;
+  locale: Locale;
   path: string | null;
 }>();
 const emit = defineEmits<{ (e: "back", changed: boolean): void }>();
@@ -45,7 +47,7 @@ onMounted(async () => {
 
 async function save() {
   if (!currentPath) {
-    currentPath = `${props.collection.folder}/${slugify(String(data.title ?? ""))}.md`;
+    currentPath = `${entryFolder(props.collection, props.locale)}/${slugify(String(data.title ?? ""))}.md`;
   }
   sha = await props.client.saveEntry(
     currentPath,

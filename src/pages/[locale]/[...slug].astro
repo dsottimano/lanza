@@ -1,0 +1,38 @@
+---
+import { getCollection } from "astro:content";
+import Base from "../../layouts/Base.astro";
+import PageArticle from "../../components/PageArticle.astro";
+import { splitId, DEFAULT_LOCALE } from "../../lib/i18n";
+import { entryAlternates } from "../../lib/alternates";
+
+// Localized standalone Pages (/es/about/, /fr/about/). Non-default locales only.
+export async function getStaticPaths() {
+  const pages = await getCollection("pages", ({ data }) =>
+    import.meta.env.PROD ? data.draft !== true : true,
+  );
+  return pages
+    .map((page) => ({ page, ...splitId(page.id) }))
+    .filter(({ locale }) => locale !== DEFAULT_LOCALE)
+    .map(({ page, locale, slug }) => ({
+      params: { locale, slug },
+      props: { page, locale },
+    }));
+}
+
+const { page, locale } = Astro.props;
+const alternates = await entryAlternates("pages", splitId(page.id).slug, "");
+---
+
+<Base
+  locale={locale}
+  alternates={alternates}
+  seo={{
+    title: page.data.title,
+    description: page.data.description,
+    ogType: "website",
+    ...(page.data.seo ?? {}),
+    ogImage: page.data.seo?.ogImage || page.data.featuredImage,
+  }}
+>
+  <PageArticle page={page} />
+</Base>

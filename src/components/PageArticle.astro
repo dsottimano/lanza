@@ -1,0 +1,29 @@
+---
+// Single page body — the <main> shared by the EN route (/about/) and the
+// localized mirror (/es/about/). Pages render frontmatter blocks + the rich body.
+import type { CollectionEntry } from "astro:content";
+import Blocks from "./Blocks.astro";
+import { sanitizeBody } from "../lib/sanitize";
+
+interface Props {
+  page: CollectionEntry<"pages">;
+}
+
+const { page } = Astro.props;
+const body = sanitizeBody(page.body ?? "");
+const layoutClass =
+  page.data.layout && page.data.layout !== "default"
+    ? `layout-${page.data.layout}`
+    : undefined;
+---
+
+<main class={layoutClass}>
+  <h1>{page.data.title}</h1>
+  {
+    page.data.featuredImage && (
+      <img src={page.data.featuredImage} alt={page.data.title} />
+    )
+  }
+  {page.data.blocks.length > 0 && <Blocks blocks={page.data.blocks} />}
+  <article class="post-body" set:html={body} />
+</main>

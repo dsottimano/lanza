@@ -95,6 +95,24 @@ a {
 .site-nav a:hover {
   color: var(--ink);
 }
+.lang-switch {
+  display: flex;
+  gap: 0.5rem;
+  align-items: baseline;
+  font-size: 0.8rem;
+  letter-spacing: 0.02em;
+}
+.lang-switch a {
+  color: var(--muted);
+  text-decoration: none;
+}
+.lang-switch a:hover {
+  color: var(--ink);
+}
+.lang-switch .lang-current {
+  color: var(--ink);
+  font-weight: 600;
+}
 .site-footer {
   border-top: 1px solid var(--border);
   margin-top: 5rem;

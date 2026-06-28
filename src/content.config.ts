@@ -2,6 +2,11 @@ import { defineCollection } from "astro:content";
 import { z } from "astro:schema";
 import { glob } from "astro/loaders";
 
+// Localized collections (posts/pages/categories/tags) store one subfolder per
+// locale, so the glob loader yields `id = "<locale>/<stem>"` (e.g. "en/about",
+// "es/about"). Routing parses that via src/lib/i18n.ts `splitId`. Authors are
+// not localized and stay flat (`id = "<stem>"`).
+
 const seoSchema = z
   .object({
     metaTitle: z.string().optional(),

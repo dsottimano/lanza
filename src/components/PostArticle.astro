@@ -1,0 +1,56 @@
+---
+// Single post body — the <main> shared by the EN route (/posts/x/) and the
+// localized mirror (/es/posts/x/). All internal links carry the locale prefix
+// via localeUrl, so the same markup serves every language.
+import type { CollectionEntry } from "astro:content";
+import { sanitizeBody } from "../lib/sanitize";
+import { localeUrl, type Locale } from "../lib/i18n";
+
+interface Props {
+  post: CollectionEntry<"posts">;
+  locale: Locale;
+  // Resolved author display name; `slug` present → link to the author archive.
+  author?: { name: string; slug?: string };
+}
+
+const { post, locale, author } = Astro.props;
+const body = sanitizeBody(post.body ?? "");
+const layoutClass =
+  post.data.layout && post.data.layout !== "default"
+    ? `layout-${post.data.layout}`
+    : undefined;
+---
+
+<main class={layoutClass}>
+  <h1>{post.data.title}</h1>
+  {
+    author?.name && (
+      <p class="byline">
+        By{" "}
+        {author.slug ? (
+          <a href={localeUrl(locale, `author/${author.slug}/`)}>{author.name}</a>
+        ) : (
+          author.name
+        )}
+      </p>
+    )
+  }
+  {
+    post.data.featuredImage && (
+      <img src={post.data.featuredImage} alt={post.data.title} />
+    )
+  }
+  {
+    (post.data.categories.length > 0 || post.data.tags.length > 0) && (
+      <p class="taxonomy">
+        {post.data.categories.map((c) => (
+          <a href={localeUrl(locale, `category/${c}/`)}>{c}</a>
+        ))}
+        {post.data.tags.map((t) => (
+          <a href={localeUrl(locale, `tag/${t}/`)}>#{t}</a>
+        ))}
+      </p>
+    )
+  }
+  <article class="post-body" set:html={body} />
+</main>

@@ -1,4 +1,5 @@
-import seoDefaults from "../data/seo.json";
+import { getSeoDefaults } from "./site";
+import { OG_LOCALE, DEFAULT_LOCALE, type Locale } from "./i18n";
 
 export interface PageSeo {
   /** Page title; runs through the global title template. */
@@ -35,12 +36,18 @@ export function absUrl(url: string, siteUrl: string): string {
   return new URL(url, siteUrl + "/").href;
 }
 
-/** Merge per-page SEO with the editable global defaults (src/data/seo.json). */
+/**
+ * Merge per-page SEO with the editable per-locale defaults
+ * (src/data/seo.<locale>.json). `og:locale` comes from the locale itself, not
+ * the editable field, so it's always correct.
+ */
 export function resolveSeo(
   page: PageSeo,
   pathname: string,
   siteUrl: string,
+  locale: Locale = DEFAULT_LOCALE,
 ): ResolvedSeo {
+  const seoDefaults = getSeoDefaults(locale);
   const title = page.metaTitle || page.title;
   const ogImageRaw = page.ogImage || seoDefaults.defaultOgImage || "";
   return {
@@ -54,7 +61,7 @@ export function resolveSeo(
     ogType: page.ogType || "website",
     noindex: page.noindex ?? false,
     siteName: seoDefaults.siteName,
-    locale: seoDefaults.locale || "en_US",
+    locale: OG_LOCALE[locale],
     twitter: seoDefaults.twitter || "",
     twitterCreator: seoDefaults.twitterCreator || "",
   };

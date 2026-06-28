@@ -2,54 +2,76 @@
 import "../styles/site.css";
 import Seo from "../components/Seo.astro";
 import { getCollection } from "astro:content";
-import menu from "../data/menu.json";
-import seoDefaults from "../data/seo.json";
 import appearance from "../data/appearance.json";
 import type { PageSeo } from "../lib/seo";
 import type { ArticleInput } from "../lib/jsonld";
+import { splitId, localeUrl, LOCALE_LABEL, DEFAULT_LOCALE, type Locale } from "../lib/i18n";
+import { getMenu, getSeoDefaults } from "../lib/site";
+import type { Alternate } from "../lib/alternates";
 
 interface Props {
   seo?: PageSeo;
   article?: ArticleInput | null;
+  /** Active locale — drives <html lang>, the per-locale menu, and SEO defaults. */
+  locale?: Locale;
+  /** This page in its other languages — header switcher + hreflang. */
+  alternates?: Alternate[];
 }
 
-const { seo = {}, article = null } = Astro.props;
+const { seo = {}, article = null, locale = DEFAULT_LOCALE, alternates = [] } = Astro.props;
 
 // Site-wide theme (Settings → Appearance). Drives the public CSS via data-theme.
 const theme = appearance.theme ?? "editorial";
-const siteName = seoDefaults.siteName || "Site";
+const siteName = getSeoDefaults(locale).siteName || "Site";
 const year = new Date().getFullYear();
+const homeUrl = localeUrl(locale, "");
 
-// Nav comes from the editable Settings → Menu (WordPress-style). If it's empty,
-// fall back to auto-listing published Pages so the nav is never blank.
-let navItems = menu.items ?? [];
+// Nav comes from the editable per-locale Settings → Menu. If it's empty, fall
+// back to auto-listing this locale's published Pages so the nav is never blank.
+let navItems = getMenu(locale).items ?? [];
 if (navItems.length === 0) {
   const pages = (
     await getCollection("pages", ({ data }) =>
       import.meta.env.PROD ? data.draft !== true : true,
     )
-  ).sort((a, b) => a.data.title.localeCompare(b.data.title));
+  )
+    .map((p) => ({ p, ...splitId(p.id) }))
+    .filter((x) => x.locale === locale)
+    .sort((a, b) => a.p.data.title.localeCompare(b.p.data.title));
   navItems = [
-    { label: "Home", url: "/" },
-    ...pages.map((p) => ({ label: p.data.title, url: `/${p.id}/` })),
+    { label: "Home", url: homeUrl },
+    ...pages.map(({ p, slug }) => ({ label: p.data.title, url: localeUrl(locale, `${slug}/`) })),
   ];
 }
 ---
 
 <!doctype html>
-<html lang="en" data-theme={theme}>
+<html lang={locale} data-theme={theme}>
   <head>
     <meta charset="utf-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1" />
-    <Seo seo={seo} article={article} />
+    <Seo seo={seo} article={article} locale={locale} alternates={alternates} />
   </head>
   <body>
     <header class="site-header">
       <div class="bar">
-        <a class="brand" href="/">{siteName}</a>
+        <a class="brand" href={homeUrl}>{siteName}</a>
         <nav class="site-nav">
           {navItems.map((item) => <a href={item.url}>{item.label}</a>)}
         </nav>
+        {
+          alternates.length > 1 && (
+            <nav class="lang-switch" aria-label="Language">
+              {alternates.map((alt) =>
+                alt.locale === locale ? (
+                  <span class="lang-current" aria-current="true">{LOCALE_LABEL[alt.locale]}</span>
+                ) : (
+                  <a href={alt.url} hreflang={alt.locale}>{LOCALE_LABEL[alt.locale]}</a>
+                ),
+              )}
+            </nav>
+          )
+        }
       </div>
     </header>
 

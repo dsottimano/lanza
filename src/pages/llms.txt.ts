@@ -4,7 +4,10 @@
 // and the exact same draft filter as the public pages. Static + cacheable.
 import type { APIRoute } from "astro";
 import { getCollection } from "astro:content";
-import seoDefaults from "../data/seo.json";
+import { splitId, localeUrl, DEFAULT_LOCALE } from "../lib/i18n";
+import { getSeoDefaults } from "../lib/site";
+
+const seoDefaults = getSeoDefaults(DEFAULT_LOCALE);
 
 const isPublic = ({ data }: { data: { draft?: boolean } }) =>
   import.meta.env.PROD ? data.draft !== true : true;
@@ -38,17 +41,22 @@ export const GET: APIRoute = async ({ site }) => {
       `(headings), \`lanza.content()\` (main text), \`lanza.site\` (site info).`,
   ];
 
+  // URLs carry the locale prefix (EN at root, /es, /fr) — see src/lib/i18n.ts.
   if (posts.length) {
     sections.push(``, `## Posts`, ``);
     for (const p of posts) {
-      sections.push(item(p.data.title, `${origin}/posts/${p.id}/`, p.data.description));
+      const { locale, slug } = splitId(p.id);
+      const url = `${origin}${localeUrl(locale, `posts/${slug}/`)}`;
+      sections.push(item(p.data.title, url, p.data.description));
     }
   }
 
   if (pages.length) {
     sections.push(``, `## Pages`, ``);
     for (const p of pages) {
-      sections.push(item(p.data.title, `${origin}/${p.id}/`, p.data.description));
+      const { locale, slug } = splitId(p.id);
+      const url = `${origin}${localeUrl(locale, `${slug}/`)}`;
+      sections.push(item(p.data.title, url, p.data.description));
     }
   }
 

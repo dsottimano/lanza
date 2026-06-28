@@ -1,0 +1,30 @@
+---
+import { getCollection } from "astro:content";
+import Base from "../../layouts/Base.astro";
+import Archive from "../../components/Archive.astro";
+import { LOCALES, DEFAULT_LOCALE, splitId, type Locale } from "../../lib/i18n";
+import { allLocaleAlternates } from "../../lib/alternates";
+
+// Localized homepage (/es/, /fr/). One per non-default locale.
+export async function getStaticPaths() {
+  return LOCALES.filter((l) => l !== DEFAULT_LOCALE).map((locale) => ({
+    params: { locale },
+    props: { locale },
+  }));
+}
+
+const { locale } = Astro.props as { locale: Locale };
+const posts = (
+  await getCollection("posts", ({ data }) =>
+    import.meta.env.PROD ? data.draft !== true : true,
+  )
+)
+  .filter((p) => splitId(p.id).locale === locale)
+  .sort((a, b) => b.data.pubDate.valueOf() - a.data.pubDate.valueOf());
+
+const alternates = allLocaleAlternates("");
+---
+
+<Base locale={locale} alternates={alternates}>
+  <Archive heading="Posts" locale={locale} posts={posts} showDrafts />
+</Base>

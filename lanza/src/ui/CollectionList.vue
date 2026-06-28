@@ -3,10 +3,15 @@
 // (the slug); titles would need a per-file fetch, which isn't worth it here.
 import { ref, watch } from "vue";
 import { GitHubClient, type RepoFile } from "../backend/github";
-import type { FolderCollection } from "../schema";
+import { entryFolder, type FolderCollection } from "../schema";
+import type { Locale } from "../backend/config";
 import { reportError } from "../errors";
 
-const props = defineProps<{ client: GitHubClient; collection: FolderCollection }>();
+const props = defineProps<{
+  client: GitHubClient;
+  collection: FolderCollection;
+  locale: Locale;
+}>();
 const emit = defineEmits<{
   (e: "open", path: string): void;
   (e: "new"): void;
@@ -20,7 +25,8 @@ async function load() {
   loading.value = true;
   failed.value = false;
   try {
-    entries.value = (await props.client.listDir(props.collection.folder)).sort((a, b) =>
+    const folder = entryFolder(props.collection, props.locale);
+    entries.value = (await props.client.listDir(folder)).sort((a, b) =>
       a.name.localeCompare(b.name),
     );
   } catch (e) {

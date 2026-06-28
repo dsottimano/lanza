@@ -2,11 +2,19 @@
 // Collection rail: content collections, taxonomies, then the settings files.
 // Grouping is derived from the schema (folder vs files collection).
 import { COLLECTIONS, type FolderCollection, type FileEntry } from "../schema";
+import { LOCALES, LOCALE_LABEL, type Locale } from "../backend/config";
 
-defineProps<{ activeCollection: string; activeSettings: string | null }>();
+defineProps<{
+  activeCollection: string;
+  activeSettings: string | null;
+  locale: Locale;
+  helpOpen: boolean;
+}>();
 const emit = defineEmits<{
   (e: "select", name: string): void;
+  (e: "selectLocale", locale: Locale): void;
   (e: "openSettings", file: FileEntry): void;
+  (e: "help"): void;
   (e: "account"): void;
   (e: "signout"): void;
 }>();
@@ -29,6 +37,27 @@ const itemActive = "bg-zinc-900 text-white hover:bg-zinc-900 hover:text-white";
   <nav class="sticky top-0 flex h-screen w-60 flex-shrink-0 flex-col gap-6 border-r border-zinc-200 bg-white px-3 py-5">
     <div class="px-2.5">
       <span class="font-serif text-xl font-bold tracking-tight text-zinc-900">Lanza</span>
+    </div>
+
+    <!-- Active editing language. Scopes localized collections to their per-locale
+         subfolder; switching resets to the list (App.setLocale). -->
+    <div class="px-1.5">
+      <p :class="groupLabel">Language</p>
+      <div class="flex gap-1 rounded-lg bg-zinc-100 p-1">
+        <button
+          v-for="l in LOCALES"
+          :key="l"
+          :class="[
+            'flex-1 rounded-md px-2 py-1 text-xs font-semibold transition',
+            locale === l
+              ? 'bg-white text-zinc-900 shadow-sm'
+              : 'text-zinc-500 hover:text-zinc-800',
+          ]"
+          @click="emit('selectLocale', l)"
+        >
+          {{ LOCALE_LABEL[l] }}
+        </button>
+      </div>
     </div>
 
     <div class="flex flex-col gap-0.5">
@@ -68,6 +97,17 @@ const itemActive = "bg-zinc-900 text-white hover:bg-zinc-900 hover:text-white";
     </div>
 
     <div class="mt-auto flex flex-col gap-0.5 border-t border-zinc-100 pt-3">
+      <button
+        :class="[
+          'flex items-center gap-1.5 rounded-lg px-2.5 py-2 text-left text-sm transition',
+          helpOpen
+            ? 'bg-zinc-900 text-white'
+            : 'text-zinc-500 hover:bg-zinc-100 hover:text-zinc-900',
+        ]"
+        @click="emit('help')"
+      >
+        <span aria-hidden="true">📖</span> Guide
+      </button>
       <button
         class="flex items-center gap-1.5 rounded-lg px-2.5 py-2 text-left text-sm text-zinc-500 transition hover:bg-zinc-100 hover:text-zinc-900"
         @click="emit('account')"

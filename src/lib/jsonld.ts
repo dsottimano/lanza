@@ -1,5 +1,10 @@
-import seoDefaults from "../data/seo.json";
 import { absUrl } from "./seo";
+import { getSeoDefaults } from "./site";
+import { DEFAULT_LOCALE } from "./i18n";
+
+// Publisher identity (organization, site name) is global — take it from the
+// default-locale SEO defaults.
+const seoDefaults = getSeoDefaults(DEFAULT_LOCALE);
 
 type Node = Record<string, unknown>;
 
