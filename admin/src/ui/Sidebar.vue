@@ -9,6 +9,7 @@ defineProps<{
   activeCollection: string;
   activeSettings: string | null;
   languagesOpen: boolean;
+  themesOpen: boolean;
   locale: Locale;
   helpOpen: boolean;
 }>();
@@ -17,6 +18,7 @@ const emit = defineEmits<{
   (e: "selectLocale", locale: Locale): void;
   (e: "openSettings", file: FileEntry): void;
   (e: "languages"): void;
+  (e: "themes"): void;
   (e: "help"): void;
 }>();
 
@@ -101,6 +103,12 @@ const itemActive = "bg-zinc-900 text-white hover:bg-zinc-900 hover:text-white";
         @click="emit('openSettings', f)"
       >
         {{ f.label }}
+      </button>
+      <button
+        :class="[item, themesOpen ? itemActive : '']"
+        @click="emit('themes')"
+      >
+        Themes
       </button>
     </div>
 

@@ -13,7 +13,6 @@ export interface SeoDefaults {
   defaultTitle: string;
   defaultDescription: string;
   defaultOgImage: string;
-  locale: string;
   twitter: string;
   twitterCreator: string;
   organization: { name: string; logo: string; sameAs: string[] };
@@ -27,10 +26,11 @@ const seos = import.meta.glob<{ default: SeoDefaults }>("../data/seo.*.json", {
 });
 
 // Index a glob map ("../data/menu.es.json" → data) by the locale in the filename.
+// Allow letters + hyphen so region codes (e.g. pt-BR) match the splitId convention.
 function byLocale<T>(map: Record<string, { default: T }>): Record<string, T> {
   const out: Record<string, T> = {};
   for (const [path, mod] of Object.entries(map)) {
-    const m = path.match(/\.([a-z]{2})\.json$/);
+    const m = path.match(/\.([a-z-]+)\.json$/);
     if (m) out[m[1]] = mod.default;
   }
   return out;

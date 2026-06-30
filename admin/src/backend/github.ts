@@ -195,4 +195,58 @@ export class GitHubClient {
       body: JSON.stringify({ message, sha, branch: REPO.branch }),
     });
   }
+
+  /**
+   * Commit many files in ONE commit via the Git Data API — so a whole theme
+   * lands as a single commit → a single Pages rebuild, not one commit (and one
+   * build) per file. Each file's content is base64, so it's binary-safe. New
+   * paths are created, existing paths overwritten; every other file in the repo
+   * is left untouched (the new tree extends the current one via `base_tree`).
+   * Returns the new commit sha. `onProgress` fires after each blob uploads.
+   */
+  async commitFiles(
+    files: { path: string; base64: string }[],
+    message: string,
+    onProgress?: (done: number, total: number) => void,
+  ): Promise<string> {
+    if (files.length === 0) throw new Error("No files to commit.");
+    const { owner, name, branch } = REPO;
+    const git = `/repos/${owner}/${name}/git`;
+
+    // 1. current branch head and the tree it points at (our base).
+    const ref = (await this.req(`${git}/ref/heads/${branch}`)) as {
+      object: { sha: string };
+    };
+    const headSha = ref.object.sha;
+    const headCommit = (await this.req(`${git}/commits/${headSha}`)) as {
+      tree: { sha: string };
+    };
+
+    // 2. upload each file as a blob, collecting tree entries.
+    const tree: { path: string; mode: "100644"; type: "blob"; sha: string }[] = [];
+    let done = 0;
+    for (const f of files) {
+      const blob = (await this.req(`${git}/blobs`, {
+        method: "POST",
+        body: JSON.stringify({ content: f.base64, encoding: "base64" }),
+      })) as { sha: string };
+      tree.push({ path: f.path, mode: "100644", type: "blob", sha: blob.sha });
+      onProgress?.(++done, files.length);
+    }
+
+    // 3. new tree on top of the current one, 4. one commit, 5. fast-forward ref.
+    const newTree = (await this.req(`${git}/trees`, {
+      method: "POST",
+      body: JSON.stringify({ base_tree: headCommit.tree.sha, tree }),
+    })) as { sha: string };
+    const commit = (await this.req(`${git}/commits`, {
+      method: "POST",
+      body: JSON.stringify({ message, tree: newTree.sha, parents: [headSha] }),
+    })) as { sha: string };
+    await this.req(`${git}/refs/heads/${branch}`, {
+      method: "PATCH",
+      body: JSON.stringify({ sha: commit.sha }),
+    });
+    return commit.sha;
+  }
 }

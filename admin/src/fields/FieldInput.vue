@@ -7,15 +7,12 @@ import type { Field } from "../schema";
 import ListInput from "./ListInput.vue";
 import RelationInput from "./RelationInput.vue";
 import ImageInput from "./ImageInput.vue";
+import { inputCls } from "./styles";
 
 const props = defineProps<{ field: Field }>();
 const model = defineModel<any>();
 
 const isRequired = computed(() => props.field.required !== false);
-
-// Shared control styling (text / number / datetime / select / image inputs).
-const inputCls =
-  "w-full rounded-lg border border-zinc-300 bg-white px-3 py-2 text-sm text-zinc-900 transition placeholder:text-zinc-400 focus:border-zinc-900 focus:outline-none focus:ring-4 focus:ring-zinc-900/5";
 
 // datetime-local <-> ISO string. Stored value stays an ISO string.
 function isoToLocal(v: unknown): string {
@@ -49,9 +46,11 @@ if (
 ) {
   model.value = {};
 }
-function objVal(): Record<string, unknown> {
-  return model.value as Record<string, unknown>;
-}
+// Stable reference to the object's value — the nested FieldInputs v-model into
+// its properties. A computed (vs a per-render function call) keeps the binding
+// target identical across renders, which avoids a Vue 3.5 dev-only teardown
+// crash when this recursive subtree (e.g. the nested SEO object) unmounts.
+const objModel = computed(() => model.value as Record<string, unknown>);
 
 const open = ref(props.field.collapsed !== true);
 </script>
@@ -76,7 +75,7 @@ const open = ref(props.field.collapsed !== true);
         v-for="sub in field.fields"
         :key="sub.name"
         :field="sub"
-        v-model="objVal()[sub.name]"
+        v-model="objModel[sub.name]"
       />
     </div>
   </fieldset>

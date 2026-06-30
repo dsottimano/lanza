@@ -4,6 +4,7 @@ import Base from "../../layouts/Base.astro";
 import Archive from "../../components/Archive.astro";
 import { splitId, localeUrl, DEFAULT_LOCALE } from "../../lib/i18n";
 import { entryAlternates } from "../../lib/alternates";
+import { localePosts } from "../../lib/routing";
 
 // Default-locale (EN) category archives at /category/<stem>/. Posts store bare
 // term stems (no locale), so we match on the stem within the default locale.
@@ -20,16 +21,7 @@ const locale = DEFAULT_LOCALE;
 const { category } = Astro.props;
 const stem = splitId(category.id).slug;
 
-const posts = (
-  await getCollection(
-    "posts",
-    ({ data }) =>
-      (import.meta.env.PROD ? data.draft !== true : true) &&
-      data.categories.includes(stem),
-  )
-)
-  .filter((p) => splitId(p.id).locale === locale)
-  .sort((a, b) => b.data.pubDate.valueOf() - a.data.pubDate.valueOf());
+const posts = await localePosts(locale, (data) => data.categories.includes(stem));
 
 // Hierarchy: resolve the parent (breadcrumb) and any child categories. `parent`
 // is stored as a bare category stem; compare against this locale's terms.

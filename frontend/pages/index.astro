@@ -1,19 +1,13 @@
 ---
-import { getCollection } from "astro:content";
 import Base from "../layouts/Base.astro";
 import Archive from "../components/Archive.astro";
-import { splitId, DEFAULT_LOCALE } from "../lib/i18n";
+import { DEFAULT_LOCALE } from "../lib/i18n";
 import { allLocaleAlternates } from "../lib/alternates";
+import { localePosts } from "../lib/routing";
 
-// Drafts are visible in dev, hidden in the production build. The root homepage
-// lists default-locale (EN) posts; ES/FR have their own homepage (Phase C).
-const posts = (
-  await getCollection("posts", ({ data }) =>
-    import.meta.env.PROD ? data.draft !== true : true,
-  )
-)
-  .filter((p) => splitId(p.id).locale === DEFAULT_LOCALE)
-  .sort((a, b) => b.data.pubDate.valueOf() - a.data.pubDate.valueOf());
+// The root homepage lists default-locale (EN) posts; ES/FR have their own
+// homepage ([locale]/index.astro).
+const posts = await localePosts(DEFAULT_LOCALE);
 
 const alternates = allLocaleAlternates("");
 ---

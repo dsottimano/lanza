@@ -1,16 +1,15 @@
 ---
-import { getCollection, getEntry } from "astro:content";
+import { getEntry } from "astro:content";
 import Base from "../../../layouts/Base.astro";
 import PostArticle from "../../../components/PostArticle.astro";
 import { splitId, isLocale, DEFAULT_LOCALE } from "../../../lib/i18n";
 import { entryAlternates } from "../../../lib/alternates";
+import { publishedPosts } from "../../../lib/routing";
 import type { ArticleInput } from "../../../lib/jsonld";
 
 // Localized posts (/es/posts/x/, /fr/posts/x/). Non-default locales only.
 export async function getStaticPaths() {
-  const posts = await getCollection("posts", ({ data }) =>
-    import.meta.env.PROD ? data.draft !== true : true,
-  );
+  const posts = await publishedPosts();
   return posts
     .map((post) => ({ post, ...splitId(post.id) }))
     .filter(({ locale }) => locale !== DEFAULT_LOCALE && isLocale(locale))

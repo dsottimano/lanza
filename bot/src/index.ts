@@ -59,30 +59,43 @@ function draftMarkdown(title: string, body: string): string {
   ].join("\n");
 }
 
-/** Commit a draft markdown file via the GitHub Contents API. */
+/**
+ * Commit a draft markdown file via the GitHub Contents API. Two messages that
+ * slugify to the same name would collide (creating without a sha fails once the
+ * file exists), so retry under `-2`, `-3`, … until a free filename is found.
+ */
 async function createDraft(env: Env, title: string, body: string): Promise<string> {
-  const path = `${env.CONTENT_DIR}/${slugify(title)}.md`;
-  const res = await fetch(
-    `https://api.github.com/repos/${env.GITHUB_REPO}/contents/${path}`,
-    {
-      method: "PUT",
-      headers: {
-        Authorization: `Bearer ${env.GITHUB_TOKEN}`,
-        Accept: "application/vnd.github+json",
-        "X-GitHub-Api-Version": "2022-11-28",
-        "User-Agent": "telegram-draft-bot",
+  const baseSlug = slugify(title);
+  const content = utf8ToBase64(draftMarkdown(title, body));
+
+  for (let attempt = 1; attempt <= 5; attempt++) {
+    const slug = attempt === 1 ? baseSlug : `${baseSlug}-${attempt}`;
+    const path = `${env.CONTENT_DIR}/${slug}.md`;
+    const res = await fetch(
+      `https://api.github.com/repos/${env.GITHUB_REPO}/contents/${path}`,
+      {
+        method: "PUT",
+        headers: {
+          Authorization: `Bearer ${env.GITHUB_TOKEN}`,
+          Accept: "application/vnd.github+json",
+          "X-GitHub-Api-Version": "2022-11-28",
+          "User-Agent": "telegram-draft-bot",
+        },
+        body: JSON.stringify({
+          message: `draft: ${title} (via telegram)`,
+          content,
+          branch: env.GITHUB_BRANCH,
+        }),
       },
-      body: JSON.stringify({
-        message: `draft: ${title} (via telegram)`,
-        content: utf8ToBase64(draftMarkdown(title, body)),
-        branch: env.GITHUB_BRANCH,
-      }),
-    },
-  );
-  if (!res.ok) {
-    throw new Error(`GitHub ${res.status}: ${await res.text()}`);
+    );
+    if (res.ok) return path;
+    // 422 (file exists, no sha) / 409 (ref conflict) → the name is taken; try the
+    // next suffix. Anything else is a real error.
+    if (res.status !== 422 && res.status !== 409) {
+      throw new Error(`GitHub ${res.status}: ${await res.text()}`);
+    }
   }
-  return path;
+  throw new Error("Couldn't find a free filename for the draft after 5 tries.");
 }
 
 function buildBot(env: Env): Bot {

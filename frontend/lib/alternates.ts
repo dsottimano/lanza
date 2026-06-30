@@ -12,6 +12,30 @@ export interface Alternate {
 
 type LocalizedCollection = "posts" | "pages" | "categories" | "tags";
 
+// Per-collection index: stem → the set of locales it exists in. Built once per
+// collection and memoized for the whole build — without this, every page rebuilt
+// the full stem map (O(N) per page → O(N²) over the site). The cached value is
+// the in-flight promise so concurrent callers share one getCollection pass.
+const localeIndexCache = new Map<LocalizedCollection, Promise<Map<string, Set<Locale>>>>();
+
+function localeIndex(collection: LocalizedCollection): Promise<Map<string, Set<Locale>>> {
+  let pending = localeIndexCache.get(collection);
+  if (!pending) {
+    pending = getCollection(collection).then((entries) => {
+      const index = new Map<string, Set<Locale>>();
+      for (const e of entries) {
+        const { locale, slug } = splitId(e.id);
+        let locales = index.get(slug);
+        if (!locales) index.set(slug, (locales = new Set()));
+        locales.add(locale);
+      }
+      return index;
+    });
+    localeIndexCache.set(collection, pending);
+  }
+  return pending;
+}
+
 /**
  * Locales in which `stem` exists for a localized collection, each with its URL.
  * `prefix` is the path segment before the stem ("posts", "category", "tag", or
@@ -22,13 +46,7 @@ export async function entryAlternates(
   stem: string,
   prefix: string,
 ): Promise<Alternate[]> {
-  const entries = await getCollection(collection);
-  const have = new Set(
-    entries
-      .map((e) => splitId(e.id))
-      .filter((s) => s.slug === stem)
-      .map((s) => s.locale),
-  );
+  const have = (await localeIndex(collection)).get(stem) ?? new Set<Locale>();
   return LOCALES.filter((l) => have.has(l)).map((l) => ({
     locale: l,
     url: localeUrl(l, prefix ? `${prefix}/${stem}/` : `${stem}/`),

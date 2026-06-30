@@ -7,6 +7,7 @@ import RecordEditor from "./ui/RecordEditor.vue";
 import SettingsView from "./ui/SettingsView.vue";
 import HelpView from "./ui/HelpView.vue";
 import LanguagesView from "./ui/LanguagesView.vue";
+import ThemesView from "./ui/ThemesView.vue";
 import OnboardingWizard from "./ui/OnboardingWizard.vue";
 import ErrorDialog from "./ui/ErrorDialog.vue";
 import { GitHubClient } from "./backend/github";
@@ -15,7 +16,7 @@ import { site, loadSiteConfig } from "./backend/site";
 import { reportError } from "./errors";
 import { getCollection, type FolderCollection, type FileEntry } from "./schema";
 
-type Pane = "list" | "editRich" | "editRecord" | "settings" | "help" | "languages";
+type Pane = "list" | "editRich" | "editRecord" | "settings" | "help" | "languages" | "themes";
 
 // The token lives server-side (the /admin/api/gh proxy). Past Cloudflare Access
 // the CMS just boots — no sign-in screen, no localStorage PAT. The client carries
@@ -75,6 +76,12 @@ function openLanguages() {
   pane.value = "languages";
 }
 
+function openThemes() {
+  settingsFile.value = null;
+  editingPath.value = null;
+  pane.value = "themes";
+}
+
 // Languages saved: the config store is already refreshed. If the active editing
 // locale was just removed, fall back to the default. Return to the list.
 function onLanguagesSaved() {
@@ -123,12 +130,14 @@ function onOnboarded() {
       :active-collection="collection.name"
       :active-settings="pane === 'settings' ? (settingsFile?.name ?? null) : null"
       :languages-open="pane === 'languages'"
+      :themes-open="pane === 'themes'"
       :locale="locale"
       :help-open="pane === 'help'"
       @select="selectCollection"
       @select-locale="setLocale"
       @open-settings="openSettings"
       @languages="openLanguages"
+      @themes="openThemes"
       @help="openHelp"
     />
     <main class="min-w-0 flex-1">
@@ -159,6 +168,7 @@ function onOnboarded() {
         @back="pane = 'list'"
       />
       <HelpView v-else-if="pane === 'help'" @back="pane = 'list'" />
+      <ThemesView v-else-if="pane === 'themes'" :client="client" @back="pane = 'list'" />
       <LanguagesView
         v-else-if="pane === 'languages'"
         :client="client"

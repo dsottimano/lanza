@@ -1,5 +1,5 @@
 ---
-import { resolveSeo, type PageSeo } from "../lib/seo";
+import { resolveSeo, absUrl, type PageSeo } from "../lib/seo";
 import {
   organizationSchema,
   websiteSchema,
@@ -8,8 +8,6 @@ import {
   jsonLdString,
   type ArticleInput,
 } from "../lib/jsonld";
-
-import { absUrl } from "../lib/seo";
 import { DEFAULT_LOCALE, type Locale } from "../lib/i18n";
 import type { Alternate } from "../lib/alternates";
 

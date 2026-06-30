@@ -1,14 +1,13 @@
 <script setup lang="ts">
 // Form-only editor for body-less folder collections (categories, tags, authors).
 // No writing canvas — just the schema fields. Any existing body is preserved.
-import { onMounted, reactive, ref } from "vue";
 import FieldForm from "../fields/FieldForm.vue";
 import SaveButton from "./SaveButton.vue";
 import { GitHubClient } from "../backend/github";
-import { entryFolder, type FolderCollection } from "../schema";
+import type { FolderCollection } from "../schema";
 import type { Locale } from "../backend/config";
-import { slugify } from "../backend/auth";
 import { reportError, clearError } from "../errors";
+import { useEntryEditor } from "./useEntryEditor";
 
 const props = defineProps<{
   client: GitHubClient;
@@ -18,52 +17,19 @@ const props = defineProps<{
 }>();
 const emit = defineEmits<{ (e: "back", changed: boolean): void }>();
 
-const loading = ref(true);
-let committedSomething = false;
-
-const data = reactive<Record<string, unknown>>({});
+// Body-less collection: keep whatever body the file already had and re-commit it
+// untouched (this editor only edits frontmatter fields).
 let body = "";
-let sha: string | undefined;
-let currentPath = props.path;
-
-onMounted(async () => {
-  try {
-    if (props.path) {
-      const entry = await props.client.loadEntry(props.path);
-      Object.assign(data, entry.data);
-      body = entry.body;
-      sha = entry.sha;
-    } else {
-      for (const f of props.collection.fields) {
-        if (f.default !== undefined) data[f.name] = f.default;
-      }
-    }
-  } catch (e) {
-    reportError(e, "Failed to load entry.");
-  } finally {
-    loading.value = false;
-  }
+const { data, loading, save, wasCommitted } = useEntryEditor(props, {
+  onLoaded: (loadedBody) => (body = loadedBody),
+  getBody: () => body,
 });
-
-async function save() {
-  if (!currentPath) {
-    currentPath = `${entryFolder(props.collection, props.locale)}/${slugify(String(data.title ?? ""))}.md`;
-  }
-  sha = await props.client.saveEntry(
-    currentPath,
-    { ...data },
-    body,
-    `${sha ? "lanza: update" : "lanza: create"} ${currentPath}`,
-    sha,
-  );
-  committedSomething = true;
-}
 </script>
 
 <template>
   <div class="min-h-screen bg-zinc-50">
     <header class="sticky top-0 z-30 flex items-center justify-between gap-4 border-b border-zinc-200 bg-white/85 px-5 py-2.5 backdrop-blur">
-      <button class="text-sm text-zinc-500 transition hover:text-zinc-900" @click="emit('back', committedSomething)">
+      <button class="text-sm text-zinc-500 transition hover:text-zinc-900" @click="emit('back', wasCommitted())">
         ← {{ collection.label }}
       </button>
       <span class="flex-1 text-center text-sm"></span>

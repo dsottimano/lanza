@@ -2,14 +2,14 @@
 import { computed, inject, ref } from "vue";
 import { type NodeViewProps, NodeViewWrapper, NodeViewContent } from "@tiptap/vue-3";
 import { safeImageUrl } from "../url";
-import { uploadImage } from "../../backend/media";
 import { CLIENT_KEY } from "../../fields/context";
+import { useImageUpload } from "../../fields/useImageUpload";
 
 const props = defineProps<NodeViewProps>();
 const client = inject(CLIENT_KEY);
+const { uploading, pick } = useImageUpload(client);
 
 const safeSrc = computed(() => safeImageUrl(props.node.attrs.src));
-const uploading = ref(false);
 const error = ref("");
 
 function setUrl() {
@@ -17,20 +17,13 @@ function setUrl() {
   if (next !== null) props.updateAttributes({ src: safeImageUrl(next) });
 }
 
-async function onPick(e: Event) {
-  const input = e.target as HTMLInputElement;
-  const file = input.files?.[0];
-  if (!file || !client) return;
+function onPick(e: Event) {
   error.value = "";
-  uploading.value = true;
-  try {
-    props.updateAttributes({ src: await uploadImage(client, file) });
-  } catch (err) {
-    error.value = err instanceof Error ? err.message : "Upload failed.";
-  } finally {
-    uploading.value = false;
-    input.value = "";
-  }
+  pick(
+    e,
+    (url) => props.updateAttributes({ src: url }),
+    (err) => (error.value = err instanceof Error ? err.message : "Upload failed."),
+  );
 }
 </script>
 

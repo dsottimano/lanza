@@ -1,17 +1,15 @@
 ---
-import { getCollection } from "astro:content";
 import Base from "../layouts/Base.astro";
 import PageArticle from "../components/PageArticle.astro";
 import { splitId, DEFAULT_LOCALE } from "../lib/i18n";
 import { entryAlternates } from "../lib/alternates";
+import { publishedPages } from "../lib/routing";
 
 // Standalone Pages (About, Contact, …) render at /<slug>. Static paths only —
 // this is not a runtime catch-all; getStaticPaths emits exactly the page slugs.
-// Default-locale (EN) only; ES/FR pages come from [locale]/[...slug].astro (Phase C).
+// Default-locale (EN) only; ES/FR pages come from [locale]/[...slug].astro.
 export async function getStaticPaths() {
-  const pages = await getCollection("pages", ({ data }) =>
-    import.meta.env.PROD ? data.draft !== true : true,
-  );
+  const pages = await publishedPages();
   return pages
     .map((page) => ({ page, ...splitId(page.id) }))
     .filter(({ locale }) => locale === DEFAULT_LOCALE)

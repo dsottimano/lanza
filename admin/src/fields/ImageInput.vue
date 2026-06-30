@@ -2,48 +2,34 @@
 // Image field: upload a file (committed to the repo under MEDIA.dir, served
 // from MEDIA.publicPrefix) or paste an external URL. The upload is its own
 // commit; the stored value is the public path/URL.
-import { computed, inject, ref } from "vue";
-import { uploadImage } from "../backend/media";
+import { computed, inject } from "vue";
 import { CLIENT_KEY } from "./context";
 import { reportError } from "../errors";
+import { inputCls } from "./styles";
+import { useImageUpload } from "./useImageUpload";
+import { safeImageUrl } from "../editor/url";
 
 const model = defineModel<string>();
-const client = inject(CLIENT_KEY);
+const { uploading, pick } = useImageUpload(inject(CLIENT_KEY));
 
-const uploading = ref(false);
+// Reuse the one image-URL policy for the preview instead of re-testing the
+// scheme here: a non-http(s)/non-local value yields "" and shows no preview.
+const safeSrc = computed(() => safeImageUrl(model.value));
 
-const hasPreview = computed(
-  () => typeof model.value === "string" && /^(https?:\/\/|\/)/.test(model.value),
-);
-
-const inputCls =
-  "w-full rounded-lg border border-zinc-300 bg-white px-3 py-2 text-sm text-zinc-900 transition placeholder:text-zinc-400 focus:border-zinc-900 focus:outline-none focus:ring-4 focus:ring-zinc-900/5";
-
-async function onPick(e: Event) {
-  const input = e.target as HTMLInputElement;
-  const file = input.files?.[0];
-  if (!file) return;
-  if (!client) {
-    reportError("Not connected to GitHub.");
-    return;
-  }
-  uploading.value = true;
-  try {
-    model.value = await uploadImage(client, file);
-  } catch (err) {
-    reportError(err, "Image upload failed.");
-  } finally {
-    uploading.value = false;
-    input.value = ""; // allow re-picking the same file
-  }
+function onPick(e: Event) {
+  pick(
+    e,
+    (url) => (model.value = url),
+    (err) => reportError(err, "Image upload failed."),
+  );
 }
 </script>
 
 <template>
   <div class="space-y-2">
     <img
-      v-if="hasPreview"
-      :src="model"
+      v-if="safeSrc"
+      :src="safeSrc"
       class="max-h-40 rounded-lg border border-zinc-200 object-contain"
       alt=""
     />

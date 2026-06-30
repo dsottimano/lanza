@@ -6,6 +6,7 @@
 import { computed, ref } from "vue";
 import type { Field, Variant } from "../schema";
 import FieldInput from "./FieldInput.vue";
+import { inputCls } from "./styles";
 
 const props = defineProps<{ field: Field }>();
 const model = defineModel<any[]>();
@@ -85,7 +86,7 @@ function move(i: number, dir: -1 | 1) {
         v-if="isScalar"
         type="text"
         v-model="items[i]"
-        class="w-full rounded-lg border border-zinc-300 bg-white px-3 py-2 text-sm text-zinc-900 transition focus:border-zinc-900 focus:outline-none focus:ring-4 focus:ring-zinc-900/5"
+        :class="inputCls"
       />
 
       <!-- typed variant item -->

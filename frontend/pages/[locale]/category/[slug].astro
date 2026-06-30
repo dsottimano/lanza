@@ -4,6 +4,7 @@ import Base from "../../../layouts/Base.astro";
 import Archive from "../../../components/Archive.astro";
 import { splitId, localeUrl, isLocale, DEFAULT_LOCALE } from "../../../lib/i18n";
 import { entryAlternates } from "../../../lib/alternates";
+import { localePosts } from "../../../lib/routing";
 
 // Localized category archives (/es/category/x/). Non-default locales only.
 export async function getStaticPaths() {
@@ -20,16 +21,7 @@ export async function getStaticPaths() {
 const { category, locale } = Astro.props;
 const stem = splitId(category.id).slug;
 
-const posts = (
-  await getCollection(
-    "posts",
-    ({ data }) =>
-      (import.meta.env.PROD ? data.draft !== true : true) &&
-      data.categories.includes(stem),
-  )
-)
-  .filter((p) => splitId(p.id).locale === locale)
-  .sort((a, b) => b.data.pubDate.valueOf() - a.data.pubDate.valueOf());
+const posts = await localePosts(locale, (data) => data.categories.includes(stem));
 
 const allCategories = (await getCollection("categories"))
   .map((c) => ({ entry: c, ...splitId(c.id) }))

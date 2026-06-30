@@ -3,16 +3,16 @@
 // centre; every structured field lives in a Ghost-style slide-in drawer driven
 // by the collection schema. Title and the draft/publish toggle are surfaced in
 // the chrome, so they're excluded from the drawer.
-import { computed, onMounted, reactive, ref, useTemplateRef } from "vue";
+import { computed, ref, useTemplateRef } from "vue";
 import Editor from "../editor/Editor.vue";
 import FieldForm from "../fields/FieldForm.vue";
 import SaveButton from "./SaveButton.vue";
 import { GitHubClient } from "../backend/github";
-import { entryFolder, type FolderCollection, type Field } from "../schema";
+import { type FolderCollection, type Field } from "../schema";
 import type { Locale } from "../backend/config";
 import { toEditorHtml } from "../backend/markdown";
-import { slugify } from "../backend/auth";
 import { reportError, clearError } from "../errors";
+import { useEntryEditor } from "./useEntryEditor";
 
 const props = defineProps<{
   client: GitHubClient;
@@ -24,67 +24,39 @@ const emit = defineEmits<{ (e: "back", changed: boolean): void }>();
 
 const editorRef = useTemplateRef<InstanceType<typeof Editor>>("editorRef");
 
-const loading = ref(true);
 const dirty = ref(false);
 const drawerOpen = ref(false);
-let committedSomething = false;
-
-// All editable frontmatter lives here; unknown keys are preserved verbatim.
-const data = reactive<Record<string, unknown>>({});
 const bodyHtml = ref("<p></p>");
-let sha: string | undefined;
-let currentPath = props.path;
+
+// Frontmatter lives in `data`; the body is the live editor HTML, read at save.
+const { data, loading, save, wasCommitted } = useEntryEditor(props, {
+  onLoaded: (body, isNew) => {
+    if (isNew) {
+      // Seed a publish date for collections that have one (posts).
+      if (props.collection.fields.some((f) => f.name === "pubDate") && !data.pubDate) {
+        data.pubDate = new Date().toISOString();
+      }
+      bodyHtml.value = "<p></p>";
+    } else {
+      bodyHtml.value = toEditorHtml(body); // bot markdown drafts → HTML canvas
+    }
+  },
+  getBody: () => editorRef.value?.getHTML() ?? "",
+  beforeSave: () => {
+    if (props.collection.name === "posts") data.updatedDate = new Date().toISOString();
+  },
+});
+
+// SaveButton drives save(); clear the dirty flag only on a successful commit.
+async function saveAndClean() {
+  await save();
+  dirty.value = false;
+}
 
 // Drawer shows every field except the ones promoted into the chrome.
 const drawerFields = computed<Field[]>(() =>
   props.collection.fields.filter((f) => f.name !== "title" && f.name !== "draft"),
 );
-
-function applyDefaults() {
-  for (const f of props.collection.fields) {
-    if (f.default !== undefined && data[f.name] === undefined) data[f.name] = f.default;
-  }
-}
-
-onMounted(async () => {
-  try {
-    if (props.path) {
-      const entry = await props.client.loadEntry(props.path);
-      Object.assign(data, entry.data);
-      sha = entry.sha;
-      bodyHtml.value = toEditorHtml(entry.body);
-    } else {
-      applyDefaults();
-      if (props.collection.fields.some((f) => f.name === "pubDate") && !data.pubDate) {
-        data.pubDate = new Date().toISOString();
-      }
-      bodyHtml.value = "<p></p>";
-    }
-  } catch (e) {
-    reportError(e, "Failed to load entry.");
-  } finally {
-    loading.value = false;
-  }
-});
-
-async function save() {
-  const body = editorRef.value?.getHTML() ?? "";
-  if (props.collection.name === "posts") data.updatedDate = new Date().toISOString();
-
-  if (!currentPath) {
-    const slug = slugify(String(data.title ?? ""));
-    currentPath = `${entryFolder(props.collection, props.locale)}/${slug}.md`;
-  }
-  sha = await props.client.saveEntry(
-    currentPath,
-    { ...data },
-    body,
-    `${sha ? "lanza: update" : "lanza: create"} ${currentPath}`,
-    sha,
-  );
-  dirty.value = false;
-  committedSomething = true;
-}
 
 function markDirty() {
   dirty.value = true;
@@ -96,7 +68,7 @@ function markDirty() {
     <header class="sticky top-0 z-30 flex items-center justify-between gap-4 border-b border-zinc-200 bg-white/85 px-5 py-2.5 backdrop-blur">
       <button
         class="text-sm text-zinc-500 transition hover:text-zinc-900"
-        @click="emit('back', committedSomething)"
+        @click="emit('back', wasCommitted())"
       >
         ← {{ collection.label }}
       </button>
@@ -116,7 +88,7 @@ function markDirty() {
               type="checkbox"
               class="sr-only"
               :checked="data.draft === false"
-              @change="data.draft = (($event.target as HTMLInputElement).checked ? false : true); markDirty()"
+              @change="data.draft = !($event.target as HTMLInputElement).checked; markDirty()"
             />
             <span
               class="size-4 rounded-full bg-white shadow transition-transform"
@@ -135,7 +107,7 @@ function markDirty() {
         </button>
 
         <SaveButton
-          :action="save"
+          :action="saveAndClean"
           :disabled="loading"
           @saved="clearError"
           @error="(e) => reportError(e, 'Save failed.')"

@@ -2,8 +2,9 @@
 import { getCollection } from "astro:content";
 import Base from "../../layouts/Base.astro";
 import Archive from "../../components/Archive.astro";
-import { splitId, DEFAULT_LOCALE } from "../../lib/i18n";
+import { DEFAULT_LOCALE } from "../../lib/i18n";
 import { allLocaleAlternates } from "../../lib/alternates";
+import { localePosts } from "../../lib/routing";
 
 // Authors are not localized (a name is language-neutral) — one flat folder, so
 // author.id is already the bare stem. The root archive lists default-locale (EN)
@@ -18,16 +19,7 @@ export async function getStaticPaths() {
 
 const locale = DEFAULT_LOCALE;
 const { author } = Astro.props;
-const posts = (
-  await getCollection(
-    "posts",
-    ({ data }) =>
-      (import.meta.env.PROD ? data.draft !== true : true) &&
-      data.author === author.id,
-  )
-)
-  .filter((p) => splitId(p.id).locale === locale)
-  .sort((a, b) => b.data.pubDate.valueOf() - a.data.pubDate.valueOf());
+const posts = await localePosts(locale, (data) => data.author === author.id);
 
 const alternates = allLocaleAlternates(`author/${author.id}/`);
 ---

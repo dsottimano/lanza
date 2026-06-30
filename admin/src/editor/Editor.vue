@@ -12,6 +12,7 @@ import { Figure } from "./extensions/Figure";
 import { Embed } from "./extensions/Embed";
 import { SlashCommand, filterSlashItems, type SlashItem } from "./extensions/slash";
 import SlashMenu from "./SlashMenu.vue";
+import { safeLinkUrl } from "./url";
 
 const props = withDefaults(
   defineProps<{ initialHtml?: string; client?: GitHubClient }>(),
@@ -42,7 +43,15 @@ const editor = useEditor({
   content: props.initialHtml,
   extensions: [
     StarterKit.configure({ link: false }),
-    Link.configure({ openOnClick: false, autolink: true }),
+    // `protocols` + `validate` pin link policy to our own allowlist (safeLinkUrl)
+    // rather than relying on TipTap's defaults — pasted/autolinked/loaded hrefs
+    // with a junk scheme (javascript:, data:, …) are dropped at parse time.
+    Link.configure({
+      openOnClick: false,
+      autolink: true,
+      protocols: ["http", "https", "mailto", "tel"],
+      validate: (href) => !!safeLinkUrl(href),
+    }),
     Placeholder.configure({
       placeholder: ({ node }) =>
         node.type.name === "paragraph"
@@ -82,6 +91,7 @@ const editor = useEditor({
           },
           onKeyDown: (props) => {
             const n = slashItems.value.length;
+            if (!n) return false; // empty list ("No matches") — avoid % 0 → NaN
             if (props.event.key === "ArrowDown") {
               slashSelected.value = (slashSelected.value + 1) % n;
               return true;
@@ -142,10 +152,20 @@ function toggleHtml() {
 }
 
 function link() {
-  const url = window.prompt("Link URL");
-  if (url === null) return;
-  if (url === "") editor.value?.chain().focus().unsetLink().run();
-  else editor.value?.chain().focus().setLink({ href: url }).run();
+  const input = window.prompt("Link URL");
+  if (input === null) return; // cancelled
+  if (input.trim() === "") {
+    editor.value?.chain().focus().unsetLink().run();
+    return;
+  }
+  // Validate here too: `setLink` is a direct command and does not run Link's
+  // `validate`, so without this an editor could type a `javascript:` href.
+  const href = safeLinkUrl(input);
+  if (!href) {
+    window.alert("That link URL isn't allowed (use http, https, mailto or tel).");
+    return;
+  }
+  editor.value?.chain().focus().setLink({ href }).run();
 }
 </script>
 

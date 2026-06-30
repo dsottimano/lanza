@@ -6,6 +6,7 @@ import { computed, inject, onMounted, ref } from "vue";
 import type { Field } from "../schema";
 import { getCollection } from "../schema";
 import { CLIENT_KEY } from "./context";
+import { inputCls } from "./styles";
 
 const props = defineProps<{ field: Field }>();
 const model = defineModel<string | string[] | undefined>();
@@ -68,7 +69,7 @@ function toggle(slug: string) {
   <select
     v-else
     v-model="model"
-    class="w-full rounded-lg border border-zinc-300 bg-white px-3 py-2 text-sm text-zinc-900 transition focus:border-zinc-900 focus:outline-none focus:ring-4 focus:ring-zinc-900/5"
+    :class="inputCls"
   >
     <option :value="undefined">—</option>
     <option v-for="s in slugs" :key="s" :value="s">{{ s }}</option>

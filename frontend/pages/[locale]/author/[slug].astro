@@ -2,8 +2,9 @@
 import { getCollection } from "astro:content";
 import Base from "../../../layouts/Base.astro";
 import Archive from "../../../components/Archive.astro";
-import { LOCALES, splitId, DEFAULT_LOCALE } from "../../../lib/i18n";
+import { LOCALES, DEFAULT_LOCALE } from "../../../lib/i18n";
 import { allLocaleAlternates } from "../../../lib/alternates";
+import { localePosts } from "../../../lib/routing";
 
 // Localized author archives (/es/author/x/). Authors are shared (not localized),
 // so we emit each author under every non-default locale, listing that locale's
@@ -20,16 +21,7 @@ export async function getStaticPaths() {
 }
 
 const { author, locale } = Astro.props;
-const posts = (
-  await getCollection(
-    "posts",
-    ({ data }) =>
-      (import.meta.env.PROD ? data.draft !== true : true) &&
-      data.author === author.id,
-  )
-)
-  .filter((p) => splitId(p.id).locale === locale)
-  .sort((a, b) => b.data.pubDate.valueOf() - a.data.pubDate.valueOf());
+const posts = await localePosts(locale, (data) => data.author === author.id);
 
 const alternates = allLocaleAlternates(`author/${author.id}/`);
 ---

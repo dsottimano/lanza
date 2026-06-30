@@ -4,8 +4,8 @@ import FigureView from "../nodeviews/FigureView.vue";
 import { safeImageUrl } from "../url";
 
 // Image-with-caption card. Caption is editable rich text; the image src is an
-// attribute. Phase 1 takes a URL; real uploads (commit to the repo) land in
-// Phase 4. Serializes to semantic <figure><img><figcaption>…</figcaption>.
+// attribute set either by URL or by uploading a file (committed to the repo via
+// FigureView). Serializes to semantic <figure><img><figcaption>…</figcaption>.
 export const Figure = Node.create({
   name: "figure",
   group: "block",

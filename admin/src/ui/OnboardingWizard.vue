@@ -3,10 +3,11 @@
 // writes everything to the repo through the proxy: the logo asset + appearance.json
 // (theme/logo) + site.json (locale set + `onboarded: true`). Once onboarded is
 // true the CMS skips this on future loads (see App.vue / backend/site.ts).
-import { ref, computed } from "vue";
+import { ref, computed, onBeforeUnmount } from "vue";
 import { GitHubClient } from "../backend/github";
 import { uploadImage } from "../backend/media";
 import { loadSiteConfig, SITE_CONFIG_PATH, putJsonSafe, LANG_CATALOG, type LocaleDef } from "../backend/site";
+import LocalePicker from "./LocalePicker.vue";
 import { reportError } from "../errors";
 
 const props = defineProps<{ client: GitHubClient }>();
@@ -32,8 +33,14 @@ const logoPreview = ref("");
 function onLogo(e: Event) {
   const file = (e.target as HTMLInputElement).files?.[0] ?? null;
   logoFile.value = file;
+  // Revoke the previous object URL before replacing it (and on unmount) so
+  // re-picking a logo doesn't leak blobs.
+  if (logoPreview.value) URL.revokeObjectURL(logoPreview.value);
   logoPreview.value = file ? URL.createObjectURL(file) : "";
 }
+onBeforeUnmount(() => {
+  if (logoPreview.value) URL.revokeObjectURL(logoPreview.value);
+});
 
 // Step 2 — theme
 const theme = ref("editorial");
@@ -43,13 +50,6 @@ const multilingual = ref(false);
 const single = ref("en");
 const chosen = ref<string[]>(["en"]);
 const defaultLocale = ref("en");
-
-function toggleLang(code: string) {
-  const i = chosen.value.indexOf(code);
-  if (i === -1) chosen.value.push(code);
-  else if (chosen.value.length > 1) chosen.value.splice(i, 1);
-  if (!chosen.value.includes(defaultLocale.value)) defaultLocale.value = chosen.value[0];
-}
 
 const langValid = computed(() =>
   multilingual.value ? chosen.value.length >= 1 : !!single.value,
@@ -189,26 +189,11 @@ const card = "rounded-xl border bg-white p-4 text-left transition";
 
           <!-- Multiple -->
           <div v-else class="mt-5">
-            <label class="mb-2 block text-xs font-medium text-zinc-500">Which languages?</label>
-            <div class="grid grid-cols-2 gap-2">
-              <button
-                v-for="l in LANG_CATALOG"
-                :key="l.code"
-                :class="['flex items-center gap-2 rounded-lg border px-3 py-2 text-left text-sm transition', chosen.includes(l.code) ? 'border-zinc-900 bg-zinc-50' : 'border-zinc-200 hover:border-zinc-300']"
-                @click="toggleLang(l.code)"
-              >
-                <span :class="['grid size-4 place-items-center rounded border text-[10px]', chosen.includes(l.code) ? 'border-zinc-900 bg-zinc-900 text-white' : 'border-zinc-300']">
-                  <span v-if="chosen.includes(l.code)">✓</span>
-                </span>
-                {{ l.label }}
-              </button>
-            </div>
-            <label class="mt-4 mb-1 block text-xs font-medium text-zinc-500">Default language</label>
-            <select v-model="defaultLocale" class="w-full rounded-lg border border-zinc-300 bg-white px-3 py-2.5 text-sm">
-              <option v-for="c in chosen" :key="c" :value="c">
-                {{ LANG_CATALOG.find((l) => l.code === c)?.label }}
-              </option>
-            </select>
+            <LocalePicker
+              v-model:chosen="chosen"
+              v-model:default="defaultLocale"
+              grid-label="Which languages?"
+            />
           </div>
         </div>
 
