@@ -1,6 +1,9 @@
 import { defineConfig, loadEnv, type Plugin } from "vite";
 import vue from "@vitejs/plugin-vue";
 import tailwindcss from "@tailwindcss/vite";
+// Shared proxy policy — same module the prod Pages Function uses, so the
+// allowlist and CSRF check can't drift between dev and prod.
+import { crossOriginBlocked, isAllowed } from "../functions/_lib/gh-proxy";
 
 // Dev mirror of the production Pages Function (functions/admin/api/gh/[[path]].ts).
 // Intercepts /admin/api/gh/* in the Vite dev server and proxies to GitHub with
@@ -27,7 +30,29 @@ function githubProxyDev(token: string | undefined): Plugin {
           end(chunk?: string): void;
         };
 
+        const reject = (status: number, message: string) => {
+          w.statusCode = status;
+          w.setHeader("content-type", "application/json");
+          w.end(JSON.stringify({ message }));
+        };
+
         try {
+          const method = r.method ?? "GET";
+          const subPath = r.url ?? "";
+
+          // Same allowlist + CSRF check as prod (functions/_lib/gh-proxy.ts).
+          if (!isAllowed(method, subPath)) {
+            reject(
+              403,
+              `Blocked by proxy allowlist: ${method} ${subPath} is not a permitted GitHub endpoint.`,
+            );
+            return;
+          }
+          if (crossOriginBlocked(method, r.headers["origin"] ?? null, r.headers["host"] ?? null)) {
+            reject(403, "Cross-origin write rejected.");
+            return;
+          }
+
           if (!token) {
             w.statusCode = 500;
             w.setHeader("content-type", "application/json");

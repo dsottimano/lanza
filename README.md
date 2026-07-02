@@ -56,6 +56,26 @@ build, so a bare `npm run dev` won't serve `/admin` until you've built it
 
 See `admin/PROGRESS.md` for the build history and architecture notes.
 
+## Security — the CMS threat model
+
+The CMS never holds a GitHub token; every write reaches GitHub through the
+`/admin/api/gh` proxy. Three layers keep that proxy safe:
+
+1. **Narrow token.** `GITHUB_TOKEN` is a fine-grained PAT scoped to **Contents:
+   read & write on this one repo** — nothing else. Never broaden it (no other
+   repos, no extra permissions) and never reuse it elsewhere; it is the only
+   secret guarding the whole content store.
+2. **Cloudflare Access.** All of `/admin/*` (the SPA and the proxy) sits behind
+   Zero Trust — only authorized editors reach it.
+3. **Endpoint allowlist.** The proxy enforces a method+path allowlist
+   (`functions/_lib/gh-proxy.ts`, shared by the prod Pages Function and the dev
+   Vite middleware) *before* attaching the token: only the exact GitHub endpoints
+   the CMS calls, on this repo/branch, are forwarded — everything else is 403.
+
+**CSRF** is mitigated by a same-origin check on state-changing methods (a write
+whose `Origin` host differs from the request host is rejected) layered on Access.
+The proxy also strips GitHub's token-scope and rate-limit headers from responses.
+
 ## Deploy to Cloudflare Pages
 
 Connect the repo in the Pages dashboard with:

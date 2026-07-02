@@ -33,7 +33,9 @@ markdown on load and re-saves HTML.
    Auth: `/admin` sits behind Cloudflare Zero Trust (Access); the GitHub token is
    server-side, injected by the `/admin/api/gh` proxy (Pages Function
    `functions/admin/api/gh/[[path]].ts` in prod, Vite middleware in dev). No
-   browser token, no sign-in screen — the CMS boots straight in past Access.
+   browser token, no sign-in screen — the CMS boots straight in past Access. The
+   proxy enforces a method+path allowlist (`functions/_lib/gh-proxy.ts`, shared
+   by both) — see README's "Security — the CMS threat model".
 
 5. **Bot secrets via wrangler, never in the repo.** `BOT_TOKEN`, `BOT_INFO`,
    `WEBHOOK_SECRET`, `GITHUB_TOKEN` are `wrangler secret put`. The bot fails

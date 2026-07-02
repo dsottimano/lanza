@@ -10,21 +10,18 @@
 // Set the secret in the Pages project: Settings → Variables → GITHUB_TOKEN
 // (encrypted). A fine-grained PAT with Contents: read/write on the repo.
 
+import {
+  FORWARD_REQUEST_HEADERS,
+  STRIP_RESPONSE_HEADERS,
+  crossOriginBlocked,
+  isAllowed,
+} from "../../../_lib/gh-proxy";
+
 interface Env {
   GITHUB_TOKEN?: string;
 }
 
 const GITHUB_API = "https://api.github.com";
-
-// Request headers worth forwarding upstream. Everything else (cookies, CF
-// headers, host, the client's own auth) is dropped — we set auth ourselves.
-const FORWARD_REQUEST_HEADERS = [
-  "accept",
-  "content-type",
-  "x-github-api-version",
-  "if-none-match",
-  "if-modified-since",
-];
 
 export const onRequest = async (context: {
   request: Request;
@@ -43,8 +40,23 @@ export const onRequest = async (context: {
   // `[[path]]` catch-all → array of path segments after /admin/api/gh/.
   const seg = params.path;
   const subPath = Array.isArray(seg) ? seg.join("/") : (seg ?? "");
-  const search = new URL(request.url).search;
-  const target = `${GITHUB_API}/${subPath}${search}`;
+  const url = new URL(request.url);
+
+  // Enforce the method+path allowlist BEFORE attaching the token: only the
+  // endpoints the CMS actually calls, on this one repo, are reachable.
+  if (!isAllowed(request.method, subPath)) {
+    return json(403, {
+      message: `Blocked by proxy allowlist: ${request.method} /${subPath} is not a permitted GitHub endpoint.`,
+    });
+  }
+
+  // CSRF guard: a cross-origin write from an authenticated editor's browser is
+  // rejected. Access gates the route; this stops a malicious page riding along.
+  if (crossOriginBlocked(request.method, request.headers.get("origin"), url.host)) {
+    return json(403, { message: "Cross-origin write rejected." });
+  }
+
+  const target = `${GITHUB_API}/${subPath}${url.search}`;
 
   const headers = new Headers();
   for (const name of FORWARD_REQUEST_HEADERS) {
@@ -64,12 +76,10 @@ export const onRequest = async (context: {
     body: hasBody ? await request.arrayBuffer() : undefined,
   });
 
-  // Return GitHub's response verbatim. Strip encoding/length headers that won't
-  // survive re-serialization (the body is already decoded by fetch()).
+  // Return GitHub's response, stripping headers that won't survive
+  // re-serialization plus token-scope / rate-limit headers we don't leak.
   const respHeaders = new Headers(upstream.headers);
-  respHeaders.delete("content-encoding");
-  respHeaders.delete("content-length");
-  respHeaders.delete("transfer-encoding");
+  for (const name of STRIP_RESPONSE_HEADERS) respHeaders.delete(name);
 
   return new Response(upstream.body, {
     status: upstream.status,
