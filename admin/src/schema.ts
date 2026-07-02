@@ -72,6 +72,9 @@ export interface FileEntry {
   // When true, the file has one variant per locale: `file` is the base name and
   // the active locale is spliced in before `.json` (menu.json → menu.es.json).
   localized?: boolean;
+  // When set, App.vue opens a purpose-built pane instead of the generic
+  // FieldForm (e.g. "menu" → MenuView.vue). `fields` is then unused.
+  view?: "menu" | "redirects";
   fields: Field[];
 }
 
@@ -388,41 +391,19 @@ export const COLLECTIONS: Collection[] = [
         label: "Menu",
         file: "frontend/data/menu.json",
         localized: true,
-        fields: [
-          {
-            name: "items",
-            label: "Menu items",
-            labelSingular: "Menu item",
-            widget: "list",
-            fields: [
-              { name: "label", label: "Label", widget: "string" },
-              {
-                name: "url",
-                label: "URL / path",
-                widget: "string",
-                hint: "e.g. /, /about/, or https://example.com",
-              },
-            ],
-          },
-        ],
+        // Custom editor: menu locations (header/footer) × per-device menus.
+        // Shape lives in frontend/lib/site.ts; edited by MenuView.vue, not FieldForm.
+        view: "menu",
+        fields: [],
       },
       {
         name: "redirects",
         label: "Redirects",
         file: "frontend/data/redirects.json",
-        fields: [
-          {
-            name: "redirects",
-            label: "Redirects",
-            labelSingular: "Redirect",
-            widget: "list",
-            fields: [
-              { name: "from", label: "From path", widget: "string" },
-              { name: "to", label: "To path / URL", widget: "string" },
-              { name: "status", label: "Status code", widget: "number", default: 301, valueType: "int" },
-            ],
-          },
-        ],
+        // Validation lives in backend/redirect-rules.ts; edited by
+        // RedirectsView.vue, not FieldForm.
+        view: "redirects",
+        fields: [],
       },
     ],
   },

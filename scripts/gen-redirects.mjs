@@ -10,6 +10,11 @@ import { fileURLToPath } from "node:url";
 const dataPath = fileURLToPath(new URL("../frontend/data/redirects.json", import.meta.url));
 const outPath = fileURLToPath(new URL("../public/_redirects", import.meta.url));
 
+// The validation below is MIRRORED in admin/src/backend/redirect-rules.ts (the
+// CMS Redirects editor), so the editor flags exactly the rules this step skips.
+// Separate build roots (Node ESM here, Vite/TS there) mean no shared import —
+// keep the two in sync, same as frontend/lib/site.ts ↔ admin MenuView.vue.
+//
 // Status codes Cloudflare's _redirects supports (200 = rewrite/proxy).
 const OK_STATUS = new Set([200, 301, 302, 303, 307, 308]);
 // A single token: a leading slash then no whitespace (blocks newline injection).

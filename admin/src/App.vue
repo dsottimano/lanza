@@ -5,6 +5,9 @@ import CollectionList from "./ui/CollectionList.vue";
 import EditorView from "./ui/EditorView.vue";
 import RecordEditor from "./ui/RecordEditor.vue";
 import SettingsView from "./ui/SettingsView.vue";
+import MenuView from "./ui/MenuView.vue";
+import RedirectsView from "./ui/RedirectsView.vue";
+import SiteHealthView from "./ui/SiteHealthView.vue";
 import HelpView from "./ui/HelpView.vue";
 import LanguagesView from "./ui/LanguagesView.vue";
 import ThemesView from "./ui/ThemesView.vue";
@@ -17,7 +20,17 @@ import { reportError } from "./errors";
 import { confirmDiscard } from "./ui/dirty";
 import { getCollection, type FolderCollection, type FileEntry } from "./schema";
 
-type Pane = "list" | "editRich" | "editRecord" | "settings" | "help" | "languages" | "themes";
+type Pane =
+  | "list"
+  | "editRich"
+  | "editRecord"
+  | "settings"
+  | "menu"
+  | "redirects"
+  | "health"
+  | "help"
+  | "languages"
+  | "themes";
 
 // The token lives server-side (the /admin/api/gh proxy). Past Cloudflare Access
 // the CMS just boots — no sign-in screen, no localStorage PAT. The client carries
@@ -67,7 +80,16 @@ function setLocale(l: Locale) {
 function openSettings(file: FileEntry) {
   if (!confirmDiscard()) return;
   settingsFile.value = file;
-  pane.value = "settings";
+  // A file entry can route to a purpose-built pane (Menu, Redirects) instead of
+  // the generic form.
+  pane.value = file.view ?? "settings";
+}
+
+function openHealth() {
+  if (!confirmDiscard()) return;
+  settingsFile.value = null;
+  editingPath.value = null;
+  pane.value = "health";
 }
 
 function openHelp() {
@@ -141,9 +163,14 @@ function onOnboarded() {
   <div v-else class="flex min-h-screen bg-zinc-50">
     <Sidebar
       :active-collection="collection.name"
-      :active-settings="pane === 'settings' ? (settingsFile?.name ?? null) : null"
+      :active-settings="
+        pane === 'settings' || pane === 'menu' || pane === 'redirects'
+          ? (settingsFile?.name ?? null)
+          : null
+      "
       :languages-open="pane === 'languages'"
       :themes-open="pane === 'themes'"
+      :health-open="pane === 'health'"
       :locale="locale"
       :help-open="pane === 'help'"
       @select="selectCollection"
@@ -151,6 +178,7 @@ function onOnboarded() {
       @open-settings="openSettings"
       @languages="openLanguages"
       @themes="openThemes"
+      @health="openHealth"
       @help="openHelp"
     />
     <main class="min-w-0 flex-1">
@@ -180,6 +208,20 @@ function onOnboarded() {
         :locale="locale"
         @back="backToList"
       />
+      <MenuView
+        v-else-if="pane === 'menu' && settingsFile"
+        :key="`menu#${locale}`"
+        :client="client"
+        :file="settingsFile"
+        :locale="locale"
+        @back="backToList"
+      />
+      <RedirectsView
+        v-else-if="pane === 'redirects'"
+        :client="client"
+        @back="backToList"
+      />
+      <SiteHealthView v-else-if="pane === 'health'" :client="client" @back="backToList" />
       <HelpView v-else-if="pane === 'help'" @back="backToList" />
       <ThemesView v-else-if="pane === 'themes'" :client="client" @back="backToList" />
       <LanguagesView

@@ -10,6 +10,7 @@ defineProps<{
   activeSettings: string | null;
   languagesOpen: boolean;
   themesOpen: boolean;
+  healthOpen: boolean;
   locale: Locale;
   helpOpen: boolean;
 }>();
@@ -19,6 +20,7 @@ const emit = defineEmits<{
   (e: "openSettings", file: FileEntry): void;
   (e: "languages"): void;
   (e: "themes"): void;
+  (e: "health"): void;
   (e: "help"): void;
 }>();
 
@@ -109,6 +111,12 @@ const itemActive = "bg-zinc-900 text-white hover:bg-zinc-900 hover:text-white";
         @click="emit('themes')"
       >
         Themes
+      </button>
+      <button
+        :class="[item, healthOpen ? itemActive : '']"
+        @click="emit('health')"
+      >
+        Site health
       </button>
     </div>
 
