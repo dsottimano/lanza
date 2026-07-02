@@ -1,40 +1,18 @@
 ---
 import { getCollection } from "astro:content";
-import Base from "../../../layouts/Base.astro";
-import Archive from "../../../components/Archive.astro";
-import { splitId, isLocale, DEFAULT_LOCALE } from "../../../lib/i18n";
-import { entryAlternates } from "../../../lib/alternates";
-import { localePosts } from "../../../lib/routing";
+import TagPage from "../../../components/TagPage.astro";
+import { splitEntries } from "../../../lib/paths";
 
 // Localized tag archives (/es/tag/x/). Non-default locales only.
 export async function getStaticPaths() {
-  const tags = await getCollection("tags");
-  return tags
-    .map((tag) => ({ tag, ...splitId(tag.id) }))
-    .filter(({ locale }) => locale !== DEFAULT_LOCALE && isLocale(locale))
-    .map(({ tag, locale, slug }) => ({
-      params: { locale, slug },
-      props: { tag, locale },
-    }));
+  const { localized } = splitEntries(await getCollection("tags"));
+  return localized.map(({ entry, locale, slug }) => ({
+    params: { locale, slug },
+    props: { tag: entry, locale },
+  }));
 }
 
 const { tag, locale } = Astro.props;
-const stem = splitId(tag.id).slug;
-const posts = await localePosts(locale, (data) => data.tags.includes(stem));
-
-const alternates = await entryAlternates("tags", stem, "tag");
 ---
 
-<Base
-  locale={locale}
-  alternates={alternates}
-  seo={{ title: `Tag: ${tag.data.title}`, description: tag.data.description }}
->
-  <Archive
-    heading={`Tag: ${tag.data.title}`}
-    locale={locale}
-    posts={posts}
-    description={tag.data.description}
-    emptyText="No posts with this tag yet."
-  />
-</Base>
+<TagPage tag={tag} locale={locale} />

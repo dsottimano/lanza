@@ -5,6 +5,7 @@
 import type { CollectionEntry } from "astro:content";
 import { sanitizeBody } from "../lib/sanitize";
 import { localeUrl, type Locale } from "../lib/i18n";
+import { resolveTerms } from "../lib/taxonomy";
 
 interface Props {
   post: CollectionEntry<"posts">;
@@ -15,6 +16,9 @@ interface Props {
 
 const { post, locale, author } = Astro.props;
 const body = sanitizeBody(post.body ?? "");
+// Chips show resolved term titles ("Web Development"), not the stored slug.
+const categories = await resolveTerms("categories", locale, post.data.categories);
+const tags = await resolveTerms("tags", locale, post.data.tags);
 const layoutClass =
   post.data.layout && post.data.layout !== "default"
     ? `layout-${post.data.layout}`
@@ -43,11 +47,11 @@ const layoutClass =
   {
     (post.data.categories.length > 0 || post.data.tags.length > 0) && (
       <p class="taxonomy">
-        {post.data.categories.map((c) => (
-          <a href={localeUrl(locale, `category/${c}/`)}>{c}</a>
+        {categories.map((c) => (
+          <a href={localeUrl(locale, `category/${c.slug}/`)}>{c.title}</a>
         ))}
-        {post.data.tags.map((t) => (
-          <a href={localeUrl(locale, `tag/${t}/`)}>#{t}</a>
+        {tags.map((t) => (
+          <a href={localeUrl(locale, `tag/${t.slug}/`)}>#{t.title}</a>
         ))}
       </p>
     )

@@ -1,0 +1,34 @@
+---
+// Shared render for a tag archive — used by the root route (/tag/x/) and the
+// localized mirror (/es/tag/x/). The route files only differ in getStaticPaths.
+import type { CollectionEntry } from "astro:content";
+import Base from "../layouts/Base.astro";
+import Archive from "./Archive.astro";
+import { splitId, type Locale } from "../lib/i18n";
+import { entryAlternates } from "../lib/alternates";
+import { localePosts } from "../lib/routing";
+
+interface Props {
+  tag: CollectionEntry<"tags">;
+  locale: Locale;
+}
+
+const { tag, locale } = Astro.props;
+const stem = splitId(tag.id).slug;
+const posts = await localePosts(locale, (data) => data.tags.includes(stem));
+const alternates = await entryAlternates("tags", stem, "tag");
+---
+
+<Base
+  locale={locale}
+  alternates={alternates}
+  seo={{ title: `Tag: ${tag.data.title}`, description: tag.data.description }}
+>
+  <Archive
+    heading={`Tag: ${tag.data.title}`}
+    locale={locale}
+    posts={posts}
+    description={tag.data.description}
+    emptyText="No posts with this tag yet."
+  />
+</Base>

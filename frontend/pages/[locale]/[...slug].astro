@@ -1,36 +1,18 @@
 ---
-import Base from "../../layouts/Base.astro";
-import PageArticle from "../../components/PageArticle.astro";
-import { splitId, isLocale, DEFAULT_LOCALE } from "../../lib/i18n";
-import { entryAlternates } from "../../lib/alternates";
+import PagePage from "../../components/PagePage.astro";
 import { publishedPages } from "../../lib/routing";
+import { splitEntries } from "../../lib/paths";
 
 // Localized standalone Pages (/es/about/, /fr/about/). Non-default locales only.
 export async function getStaticPaths() {
-  const pages = await publishedPages();
-  return pages
-    .map((page) => ({ page, ...splitId(page.id) }))
-    .filter(({ locale }) => locale !== DEFAULT_LOCALE && isLocale(locale))
-    .map(({ page, locale, slug }) => ({
-      params: { locale, slug },
-      props: { page, locale },
-    }));
+  const { localized } = splitEntries(await publishedPages());
+  return localized.map(({ entry, locale, slug }) => ({
+    params: { locale, slug },
+    props: { page: entry, locale },
+  }));
 }
 
 const { page, locale } = Astro.props;
-const alternates = await entryAlternates("pages", splitId(page.id).slug, "");
 ---
 
-<Base
-  locale={locale}
-  alternates={alternates}
-  seo={{
-    title: page.data.title,
-    description: page.data.description,
-    ogType: "website",
-    ...(page.data.seo ?? {}),
-    ogImage: page.data.seo?.ogImage || page.data.featuredImage,
-  }}
->
-  <PageArticle page={page} />
-</Base>
+<PagePage page={page} locale={locale} />

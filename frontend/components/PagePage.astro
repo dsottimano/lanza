@@ -1,0 +1,31 @@
+---
+// Shared render for a standalone Page — used by the root route (/about/) and the
+// localized mirror (/es/about/). The route files only differ in getStaticPaths.
+import type { CollectionEntry } from "astro:content";
+import Base from "../layouts/Base.astro";
+import PageArticle from "./PageArticle.astro";
+import { splitId, type Locale } from "../lib/i18n";
+import { entryAlternates } from "../lib/alternates";
+
+interface Props {
+  page: CollectionEntry<"pages">;
+  locale: Locale;
+}
+
+const { page, locale } = Astro.props;
+const alternates = await entryAlternates("pages", splitId(page.id).slug, "");
+---
+
+<Base
+  locale={locale}
+  alternates={alternates}
+  seo={{
+    title: page.data.title,
+    description: page.data.description,
+    ogType: "website",
+    ...(page.data.seo ?? {}),
+    ogImage: page.data.seo?.ogImage || page.data.featuredImage,
+  }}
+>
+  <PageArticle page={page} />
+</Base>

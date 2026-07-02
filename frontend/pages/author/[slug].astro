@@ -1,40 +1,17 @@
 ---
 import { getCollection } from "astro:content";
-import Base from "../../layouts/Base.astro";
-import Archive from "../../components/Archive.astro";
+import AuthorPage from "../../components/AuthorPage.astro";
 import { DEFAULT_LOCALE } from "../../lib/i18n";
-import { allLocaleAlternates } from "../../lib/alternates";
-import { localePosts } from "../../lib/routing";
 
 // Authors are not localized (a name is language-neutral) — one flat folder, so
 // author.id is already the bare stem. The root archive lists default-locale (EN)
-// posts; ES/FR author archives come from [locale]/author/[slug].astro (Phase C).
+// posts; ES/FR author archives come from [locale]/author/[slug].astro.
 export async function getStaticPaths() {
   const authors = await getCollection("authors");
-  return authors.map((author) => ({
-    params: { slug: author.id },
-    props: { author },
-  }));
+  return authors.map((author) => ({ params: { slug: author.id }, props: { author } }));
 }
 
-const locale = DEFAULT_LOCALE;
 const { author } = Astro.props;
-const posts = await localePosts(locale, (data) => data.author === author.id);
-
-const alternates = allLocaleAlternates(`author/${author.id}/`);
 ---
 
-<Base
-  locale={locale}
-  alternates={alternates}
-  seo={{ title: author.data.title, description: author.data.bio }}
->
-  {author.data.avatar && <img src={author.data.avatar} alt={author.data.title} />}
-  <Archive
-    heading={author.data.title}
-    locale={locale}
-    posts={posts}
-    description={author.data.bio}
-    emptyText="No posts by this author yet."
-  />
-</Base>
+<AuthorPage author={author} locale={DEFAULT_LOCALE} />

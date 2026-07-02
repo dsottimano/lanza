@@ -1,0 +1,48 @@
+---
+// Shared render for a category archive — used by the root route (/category/x/)
+// and the localized mirror (/es/category/x/). The route files only differ in
+// getStaticPaths.
+import type { CollectionEntry } from "astro:content";
+import Base from "../layouts/Base.astro";
+import Archive from "./Archive.astro";
+import { splitId, localeUrl, type Locale } from "../lib/i18n";
+import { entryAlternates } from "../lib/alternates";
+import { localePosts } from "../lib/routing";
+import { categoryHierarchy } from "../lib/taxonomy";
+
+interface Props {
+  category: CollectionEntry<"categories">;
+  locale: Locale;
+}
+
+const { category, locale } = Astro.props;
+const stem = splitId(category.id).slug;
+
+const posts = await localePosts(locale, (data) => data.categories.includes(stem));
+const { parent, children } = await categoryHierarchy(locale, stem, category.data.parent);
+const alternates = await entryAlternates("categories", stem, "category");
+---
+
+<Base
+  locale={locale}
+  alternates={alternates}
+  seo={{
+    title: `Category: ${category.data.title}`,
+    description: category.data.description,
+  }}
+>
+  <Archive
+    heading={`Category: ${category.data.title}`}
+    locale={locale}
+    posts={posts}
+    description={category.data.description}
+    emptyText="No posts in this category yet."
+    breadcrumb={parent
+      ? { url: localeUrl(locale, `category/${parent.slug}/`), label: parent.title }
+      : undefined}
+    childLinks={children.map((c) => ({
+      url: localeUrl(locale, `category/${c.slug}/`),
+      label: c.title,
+    }))}
+  />
+</Base>

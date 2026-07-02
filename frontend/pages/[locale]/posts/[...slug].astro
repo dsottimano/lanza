@@ -1,66 +1,18 @@
 ---
-import { getEntry } from "astro:content";
-import Base from "../../../layouts/Base.astro";
-import PostArticle from "../../../components/PostArticle.astro";
-import { splitId, isLocale, DEFAULT_LOCALE } from "../../../lib/i18n";
-import { entryAlternates } from "../../../lib/alternates";
+import PostPage from "../../../components/PostPage.astro";
 import { publishedPosts } from "../../../lib/routing";
-import type { ArticleInput } from "../../../lib/jsonld";
+import { splitEntries } from "../../../lib/paths";
 
 // Localized posts (/es/posts/x/, /fr/posts/x/). Non-default locales only.
 export async function getStaticPaths() {
-  const posts = await publishedPosts();
-  return posts
-    .map((post) => ({ post, ...splitId(post.id) }))
-    .filter(({ locale }) => locale !== DEFAULT_LOCALE && isLocale(locale))
-    .map(({ post, locale, slug }) => ({
-      params: { locale, slug },
-      props: { post, locale },
-    }));
+  const { localized } = splitEntries(await publishedPosts());
+  return localized.map(({ entry, locale, slug }) => ({
+    params: { locale, slug },
+    props: { post: entry, locale },
+  }));
 }
 
 const { post, locale } = Astro.props;
-const alternates = await entryAlternates("posts", splitId(post.id).slug, "posts");
-
-const siteUrl = (Astro.site ?? new URL("/", Astro.url)).href.replace(/\/$/, "");
-const url = new URL(Astro.url.pathname, siteUrl + "/").href;
-
-const ogImage = post.data.seo?.ogImage || post.data.featuredImage;
-
-// Authors are shared (not localized) — resolve by stem from the authors folder.
-const authorEntry = post.data.author
-  ? await getEntry("authors", post.data.author)
-  : undefined;
-const authorName = authorEntry?.data.title || post.data.seo?.author;
-
-const article: ArticleInput = {
-  title: post.data.title,
-  description: post.data.description,
-  image: ogImage,
-  datePublished: post.data.pubDate.toISOString(),
-  dateModified: (post.data.updatedDate ?? post.data.pubDate).toISOString(),
-  author: authorName,
-  url,
-};
 ---
 
-<Base
-  locale={locale}
-  alternates={alternates}
-  seo={{
-    title: post.data.title,
-    description: post.data.description,
-    ogType: "article",
-    ...(post.data.seo ?? {}),
-    ogImage,
-  }}
-  article={article}
->
-  <PostArticle
-    post={post}
-    locale={locale}
-    author={authorName
-      ? { name: authorName, slug: authorEntry ? post.data.author : undefined }
-      : undefined}
-  />
-</Base>
+<PostPage post={post} locale={locale} />

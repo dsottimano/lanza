@@ -3,14 +3,11 @@
 // An Astro endpoint, not a node script, so it reuses the content collections
 // and the exact same draft filter as the public pages. Static + cacheable.
 import type { APIRoute } from "astro";
-import { getCollection } from "astro:content";
 import { splitId, localeUrl, isLocale, DEFAULT_LOCALE } from "../lib/i18n";
 import { getSeoDefaults } from "../lib/site";
+import { publishedPosts, publishedPages } from "../lib/routing";
 
 const seoDefaults = getSeoDefaults(DEFAULT_LOCALE);
-
-const isPublic = ({ data }: { data: { draft?: boolean } }) =>
-  import.meta.env.PROD ? data.draft !== true : true;
 
 const item = (title: string, url: string, desc?: string) =>
   `- [${title}](${url})${desc ? `: ${desc}` : ""}`;
@@ -18,10 +15,10 @@ const item = (title: string, url: string, desc?: string) =>
 export const GET: APIRoute = async ({ site }) => {
   const origin = (site ?? new URL("http://localhost/")).href.replace(/\/$/, "");
 
-  const posts = (await getCollection("posts", isPublic)).sort(
+  const posts = (await publishedPosts()).sort(
     (a, b) => +b.data.pubDate - +a.data.pubDate,
   );
-  const pages = (await getCollection("pages", isPublic)).sort((a, b) =>
+  const pages = (await publishedPages()).sort((a, b) =>
     a.data.title.localeCompare(b.data.title),
   );
 

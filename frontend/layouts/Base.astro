@@ -1,12 +1,12 @@
 ---
 import "../styles/site.css";
 import Seo from "../components/Seo.astro";
-import { getCollection } from "astro:content";
 import appearance from "../data/appearance.json";
 import type { PageSeo } from "../lib/seo";
 import type { ArticleInput } from "../lib/jsonld";
-import { splitId, localeUrl, LOCALE_LABEL, DEFAULT_LOCALE, type Locale } from "../lib/i18n";
+import { localeUrl, LOCALE_LABEL, DEFAULT_LOCALE, type Locale } from "../lib/i18n";
 import { getMenu, getSeoDefaults } from "../lib/site";
+import { fallbackNav } from "../lib/routing";
 import type { Alternate } from "../lib/alternates";
 
 interface Props {
@@ -32,18 +32,7 @@ const homeUrl = localeUrl(locale, "");
 // back to auto-listing this locale's published Pages so the nav is never blank.
 let navItems = getMenu(locale).items ?? [];
 if (navItems.length === 0) {
-  const pages = (
-    await getCollection("pages", ({ data }) =>
-      import.meta.env.PROD ? data.draft !== true : true,
-    )
-  )
-    .map((p) => ({ p, ...splitId(p.id) }))
-    .filter((x) => x.locale === locale)
-    .sort((a, b) => a.p.data.title.localeCompare(b.p.data.title));
-  navItems = [
-    { label: "Home", url: homeUrl },
-    ...pages.map(({ p, slug }) => ({ label: p.data.title, url: localeUrl(locale, `${slug}/`) })),
-  ];
+  navItems = [{ label: "Home", url: homeUrl }, ...(await fallbackNav(locale))];
 }
 ---
 

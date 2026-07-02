@@ -8,6 +8,15 @@ interface Props {
 }
 
 const { blocks } = Astro.props;
+
+// Block URLs are plain CMS strings (git-edited) — guard the href at render time
+// so a `javascript:`/`data:` scheme can't survive. Allow http(s), mailto, tel,
+// and site-relative paths (`/…`, not protocol-relative `//`); else drop to "#".
+function safeHref(url: string): string {
+  if (/^(https?:|mailto:|tel:)/i.test(url)) return url;
+  if (url.startsWith("/") && !url.startsWith("//")) return url;
+  return "#";
+}
 ---
 
 {
@@ -19,7 +28,7 @@ const { blocks } = Astro.props;
           <h2>{block.heading}</h2>
           {block.subheading && <p>{block.subheading}</p>}
           {block.ctaText && block.ctaUrl && (
-            <a class="button" href={block.ctaUrl}>
+            <a class="button" href={safeHref(block.ctaUrl)}>
               {block.ctaText}
             </a>
           )}
@@ -53,7 +62,7 @@ const { blocks } = Astro.props;
         <section class="block block-cta">
           {block.heading && <h2>{block.heading}</h2>}
           {block.text && <p>{block.text}</p>}
-          <a class="button" href={block.buttonUrl}>
+          <a class="button" href={safeHref(block.buttonUrl)}>
             {block.buttonText}
           </a>
         </section>

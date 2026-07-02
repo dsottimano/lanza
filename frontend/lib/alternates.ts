@@ -4,6 +4,7 @@
 // alternates are the same stem found under other locale folders.
 import { getCollection } from "astro:content";
 import { LOCALES, splitId, localeUrl, type Locale } from "./i18n";
+import { isPublished } from "./routing";
 
 export interface Alternate {
   locale: Locale;
@@ -21,7 +22,13 @@ const localeIndexCache = new Map<LocalizedCollection, Promise<Map<string, Set<Lo
 function localeIndex(collection: LocalizedCollection): Promise<Map<string, Set<Locale>>> {
   let pending = localeIndexCache.get(collection);
   if (!pending) {
-    pending = getCollection(collection).then((entries) => {
+    // Same publish gate the routes use (routing.ts) so hreflang/switcher links
+    // never point at a draft translation that was excluded from the build → 404.
+    // For categories/tags (no draft field) isPublished is always true, so this
+    // is a no-op there.
+    pending = getCollection(collection, ({ data }) =>
+      "draft" in data ? isPublished(data) : true,
+    ).then((entries) => {
       const index = new Map<string, Set<Locale>>();
       for (const e of entries) {
         const { locale, slug } = splitId(e.id);

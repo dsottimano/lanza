@@ -1,0 +1,22 @@
+---
+// Shared render for a locale homepage — used by the root route (/) and the
+// localized mirror (/es/). Lists that locale's posts. Route files differ only in
+// getStaticPaths.
+import Base from "../layouts/Base.astro";
+import Archive from "./Archive.astro";
+import { type Locale } from "../lib/i18n";
+import { allLocaleAlternates } from "../lib/alternates";
+import { localePosts } from "../lib/routing";
+
+interface Props {
+  locale: Locale;
+}
+
+const { locale } = Astro.props;
+const posts = await localePosts(locale);
+const alternates = allLocaleAlternates("");
+---
+
+<Base locale={locale} alternates={alternates}>
+  <Archive heading="Posts" locale={locale} posts={posts} showDrafts />
+</Base>

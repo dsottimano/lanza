@@ -3,11 +3,11 @@
 // "posts in this locale, newest first" query. Keeping the gate in ONE place
 // means a change to the publish rule can't drift between routes.
 import { getCollection, type CollectionEntry } from "astro:content";
-import { splitId, type Locale } from "./i18n";
+import { splitId, localeUrl, type Locale } from "./i18n";
 
 // Drafts are visible in dev and hidden in the production build. This is the
 // single source of truth for the publish gate (was copy-pasted into ~10 routes).
-const isPublished = (data: { draft?: boolean }): boolean =>
+export const isPublished = (data: { draft?: boolean }): boolean =>
   import.meta.env.PROD ? data.draft !== true : true;
 
 /** Published posts (draft-gated), across all locales — for getStaticPaths. */
@@ -35,4 +35,24 @@ export async function localePosts(
   return posts
     .filter((p) => splitId(p.id).locale === locale)
     .sort((a, b) => b.data.pubDate.valueOf() - a.data.pubDate.valueOf());
+}
+
+// Fallback nav for when a locale's CMS menu is empty: this locale's published
+// pages, title-sorted, as {label,url}. Memoized per locale for the whole build
+// (alternates.ts cache pattern) so every page render doesn't re-query pages.
+const fallbackNavCache = new Map<Locale, Promise<{ label: string; url: string }[]>>();
+
+export function fallbackNav(locale: Locale): Promise<{ label: string; url: string }[]> {
+  let pending = fallbackNavCache.get(locale);
+  if (!pending) {
+    pending = publishedPages().then((pages) =>
+      pages
+        .map((p) => ({ p, ...splitId(p.id) }))
+        .filter((x) => x.locale === locale)
+        .sort((a, b) => a.p.data.title.localeCompare(b.p.data.title))
+        .map(({ p, slug }) => ({ label: p.data.title, url: localeUrl(locale, `${slug}/`) })),
+    );
+    fallbackNavCache.set(locale, pending);
+  }
+  return pending;
 }

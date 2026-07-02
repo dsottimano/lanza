@@ -33,9 +33,9 @@ const hreflangs = alternates.length > 1 ? alternates : [];
 const xDefault = hreflangs.find((a) => a.locale === DEFAULT_LOCALE);
 
 const graph = buildGraph([
-  websiteSchema(siteUrl),
-  organizationSchema(siteUrl),
-  article ? articleSchema(article, siteUrl) : null,
+  websiteSchema(siteUrl, locale),
+  organizationSchema(siteUrl, locale),
+  article ? articleSchema(article, siteUrl, locale) : null,
 ]);
 ---
 

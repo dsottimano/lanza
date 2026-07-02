@@ -1,63 +1,17 @@
 ---
 import { getCollection } from "astro:content";
-import Base from "../../layouts/Base.astro";
-import Archive from "../../components/Archive.astro";
-import { splitId, localeUrl, DEFAULT_LOCALE } from "../../lib/i18n";
-import { entryAlternates } from "../../lib/alternates";
-import { localePosts } from "../../lib/routing";
+import CategoryPage from "../../components/CategoryPage.astro";
+import { DEFAULT_LOCALE } from "../../lib/i18n";
+import { splitEntries } from "../../lib/paths";
 
 // Default-locale (EN) category archives at /category/<stem>/. Posts store bare
-// term stems (no locale), so we match on the stem within the default locale.
-// ES/FR archives come from [locale]/category/[slug].astro (Phase C).
+// term stems (no locale). ES/FR archives come from [locale]/category/[slug].astro.
 export async function getStaticPaths() {
-  const categories = await getCollection("categories");
-  return categories
-    .map((category) => ({ category, ...splitId(category.id) }))
-    .filter(({ locale }) => locale === DEFAULT_LOCALE)
-    .map(({ category, slug }) => ({ params: { slug }, props: { category } }));
+  const { root } = splitEntries(await getCollection("categories"));
+  return root.map(({ entry, slug }) => ({ params: { slug }, props: { category: entry } }));
 }
 
-const locale = DEFAULT_LOCALE;
 const { category } = Astro.props;
-const stem = splitId(category.id).slug;
-
-const posts = await localePosts(locale, (data) => data.categories.includes(stem));
-
-// Hierarchy: resolve the parent (breadcrumb) and any child categories. `parent`
-// is stored as a bare category stem; compare against this locale's terms.
-const allCategories = (await getCollection("categories"))
-  .map((c) => ({ entry: c, ...splitId(c.id) }))
-  .filter((c) => c.locale === locale);
-const parent = category.data.parent
-  ? allCategories.find((c) => c.slug === category.data.parent)
-  : undefined;
-const children = allCategories
-  .filter((c) => c.entry.data.parent === stem)
-  .sort((a, b) => a.entry.data.title.localeCompare(b.entry.data.title));
-
-const alternates = await entryAlternates("categories", stem, "category");
 ---
 
-<Base
-  locale={locale}
-  alternates={alternates}
-  seo={{
-    title: `Category: ${category.data.title}`,
-    description: category.data.description,
-  }}
->
-  <Archive
-    heading={`Category: ${category.data.title}`}
-    locale={locale}
-    posts={posts}
-    description={category.data.description}
-    emptyText="No posts in this category yet."
-    breadcrumb={parent
-      ? { url: localeUrl(locale, `category/${parent.slug}/`), label: parent.entry.data.title }
-      : undefined}
-    childLinks={children.map((c) => ({
-      url: localeUrl(locale, `category/${c.slug}/`),
-      label: c.entry.data.title,
-    }))}
-  />
-</Base>
+<CategoryPage category={category} locale={DEFAULT_LOCALE} />

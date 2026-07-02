@@ -1,0 +1,64 @@
+---
+// Shared render for a single post — used by both the root route (/posts/x/) and
+// the localized mirror (/es/posts/x/). The route files only differ in
+// getStaticPaths (see frontend/lib/paths.ts); everything below is identical.
+import type { CollectionEntry } from "astro:content";
+import { getEntry } from "astro:content";
+import Base from "../layouts/Base.astro";
+import PostArticle from "./PostArticle.astro";
+import { splitId, type Locale } from "../lib/i18n";
+import { entryAlternates } from "../lib/alternates";
+import type { ArticleInput } from "../lib/jsonld";
+
+interface Props {
+  post: CollectionEntry<"posts">;
+  locale: Locale;
+}
+
+const { post, locale } = Astro.props;
+const alternates = await entryAlternates("posts", splitId(post.id).slug, "posts");
+
+const siteUrl = (Astro.site ?? new URL("/", Astro.url)).href.replace(/\/$/, "");
+const url = new URL(Astro.url.pathname, siteUrl + "/").href;
+
+// Featured image doubles as the social/og image and JSON-LD article image.
+const ogImage = post.data.seo?.ogImage || post.data.featuredImage;
+
+// Resolve the author relation to its display name (falls back to seo.author).
+// Authors are shared (not localized) — resolved by stem from the authors folder.
+const authorEntry = post.data.author
+  ? await getEntry("authors", post.data.author)
+  : undefined;
+const authorName = authorEntry?.data.title || post.data.seo?.author;
+
+const article: ArticleInput = {
+  title: post.data.title,
+  description: post.data.description,
+  image: ogImage,
+  datePublished: post.data.pubDate.toISOString(),
+  dateModified: (post.data.updatedDate ?? post.data.pubDate).toISOString(),
+  author: authorName,
+  url,
+};
+---
+
+<Base
+  locale={locale}
+  alternates={alternates}
+  seo={{
+    title: post.data.title,
+    description: post.data.description,
+    ogType: "article",
+    ...(post.data.seo ?? {}),
+    ogImage,
+  }}
+  article={article}
+>
+  <PostArticle
+    post={post}
+    locale={locale}
+    author={authorName
+      ? { name: authorName, slug: authorEntry ? post.data.author : undefined }
+      : undefined}
+  />
+</Base>

@@ -1,24 +1,13 @@
 ---
-import Base from "../../layouts/Base.astro";
-import Archive from "../../components/Archive.astro";
-import { LOCALES, DEFAULT_LOCALE, type Locale } from "../../lib/i18n";
-import { allLocaleAlternates } from "../../lib/alternates";
-import { localePosts } from "../../lib/routing";
+import HomePage from "../../components/HomePage.astro";
+import { otherLocales } from "../../lib/paths";
 
 // Localized homepage (/es/, /fr/). One per non-default locale.
 export async function getStaticPaths() {
-  return LOCALES.filter((l) => l !== DEFAULT_LOCALE).map((locale) => ({
-    params: { locale },
-    props: { locale },
-  }));
+  return otherLocales().map((locale) => ({ params: { locale }, props: { locale } }));
 }
 
-const { locale } = Astro.props as { locale: Locale };
-const posts = await localePosts(locale);
-
-const alternates = allLocaleAlternates("");
+const { locale } = Astro.props;
 ---
 
-<Base locale={locale} alternates={alternates}>
-  <Archive heading="Posts" locale={locale} posts={posts} showDrafts />
-</Base>
+<HomePage locale={locale} />

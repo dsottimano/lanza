@@ -1,15 +1,12 @@
 import { absUrl } from "./seo";
 import { getSeoDefaults } from "./site";
-import { DEFAULT_LOCALE } from "./i18n";
-
-// Publisher identity (organization, site name) is global — take it from the
-// default-locale SEO defaults.
-const seoDefaults = getSeoDefaults(DEFAULT_LOCALE);
+import { DEFAULT_LOCALE, type Locale } from "./i18n";
 
 type Node = Record<string, unknown>;
 
-/** Organization node — the site's publisher identity. */
-export function organizationSchema(siteUrl: string): Node {
+/** Organization node — the site's publisher identity, in the page's locale. */
+export function organizationSchema(siteUrl: string, locale: Locale = DEFAULT_LOCALE): Node {
+  const seoDefaults = getSeoDefaults(locale);
   const org = seoDefaults.organization;
   return {
     "@type": "Organization",
@@ -21,13 +18,13 @@ export function organizationSchema(siteUrl: string): Node {
   };
 }
 
-/** WebSite node, linked to the Organization as publisher. */
-export function websiteSchema(siteUrl: string): Node {
+/** WebSite node, linked to the Organization as publisher, in the page's locale. */
+export function websiteSchema(siteUrl: string, locale: Locale = DEFAULT_LOCALE): Node {
   return {
     "@type": "WebSite",
     "@id": `${siteUrl}#website`,
     url: `${siteUrl}/`,
-    name: seoDefaults.siteName,
+    name: getSeoDefaults(locale).siteName,
     publisher: { "@id": `${siteUrl}#organization` },
   };
 }
@@ -46,7 +43,8 @@ export interface ArticleInput {
 }
 
 /** BlogPosting node, auto-derived from a post's frontmatter. */
-export function articleSchema(a: ArticleInput, siteUrl: string): Node {
+export function articleSchema(a: ArticleInput, siteUrl: string, locale: Locale = DEFAULT_LOCALE): Node {
+  const seoDefaults = getSeoDefaults(locale);
   return {
     "@type": "BlogPosting",
     "@id": `${a.url}#article`,

@@ -1,17 +1,9 @@
 ---
-import Base from "../layouts/Base.astro";
-import Archive from "../components/Archive.astro";
+import HomePage from "../components/HomePage.astro";
 import { DEFAULT_LOCALE } from "../lib/i18n";
-import { allLocaleAlternates } from "../lib/alternates";
-import { localePosts } from "../lib/routing";
 
 // The root homepage lists default-locale (EN) posts; ES/FR have their own
 // homepage ([locale]/index.astro).
-const posts = await localePosts(DEFAULT_LOCALE);
-
-const alternates = allLocaleAlternates("");
 ---
 
-<Base locale={DEFAULT_LOCALE} alternates={alternates}>
-  <Archive heading="Posts" locale={DEFAULT_LOCALE} posts={posts} showDrafts />
-</Base>
+<HomePage locale={DEFAULT_LOCALE} />

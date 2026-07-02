@@ -1,61 +1,18 @@
 ---
 import { getCollection } from "astro:content";
-import Base from "../../../layouts/Base.astro";
-import Archive from "../../../components/Archive.astro";
-import { splitId, localeUrl, isLocale, DEFAULT_LOCALE } from "../../../lib/i18n";
-import { entryAlternates } from "../../../lib/alternates";
-import { localePosts } from "../../../lib/routing";
+import CategoryPage from "../../../components/CategoryPage.astro";
+import { splitEntries } from "../../../lib/paths";
 
 // Localized category archives (/es/category/x/). Non-default locales only.
 export async function getStaticPaths() {
-  const categories = await getCollection("categories");
-  return categories
-    .map((category) => ({ category, ...splitId(category.id) }))
-    .filter(({ locale }) => locale !== DEFAULT_LOCALE && isLocale(locale))
-    .map(({ category, locale, slug }) => ({
-      params: { locale, slug },
-      props: { category, locale },
-    }));
+  const { localized } = splitEntries(await getCollection("categories"));
+  return localized.map(({ entry, locale, slug }) => ({
+    params: { locale, slug },
+    props: { category: entry, locale },
+  }));
 }
 
 const { category, locale } = Astro.props;
-const stem = splitId(category.id).slug;
-
-const posts = await localePosts(locale, (data) => data.categories.includes(stem));
-
-const allCategories = (await getCollection("categories"))
-  .map((c) => ({ entry: c, ...splitId(c.id) }))
-  .filter((c) => c.locale === locale);
-const parent = category.data.parent
-  ? allCategories.find((c) => c.slug === category.data.parent)
-  : undefined;
-const children = allCategories
-  .filter((c) => c.entry.data.parent === stem)
-  .sort((a, b) => a.entry.data.title.localeCompare(b.entry.data.title));
-
-const alternates = await entryAlternates("categories", stem, "category");
 ---
 
-<Base
-  locale={locale}
-  alternates={alternates}
-  seo={{
-    title: `Category: ${category.data.title}`,
-    description: category.data.description,
-  }}
->
-  <Archive
-    heading={`Category: ${category.data.title}`}
-    locale={locale}
-    posts={posts}
-    description={category.data.description}
-    emptyText="No posts in this category yet."
-    breadcrumb={parent
-      ? { url: localeUrl(locale, `category/${parent.slug}/`), label: parent.entry.data.title }
-      : undefined}
-    childLinks={children.map((c) => ({
-      url: localeUrl(locale, `category/${c.slug}/`),
-      label: c.entry.data.title,
-    }))}
-  />
-</Base>
+<CategoryPage category={category} locale={locale} />
