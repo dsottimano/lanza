@@ -43,6 +43,13 @@ build, so a bare `npm run dev` won't serve `/admin` until you've built it
   as the `GITHUB_TOKEN` Pages secret (fine-grained PAT, **Contents: read &
   write** on this repo). For local dev, put it in `admin/.env` (see
   `admin/.sample.env`).
+- The Site Health / provisioning diagnostics reach the Cloudflare API the same
+  way, through the `/admin/api/cf` proxy. Set three Pages secrets:
+  `CLOUDFLARE_API_TOKEN` (Account token scoped to **Workers KV Storage:Edit,
+  D1:Edit, Workers R2 Storage:Edit, Cloudflare Pages:Edit** — nothing more),
+  `CLOUDFLARE_ACCOUNT_ID`, and `PAGES_PROJECT`. For local dev they go in
+  `admin/.env` too. If they're unset the proxy returns a 503 and the CMS shows a
+  "not configured" panel instead of erroring.
 - **Drafts:** new entries default to `draft: true` and stay off the live site
   until you flip *Published* and save.
 - **Collections, fields, and settings** are all defined in one place —
@@ -75,6 +82,20 @@ The CMS never holds a GitHub token; every write reaches GitHub through the
 **CSRF** is mitigated by a same-origin check on state-changing methods (a write
 whose `Origin` host differs from the request host is rejected) layered on Access.
 The proxy also strips GitHub's token-scope and rate-limit headers from responses.
+
+The **Cloudflare API proxy** (`/admin/api/cf`, `functions/_lib/cf-proxy.ts` shared
+by the prod Pages Function and the dev Vite middleware) follows the identical
+posture for the Site Health / provisioning features. `CLOUDFLARE_API_TOKEN` is an
+Account token scoped to only **Workers KV Storage:Edit, D1:Edit, Workers R2
+Storage:Edit, Cloudflare Pages:Edit** — it can touch nothing else. The client
+never learns the account ID or project name: it always sends the literal `self`
+placeholder for both (`accounts/self/…`, `pages/projects/self`), and the proxy
+substitutes `CLOUDFLARE_ACCOUNT_ID` / `PAGES_PROJECT` server-side — the account ID
+*after* the allowlist check (it's a secret and never takes part in the match), the
+project name *before* it (it's public and the allowlist pins that one project).
+The same method+path allowlist (only the KV/D1/R2/Pages endpoints the CMS calls),
+the same dot-segment rejection, and the same cross-origin write check apply; the
+proxy strips Cloudflare's rate-limit headers from responses.
 
 ## Deploy to Cloudflare Pages
 
