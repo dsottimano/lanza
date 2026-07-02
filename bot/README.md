@@ -40,6 +40,17 @@ This bot holds a repo-write token, so it's locked down three ways (all fail clos
   empty list silently drops all updates. Set it to your chat ID before use.
 - Internal/API errors are logged server-side only; users get a generic message.
 
+## Hardening
+
+The webhook URL is public and unguarded before the secret-token check, so a flood
+of bogus requests still gets a (cheap) 401 — but each one bills against the shared
+100k req/day Workers free quota. To blunt that:
+
+- Add a **Cloudflare WAF rate-limiting rule** on the worker route (e.g. cap
+  requests per IP), and/or
+- Register the webhook on an **unguessable secret path segment**
+  (`.../workers.dev/<random>`) so scanners can't find it.
+
 ## Extending to full CRUD
 
 Update/delete use the same Contents API: `GET .../contents/{path}` for the blob

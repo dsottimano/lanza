@@ -22,14 +22,15 @@ function allowedChatIds(env: Env): Set<number> {
 }
 
 function slugify(input: string): string {
-  return (
-    input
-      .toLowerCase()
-      .trim()
-      .replace(/[^a-z0-9]+/g, "-")
-      .replace(/^-+|-+$/g, "")
-      .slice(0, 60) || "untitled"
-  );
+  const slug = input
+    .toLowerCase()
+    .trim()
+    .replace(/[^a-z0-9]+/g, "-")
+    .replace(/^-+|-+$/g, "")
+    .slice(0, 60);
+  // Non-Latin titles (CJK/Cyrillic/Arabic) reduce to empty; date-stamp them so
+  // drafts stay identifiable instead of piling up as untitled.md.
+  return slug || `draft-${new Date().toISOString().slice(0, 10)}`;
 }
 
 /** UTF-8 safe base64 (btoa alone mangles multi-byte chars). */
@@ -41,7 +42,10 @@ function utf8ToBase64(str: string): string {
 }
 
 function draftMarkdown(title: string, body: string): string {
-  const safeTitle = title.replace(/"/g, '\\"');
+  // Escape backslashes first, then quotes: inside a double-quoted YAML scalar a
+  // lone `\` starts an escape sequence, so a trailing/embedded backslash would
+  // otherwise corrupt the frontmatter (e.g. swallow the closing quote).
+  const safeTitle = title.replace(/\\/g, "\\\\").replace(/"/g, '\\"');
   return [
     "---",
     `title: "${safeTitle}"`,
@@ -142,6 +146,17 @@ function buildBot(env: Env): Bot {
   return bot;
 }
 
+// env is stable per deployment, so build the bot (and its webhook handler) once
+// and reuse it across requests instead of re-parsing BOT_INFO every time. env
+// isn't available at module scope, so init lazily on the first request.
+type WebhookHandler = (request: Request) => Promise<Response>;
+let handler: WebhookHandler | undefined;
+
+function getHandler(env: Env): WebhookHandler {
+  if (!handler) handler = webhookCallback(buildBot(env), "cloudflare-mod");
+  return handler;
+}
+
 export default {
   async fetch(request: Request, env: Env): Promise<Response> {
     if (request.method !== "POST") return new Response("ok");
@@ -153,6 +168,15 @@ export default {
     ) {
       return new Response("unauthorized", { status: 401 });
     }
-    return webhookCallback(buildBot(env), "cloudflare-mod")(request);
+    let webhook: WebhookHandler;
+    try {
+      webhook = getHandler(env);
+    } catch (err) {
+      // Misconfig (e.g. malformed BOT_INFO JSON). Log once, return a terse 500 —
+      // never leak the underlying error or any secret to the caller.
+      console.error("bot init failed:", err);
+      return new Response("misconfigured", { status: 500 });
+    }
+    return webhook(request);
   },
 };
