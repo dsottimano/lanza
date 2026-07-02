@@ -129,6 +129,51 @@ a {
   color: var(--muted);
   font-size: 0.85rem;
 }
+.footer-nav {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 1.2rem;
+  margin-bottom: 1rem;
+}
+.footer-nav a {
+  color: var(--muted);
+  text-decoration: none;
+  font-size: 0.9rem;
+  font-weight: var(--nav-weight);
+  text-transform: var(--nav-transform);
+  letter-spacing: 0.01em;
+}
+.footer-nav a:hover {
+  color: var(--ink);
+}
+.footer-copy {
+  margin: 0;
+}
+
+/* ── per-device menus ──────────────────────────────────────────────────────
+   Header/footer render one nav per distinct device group (see Base.astro +
+   lib/site.ts groupByDevice), so devices that inherit share markup. A nav
+   tagged `.resp` is hidden until a breakpoint matching one of its `.at-*`
+   classes reveals it — pure CSS, no JS. Menus where every device resolves to
+   the same list skip `.resp` entirely and stay always-visible. */
+.resp {
+  display: none;
+}
+@media (max-width: 640px) {
+  .resp.at-mobile {
+    display: flex;
+  }
+}
+@media (min-width: 641px) and (max-width: 1024px) {
+  .resp.at-tablet {
+    display: flex;
+  }
+}
+@media (min-width: 1025px) {
+  .resp.at-desktop {
+    display: flex;
+  }
+}
 
 /* ── content column + per-page layout ──────────────────────────────────── */
 main {

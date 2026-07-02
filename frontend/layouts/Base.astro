@@ -5,7 +5,7 @@ import appearance from "../data/appearance.json";
 import type { PageSeo } from "../lib/seo";
 import type { ArticleInput } from "../lib/jsonld";
 import { localeUrl, LOCALE_LABEL, DEFAULT_LOCALE, type Locale } from "../lib/i18n";
-import { getMenu, getSeoDefaults } from "../lib/site";
+import { getMenu, getSeoDefaults, groupByDevice, menuIsEmpty, type Device } from "../lib/site";
 import { fallbackNav } from "../lib/routing";
 import type { Alternate } from "../lib/alternates";
 
@@ -28,11 +28,27 @@ const siteName = getSeoDefaults(locale).siteName || "Site";
 const year = new Date().getFullYear();
 const homeUrl = localeUrl(locale, "");
 
-// Nav comes from the editable per-locale Settings → Menu. If it's empty, fall
-// back to auto-listing this locale's published Pages so the nav is never blank.
-let navItems = getMenu(locale).items ?? [];
-if (navItems.length === 0) {
-  navItems = [{ label: "Home", url: homeUrl }, ...(await fallbackNav(locale))];
+// Nav comes from the editable per-locale Settings → Menu — WordPress-style menu
+// locations (header/footer), each with a per-device menu (tablet/mobile inherit
+// desktop unless customized). groupByDevice dedupes inherited devices so we emit
+// one <nav> per distinct list, revealed at its breakpoints by CSS (.resp/.at-*).
+const menu = getMenu(locale);
+
+// Header: if no header menu is defined at all, fall back to auto-listing this
+// locale's published Pages so the nav is never blank.
+let header = menu.header;
+if (menuIsEmpty(header)) {
+  const items = [{ label: "Home", url: homeUrl }, ...(await fallbackNav(locale))];
+  header = { desktop: items, tablet: null, mobile: null };
+}
+const headerGroups = groupByDevice(header);
+const footerGroups = menuIsEmpty(menu.footer) ? [] : groupByDevice(menu.footer);
+
+// One group ⇒ every device shares one list ⇒ a plain always-visible nav. Two or
+// three groups ⇒ each nav is `.resp` + one `.at-<device>` per device it serves.
+function navClasses(base: string, groups: unknown[], devices: Device[]): string[] {
+  if (groups.length <= 1) return [base];
+  return [base, "resp", ...devices.map((d) => `at-${d}`)];
 }
 ---
 
@@ -49,9 +65,13 @@ if (navItems.length === 0) {
         <a class="brand" href={homeUrl}>
           {logo ? <img class="brand-logo" src={logo} alt={siteName} /> : siteName}
         </a>
-        <nav class="site-nav">
-          {navItems.map((item) => <a href={item.url}>{item.label}</a>)}
-        </nav>
+        {
+          headerGroups.map((g) => (
+            <nav class:list={navClasses("site-nav", headerGroups, g.devices)}>
+              {g.items.map((item) => <a href={item.url}>{item.label}</a>)}
+            </nav>
+          ))
+        }
         {
           alternates.length > 1 && (
             <nav class="lang-switch" aria-label="Language">
@@ -71,7 +91,16 @@ if (navItems.length === 0) {
     <slot />
 
     <footer class="site-footer">
-      <div class="bar">© {year} {siteName}</div>
+      <div class="bar">
+        {
+          footerGroups.map((g) => (
+            <nav class:list={navClasses("footer-nav", footerGroups, g.devices)} aria-label="Footer">
+              {g.items.map((item) => <a href={item.url}>{item.label}</a>)}
+            </nav>
+          ))
+        }
+        <p class="footer-copy">© {year} {siteName}</p>
+      </div>
     </footer>
 
     {/* Agent surface: window.lanza read API (see public/lanza.js). Static, deferred, cached site-wide. */}

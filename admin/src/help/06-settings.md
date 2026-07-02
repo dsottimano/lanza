@@ -14,9 +14,14 @@ Per-entry SEO (in the editor's settings drawer) always overrides these.
 
 ## Menu — *per language*
 
-The site's navigation links. Each language has its own menu, so you can point the
-Spanish menu at `/es/…` URLs with translated labels. If a language's menu is left
-empty, the site auto-lists that language's Pages.
+The site's navigation links. Pick a **location** (Header or Footer), then set its
+links — each is just a label and a URL, one per row. Each language has its own
+menus, so you can point the Spanish menu at `/es/…` URLs with translated labels.
+
+Each location also has **Desktop / Tablet / Mobile** menus. Tablet and mobile
+follow the desktop menu by default; untick **Same as desktop** to give a device
+its own shorter list (handy for trimming a long menu on phones). If the header
+location is left empty, the site auto-lists that language's Pages.
 
 ## Languages — *global*
 

@@ -1,6 +1,26 @@
 {
-  "items": [
-    { "label": "Home", "url": "/" },
-    { "label": "About", "url": "/about/" }
-  ]
+  "locations": {
+    "header": {
+      "desktop": [
+        { "label": "Home", "url": "/" },
+        { "label": "About", "url": "/about/" },
+        { "label": "Blog", "url": "/blog/" },
+        { "label": "Contact", "url": "/contact/" }
+      ],
+      "tablet": null,
+      "mobile": [
+        { "label": "Home", "url": "/" },
+        { "label": "Blog", "url": "/blog/" }
+      ]
+    },
+    "footer": {
+      "desktop": [
+        { "label": "About", "url": "/about/" },
+        { "label": "Contact", "url": "/contact/" },
+        { "label": "Privacy", "url": "/privacy/" }
+      ],
+      "tablet": null,
+      "mobile": null
+    }
+  }
 }
