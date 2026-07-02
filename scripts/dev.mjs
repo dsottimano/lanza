@@ -19,13 +19,20 @@ const here = (p) => new URL(p, import.meta.url).pathname;
 // checkouts never collide in `pgrep`.
 const project = basename(here("../").replace(/\/+$/, ""));
 
-function isFree(port) {
+// A port only counts as free if BOTH loopbacks can bind: Vite/Astro listen on
+// ::1, so probing 127.0.0.1 alone reports "free" for ports they already hold
+// (and the banner would then lie about where this project ends up).
+function bindable(port, host) {
   return new Promise((resolve) => {
     const srv = net.createServer();
     srv.once("error", () => resolve(false));
     srv.once("listening", () => srv.close(() => resolve(true)));
-    srv.listen(port, "127.0.0.1");
+    srv.listen(port, host);
   });
+}
+
+async function isFree(port) {
+  return (await bindable(port, "127.0.0.1")) && (await bindable(port, "::1"));
 }
 
 async function findPort(start) {
@@ -35,14 +42,44 @@ async function findPort(start) {
   throw new Error(`No free port in ${start}–${start + 49}`);
 }
 
-const astroPort = await findPort(Number(process.env.PORT) || 4321);
-const lanzaPort = await findPort(5173);
+const astroDefault = Number(process.env.PORT) || 4321;
+const lanzaDefault = 5173;
+const astroPort = await findPort(astroDefault);
+const lanzaPort = await findPort(lanzaDefault);
+
+// ── startup banner ───────────────────────────────────────────────────────────
+// The whole point: the CHOSEN ports, unmissable. With several checkouts running
+// at once (lanza, laperle-lanza, …) the defaults get taken and Astro/Vite roll
+// ports silently — this says exactly where THIS project ended up.
+const tty = process.stdout.isTTY;
+const c = (code, s) => (tty ? `\x1b[${code}m${s}\x1b[0m` : s);
+const dim = (s) => c("2", s);
+const bold = (s) => c("1", s);
+const cyan = (s) => c("36", s);
+const green = (s) => c("32", s);
+const yellow = (s) => c("33", s);
+
+const rolled = (port, def) =>
+  port === def ? green(`:${port}`) : `${yellow(`:${port}`)} ${dim(`(:${def} was busy)`)}`;
+
+console.log(`
+${cyan("  ██╗      █████╗ ███╗   ██╗███████╗ █████╗ ")}
+${cyan("  ██║     ██╔══██╗████╗  ██║╚══███╔╝██╔══██╗")}
+${cyan("  ██║     ███████║██╔██║ ██║  ███╔╝ ███████║")}
+${cyan("  ██║     ██╔══██║██║╚██╗██║ ███╔╝  ██╔══██║")}
+${cyan("  ███████╗██║  ██║██║ ╚████║███████╗██║  ██║")}
+${cyan("  ╚══════╝╚═╝  ╚═╝╚═╝  ╚═══╝╚══════╝╚═╝  ╚═╝")}
+  ${dim("git-powered CMS · project:")} ${bold(project)}
+
+  ${bold("Site ")}  ${cyan(`http://localhost:${astroPort}/`)}        ${rolled(astroPort, astroDefault)}
+  ${bold("Admin")}  ${cyan(`http://localhost:${lanzaPort}/admin/`)}  ${rolled(lanzaPort, lanzaDefault)}
+`);
 
 const children = [];
 // Run a local node CLI under a custom argv0 (the process name). No shell needed —
 // argv0 is a spawn option — which keeps this dash-safe (`exec -a` is a bashism).
 function launch(label, name, entry, args, cwd) {
-  console.log(`→ ${label}  [${name}]`);
+  console.log(dim(`→ ${label}  [${name}]`));
   const child = spawn(process.execPath, [entry, ...args], {
     argv0: name,
     stdio: "inherit",
