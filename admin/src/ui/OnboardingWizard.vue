@@ -97,15 +97,15 @@ async function finish() {
   }
 }
 
-const card = "rounded-xl border bg-white p-4 text-left transition";
+const card = "rounded-xl border bg-white/50 p-4 text-left transition";
 </script>
 
 <template>
-  <div class="grid min-h-screen place-items-center bg-zinc-50 p-6">
+  <div class="grid min-h-screen place-items-center p-6">
     <div class="w-full max-w-xl">
       <div class="mb-6 text-center">
         <h1 class="font-serif text-3xl font-bold tracking-tight text-zinc-900">Welcome to Lanza</h1>
-        <p class="mt-1 text-sm text-zinc-500">A few quick choices to set up your site.</p>
+        <p class="mt-1 text-sm text-zinc-600">A few quick choices to set up your site.</p>
         <div class="mt-4 flex justify-center gap-1.5">
           <span
             v-for="n in 3"
@@ -115,7 +115,7 @@ const card = "rounded-xl border bg-white p-4 text-left transition";
         </div>
       </div>
 
-      <div class="rounded-2xl border border-zinc-200 bg-white p-7 shadow-sm">
+      <div class="card p-7">
         <!-- Step 1 — Logo -->
         <div v-if="step === 1">
           <h2 class="text-base font-semibold text-zinc-900">Add your logo</h2>
@@ -123,11 +123,11 @@ const card = "rounded-xl border bg-white p-4 text-left transition";
             Shown in the site header. Optional — you can skip and add one later.
           </p>
           <div class="flex items-center gap-4">
-            <div class="grid size-20 place-items-center overflow-hidden rounded-xl border border-dashed border-zinc-300 bg-zinc-50">
+            <div class="grid size-20 place-items-center overflow-hidden rounded-xl border border-dashed border-white/60 bg-white/40">
               <img v-if="logoPreview" :src="logoPreview" alt="Logo preview" class="max-h-full max-w-full" />
-              <span v-else class="text-xs text-zinc-400">No logo</span>
+              <span v-else class="text-xs text-zinc-500">No logo</span>
             </div>
-            <label class="cursor-pointer rounded-lg border border-zinc-300 px-3 py-2 text-sm text-zinc-700 transition hover:bg-zinc-100">
+            <label class="btn btn-ghost cursor-pointer">
               Choose image…
               <input type="file" accept="image/*" class="hidden" @change="onLogo" />
             </label>
@@ -142,7 +142,7 @@ const card = "rounded-xl border bg-white p-4 text-left transition";
             <button
               v-for="t in THEMES"
               :key="t.id"
-              :class="[card, theme === t.id ? 'border-zinc-900 ring-4 ring-zinc-900/5' : 'border-zinc-200 hover:border-zinc-300']"
+              :class="[card, theme === t.id ? 'border-zinc-900 ring-4 ring-zinc-900/10' : 'border-white/50 hover:border-white/80']"
               @click="theme = t.id"
             >
               <span class="mb-2 flex gap-1">
@@ -166,13 +166,13 @@ const card = "rounded-xl border bg-white p-4 text-left transition";
 
           <div class="flex gap-2">
             <button
-              :class="[card, 'flex-1 text-center', !multilingual ? 'border-zinc-900 ring-4 ring-zinc-900/5' : 'border-zinc-200 hover:border-zinc-300']"
+              :class="[card, 'flex-1 text-center', !multilingual ? 'border-zinc-900 ring-4 ring-zinc-900/10' : 'border-white/50 hover:border-white/80']"
               @click="multilingual = false"
             >
               <span class="block text-sm font-medium text-zinc-900">One language</span>
             </button>
             <button
-              :class="[card, 'flex-1 text-center', multilingual ? 'border-zinc-900 ring-4 ring-zinc-900/5' : 'border-zinc-200 hover:border-zinc-300']"
+              :class="[card, 'flex-1 text-center', multilingual ? 'border-zinc-900 ring-4 ring-zinc-900/10' : 'border-white/50 hover:border-white/80']"
               @click="multilingual = true"
             >
               <span class="block text-sm font-medium text-zinc-900">Multiple languages</span>
@@ -182,7 +182,7 @@ const card = "rounded-xl border bg-white p-4 text-left transition";
           <!-- Single -->
           <div v-if="!multilingual" class="mt-5">
             <label class="mb-1 block text-xs font-medium text-zinc-500">Language</label>
-            <select v-model="single" class="w-full rounded-lg border border-zinc-300 bg-white px-3 py-2.5 text-sm">
+            <select v-model="single" class="input">
               <option v-for="l in LANG_CATALOG" :key="l.code" :value="l.code">{{ l.label }}</option>
             </select>
           </div>
@@ -201,7 +201,7 @@ const card = "rounded-xl border bg-white p-4 text-left transition";
         <div class="mt-7 flex items-center justify-between">
           <button
             v-if="step > 1"
-            class="rounded-lg px-3 py-2 text-sm text-zinc-600 transition hover:bg-zinc-100"
+            class="rounded-lg px-3 py-2 text-sm text-zinc-600 transition hover:bg-white/60"
             :disabled="busy"
             @click="step--"
           >
@@ -209,16 +209,12 @@ const card = "rounded-xl border bg-white p-4 text-left transition";
           </button>
           <span v-else />
 
-          <button
-            v-if="step < 3"
-            class="rounded-lg bg-zinc-900 px-5 py-2.5 text-sm font-medium text-white transition hover:bg-zinc-700"
-            @click="step++"
-          >
+          <button v-if="step < 3" class="btn btn-primary px-5" @click="step++">
             {{ step === 1 && !logoFile ? "Skip" : "Continue" }}
           </button>
           <button
             v-else
-            class="rounded-lg bg-zinc-900 px-5 py-2.5 text-sm font-medium text-white transition hover:bg-zinc-700 disabled:opacity-40"
+            class="btn btn-primary px-5"
             :disabled="busy || !langValid"
             @click="finish"
           >

@@ -1,18 +1,30 @@
 <script setup lang="ts">
-import { ref, shallowRef } from "vue";
+import { defineAsyncComponent, h, ref, shallowRef } from "vue";
+// Eager: the shell that's always on screen at boot.
 import Sidebar from "./ui/Sidebar.vue";
 import CollectionList from "./ui/CollectionList.vue";
-import EditorView from "./ui/EditorView.vue";
-import RecordEditor from "./ui/RecordEditor.vue";
-import SettingsView from "./ui/SettingsView.vue";
-import MenuView from "./ui/MenuView.vue";
-import RedirectsView from "./ui/RedirectsView.vue";
-import SiteHealthView from "./ui/SiteHealthView.vue";
-import HelpView from "./ui/HelpView.vue";
-import LanguagesView from "./ui/LanguagesView.vue";
-import ThemesView from "./ui/ThemesView.vue";
-import OnboardingWizard from "./ui/OnboardingWizard.vue";
 import ErrorDialog from "./ui/ErrorDialog.vue";
+
+// Lazy: every other pane is its own chunk, split out of the entry bundle. The
+// big win is EditorView, which pulls the whole TipTap/ProseMirror stack; HelpView
+// (marked), ThemesView (tar parsing) and the Cloudflare-backed views split too.
+// A neutral full-height fallback (delay:0) fills the crossfade while the chunk
+// loads, so a pane switch never leaves a blank gap — then the pane's own
+// layout-stable skeleton takes over until its data arrives.
+const PaneFallback = { render: () => h("div", { class: "min-h-screen" }) };
+const lazyPane = (loader: () => Promise<unknown>) =>
+  defineAsyncComponent({ loader: loader as never, loadingComponent: PaneFallback, delay: 0 });
+
+const EditorView = lazyPane(() => import("./ui/EditorView.vue"));
+const RecordEditor = lazyPane(() => import("./ui/RecordEditor.vue"));
+const SettingsView = lazyPane(() => import("./ui/SettingsView.vue"));
+const MenuView = lazyPane(() => import("./ui/MenuView.vue"));
+const RedirectsView = lazyPane(() => import("./ui/RedirectsView.vue"));
+const SiteHealthView = lazyPane(() => import("./ui/SiteHealthView.vue"));
+const HelpView = lazyPane(() => import("./ui/HelpView.vue"));
+const LanguagesView = lazyPane(() => import("./ui/LanguagesView.vue"));
+const ThemesView = lazyPane(() => import("./ui/ThemesView.vue"));
+const OnboardingWizard = lazyPane(() => import("./ui/OnboardingWizard.vue"));
 import { GitHubClient } from "./backend/github";
 import type { Locale } from "./backend/config";
 import { site, loadSiteConfig } from "./backend/site";
@@ -151,7 +163,7 @@ function onOnboarded() {
 <template>
   <div
     v-if="!ready"
-    class="grid min-h-screen place-items-center bg-zinc-50 text-sm text-zinc-400"
+    class="grid min-h-screen place-items-center text-sm text-zinc-500"
   >
     Loading…
   </div>
@@ -160,7 +172,7 @@ function onOnboarded() {
   <OnboardingWizard v-else-if="!site.onboarded" :client="client" @done="onOnboarded" />
 
   <!-- The collection rail is permanent; only the main column swaps. -->
-  <div v-else class="flex min-h-screen bg-zinc-50">
+  <div v-else class="flex min-h-screen">
     <Sidebar
       :active-collection="collection.name"
       :active-settings="
@@ -182,6 +194,10 @@ function onOnboarded() {
       @help="openHelp"
     />
     <main class="min-w-0 flex-1">
+      <!-- Crossfade the main-column swap so switching panes doesn't hard-flash.
+           Each branch below carries its own :key, so same-component switches
+           (e.g. list → list) also fade. mode="out-in" avoids overlap. -->
+      <Transition name="pane" mode="out-in">
       <EditorView
         v-if="pane === 'editRich'"
         :key="`${editingPath ?? 'new'}#${locale}`"
@@ -239,6 +255,7 @@ function onOnboarded() {
         @open="openEntry"
         @new="newEntry"
       />
+      </Transition>
     </main>
   </div>
 

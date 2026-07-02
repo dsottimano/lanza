@@ -87,14 +87,14 @@ onMounted(refreshAll);
 </script>
 
 <template>
-  <div class="min-h-screen bg-zinc-50">
-    <header class="sticky top-0 z-30 flex items-center justify-between gap-4 border-b border-zinc-200 bg-white/85 px-5 py-2.5 backdrop-blur">
+  <div class="min-h-screen">
+    <header class="toolbar flex items-center justify-between gap-4 px-5 py-2.5">
       <div class="flex items-center gap-4">
-        <button class="text-sm text-zinc-500 transition hover:text-zinc-900" @click="emit('back')">← Back</button>
+        <button class="text-sm text-zinc-600 transition hover:text-zinc-900" @click="emit('back')">← Back</button>
         <span class="text-sm font-semibold text-zinc-900">Site Health</span>
       </div>
       <button
-        class="rounded-lg bg-zinc-900 px-3 py-1.5 text-xs font-semibold text-white transition hover:bg-zinc-700 disabled:opacity-50"
+        class="btn btn-primary text-xs"
         :disabled="refreshing"
         @click="refreshAll"
       >
@@ -104,16 +104,16 @@ onMounted(refreshAll);
 
     <main class="mx-auto max-w-2xl px-6 pt-8 pb-24">
       <h1 class="mb-1 font-serif text-3xl font-bold tracking-tight text-zinc-900">Site Health</h1>
-      <p class="mb-8 text-sm text-zinc-500">
+      <p class="mb-8 text-sm text-zinc-600">
         A quick read on how your site is connected and what's turned on. Green means good;
         amber needs a look; red needs fixing.
       </p>
 
       <!-- ── Connections ─────────────────────────────────────────────── -->
-      <h2 class="mb-3 text-xs font-semibold uppercase tracking-wide text-zinc-400">Connections</h2>
+      <h2 class="mb-3 text-xs font-semibold uppercase tracking-wide text-zinc-600">Connections</h2>
       <div class="space-y-3">
         <!-- GitHub -->
-        <section class="rounded-2xl border border-zinc-200 bg-white p-5 shadow-sm">
+        <section class="card p-5">
           <div class="flex items-start gap-3">
             <span class="mt-1.5 h-2.5 w-2.5 shrink-0 rounded-full" :class="dotClass[githubCard.loading ? 'loading' : githubCard.state === 'ok' ? 'ok' : 'error']" />
             <div class="min-w-0 flex-1">
@@ -130,7 +130,7 @@ onMounted(refreshAll);
               >
                 {{ open.gh ? "Hide" : "How to fix" }}
               </button>
-              <div v-if="open.gh && githubCard.state === 'error'" class="mt-2 rounded-lg bg-zinc-50 p-3 text-xs text-zinc-600">
+              <div v-if="open.gh && githubCard.state === 'error'" class="mt-2 rounded-lg bg-white/50 p-3 text-xs text-zinc-600">
                 <p v-if="githubCard.authIssue">
                   The server-side <code class="rounded bg-zinc-200 px-1">GITHUB_TOKEN</code> is missing or
                   expired. Check the Pages project's secrets (Settings → Variables &amp; Secrets) and set a
@@ -138,14 +138,14 @@ onMounted(refreshAll);
                   dev, put it in <code class="rounded bg-zinc-200 px-1">admin/.env</code>.
                 </p>
                 <p v-else>The GitHub proxy returned an unexpected error. See detail below.</p>
-                <p class="mt-2 font-mono text-[11px] text-zinc-400">{{ githubCard.detail }}</p>
+                <p class="mt-2 font-mono text-[11px] text-zinc-500">{{ githubCard.detail }}</p>
               </div>
             </div>
           </div>
         </section>
 
         <!-- Cloudflare API -->
-        <section class="rounded-2xl border border-zinc-200 bg-white p-5 shadow-sm">
+        <section class="card p-5">
           <div class="flex items-start gap-3">
             <span class="mt-1.5 h-2.5 w-2.5 shrink-0 rounded-full" :class="dotClass[cfApiCard.loading ? 'loading' : cfApiCard.state === 'ok' ? 'ok' : cfApiCard.state === 'notConfigured' ? 'muted' : 'error']" />
             <div class="min-w-0 flex-1">
@@ -162,7 +162,7 @@ onMounted(refreshAll);
               >
                 {{ open.cf ? "Hide setup steps" : "Set it up" }}
               </button>
-              <div v-if="open.cf && cfApiCard.state === 'notConfigured'" class="mt-2 rounded-lg bg-zinc-50 p-3 text-xs text-zinc-600">
+              <div v-if="open.cf && cfApiCard.state === 'notConfigured'" class="mt-2 rounded-lg bg-white/50 p-3 text-xs text-zinc-600">
                 <p class="mb-2">
                   Connecting Cloudflare lets this page turn storage services on and off for you. To set it up:
                 </p>
@@ -198,7 +198,7 @@ onMounted(refreshAll);
               >
                 {{ open.cf ? "Hide detail" : "Detail" }}
               </button>
-              <div v-if="open.cf && cfApiCard.state !== 'notConfigured'" class="mt-2 rounded-lg bg-zinc-50 p-3 text-xs">
+              <div v-if="open.cf && cfApiCard.state !== 'notConfigured'" class="mt-2 rounded-lg bg-white/50 p-3 text-xs">
                 <p class="font-mono text-[11px] text-zinc-500">{{ cfApiCard.detail }}</p>
               </div>
             </div>
@@ -206,7 +206,7 @@ onMounted(refreshAll);
         </section>
 
         <!-- Pages project -->
-        <section class="rounded-2xl border border-zinc-200 bg-white p-5 shadow-sm">
+        <section class="card p-5">
           <div class="flex items-start gap-3">
             <span class="mt-1.5 h-2.5 w-2.5 shrink-0 rounded-full" :class="dotClass[pagesLevel()]" />
             <div class="min-w-0 flex-1">
@@ -232,7 +232,7 @@ onMounted(refreshAll);
               >
                 {{ open.pages ? "Hide detail" : "Detail" }}
               </button>
-              <div v-if="open.pages && pagesCard.detail" class="mt-2 rounded-lg bg-zinc-50 p-3 text-xs">
+              <div v-if="open.pages && pagesCard.detail" class="mt-2 rounded-lg bg-white/50 p-3 text-xs">
                 <p class="font-mono text-[11px] text-zinc-500">{{ pagesCard.detail }}</p>
               </div>
             </div>
@@ -241,12 +241,12 @@ onMounted(refreshAll);
       </div>
 
       <!-- ── Services ────────────────────────────────────────────────── -->
-      <h2 class="mb-3 mt-8 text-xs font-semibold uppercase tracking-wide text-zinc-400">Storage services</h2>
+      <h2 class="mb-3 mt-8 text-xs font-semibold uppercase tracking-wide text-zinc-600">Storage services</h2>
       <div class="space-y-3">
         <section
           v-for="kind in SERVICE_KINDS"
           :key="kind"
-          class="rounded-2xl border border-zinc-200 bg-white p-5 shadow-sm"
+          class="card p-5"
         >
           <div class="flex items-start gap-3">
             <span class="mt-1.5 h-2.5 w-2.5 shrink-0 rounded-full" :class="dotClass[serviceLevel(kind)]" />
@@ -260,13 +260,13 @@ onMounted(refreshAll);
                 <!-- State label + action -->
                 <div class="shrink-0 text-right">
                   <template v-if="services[kind].loading">
-                    <span class="text-xs text-zinc-400">Checking…</span>
+                    <span class="text-xs text-zinc-500">Checking…</span>
                   </template>
                   <template v-else-if="services[kind].busy">
-                    <span class="text-xs text-zinc-400">Working…</span>
+                    <span class="text-xs text-zinc-500">Working…</span>
                   </template>
                   <template v-else-if="services[kind].state === 'notConfigured'">
-                    <span class="text-xs text-zinc-400">Set up the Cloudflare connection first</span>
+                    <span class="text-xs text-zinc-500">Set up the Cloudflare connection first</span>
                   </template>
                   <template v-else-if="services[kind].state === 'connected'">
                     <span class="inline-flex items-center gap-1.5 text-xs font-semibold text-emerald-700">Connected</span>
@@ -275,7 +275,7 @@ onMounted(refreshAll);
                     <div class="flex flex-col items-end gap-1.5">
                       <span class="text-xs font-medium text-amber-700">Found, not connected</span>
                       <button
-                        class="rounded-lg bg-zinc-900 px-3 py-1.5 text-xs font-semibold text-white transition hover:bg-zinc-700"
+                        class="btn btn-primary text-xs"
                         @click="onConnect(kind)"
                       >Connect</button>
                     </div>
@@ -285,9 +285,9 @@ onMounted(refreshAll);
                   </template>
                   <template v-else>
                     <div class="flex flex-col items-end gap-1.5">
-                      <span class="text-xs text-zinc-400">Off</span>
+                      <span class="text-xs text-zinc-500">Off</span>
                       <button
-                        class="rounded-lg bg-zinc-900 px-3 py-1.5 text-xs font-semibold text-white transition hover:bg-zinc-700"
+                        class="btn btn-primary text-xs"
                         @click="onEnable(kind)"
                       >Enable</button>
                     </div>
@@ -302,11 +302,11 @@ onMounted(refreshAll);
               >
                 {{ open['svc-' + kind] ? "Hide detail" : "Detail" }}
               </button>
-              <div v-if="open['svc-' + kind]" class="mt-2 space-y-2 rounded-lg bg-zinc-50 p-3 text-xs text-zinc-600">
+              <div v-if="open['svc-' + kind]" class="mt-2 space-y-2 rounded-lg bg-white/50 p-3 text-xs text-zinc-600">
                 <p v-if="services[kind].state === 'connected'">
                   Binding <code class="rounded bg-zinc-200 px-1">{{ services[kind].bindingName }}</code>
                   → <span class="font-medium">{{ services[kind].resourceName }}</span>
-                  <span v-if="services[kind].resourceId" class="font-mono text-[11px] text-zinc-400"> ({{ services[kind].resourceId }})</span>
+                  <span v-if="services[kind].resourceId" class="font-mono text-[11px] text-zinc-500"> ({{ services[kind].resourceId }})</span>
                 </p>
                 <p v-else-if="services[kind].state === 'found' && services[kind].resourceName">
                   Resource <span class="font-medium">{{ services[kind].resourceName }}</span> exists on your
@@ -314,7 +314,7 @@ onMounted(refreshAll);
                   <code class="rounded bg-zinc-200 px-1">{{ services[kind].bindingName }}</code>.
                 </p>
                 <p v-if="services[kind].state === 'error'" class="font-mono text-[11px] text-rose-500">{{ services[kind].detail }}</p>
-                <p class="text-[11px] text-zinc-400">
+                <p class="text-[11px] text-zinc-500">
                   Turning a service on is free-tier, but reads and writes have daily limits — the public
                   site should avoid querying these on every page view.
                 </p>
@@ -325,17 +325,17 @@ onMounted(refreshAll);
       </div>
 
       <!-- ── API status ──────────────────────────────────────────────── -->
-      <h2 class="mb-3 mt-8 text-xs font-semibold uppercase tracking-wide text-zinc-400">API status</h2>
-      <div class="rounded-2xl border border-zinc-200 bg-white p-5 text-sm shadow-sm">
+      <h2 class="mb-3 mt-8 text-xs font-semibold uppercase tracking-wide text-zinc-600">API status</h2>
+      <div class="card p-5 text-sm">
         <div class="flex items-center justify-between py-1">
-          <span class="text-zinc-600">GitHub proxy <code class="text-xs text-zinc-400">/admin/api/gh</code></span>
+          <span class="text-zinc-600">GitHub proxy <code class="text-xs text-zinc-500">/admin/api/gh</code></span>
           <span class="inline-flex items-center gap-2">
             <span class="h-2 w-2 rounded-full" :class="dotClass[proxies.gh === null ? 'loading' : proxies.gh ? 'ok' : 'error']" />
             <span class="text-xs text-zinc-500">{{ proxies.gh === null ? "…" : proxies.gh ? "Reachable" : "Unreachable" }}</span>
           </span>
         </div>
         <div class="flex items-center justify-between py-1">
-          <span class="text-zinc-600">Cloudflare proxy <code class="text-xs text-zinc-400">/admin/api/cf</code></span>
+          <span class="text-zinc-600">Cloudflare proxy <code class="text-xs text-zinc-500">/admin/api/cf</code></span>
           <span class="inline-flex items-center gap-2">
             <span class="h-2 w-2 rounded-full" :class="dotClass[proxies.cf === null ? 'loading' : proxies.cf ? 'ok' : 'error']" />
             <span class="text-xs text-zinc-500">{{ proxies.cf === null ? "…" : proxies.cf ? "Reachable" : "Unreachable" }}</span>

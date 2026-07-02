@@ -27,9 +27,9 @@ const { data, loading, save, markDirty } = useEntryEditor(props, {
 </script>
 
 <template>
-  <div class="min-h-screen bg-zinc-50">
-    <header class="sticky top-0 z-30 flex items-center justify-between gap-4 border-b border-zinc-200 bg-white/85 px-5 py-2.5 backdrop-blur">
-      <button class="text-sm text-zinc-500 transition hover:text-zinc-900" @click="emit('back')">
+  <div class="min-h-screen">
+    <header class="toolbar flex items-center justify-between gap-4 px-5 py-2.5">
+      <button class="text-sm text-zinc-600 transition hover:text-zinc-900" @click="emit('back')">
         ← {{ collection.label }}
       </button>
       <span class="flex-1 text-center text-sm"></span>
@@ -45,10 +45,15 @@ const { data, loading, save, markDirty } = useEntryEditor(props, {
       <h1 class="mb-6 font-serif text-3xl font-bold tracking-tight text-zinc-900">
         {{ path ? "Edit" : "New" }} {{ collection.labelSingular.toLowerCase() }}
       </h1>
-      <div v-if="loading" class="text-sm text-zinc-400">Loading…</div>
+      <div v-if="loading" class="card space-y-4 p-6">
+        <div class="skeleton h-4 w-28" />
+        <div class="skeleton h-9 w-full" />
+        <div class="skeleton h-4 w-28" />
+        <div class="skeleton h-9 w-full" />
+      </div>
       <div
         v-else
-        class="rounded-2xl border border-zinc-200 bg-white p-6 shadow-sm"
+        class="card p-6"
         @input="markDirty"
         @change="markDirty"
       >

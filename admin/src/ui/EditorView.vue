@@ -55,16 +55,16 @@ const drawerFields = computed<Field[]>(() =>
 
 <template>
   <div class="flex min-h-screen flex-col">
-    <header class="sticky top-0 z-30 flex items-center justify-between gap-4 border-b border-zinc-200 bg-white/85 px-5 py-2.5 backdrop-blur">
+    <header class="toolbar flex items-center justify-between gap-4 px-5 py-2.5">
       <button
-        class="text-sm text-zinc-500 transition hover:text-zinc-900"
+        class="text-sm text-zinc-600 transition hover:text-zinc-900"
         @click="emit('back')"
       >
         ← {{ collection.label }}
       </button>
 
       <span class="flex-1 text-center text-sm">
-        <span v-if="dirty" class="text-zinc-400">Unsaved changes</span>
+        <span v-if="dirty" class="text-zinc-500">Unsaved changes</span>
       </span>
 
       <div class="flex items-center gap-3">
@@ -88,11 +88,7 @@ const drawerFields = computed<Field[]>(() =>
           Published
         </label>
 
-        <button
-          class="inline-flex items-center gap-1.5 rounded-lg px-2.5 py-2 text-sm text-zinc-600 transition hover:bg-zinc-100 hover:text-zinc-900"
-          title="Settings"
-          @click="drawerOpen = true"
-        >
+        <button class="btn btn-ghost" title="Settings" @click="drawerOpen = true">
           ⚙ Settings
         </button>
 
@@ -106,11 +102,18 @@ const drawerFields = computed<Field[]>(() =>
     </header>
 
     <main class="flex flex-1 justify-center px-5 pt-12 pb-24">
-      <div v-if="loading" class="self-center text-sm text-zinc-400">Loading…</div>
-      <div v-else class="w-full max-w-2xl">
+      <!-- Layout-stable skeleton mirroring the title + first body lines. -->
+      <div v-if="loading" class="w-full max-w-2xl">
+        <div class="skeleton mb-8 h-12 w-3/4" />
+        <div class="skeleton mb-3 h-4 w-full" />
+        <div class="skeleton mb-3 h-4 w-11/12" />
+        <div class="skeleton h-4 w-4/5" />
+      </div>
+      <!-- Calm, near-opaque "paper" surface — writing comfort beats effect. -->
+      <div v-else class="editor-paper w-full max-w-2xl">
         <input
           v-model="data.title"
-          class="mb-6 w-full border-none font-serif text-5xl font-bold leading-tight tracking-tight text-zinc-900 outline-none placeholder:text-zinc-300"
+          class="mb-6 w-full border-none bg-transparent font-serif text-5xl font-bold leading-tight tracking-tight text-zinc-900 outline-none placeholder:text-zinc-300"
           :placeholder="`${collection.labelSingular} title`"
           @input="markDirty"
         />
@@ -128,14 +131,14 @@ const drawerFields = computed<Field[]>(() =>
       <div v-if="drawerOpen" class="fixed inset-0 z-40 bg-black/20" @click="drawerOpen = false" />
     </Transition>
     <aside
-      class="fixed top-0 right-0 z-50 flex h-screen w-[min(420px,92vw)] flex-col border-l border-zinc-200 bg-white shadow-2xl transition-transform duration-200"
+      class="glass-strong fixed top-0 right-0 z-50 flex h-screen w-[min(420px,92vw)] flex-col transition-transform duration-200"
       :class="drawerOpen ? 'translate-x-0' : 'translate-x-full'"
       @input="markDirty"
       @change="markDirty"
     >
-      <div class="flex items-center justify-between border-b border-zinc-100 px-5 py-4">
+      <div class="flex items-center justify-between border-b border-white/40 px-5 py-4">
         <strong class="text-sm font-semibold text-zinc-900">{{ collection.labelSingular }} settings</strong>
-        <button class="text-zinc-400 transition hover:text-zinc-900" @click="drawerOpen = false">✕</button>
+        <button class="text-zinc-500 transition hover:text-zinc-900" @click="drawerOpen = false">✕</button>
       </div>
       <div class="flex-1 overflow-y-auto p-5">
         <FieldForm v-if="!loading" :fields="drawerFields" :data="data" :client="client" :locale="locale" />
@@ -143,3 +146,28 @@ const drawerFields = computed<Field[]>(() =>
     </aside>
   </div>
 </template>
+
+<style scoped>
+/* Calm paper surface for the writing canvas — near-opaque so long-form editing
+   stays comfortable and high-contrast, only a whisper of the glass system. */
+.editor-paper {
+  border-radius: 22px;
+  background: rgba(255, 255, 255, 0.82);
+  border: 1px solid var(--glass-border-soft);
+  box-shadow: 0 18px 50px -20px rgba(30, 41, 80, 0.28),
+    inset 0 1px 0 rgba(255, 255, 255, 0.7);
+  padding: 2.75rem 3rem 3.5rem;
+}
+@supports ((backdrop-filter: blur(1px)) or (-webkit-backdrop-filter: blur(1px))) {
+  .editor-paper {
+    background: rgba(255, 255, 255, 0.72);
+    backdrop-filter: blur(6px);
+    -webkit-backdrop-filter: blur(6px);
+  }
+}
+@media (max-width: 640px) {
+  .editor-paper {
+    padding: 1.75rem 1.5rem 2.5rem;
+  }
+}
+</style>

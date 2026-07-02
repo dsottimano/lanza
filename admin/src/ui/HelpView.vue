@@ -15,15 +15,14 @@ const html = computed(
   () => marked.parse(active.value?.body ?? "", { async: false, gfm: true }) as string,
 );
 
-const tocItem =
-  "w-full rounded-lg px-2.5 py-2 text-left text-sm text-zinc-600 transition hover:bg-zinc-100 hover:text-zinc-900";
-const tocActive = "bg-zinc-900 text-white hover:bg-zinc-900 hover:text-white";
+const tocItem = "nav-item block";
+const tocActive = "nav-item--active";
 </script>
 
 <template>
-  <div class="min-h-screen bg-zinc-50">
-    <header class="sticky top-0 z-30 flex items-center gap-4 border-b border-zinc-200 bg-white/85 px-5 py-2.5 backdrop-blur">
-      <button class="text-sm text-zinc-500 transition hover:text-zinc-900" @click="$emit('back')">← Back</button>
+  <div class="min-h-screen">
+    <header class="toolbar flex items-center gap-4 px-5 py-2.5">
+      <button class="text-sm text-zinc-600 transition hover:text-zinc-900" @click="$emit('back')">← Back</button>
       <span class="text-sm font-semibold text-zinc-900">Guide</span>
     </header>
 

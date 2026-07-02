@@ -32,14 +32,16 @@ const taxonomies = folders.filter((c) => c.body === "none");
 const settings = COLLECTIONS.find((c) => c.kind === "files");
 const settingsFiles = settings && settings.kind === "files" ? settings.files : [];
 
-const groupLabel = "px-2.5 mb-1 text-[0.68rem] font-semibold uppercase tracking-wider text-zinc-400";
-const item =
-  "w-full rounded-lg px-2.5 py-2 text-left text-sm text-zinc-600 transition hover:bg-zinc-100 hover:text-zinc-900";
-const itemActive = "bg-zinc-900 text-white hover:bg-zinc-900 hover:text-white";
+const groupLabel = "px-2.5 mb-1 text-[0.68rem] font-semibold uppercase tracking-wider text-zinc-600";
+const item = "nav-item block";
+const itemActive = "nav-item--active";
 </script>
 
 <template>
-  <nav class="sticky top-0 flex h-screen w-60 flex-shrink-0 flex-col gap-6 border-r border-zinc-200 bg-white px-3 py-5">
+  <nav class="rail-glass sticky top-3 m-3 flex h-[calc(100vh-1.5rem)] w-60 flex-shrink-0 flex-col gap-6 rounded-3xl px-3 py-5">
+    <!-- Distortion layer (backdrop only) — the one place the SVG filter runs. -->
+    <div class="rail-glass__distortion" aria-hidden="true" />
+
     <div class="px-2.5">
       <span class="font-serif text-xl font-bold tracking-tight text-zinc-900">Lanza</span>
     </div>
@@ -49,16 +51,12 @@ const itemActive = "bg-zinc-900 text-white hover:bg-zinc-900 hover:text-white";
          single-language site. -->
     <div v-if="site.locales.length > 1" class="px-1.5">
       <p :class="groupLabel">Language</p>
-      <div class="flex gap-1 rounded-lg bg-zinc-100 p-1">
+      <div class="segment">
         <button
           v-for="l in site.locales"
           :key="l.code"
-          :class="[
-            'flex-1 rounded-md px-2 py-1 text-xs font-semibold transition',
-            locale === l.code
-              ? 'bg-white text-zinc-900 shadow-sm'
-              : 'text-zinc-500 hover:text-zinc-800',
-          ]"
+          class="segment-btn"
+          :class="{ 'segment-btn--active': locale === l.code }"
           @click="emit('selectLocale', l.code)"
         >
           {{ l.label }}
@@ -120,14 +118,10 @@ const itemActive = "bg-zinc-900 text-white hover:bg-zinc-900 hover:text-white";
       </button>
     </div>
 
-    <div class="mt-auto flex flex-col gap-0.5 border-t border-zinc-100 pt-3">
+    <div class="mt-auto flex flex-col gap-0.5 border-t border-white/40 pt-3">
       <button
-        :class="[
-          'flex items-center gap-1.5 rounded-lg px-2.5 py-2 text-left text-sm transition',
-          helpOpen
-            ? 'bg-zinc-900 text-white'
-            : 'text-zinc-500 hover:bg-zinc-100 hover:text-zinc-900',
-        ]"
+        class="nav-item flex items-center gap-1.5"
+        :class="{ 'nav-item--active': helpOpen }"
         @click="emit('help')"
       >
         <span aria-hidden="true">📖</span> Guide

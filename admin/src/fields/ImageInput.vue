@@ -30,13 +30,13 @@ function onPick(e: Event) {
     <img
       v-if="safeSrc"
       :src="safeSrc"
-      class="max-h-40 rounded-lg border border-zinc-200 object-contain"
+      class="max-h-40 rounded-lg border border-white/50 object-contain"
       alt=""
     />
 
     <div class="flex items-center gap-3">
       <label
-        class="inline-flex cursor-pointer items-center gap-1.5 rounded-lg border border-zinc-300 bg-white px-3 py-2 text-sm text-zinc-700 transition hover:border-zinc-400 hover:text-zinc-900"
+        class="btn btn-ghost cursor-pointer"
         :class="{ 'pointer-events-none opacity-60': uploading }"
       >
         <span

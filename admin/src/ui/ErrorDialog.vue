@@ -11,7 +11,7 @@ import { errorState, clearError, isAuthError } from "../errors";
     class="fixed inset-0 z-[70] flex items-center justify-center bg-black/30 p-4"
     @click.self="clearError"
   >
-    <div class="w-full max-w-md rounded-2xl border border-zinc-200 bg-white p-6 shadow-2xl">
+    <div class="glass-strong w-full max-w-md rounded-2xl p-6">
       <div class="mb-3 flex items-center gap-2">
         <span class="flex size-7 items-center justify-center rounded-full bg-rose-100 text-rose-600" aria-hidden="true">!</span>
         <h2 class="text-base font-semibold text-zinc-900">
@@ -20,7 +20,7 @@ import { errorState, clearError, isAuthError } from "../errors";
       </div>
 
       <p class="text-sm leading-relaxed break-words text-zinc-600">{{ errorState.message }}</p>
-      <p v-if="errorState.status" class="mt-1 text-xs text-zinc-400">GitHub status {{ errorState.status }}</p>
+      <p v-if="errorState.status" class="mt-1 text-xs text-zinc-500">GitHub status {{ errorState.status }}</p>
 
       <p v-if="isAuthError(errorState.status)" class="mt-3 text-sm text-zinc-500">
         The server's GitHub token may be missing, expired, or lacking
@@ -30,7 +30,7 @@ import { errorState, clearError, isAuthError } from "../errors";
 
       <div class="mt-5 flex justify-end gap-2">
         <button
-          class="rounded-lg px-4 py-2 text-sm text-zinc-600 transition hover:bg-zinc-100"
+          class="rounded-lg px-4 py-2 text-sm text-zinc-600 transition hover:bg-white/60"
           @click="clearError"
         >
           Dismiss

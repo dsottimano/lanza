@@ -42,10 +42,12 @@ defineEmits<{
   max-height: 19rem;
   overflow-y: auto;
   padding: 0.35rem;
-  background: #fff;
-  border: 1px solid #e7e7e7;
-  border-radius: 10px;
-  box-shadow: 0 8px 28px rgba(0, 0, 0, 0.12);
+  background: var(--glass-tint-strong);
+  backdrop-filter: blur(18px) saturate(180%);
+  -webkit-backdrop-filter: blur(18px) saturate(180%);
+  border: 1px solid var(--glass-border);
+  border-radius: 14px;
+  box-shadow: var(--glass-shadow), inset 0 1px 0 rgba(255, 255, 255, 0.7);
 }
 .slash-empty {
   padding: 0.6rem 0.7rem;
@@ -65,7 +67,7 @@ defineEmits<{
   text-align: left;
 }
 .slash-item.active {
-  background: #f1f1ef;
+  background: rgba(23, 25, 32, 0.08);
 }
 .slash-icon {
   flex: 0 0 1.9rem;

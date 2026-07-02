@@ -52,7 +52,7 @@ function move(i: number, dir: -1 | 1) {
 
 <template>
   <div class="flex flex-col gap-2.5">
-    <div v-for="(item, i) in items" :key="i" class="rounded-xl border border-zinc-200 bg-zinc-50/70 p-3">
+    <div v-for="(item, i) in items" :key="i" class="rounded-xl border border-white/50 bg-white/40 p-3">
       <div class="mb-2.5 flex items-center justify-between">
         <span class="text-[0.7rem] font-bold tracking-wide text-zinc-500 uppercase">
           {{ variantOf(item)?.label ?? `${singular} ${i + 1}` }}
@@ -61,20 +61,20 @@ function move(i: number, dir: -1 | 1) {
           <button
             type="button"
             :disabled="i === 0"
-            class="size-7 rounded-md border border-zinc-200 bg-white text-zinc-500 transition hover:text-zinc-900 disabled:opacity-35 disabled:hover:text-zinc-500"
+            class="size-7 rounded-md border border-white/50 bg-white/50 text-zinc-500 transition hover:text-zinc-900 disabled:opacity-35 disabled:hover:text-zinc-500"
             title="Move up"
             @click="move(i, -1)"
           >↑</button>
           <button
             type="button"
             :disabled="i === items.length - 1"
-            class="size-7 rounded-md border border-zinc-200 bg-white text-zinc-500 transition hover:text-zinc-900 disabled:opacity-35 disabled:hover:text-zinc-500"
+            class="size-7 rounded-md border border-white/50 bg-white/50 text-zinc-500 transition hover:text-zinc-900 disabled:opacity-35 disabled:hover:text-zinc-500"
             title="Move down"
             @click="move(i, 1)"
           >↓</button>
           <button
             type="button"
-            class="size-7 rounded-md border border-zinc-200 bg-white text-rose-500 transition hover:bg-rose-50"
+            class="size-7 rounded-md border border-white/50 bg-white/50 text-rose-500 transition hover:bg-rose-50"
             title="Remove"
             @click="remove(i)"
           >✕</button>
@@ -112,34 +112,25 @@ function move(i: number, dir: -1 | 1) {
 
     <!-- add control: variant picker when typed, plain add otherwise -->
     <div v-if="field.types" class="relative">
-      <button
-        type="button"
-        class="self-start rounded-lg border border-dashed border-zinc-300 bg-white px-3 py-2 text-sm text-zinc-600 transition hover:border-zinc-400 hover:text-zinc-900"
-        @click="addMenu = !addMenu"
-      >
+      <button type="button" class="btn btn-ghost self-start" @click="addMenu = !addMenu">
         + Add {{ singular.toLowerCase() }}
       </button>
       <div
         v-if="addMenu"
-        class="absolute z-10 mt-1.5 flex min-w-48 flex-col overflow-hidden rounded-xl border border-zinc-200 bg-white shadow-lg"
+        class="glass-strong absolute z-10 mt-1.5 flex min-w-48 flex-col overflow-hidden rounded-xl"
       >
         <button
           v-for="v in field.types"
           :key="v.name"
           type="button"
-          class="px-3.5 py-2.5 text-left text-sm text-zinc-700 transition hover:bg-zinc-50"
+          class="px-3.5 py-2.5 text-left text-sm text-zinc-700 transition hover:bg-white/50"
           @click="addVariant(v)"
         >
           {{ v.label }}
         </button>
       </div>
     </div>
-    <button
-      v-else
-      type="button"
-      class="self-start rounded-lg border border-dashed border-zinc-300 bg-white px-3 py-2 text-sm text-zinc-600 transition hover:border-zinc-400 hover:text-zinc-900"
-      @click="add"
-    >
+    <button v-else type="button" class="btn btn-ghost self-start" @click="add">
       + Add {{ singular.toLowerCase() }}
     </button>
   </div>

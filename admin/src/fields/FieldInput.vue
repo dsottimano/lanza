@@ -57,7 +57,7 @@ const open = ref(props.field.collapsed !== true);
 
 <template>
   <!-- object: a collapsible group of nested fields -->
-  <fieldset v-if="field.widget === 'object'" class="mb-4 rounded-xl border border-zinc-200 px-3.5">
+  <fieldset v-if="field.widget === 'object'" class="mb-4 rounded-xl border border-white/50 px-3.5">
     <legend
       class="flex cursor-pointer items-center gap-1.5 py-2.5 text-xs font-bold tracking-wide text-zinc-700 uppercase select-none"
       @click="open = !open"
@@ -84,14 +84,14 @@ const open = ref(props.field.collapsed !== true);
   <div v-else-if="field.widget === 'list'" class="mb-4">
     <label class="mb-1.5 block text-xs font-semibold text-zinc-600">{{ field.label }}</label>
     <ListInput :field="field" v-model="model" />
-    <p v-if="field.hint" class="mt-1.5 text-xs text-zinc-400">{{ field.hint }}</p>
+    <p v-if="field.hint" class="mt-1.5 text-xs text-zinc-500">{{ field.hint }}</p>
   </div>
 
   <!-- relation: pick slug(s) from a target collection -->
   <div v-else-if="field.widget === 'relation'" class="mb-4">
     <label class="mb-1.5 block text-xs font-semibold text-zinc-600">{{ field.label }}</label>
     <RelationInput :field="field" v-model="model" />
-    <p v-if="field.hint" class="mt-1.5 text-xs text-zinc-400">{{ field.hint }}</p>
+    <p v-if="field.hint" class="mt-1.5 text-xs text-zinc-500">{{ field.hint }}</p>
   </div>
 
   <!-- scalar widgets -->
@@ -145,6 +145,6 @@ const open = ref(props.field.collapsed !== true);
     <!-- string (default) -->
     <input v-else :id="field.name" type="text" v-model="model" :required="isRequired" :class="inputCls" />
 
-    <p v-if="field.hint" class="mt-1.5 text-xs text-zinc-400">{{ field.hint }}</p>
+    <p v-if="field.hint" class="mt-1.5 text-xs text-zinc-500">{{ field.hint }}</p>
   </div>
 </template>

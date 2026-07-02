@@ -299,10 +299,14 @@ function link() {
   display: flex;
   align-items: center;
   gap: 0.15rem;
-  padding: 0.2rem;
-  background: #1a1a1a;
-  border-radius: 8px;
-  box-shadow: 0 6px 20px rgba(0, 0, 0, 0.25);
+  padding: 0.25rem;
+  background: rgba(23, 25, 32, 0.82);
+  backdrop-filter: blur(12px) saturate(160%);
+  -webkit-backdrop-filter: blur(12px) saturate(160%);
+  border: 1px solid rgba(255, 255, 255, 0.12);
+  border-radius: 12px;
+  box-shadow: 0 12px 30px rgba(15, 18, 30, 0.4),
+    inset 0 1px 0 rgba(255, 255, 255, 0.14);
 }
 .bubble button {
   min-width: 1.9rem;
@@ -334,11 +338,14 @@ function link() {
   right: 1rem;
   bottom: 1rem;
   z-index: 40;
-  padding: 0.4rem 0.6rem;
-  border: 1px solid #e2e2e2;
-  border-radius: 6px;
-  background: #fff;
-  color: #666;
+  padding: 0.45rem 0.65rem;
+  border: 1px solid var(--glass-border);
+  border-radius: 11px;
+  background: var(--glass-tint-strong);
+  backdrop-filter: blur(12px) saturate(180%);
+  -webkit-backdrop-filter: blur(12px) saturate(180%);
+  color: var(--ink-soft);
+  box-shadow: var(--glass-shadow-sm);
   font-family: ui-monospace, monospace;
   cursor: pointer;
 }

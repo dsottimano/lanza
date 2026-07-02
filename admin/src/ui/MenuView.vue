@@ -160,16 +160,15 @@ function urlWarns(url: string): boolean {
   return !!url && !(url.startsWith("/") || /^https?:\/\//.test(url));
 }
 
-const inputCls =
-  "min-w-0 flex-1 rounded-md border border-zinc-200 bg-white px-2.5 py-1.5 text-sm text-zinc-900 outline-none transition focus:border-zinc-400";
+const inputCls = "input min-w-0 flex-1";
 const iconBtn =
-  "grid size-8 flex-shrink-0 place-items-center rounded-md text-zinc-400 transition hover:bg-zinc-100 hover:text-zinc-700 disabled:cursor-default disabled:opacity-30 disabled:hover:bg-transparent";
+  "grid size-8 flex-shrink-0 place-items-center rounded-md text-zinc-500 transition hover:bg-white/60 hover:text-zinc-800 disabled:cursor-default disabled:opacity-30 disabled:hover:bg-transparent";
 </script>
 
 <template>
-  <div class="min-h-screen bg-zinc-50">
-    <header class="sticky top-0 z-30 flex items-center justify-between gap-4 border-b border-zinc-200 bg-white/85 px-5 py-2.5 backdrop-blur">
-      <button class="text-sm text-zinc-500 transition hover:text-zinc-900" @click="emit('back')">← Back</button>
+  <div class="min-h-screen">
+    <header class="toolbar flex items-center justify-between gap-4 px-5 py-2.5">
+      <button class="text-sm text-zinc-600 transition hover:text-zinc-900" @click="emit('back')">← Back</button>
       <span class="flex-1 text-center text-sm"></span>
       <SaveButton
         :action="save"
@@ -182,27 +181,29 @@ const iconBtn =
     <main class="mx-auto max-w-2xl px-6 pt-8 pb-24">
       <h1 class="mb-1 font-serif text-3xl font-bold tracking-tight text-zinc-900">
         Menu
-        <span v-if="file.localized" class="ml-2 align-middle text-base font-medium text-zinc-400">
+        <span v-if="file.localized" class="ml-2 align-middle text-base font-medium text-zinc-500">
           · {{ localeLabel(locale) }}
         </span>
       </h1>
-      <p class="mb-6 text-sm text-zinc-500">
+      <p class="mb-6 text-sm text-zinc-600">
         Set the links for each menu location. Tablet and mobile follow the desktop menu
         unless you customize them.
       </p>
 
-      <div v-if="loading" class="text-sm text-zinc-400">Loading…</div>
+      <div v-if="loading" class="card space-y-4 p-5">
+        <div class="skeleton h-9 w-full" />
+        <div class="skeleton h-9 w-2/3" />
+        <div class="skeleton h-9 w-full" />
+      </div>
 
-      <div v-else class="rounded-2xl border border-zinc-200 bg-white p-5 shadow-sm">
+      <div v-else class="card p-5">
         <!-- Location tabs -->
-        <div class="mb-4 flex gap-1 rounded-lg bg-zinc-100 p-1">
+        <div class="segment mb-4">
           <button
             v-for="l in LOCATIONS"
             :key="l.key"
-            :class="[
-              'flex-1 rounded-md px-3 py-1.5 text-sm font-semibold transition',
-              activeLocation === l.key ? 'bg-white text-zinc-900 shadow-sm' : 'text-zinc-500 hover:text-zinc-800',
-            ]"
+            class="segment-btn text-sm"
+            :class="{ 'segment-btn--active': activeLocation === l.key }"
             @click="activeLocation = l.key"
           >
             {{ l.label }}
@@ -210,7 +211,7 @@ const iconBtn =
         </div>
 
         <!-- Device sub-tabs -->
-        <div class="mb-4 flex gap-4 border-b border-zinc-100">
+        <div class="mb-4 flex gap-4 border-b border-white/40">
           <button
             v-for="d in DEVICES"
             :key="d.key"
@@ -218,7 +219,7 @@ const iconBtn =
               '-mb-px border-b-2 px-1 pb-2 text-sm font-medium transition',
               activeDevice === d.key
                 ? 'border-zinc-900 text-zinc-900'
-                : 'border-transparent text-zinc-400 hover:text-zinc-700',
+                : 'border-transparent text-zinc-500 hover:text-zinc-800',
             ]"
             @click="activeDevice = d.key"
           >
@@ -241,14 +242,14 @@ const iconBtn =
         </label>
 
         <!-- Inheriting: read-only preview of the desktop menu -->
-        <div v-if="inherits" class="rounded-lg border border-dashed border-zinc-200 bg-zinc-50/60 px-4 py-3 text-sm text-zinc-500">
+        <div v-if="inherits" class="rounded-lg border border-dashed border-white/50 bg-white/40 px-4 py-3 text-sm text-zinc-600">
           <p v-if="items.length === 0">Uses the desktop menu (currently empty).</p>
           <template v-else>
-            <p class="mb-2 text-xs font-semibold uppercase tracking-wide text-zinc-400">Following desktop</p>
+            <p class="mb-2 text-xs font-semibold uppercase tracking-wide text-zinc-500">Following desktop</p>
             <ul class="space-y-1">
               <li v-for="(it, i) in items" :key="i" class="flex gap-2">
                 <span class="text-zinc-700">{{ it.label || "(no label)" }}</span>
-                <span class="text-zinc-400">{{ it.url }}</span>
+                <span class="text-zinc-500">{{ it.url }}</span>
               </li>
             </ul>
           </template>
@@ -256,7 +257,7 @@ const iconBtn =
 
         <!-- Editable rows -->
         <div v-else>
-          <p v-if="items.length === 0" class="mb-3 text-sm text-zinc-400">No links yet.</p>
+          <p v-if="items.length === 0" class="mb-3 text-sm text-zinc-500">No links yet.</p>
           <ul class="space-y-2">
             <li v-for="(it, i) in items" :key="i" class="flex items-start gap-1.5">
               <div class="flex min-w-0 flex-1 flex-col gap-1">
@@ -273,12 +274,7 @@ const iconBtn =
               <button :class="iconBtn" title="Remove" @click="removeItem(i)">✕</button>
             </li>
           </ul>
-          <button
-            class="mt-3 rounded-lg border border-zinc-200 px-3 py-1.5 text-sm font-medium text-zinc-600 transition hover:border-zinc-300 hover:text-zinc-900"
-            @click="addItem"
-          >
-            + Add link
-          </button>
+          <button class="btn btn-ghost mt-3" @click="addItem">+ Add link</button>
         </div>
       </div>
     </main>

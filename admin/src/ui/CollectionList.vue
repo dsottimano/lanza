@@ -45,23 +45,26 @@ watch(() => props.collection.name, load, { immediate: true });
     <div class="mb-7 flex items-end justify-between">
       <div>
         <h1 class="font-serif text-3xl font-bold tracking-tight text-zinc-900">{{ collection.label }}</h1>
-        <p v-if="!loading && !failed" class="mt-1 text-sm text-zinc-500">
+        <p v-if="!loading && !failed" class="mt-1 text-sm text-zinc-600">
           {{ entries.length }} {{ entries.length === 1 ? "entry" : "entries" }}
         </p>
       </div>
-      <button
-        class="inline-flex items-center gap-1.5 rounded-lg bg-zinc-900 px-3.5 py-2 text-sm font-medium text-white transition hover:bg-zinc-700"
-        @click="emit('new')"
-      >
+      <button class="btn btn-primary" @click="emit('new')">
         <span class="text-base leading-none">+</span>
         New {{ collection.labelSingular.toLowerCase() }}
       </button>
     </div>
 
-    <p v-if="loading" class="text-sm text-zinc-400">Loading…</p>
+    <!-- Layout-stable skeleton: same rounded card shell as the list, so content
+         appearing doesn't reflow the page. -->
+    <ul v-if="loading" class="card divide-y divide-white/40 overflow-hidden">
+      <li v-for="n in 5" :key="n" class="flex items-center justify-between px-4 py-3.5">
+        <span class="skeleton h-3.5 w-40" />
+      </li>
+    </ul>
 
-    <div v-else-if="failed" class="rounded-2xl border border-dashed border-zinc-300 bg-white py-12 text-center">
-      <p class="text-sm text-zinc-500">Couldn't load {{ collection.label.toLowerCase() }}.</p>
+    <div v-else-if="failed" class="rounded-2xl border border-dashed border-white/50 bg-white/40 py-12 text-center">
+      <p class="text-sm text-zinc-600">Couldn't load {{ collection.label.toLowerCase() }}.</p>
       <button class="mt-3 text-sm font-medium text-zinc-900 underline-offset-2 hover:underline" @click="load">
         Try again
       </button>
@@ -69,9 +72,9 @@ watch(() => props.collection.name, load, { immediate: true });
 
     <div
       v-else-if="!entries.length"
-      class="rounded-2xl border border-dashed border-zinc-300 bg-white py-16 text-center"
+      class="rounded-2xl border border-dashed border-white/50 bg-white/40 py-16 text-center"
     >
-      <p class="text-sm text-zinc-500">No {{ collection.label.toLowerCase() }} yet.</p>
+      <p class="text-sm text-zinc-600">No {{ collection.label.toLowerCase() }} yet.</p>
       <button
         class="mt-3 text-sm font-medium text-zinc-900 underline-offset-2 hover:underline"
         @click="emit('new')"
@@ -80,14 +83,14 @@ watch(() => props.collection.name, load, { immediate: true });
       </button>
     </div>
 
-    <ul v-else class="divide-y divide-zinc-100 overflow-hidden rounded-2xl border border-zinc-200 bg-white shadow-sm">
+    <ul v-else class="card divide-y divide-white/40 overflow-hidden">
       <li v-for="e in entries" :key="e.path">
         <button
-          class="group flex w-full items-center justify-between px-4 py-3.5 text-left transition hover:bg-zinc-50"
+          class="group flex w-full items-center justify-between px-4 py-3.5 text-left transition hover:bg-white/50"
           @click="emit('open', e.path)"
         >
           <span class="text-sm text-zinc-800">{{ e.name.replace(/\.md$/, "") }}</span>
-          <span class="text-zinc-300 transition group-hover:translate-x-0.5 group-hover:text-zinc-500">→</span>
+          <span class="text-zinc-500 transition group-hover:translate-x-0.5 group-hover:text-zinc-600">→</span>
         </button>
       </li>
     </ul>

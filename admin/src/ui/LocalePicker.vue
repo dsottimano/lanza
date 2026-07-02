@@ -30,20 +30,20 @@ function toggle(code: string) {
         v-for="l in LANG_CATALOG"
         :key="l.code"
         type="button"
-        :class="['flex items-center gap-2 rounded-lg border px-3 py-2 text-left text-sm transition', chosen.includes(l.code) ? 'border-zinc-900 bg-zinc-50' : 'border-zinc-200 hover:border-zinc-300']"
+        :class="['flex items-center gap-2 rounded-xl border px-3 py-2 text-left text-sm transition', chosen.includes(l.code) ? 'border-zinc-900/70 bg-white/70' : 'border-white/50 bg-white/40 hover:border-white/80']"
         @click="toggle(l.code)"
       >
-        <span :class="['grid size-4 place-items-center rounded border text-[10px]', chosen.includes(l.code) ? 'border-zinc-900 bg-zinc-900 text-white' : 'border-zinc-300']">
+        <span :class="['grid size-4 place-items-center rounded border text-[10px]', chosen.includes(l.code) ? 'border-zinc-900 bg-zinc-900 text-white' : 'border-zinc-400']">
           <span v-if="chosen.includes(l.code)">✓</span>
         </span>
         {{ l.label }}
-        <span class="ml-auto font-mono text-xs text-zinc-400">{{ l.code }}</span>
+        <span class="ml-auto font-mono text-xs text-zinc-500">{{ l.code }}</span>
       </button>
     </div>
 
     <label class="mt-6 mb-1 block text-xs font-medium text-zinc-500">Default language</label>
-    <p v-if="defaultHint" class="mb-2 text-xs text-zinc-400">{{ defaultHint }}</p>
-    <select v-model="def" class="w-full rounded-lg border border-zinc-300 bg-white px-3 py-2.5 text-sm">
+    <p v-if="defaultHint" class="mb-2 text-xs text-zinc-500">{{ defaultHint }}</p>
+    <select v-model="def" class="input">
       <option v-for="c in chosen" :key="c" :value="c">
         {{ LANG_CATALOG.find((l) => l.code === c)?.label ?? c }}
       </option>

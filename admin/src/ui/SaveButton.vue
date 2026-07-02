@@ -44,18 +44,15 @@ const label = computed(() =>
 );
 
 const tone = computed(() => {
-  if (state.value === "saved") return "bg-emerald-600";
-  if (state.value === "error") return "bg-rose-600 hover:bg-rose-500";
-  return "bg-zinc-900 hover:bg-zinc-700";
+  if (state.value === "saved") return "bg-emerald-600 text-white";
+  if (state.value === "error") return "btn-danger";
+  return "btn-primary";
 });
 </script>
 
 <template>
   <button
-    :class="[
-      'inline-flex min-w-[6.5rem] items-center justify-center gap-2 rounded-lg px-4 py-2 text-sm font-medium text-white shadow-sm transition-colors disabled:cursor-default disabled:opacity-60',
-      tone,
-    ]"
+    :class="['btn min-w-[6.5rem] px-4', tone]"
     :disabled="disabled || state === 'saving'"
     @click="run"
   >

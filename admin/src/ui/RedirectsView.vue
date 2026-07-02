@@ -210,10 +210,9 @@ onMounted(() => {
 });
 
 // ── shared class strings (match MenuView) ───────────────────────────────────
-const cellInput =
-  "w-full min-w-0 rounded-md border border-zinc-200 bg-white px-2.5 py-1.5 font-mono text-[13px] text-zinc-900 outline-none transition focus:border-zinc-400";
+const cellInput = "input min-w-0 font-mono text-[13px]";
 const iconBtn =
-  "grid size-7 flex-shrink-0 place-items-center rounded-md text-zinc-400 transition hover:bg-zinc-100 hover:text-zinc-700 disabled:cursor-default disabled:opacity-30 disabled:hover:bg-transparent";
+  "grid size-7 flex-shrink-0 place-items-center rounded-md text-zinc-500 transition hover:bg-white/60 hover:text-zinc-800 disabled:cursor-default disabled:opacity-30 disabled:hover:bg-transparent";
 const toneRing: Record<string, string> = {
   emerald: "bg-emerald-500",
   blue: "bg-blue-500",
@@ -224,9 +223,9 @@ const toneRing: Record<string, string> = {
 </script>
 
 <template>
-  <div class="min-h-screen bg-zinc-50">
-    <header class="sticky top-0 z-30 flex items-center justify-between gap-4 border-b border-zinc-200 bg-white/85 px-5 py-2.5 backdrop-blur">
-      <button class="text-sm text-zinc-500 transition hover:text-zinc-900" @click="emit('back')">← Back</button>
+  <div class="min-h-screen">
+    <header class="toolbar flex items-center justify-between gap-4 px-5 py-2.5">
+      <button class="text-sm text-zinc-600 transition hover:text-zinc-900" @click="emit('back')">← Back</button>
       <span class="flex-1 text-center text-sm"></span>
       <SaveButton
         :action="save"
@@ -238,12 +237,12 @@ const toneRing: Record<string, string> = {
 
     <main class="mx-auto max-w-3xl px-6 pt-8 pb-24">
       <h1 class="mb-1 font-serif text-3xl font-bold tracking-tight text-zinc-900">Redirects</h1>
-      <p class="mb-6 text-sm text-zinc-500">
+      <p class="mb-6 text-sm text-zinc-600">
         Send visitors from an old path to a new one. Rules apply top to bottom — the first match wins.
       </p>
 
       <!-- Status panel -->
-      <section class="mb-5 rounded-2xl border border-zinc-200 bg-white p-4 shadow-sm">
+      <section class="card mb-5 p-4">
         <div class="flex items-center gap-2.5">
           <span
             class="size-2.5 flex-shrink-0 rounded-full"
@@ -268,13 +267,17 @@ const toneRing: Record<string, string> = {
         </div>
       </section>
 
-      <div v-if="loading" class="text-sm text-zinc-400">Loading…</div>
+      <div v-if="loading" class="card space-y-3 p-4">
+        <div class="skeleton h-8 w-full" />
+        <div class="skeleton h-8 w-full" />
+        <div class="skeleton h-8 w-5/6" />
+      </div>
 
       <!-- Rules table -->
-      <div v-else class="overflow-x-auto rounded-2xl border border-zinc-200 bg-white shadow-sm">
+      <div v-else class="card overflow-x-auto">
         <table class="w-full border-collapse text-left">
           <thead>
-            <tr class="border-b border-zinc-100 text-[11px] font-semibold uppercase tracking-wide text-zinc-400">
+            <tr class="border-b border-white/40 text-[11px] font-semibold uppercase tracking-wide text-zinc-500">
               <th class="w-14 px-2 py-2"></th>
               <th class="px-2 py-2">From</th>
               <th class="px-2 py-2">To</th>
@@ -314,7 +317,7 @@ const toneRing: Record<string, string> = {
                 <td class="px-2 py-1.5 align-top">
                   <select
                     v-model.number="r.status"
-                    class="w-full rounded-md border border-zinc-200 bg-white px-2 py-1.5 text-[13px] text-zinc-900 outline-none transition focus:border-zinc-400"
+                    class="input text-[13px]"
                     @change="markDirty"
                   >
                     <option v-for="s in STATUS_OPTIONS" :key="s" :value="s">{{ STATUS_LABELS[s] }}</option>
@@ -325,7 +328,7 @@ const toneRing: Record<string, string> = {
                 </td>
               </tr>
               <!-- Per-row diagnostics -->
-              <tr v-if="diagnostics[i].error || diagnostics[i].warnings.length" class="border-b border-zinc-50">
+              <tr v-if="diagnostics[i].error || diagnostics[i].warnings.length" class="border-b border-white/30">
                 <td></td>
                 <td colspan="4" class="px-2 pb-2">
                   <p v-if="diagnostics[i].error" class="text-xs text-rose-600">
@@ -343,7 +346,7 @@ const toneRing: Record<string, string> = {
             </template>
 
             <tr v-if="rows.length === 0">
-              <td colspan="5" class="px-3 py-6 text-center text-sm text-zinc-400">
+              <td colspan="5" class="px-3 py-6 text-center text-sm text-zinc-500">
                 No redirects yet.
               </td>
             </tr>
@@ -351,9 +354,9 @@ const toneRing: Record<string, string> = {
         </table>
 
         <!-- Inline add row -->
-        <div class="border-t border-zinc-100 px-2 py-2">
+        <div class="border-t border-white/40 px-2 py-2">
           <button
-            class="rounded-lg px-2.5 py-1.5 text-sm font-medium text-zinc-500 transition hover:bg-zinc-50 hover:text-zinc-900"
+            class="rounded-lg px-2.5 py-1.5 text-sm font-medium text-zinc-600 transition hover:bg-white/50 hover:text-zinc-900"
             @click="addRow"
           >
             + Add redirect

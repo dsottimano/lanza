@@ -50,9 +50,9 @@ function toggle(slug: string) {
 </script>
 
 <template>
-  <p v-if="loading" class="text-sm text-zinc-400">Loading…</p>
+  <p v-if="loading" class="text-sm text-zinc-500">Loading…</p>
   <p v-else-if="error" class="text-sm text-rose-600">{{ error }}</p>
-  <p v-else-if="!slugs.length" class="text-sm text-zinc-400">No entries yet.</p>
+  <p v-else-if="!slugs.length" class="text-sm text-zinc-500">No entries yet.</p>
 
   <!-- multiple: checkbox chips -->
   <div v-else-if="field.multiple" class="flex flex-wrap gap-1.5">
@@ -62,7 +62,7 @@ function toggle(slug: string) {
       class="inline-flex cursor-pointer items-center rounded-full border px-3 py-1 text-sm transition"
       :class="selected.includes(s)
         ? 'border-zinc-900 bg-zinc-900 text-white'
-        : 'border-zinc-300 text-zinc-600 hover:border-zinc-400'"
+        : 'border-white/60 bg-white/40 text-zinc-700 hover:border-white/90'"
     >
       <input type="checkbox" class="hidden" :checked="selected.includes(s)" @change="toggle(s)" />
       {{ s }}
