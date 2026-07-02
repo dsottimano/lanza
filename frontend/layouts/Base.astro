@@ -60,6 +60,17 @@ function navClasses(base: string, groups: unknown[], devices: Device[]): string[
     <Seo seo={seo} article={article} locale={locale} alternates={alternates} />
   </head>
   <body>
+    {
+      theme === "liquid-glass" && (
+        <svg width="0" height="0" style="position:absolute" aria-hidden="true" focusable="false">
+          <filter id="glass-distortion" x="-20%" y="-20%" width="140%" height="140%">
+            <feTurbulence type="fractalNoise" baseFrequency="0.008 0.012" numOctaves="2" seed="42" result="noise" />
+            <feGaussianBlur in="noise" stdDeviation="2" result="blurred" />
+            <feDisplacementMap in="SourceGraphic" in2="blurred" scale="36" xChannelSelector="R" yChannelSelector="G" />
+          </filter>
+        </svg>
+      )
+    }
     <header class="site-header">
       <div class="bar">
         <a class="brand" href={homeUrl}>

@@ -490,3 +490,275 @@ main > ul > li > a:hover {
   font-family: var(--font-ui);
   font-weight: 600;
 }
+
+/* ═══ THEME: Liquid Glass — layered translucent glass on an ambient scene ═══
+   Apple-style: a fixed CSS gradient scene behind everything, a floating glass
+   nav dock (the one signature element, with an SVG turbulence distortion), and
+   quiet near-opaque glass panels for reading. Everything below is scoped under
+   [data-theme="liquid-glass"] so the other themes are untouched. Backdrop-filter
+   is limited to a handful of surfaces (dock, content panel, hero/CTA, footer);
+   list rows use a plain translucent tint, never their own blur. */
+[data-theme="liquid-glass"] {
+  --font-ui: ui-sans-serif, system-ui, -apple-system, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif;
+  --font-heading: var(--font-ui);
+  --font-prose: var(--font-ui);
+
+  --ink: #0d1b2a;      /* deep slate ink — high contrast over pale glass */
+  --muted: #48586a;    /* readable secondary (~7:1 on light panels) */
+  --accent: #1f5fd6;   /* trustworthy azure; white text ≈5.2:1 */
+  --bg: #e8eef5;       /* base behind the fixed scene (fallback bg color) */
+  --surface: rgba(255, 255, 255, 0.5);
+  --border: rgba(120, 145, 175, 0.28);
+
+  --content: 46rem;
+  --wide: 66rem;
+  --radius: 20px;
+
+  --h1-size: 3rem;
+  --h1-weight: 750;
+  --prose-size: 1.16rem;
+  --prose-leading: 1.8;
+  --header-border: none;
+  --nav-weight: 550;
+
+  /* glass mixing surface (raised to solid in the no-backdrop-filter fallback) */
+  --glass-tint: rgba(255, 255, 255, 0.5);
+  --glass-panel: rgba(255, 255, 255, 0.74); /* near-opaque reading panel */
+  --glass-line: rgba(255, 255, 255, 0.65);  /* inset shine / hairline */
+  --glass-edge: rgba(120, 145, 175, 0.3);
+  --glass-shadow: 0 10px 34px -12px rgba(18, 38, 64, 0.4);
+  --glass-blur: blur(18px) saturate(160%);
+  --spring: cubic-bezier(0.175, 0.885, 0.32, 2.2);
+}
+
+/* Ambient scene: fixed, CSS-only, self-contained (no external images). Three
+   airy radial blooms + one small warm accent, over a soft cool base. */
+[data-theme="liquid-glass"] body {
+  background:
+    radial-gradient(60% 55% at 16% 18%, rgba(180, 214, 255, 0.75), transparent 70%),
+    radial-gradient(38% 40% at 84% 12%, rgba(255, 214, 186, 0.6), transparent 70%),
+    radial-gradient(55% 60% at 78% 88%, rgba(206, 196, 255, 0.6), transparent 72%),
+    linear-gradient(160deg, #eef4fb 0%, #e5ecf6 55%, #e9e6f4 100%);
+  background-attachment: fixed;
+  min-height: 100vh;
+}
+
+/* ── header dock: the signature floating glass pill ─────────────────────── */
+[data-theme="liquid-glass"] .site-header {
+  position: sticky;
+  top: 0;
+  z-index: 50;
+  border-bottom: none;
+  background: none;
+  padding: 0.7rem 1rem 0.2rem;
+}
+[data-theme="liquid-glass"] .site-header .bar {
+  position: relative;
+  isolation: isolate;
+  max-width: var(--wide);
+  padding: 0.6rem 1.1rem;
+  border-radius: 999px;
+  align-items: center;
+  gap: 1rem;
+  box-shadow: var(--glass-shadow), inset 0 1px 0 var(--glass-line);
+  border: 1px solid var(--glass-edge);
+  overflow: hidden;
+}
+/* backdrop layer (blur + distortion) sits behind the content, so the SVG
+   turbulence only warps the blurred scene — never the nav text. */
+[data-theme="liquid-glass"] .site-header .bar::before {
+  content: "";
+  position: absolute;
+  inset: 0;
+  z-index: -1;
+  background: var(--glass-tint);
+  -webkit-backdrop-filter: var(--glass-blur);
+  backdrop-filter: var(--glass-blur);
+}
+[data-theme="liquid-glass"] .brand {
+  position: relative;
+  font-weight: 750;
+  letter-spacing: -0.02em;
+}
+/* nav links become quiet glass chips with a springy hover */
+[data-theme="liquid-glass"] .site-nav {
+  gap: 0.35rem;
+  align-items: center;
+}
+[data-theme="liquid-glass"] .site-nav a {
+  position: relative;
+  padding: 0.4rem 0.85rem;
+  border-radius: 999px;
+  /* Full ink, not --muted: resting chips sit on a ~0.5-opacity dock that can
+     overlap a bright scene bloom — muted text only reaches ~AA there. */
+  color: var(--ink);
+  font-weight: var(--nav-weight);
+  transition:
+    transform 0.4s var(--spring),
+    background-color 0.25s ease,
+    color 0.25s ease,
+    box-shadow 0.25s ease;
+}
+[data-theme="liquid-glass"] .site-nav a:hover {
+  color: var(--ink);
+  background: rgba(255, 255, 255, 0.55);
+  box-shadow: inset 0 1px 0 var(--glass-line), 0 4px 12px -6px rgba(18, 38, 64, 0.4);
+  transform: translateY(-1px) scale(1.04);
+}
+[data-theme="liquid-glass"] .lang-switch {
+  position: relative;
+  align-items: center;
+}
+
+/* ── reading + list surfaces: quiet near-opaque glass panels ────────────── */
+[data-theme="liquid-glass"] main:not(.layout-landing) {
+  margin-top: 2.5rem;
+  margin-bottom: 2rem;
+  padding: 2.5rem 2rem;
+  background: var(--glass-panel);
+  -webkit-backdrop-filter: blur(12px);
+  backdrop-filter: blur(12px);
+  border: 1px solid var(--glass-edge);
+  border-radius: var(--radius);
+  box-shadow: var(--glass-shadow), inset 0 1px 0 var(--glass-line);
+}
+/* archive/home list rows: translucent tint only — no per-row backdrop-filter */
+[data-theme="liquid-glass"] main > ul {
+  display: grid;
+  gap: 0.7rem;
+}
+[data-theme="liquid-glass"] main > ul > li {
+  padding: 1rem 1.2rem;
+  border-bottom: none;
+  border: 1px solid var(--glass-edge);
+  border-radius: 14px;
+  background: rgba(255, 255, 255, 0.42);
+  transition:
+    transform 0.4s var(--spring),
+    box-shadow 0.25s ease,
+    background-color 0.25s ease;
+}
+[data-theme="liquid-glass"] main > ul > li:hover {
+  background: rgba(255, 255, 255, 0.62);
+  box-shadow: 0 8px 22px -12px rgba(18, 38, 64, 0.45);
+  transform: translateY(-2px);
+}
+
+/* taxonomy + subcategory chips as small glass pills */
+[data-theme="liquid-glass"] .taxonomy a {
+  display: inline-block;
+  margin: 0 0.35rem 0.35rem 0;
+  padding: 0.2rem 0.7rem;
+  border-radius: 999px;
+  background: rgba(255, 255, 255, 0.5);
+  border: 1px solid var(--glass-edge);
+  color: var(--muted);
+  text-decoration: none;
+  font-size: 0.82rem;
+  transition: transform 0.4s var(--spring), color 0.2s ease;
+}
+[data-theme="liquid-glass"] .taxonomy a:hover {
+  color: var(--accent);
+  transform: translateY(-1px) scale(1.04);
+}
+
+/* ── hero / CTA blocks on glass ─────────────────────────────────────────── */
+[data-theme="liquid-glass"] .block-hero,
+[data-theme="liquid-glass"] .block-cta {
+  background: rgba(255, 255, 255, 0.55);
+  -webkit-backdrop-filter: blur(14px) saturate(150%);
+  backdrop-filter: blur(14px) saturate(150%);
+  border: 1px solid var(--glass-edge);
+  border-radius: var(--radius);
+  box-shadow: var(--glass-shadow), inset 0 1px 0 var(--glass-line);
+}
+[data-theme="liquid-glass"] .block-hero h2 {
+  letter-spacing: -0.02em;
+}
+[data-theme="liquid-glass"] .button {
+  box-shadow: 0 10px 24px -10px rgba(31, 95, 214, 0.7), inset 0 1px 0 rgba(255, 255, 255, 0.3);
+  transition: transform 0.4s var(--spring), box-shadow 0.25s ease;
+}
+[data-theme="liquid-glass"] .button:hover {
+  transform: translateY(-2px) scale(1.03);
+}
+
+/* callouts / code inside prose read on their own quiet tint */
+[data-theme="liquid-glass"] .post-body :is(.callout, code) {
+  background: rgba(120, 145, 175, 0.12);
+}
+
+/* ── footer: subtler glass strip ────────────────────────────────────────── */
+[data-theme="liquid-glass"] .site-footer {
+  border-top: none;
+}
+[data-theme="liquid-glass"] .site-footer .bar {
+  position: relative;
+  isolation: isolate;
+  border-radius: var(--radius) var(--radius) 0 0;
+  background: rgba(255, 255, 255, 0.4);
+  -webkit-backdrop-filter: blur(10px);
+  backdrop-filter: blur(10px);
+  border: 1px solid var(--glass-edge);
+  border-bottom: none;
+  box-shadow: inset 0 1px 0 var(--glass-line);
+}
+[data-theme="liquid-glass"] .footer-nav a {
+  padding: 0.3rem 0.7rem;
+  border-radius: 999px;
+  transition: transform 0.4s var(--spring), background-color 0.2s ease, color 0.2s ease;
+}
+[data-theme="liquid-glass"] .footer-nav a:hover {
+  color: var(--ink);
+  background: rgba(255, 255, 255, 0.5);
+  transform: translateY(-1px);
+}
+
+/* ── focus: visible keyboard ring on every interactive glass surface ─────── */
+[data-theme="liquid-glass"] a:focus-visible,
+[data-theme="liquid-glass"] .button:focus-visible {
+  outline: 2px solid var(--accent);
+  outline-offset: 3px;
+  border-radius: 999px;
+}
+
+/* ── accessibility: no motion, no distortion ────────────────────────────── */
+@media (prefers-reduced-motion: reduce) {
+  [data-theme="liquid-glass"] * {
+    transition: none !important;
+  }
+  [data-theme="liquid-glass"] .site-header .bar::before {
+    filter: none !important;
+  }
+}
+
+/* Distortion is applied ONLY to the dock's backdrop layer, and only where both
+   the SVG filter and backdrop-filter are supported. */
+@supports (backdrop-filter: blur(1px)) or (-webkit-backdrop-filter: blur(1px)) {
+  @media (prefers-reduced-motion: no-preference) {
+    [data-theme="liquid-glass"] .site-header .bar::before {
+      filter: url(#glass-distortion);
+    }
+  }
+}
+
+/* Fallback: no backdrop-filter → raise every glass surface to a translucent
+   solid so text keeps its contrast (WCAG-ish) without the blur. */
+@supports not ((backdrop-filter: blur(1px)) or (-webkit-backdrop-filter: blur(1px))) {
+  [data-theme="liquid-glass"] .site-header .bar::before {
+    background: rgba(240, 245, 251, 0.94);
+  }
+  [data-theme="liquid-glass"] main:not(.layout-landing) {
+    background: rgba(248, 250, 253, 0.97);
+  }
+  [data-theme="liquid-glass"] .block-hero,
+  [data-theme="liquid-glass"] .block-cta {
+    background: rgba(244, 248, 252, 0.96);
+  }
+  [data-theme="liquid-glass"] .site-footer .bar {
+    background: rgba(240, 245, 251, 0.95);
+  }
+  [data-theme="liquid-glass"] main > ul > li {
+    background: rgba(248, 250, 253, 0.9);
+  }
+}
