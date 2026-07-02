@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { onBeforeUnmount, onMounted, provide, ref, shallowRef } from "vue";
+import { onMounted, provide, ref, shallowRef } from "vue";
 import { useEditor, EditorContent } from "@tiptap/vue-3";
 import type { GitHubClient } from "../backend/github";
 import { CLIENT_KEY } from "../fields/context";
@@ -137,10 +137,6 @@ onMounted(() => {
         from !== to && e.isEditable && !e.state.selection.empty,
     }),
   );
-});
-
-onBeforeUnmount(() => {
-  editor.value?.destroy();
 });
 
 // ── HTML inspector (verifies the HTML round-trip) ──

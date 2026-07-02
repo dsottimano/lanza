@@ -30,6 +30,19 @@ export const Figure = Node.create({
           return img ? { src: img.getAttribute("src"), alt: img.getAttribute("alt") || "" } : false;
         },
       },
+      // Bare <img> (no <figure> wrapper). The bot's markdown `![alt](src)` renders
+      // as `<p><img></p>` via marked; with no Image node registered, ProseMirror
+      // would drop the unmatched img and the next save would commit the post
+      // without it. Adopt it as a Figure instead (one image concept, empty
+      // caption). Skip imgs already inside a <figure> — the rule above owns those.
+      {
+        tag: "img[src]",
+        getAttrs: (el) => {
+          const img = el as HTMLImageElement;
+          if (img.closest("figure")) return false;
+          return { src: img.getAttribute("src"), alt: img.getAttribute("alt") || "" };
+        },
+      },
     ];
   },
 

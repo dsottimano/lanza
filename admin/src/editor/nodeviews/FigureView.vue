@@ -14,7 +14,19 @@ const error = ref("");
 
 function setUrl() {
   const next = window.prompt("Image URL", props.node.attrs.src || "");
-  if (next !== null) props.updateAttributes({ src: safeImageUrl(next) });
+  if (next === null) return; // cancelled
+  const url = safeImageUrl(next);
+  if (!url) {
+    // Keep the current image rather than silently blanking it on a bad URL.
+    window.alert("Enter a valid http(s) URL.");
+    return;
+  }
+  props.updateAttributes({ src: url });
+}
+
+function setAlt() {
+  const next = window.prompt("Alt text (describe the image for screen readers)", props.node.attrs.alt || "");
+  if (next !== null) props.updateAttributes({ alt: next.trim() });
 }
 
 function onPick(e: Event) {
@@ -29,14 +41,18 @@ function onPick(e: Event) {
 
 <template>
   <NodeViewWrapper class="figure" data-drag-handle>
-    <img
-      v-if="safeSrc"
-      :src="safeSrc"
-      :alt="node.attrs.alt"
-      contenteditable="false"
-      title="Click to replace by URL"
-      @click="setUrl"
-    />
+    <template v-if="safeSrc">
+      <img
+        :src="safeSrc"
+        :alt="node.attrs.alt"
+        contenteditable="false"
+        title="Click to replace by URL"
+        @click="setUrl"
+      />
+      <button class="figure-alt" contenteditable="false" @click="setAlt">
+        {{ node.attrs.alt ? "Alt: " + node.attrs.alt : "+ Add alt text" }}
+      </button>
+    </template>
     <div v-else class="figure-empty" contenteditable="false">
       <span class="figure-emoji">🖼️</span>
       <div class="figure-actions">
@@ -117,6 +133,24 @@ function onPick(e: Event) {
 .figure-error {
   color: #c0392b;
   font-size: 0.78rem;
+}
+.figure-alt {
+  display: inline-block;
+  margin-top: 0.4em;
+  border: none;
+  background: none;
+  color: #a1a1aa;
+  cursor: pointer;
+  font-size: 0.78rem;
+  text-decoration: underline;
+  text-underline-offset: 2px;
+  max-width: 100%;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.figure-alt:hover {
+  color: #71717a;
 }
 .figure-caption {
   margin-top: 0.6em;

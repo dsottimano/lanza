@@ -31,6 +31,7 @@ function apply() {
       loading="lazy"
       allowfullscreen
       frameborder="0"
+      sandbox="allow-scripts allow-same-origin allow-presentation allow-popups"
     />
     <div v-else class="embed-input">
       <span class="embed-label">🔗 Embed URL</span>
