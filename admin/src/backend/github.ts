@@ -107,6 +107,11 @@ export class GitHubClient {
       .map(({ name, path, sha }) => ({ name, path, sha }));
   }
 
+  /** Does a file exist at `path` on the branch? Used to detect media name clashes. */
+  async exists(path: string): Promise<boolean> {
+    return (await this.currentSha(path)) !== undefined;
+  }
+
   /** Load a markdown entry: parsed frontmatter + raw body. */
   async loadEntry(path: string): Promise<LoadedEntry> {
     const file = (await this.req(this.contentsUrl(path))) as {
@@ -182,11 +187,42 @@ export class GitHubClient {
     message: string,
     sha?: string,
   ): Promise<string> {
+    try {
+      return await this.putRawOnce(path, base64, message, sha);
+    } catch (e) {
+      // Stale-sha conflict: the file moved on since we read it (another editor,
+      // or an earlier save whose new sha we didn't keep). Re-fetch the current
+      // sha and retry once — last-write-wins, which is fine for this
+      // single-editor-mostly CMS. This is the ONE place writes recover from 409.
+      if (e instanceof GitHubError && e.status === 409) {
+        return this.putRawOnce(path, base64, message, await this.currentSha(path));
+      }
+      throw e;
+    }
+  }
+
+  private async putRawOnce(
+    path: string,
+    base64: string,
+    message: string,
+    sha?: string,
+  ): Promise<string> {
     const result = (await this.req(this.contentsUrl(path, false), {
       method: "PUT",
       body: JSON.stringify({ message, content: base64, branch: REPO.branch, sha }),
     })) as { content: { sha: string } };
     return result.content.sha;
+  }
+
+  /** Current blob sha of a file, or undefined if it doesn't exist. */
+  private async currentSha(path: string): Promise<string | undefined> {
+    try {
+      const file = (await this.req(this.contentsUrl(path))) as { sha: string };
+      return file.sha;
+    } catch (e) {
+      if (e instanceof GitHubError && e.status === 404) return undefined;
+      throw e;
+    }
   }
 
   async deleteFile(path: string, sha: string, message: string): Promise<void> {

@@ -38,7 +38,6 @@ async function load() {
 }
 
 watch(() => props.collection.name, load, { immediate: true });
-defineExpose({ reload: load });
 </script>
 
 <template>

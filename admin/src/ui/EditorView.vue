@@ -20,16 +20,16 @@ const props = defineProps<{
   locale: Locale;
   path: string | null;
 }>();
-const emit = defineEmits<{ (e: "back", changed: boolean): void }>();
+const emit = defineEmits<{ (e: "back"): void }>();
 
 const editorRef = useTemplateRef<InstanceType<typeof Editor>>("editorRef");
 
-const dirty = ref(false);
 const drawerOpen = ref(false);
 const bodyHtml = ref("<p></p>");
 
 // Frontmatter lives in `data`; the body is the live editor HTML, read at save.
-const { data, loading, save, wasCommitted } = useEntryEditor(props, {
+// `dirty`/`markDirty` are the shared unsaved-changes signal (see useEntryEditor).
+const { data, loading, save, dirty, markDirty } = useEntryEditor(props, {
   onLoaded: (body, isNew) => {
     if (isNew) {
       // Seed a publish date for collections that have one (posts).
@@ -47,20 +47,10 @@ const { data, loading, save, wasCommitted } = useEntryEditor(props, {
   },
 });
 
-// SaveButton drives save(); clear the dirty flag only on a successful commit.
-async function saveAndClean() {
-  await save();
-  dirty.value = false;
-}
-
 // Drawer shows every field except the ones promoted into the chrome.
 const drawerFields = computed<Field[]>(() =>
   props.collection.fields.filter((f) => f.name !== "title" && f.name !== "draft"),
 );
-
-function markDirty() {
-  dirty.value = true;
-}
 </script>
 
 <template>
@@ -68,7 +58,7 @@ function markDirty() {
     <header class="sticky top-0 z-30 flex items-center justify-between gap-4 border-b border-zinc-200 bg-white/85 px-5 py-2.5 backdrop-blur">
       <button
         class="text-sm text-zinc-500 transition hover:text-zinc-900"
-        @click="emit('back', wasCommitted())"
+        @click="emit('back')"
       >
         ← {{ collection.label }}
       </button>
@@ -107,7 +97,7 @@ function markDirty() {
         </button>
 
         <SaveButton
-          :action="saveAndClean"
+          :action="save"
           :disabled="loading"
           @saved="clearError"
           @error="(e) => reportError(e, 'Save failed.')"
@@ -148,7 +138,7 @@ function markDirty() {
         <button class="text-zinc-400 transition hover:text-zinc-900" @click="drawerOpen = false">✕</button>
       </div>
       <div class="flex-1 overflow-y-auto p-5">
-        <FieldForm v-if="!loading" :fields="drawerFields" :data="data" :client="client" />
+        <FieldForm v-if="!loading" :fields="drawerFields" :data="data" :client="client" :locale="locale" />
       </div>
     </aside>
   </div>

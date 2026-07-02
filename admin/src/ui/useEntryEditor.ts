@@ -1,9 +1,10 @@
-import { onMounted, reactive, ref } from "vue";
+import { onMounted, onUnmounted, reactive, ref } from "vue";
 import type { GitHubClient } from "../backend/github";
 import { entryFolder, type FolderCollection } from "../schema";
 import type { Locale } from "../backend/config";
 import { slugify } from "../backend/slug";
 import { reportError } from "../errors";
+import { isDirty } from "./dirty";
 
 // Shared load/save lifecycle for the two entry editors — the rich-body
 // EditorView (posts/pages) and the form-only RecordEditor (categories/tags/
@@ -34,7 +35,13 @@ export function useEntryEditor(props: EntryEditorProps, hooks: EntryEditorHooks)
   const data = reactive<Record<string, unknown>>({});
   let sha: string | undefined;
   let currentPath = props.path;
-  let committed = false;
+
+  // Dirty tracking lives here so both entry editors share it. `isDirty` is the
+  // app-wide flag App.vue guards navigation on; reset it whenever this editor
+  // mounts/unmounts so a stale flag from a previous pane never lingers.
+  const markDirty = () => (isDirty.value = true);
+  isDirty.value = false;
+  onUnmounted(() => (isDirty.value = false));
 
   onMounted(async () => {
     try {
@@ -69,10 +76,8 @@ export function useEntryEditor(props: EntryEditorProps, hooks: EntryEditorHooks)
       `${sha ? "lanza: update" : "lanza: create"} ${currentPath}`,
       sha,
     );
-    committed = true;
+    isDirty.value = false;
   }
 
-  // `committed` is a plain flag read at "back"-emit time; expose a getter so the
-  // template reads its current value without making it reactive.
-  return { data, loading, save, wasCommitted: () => committed };
+  return { data, loading, save, dirty: isDirty, markDirty };
 }

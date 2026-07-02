@@ -1,5 +1,5 @@
-// Repo coordinates — must match public/admin/config.yml (backend.repo/branch)
-// and the posts folder Astro reads. We are NOT moving the folder.
+// Repo coordinates — the repo the CMS reads and writes, and the branch Astro
+// builds from. The content model itself lives in admin/src/schema.ts.
 export const REPO = {
   owner: "dsottimano",
   name: "lanza",
@@ -15,8 +15,7 @@ export const POSTS_DIR = "frontend/content/posts";
 export type Locale = string;
 
 // Media: uploaded images are committed under MEDIA.dir and served as static
-// assets at MEDIA.publicPrefix. Must match public/admin/config.yml
-// (media_folder / public_folder). Images ship straight from the static build —
+// assets at MEDIA.publicPrefix. Images ship straight from the static build —
 // never through a Worker (see CLAUDE.md Rule 3).
 export const MEDIA = {
   dir: "public/images/uploads",

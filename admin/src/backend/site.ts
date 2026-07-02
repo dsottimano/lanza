@@ -85,32 +85,25 @@ export const LANG_CATALOG: LocaleDef[] = [
   { code: "ja", label: "日本語", ogLocale: "ja_JP" },
 ];
 
-// Resilient JSON write through the proxy: re-fetch the sha immediately before the
-// PUT and retry once on a 409 (stale-sha conflict). `build` receives the current
-// file data (or {} if absent) so callers can merge and preserve unknown keys
-// (e.g. `onboarded`). Used by the onboarding wizard and the Languages settings.
+// Merge-write a JSON file through the proxy: read the current file, hand its data
+// (or {} if absent) to `build` so callers can preserve unknown keys (e.g.
+// `onboarded`), then save. The stale-sha 409 retry lives in the client's write
+// path, so this stays a thin read-merge helper. Used by the onboarding wizard and
+// the Languages settings.
 export async function putJsonSafe(
   client: GitHubClient,
   path: string,
   build: (current: Record<string, unknown>) => Record<string, unknown>,
   message: string,
 ): Promise<void> {
-  for (let attempt = 0; attempt < 2; attempt++) {
-    let current: Record<string, unknown> = {};
-    let sha: string | undefined;
-    try {
-      const j = await client.loadJson(path);
-      current = j.data;
-      sha = j.sha;
-    } catch (e) {
-      if (!(e instanceof GitHubError && e.status === 404)) throw e;
-    }
-    try {
-      await client.saveJson(path, build(current), message, sha);
-      return;
-    } catch (e) {
-      if (e instanceof GitHubError && e.status === 409 && attempt === 0) continue;
-      throw e;
-    }
+  let current: Record<string, unknown> = {};
+  let sha: string | undefined;
+  try {
+    const j = await client.loadJson(path);
+    current = j.data;
+    sha = j.sha;
+  } catch (e) {
+    if (!(e instanceof GitHubError && e.status === 404)) throw e;
   }
+  await client.saveJson(path, build(current), message, sha);
 }

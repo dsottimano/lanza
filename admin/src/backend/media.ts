@@ -26,10 +26,28 @@ function fileToBase64(file: File): Promise<string> {
   });
 }
 
+// Different source names can slug to the same file (e.g. "My Photo!!.jpg" and
+// "my_photo.jpg" both → my-photo.jpg). When the slug already exists, ask whether
+// to replace it; if not, append -2, -3… until a free name is found so an upload
+// never silently clobbers an unrelated image.
+async function resolveName(client: GitHubClient, base: string): Promise<string> {
+  if (!(await client.exists(`${MEDIA.dir}/${base}`))) return base;
+  if (confirm(`An image named "${base}" already exists. Replace it?`)) return base;
+
+  const dot = base.lastIndexOf(".");
+  const stem = dot > 0 ? base.slice(0, dot) : base;
+  const ext = dot > 0 ? base.slice(dot) : "";
+  for (let n = 2; ; n++) {
+    const candidate = `${stem}-${n}${ext}`;
+    if (!(await client.exists(`${MEDIA.dir}/${candidate}`))) return candidate;
+  }
+}
+
 /** Upload an image as its own commit; resolves to its public path/URL. */
 export async function uploadImage(client: GitHubClient, file: File): Promise<string> {
-  const name = fileSlug(file.name);
+  const base64 = await fileToBase64(file);
+  const name = await resolveName(client, fileSlug(file.name));
   const path = `${MEDIA.dir}/${name}`;
-  await client.uploadBinary(path, await fileToBase64(file), `lanza: upload ${name}`);
+  await client.uploadBinary(path, base64, `lanza: upload ${name}`);
   return `${MEDIA.publicPrefix}/${name}`;
 }

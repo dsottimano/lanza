@@ -15,12 +15,12 @@ const props = defineProps<{
   locale: Locale;
   path: string | null;
 }>();
-const emit = defineEmits<{ (e: "back", changed: boolean): void }>();
+const emit = defineEmits<{ (e: "back"): void }>();
 
 // Body-less collection: keep whatever body the file already had and re-commit it
 // untouched (this editor only edits frontmatter fields).
 let body = "";
-const { data, loading, save, wasCommitted } = useEntryEditor(props, {
+const { data, loading, save, markDirty } = useEntryEditor(props, {
   onLoaded: (loadedBody) => (body = loadedBody),
   getBody: () => body,
 });
@@ -29,7 +29,7 @@ const { data, loading, save, wasCommitted } = useEntryEditor(props, {
 <template>
   <div class="min-h-screen bg-zinc-50">
     <header class="sticky top-0 z-30 flex items-center justify-between gap-4 border-b border-zinc-200 bg-white/85 px-5 py-2.5 backdrop-blur">
-      <button class="text-sm text-zinc-500 transition hover:text-zinc-900" @click="emit('back', wasCommitted())">
+      <button class="text-sm text-zinc-500 transition hover:text-zinc-900" @click="emit('back')">
         ← {{ collection.label }}
       </button>
       <span class="flex-1 text-center text-sm"></span>
@@ -46,8 +46,13 @@ const { data, loading, save, wasCommitted } = useEntryEditor(props, {
         {{ path ? "Edit" : "New" }} {{ collection.labelSingular.toLowerCase() }}
       </h1>
       <div v-if="loading" class="text-sm text-zinc-400">Loading…</div>
-      <div v-else class="rounded-2xl border border-zinc-200 bg-white p-6 shadow-sm">
-        <FieldForm :fields="collection.fields" :data="data" :client="client" />
+      <div
+        v-else
+        class="rounded-2xl border border-zinc-200 bg-white p-6 shadow-sm"
+        @input="markDirty"
+        @change="markDirty"
+      >
+        <FieldForm :fields="collection.fields" :data="data" :client="client" :locale="locale" />
       </div>
     </main>
   </div>

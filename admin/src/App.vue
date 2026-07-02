@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { ref, shallowRef, useTemplateRef } from "vue";
+import { ref, shallowRef } from "vue";
 import Sidebar from "./ui/Sidebar.vue";
 import CollectionList from "./ui/CollectionList.vue";
 import EditorView from "./ui/EditorView.vue";
@@ -14,6 +14,7 @@ import { GitHubClient } from "./backend/github";
 import type { Locale } from "./backend/config";
 import { site, loadSiteConfig } from "./backend/site";
 import { reportError } from "./errors";
+import { confirmDiscard } from "./ui/dirty";
 import { getCollection, type FolderCollection, type FileEntry } from "./schema";
 
 type Pane = "list" | "editRich" | "editRecord" | "settings" | "help" | "languages" | "themes";
@@ -41,9 +42,12 @@ const locale = ref<Locale>("en");
 const collection = shallowRef<FolderCollection>(getCollection("posts") as FolderCollection);
 const editingPath = ref<string | null>(null);
 const settingsFile = shallowRef<FileEntry | null>(null);
-const listRef = useTemplateRef<InstanceType<typeof CollectionList>>("listRef");
+
+// Every pane transition guards on unsaved changes: if the active editor is dirty,
+// confirmDiscard() prompts and bails out when the user cancels.
 
 function selectCollection(name: string) {
+  if (!confirmDiscard()) return;
   collection.value = getCollection(name) as FolderCollection;
   settingsFile.value = null;
   editingPath.value = null;
@@ -53,6 +57,7 @@ function selectCollection(name: string) {
 // Switching language drops back to the list so you never edit one locale's entry
 // while the rail says another. The list re-fetches via its locale-keyed remount.
 function setLocale(l: Locale) {
+  if (!confirmDiscard()) return;
   locale.value = l;
   settingsFile.value = null;
   editingPath.value = null;
@@ -60,23 +65,27 @@ function setLocale(l: Locale) {
 }
 
 function openSettings(file: FileEntry) {
+  if (!confirmDiscard()) return;
   settingsFile.value = file;
   pane.value = "settings";
 }
 
 function openHelp() {
+  if (!confirmDiscard()) return;
   settingsFile.value = null;
   editingPath.value = null;
   pane.value = "help";
 }
 
 function openLanguages() {
+  if (!confirmDiscard()) return;
   settingsFile.value = null;
   editingPath.value = null;
   pane.value = "languages";
 }
 
 function openThemes() {
+  if (!confirmDiscard()) return;
   settingsFile.value = null;
   editingPath.value = null;
   pane.value = "themes";
@@ -101,9 +110,13 @@ function newEntry() {
   pane.value = collection.value.body === "rich" ? "editRich" : "editRecord";
 }
 
-function backToList(changed: boolean) {
+// Shared "return to the list" handler for the editors' ← Back and the settings/
+// help/themes/languages panes. Guards on unsaved changes like the rail nav does.
+// The list remounts (its :key changes) and reloads on its own, so nothing to
+// refresh here.
+function backToList() {
+  if (!confirmDiscard()) return;
   pane.value = "list";
-  if (changed) listRef.value?.reload();
 }
 
 // Onboarding just finished: config was reloaded, so adopt the new default locale
@@ -165,19 +178,18 @@ function onOnboarded() {
         :client="client"
         :file="settingsFile"
         :locale="locale"
-        @back="pane = 'list'"
+        @back="backToList"
       />
-      <HelpView v-else-if="pane === 'help'" @back="pane = 'list'" />
-      <ThemesView v-else-if="pane === 'themes'" :client="client" @back="pane = 'list'" />
+      <HelpView v-else-if="pane === 'help'" @back="backToList" />
+      <ThemesView v-else-if="pane === 'themes'" :client="client" @back="backToList" />
       <LanguagesView
         v-else-if="pane === 'languages'"
         :client="client"
-        @back="pane = 'list'"
+        @back="backToList"
         @saved="onLanguagesSaved"
       />
       <CollectionList
         v-else
-        ref="listRef"
         :key="`list#${collection.name}#${locale}`"
         :client="client"
         :collection="collection"

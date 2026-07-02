@@ -4,16 +4,19 @@
 import { provide } from "vue";
 import type { Field } from "../schema";
 import type { GitHubClient } from "../backend/github";
+import type { Locale } from "../backend/config";
 import FieldInput from "./FieldInput.vue";
-import { CLIENT_KEY } from "./context";
+import { CLIENT_KEY, LOCALE_KEY } from "./context";
 
 const props = defineProps<{
   fields: Field[];
   data: Record<string, unknown>;
   client: GitHubClient;
+  locale: Locale;
 }>();
 
 provide(CLIENT_KEY, props.client);
+provide(LOCALE_KEY, props.locale);
 </script>
 
 <template>

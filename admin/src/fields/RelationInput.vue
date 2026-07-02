@@ -4,14 +4,15 @@
 // value_field: {{slug}}). One cheap directory listing; no per-file fetches.
 import { computed, inject, onMounted, ref } from "vue";
 import type { Field } from "../schema";
-import { getCollection } from "../schema";
-import { CLIENT_KEY } from "./context";
+import { entryFolder, getCollection } from "../schema";
+import { CLIENT_KEY, LOCALE_KEY } from "./context";
 import { inputCls } from "./styles";
 
 const props = defineProps<{ field: Field }>();
 const model = defineModel<string | string[] | undefined>();
 
 const client = inject(CLIENT_KEY);
+const locale = inject(LOCALE_KEY);
 const slugs = ref<string[]>([]);
 const loading = ref(true);
 const error = ref("");
@@ -24,7 +25,10 @@ onMounted(async () => {
     return;
   }
   try {
-    const files = await client.listDir(target.folder);
+    // Localized targets (categories/tags) live under folder/<locale> — scope the
+    // listing to the active locale so entries actually show up.
+    const dir = locale ? entryFolder(target, locale) : target.folder;
+    const files = await client.listDir(dir);
     slugs.value = files.map((f) => f.name.replace(/\.md$/, "")).sort();
   } catch (e) {
     error.value = e instanceof Error ? e.message : "Failed to load options.";
