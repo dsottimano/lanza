@@ -13,7 +13,23 @@ import ErrorDialog from "./ui/ErrorDialog.vue";
 // layout-stable skeleton takes over until its data arrives.
 const PaneFallback = { render: () => h("div", { class: "min-h-screen" }) };
 const lazyPane = (loader: () => Promise<unknown>) =>
-  defineAsyncComponent({ loader: loader as never, loadingComponent: PaneFallback, delay: 0 });
+  defineAsyncComponent({
+    loader: loader as never,
+    loadingComponent: PaneFallback,
+    delay: 0,
+    // A failed chunk fetch must never dead-end in a blank pane. Retry once
+    // (transient blip), then surface it — the usual cause in dev is a stale
+    // Vite optimizer under a tab that outlived a dev-server restart.
+    onError(error, retry, fail, attempts) {
+      if (attempts <= 1) return retry();
+      reportError(
+        new Error(
+          `Couldn't load this screen (${error.message}). Reload the page — in dev, restart npm run dev.`,
+        ),
+      );
+      fail();
+    },
+  });
 
 const EditorView = lazyPane(() => import("./ui/EditorView.vue"));
 const RecordEditor = lazyPane(() => import("./ui/RecordEditor.vue"));
