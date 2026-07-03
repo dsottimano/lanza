@@ -69,9 +69,16 @@ the page, the network tab, and the build output.
 
 ## Who can get in
 
-`/admin` (and its proxy) sits behind **Cloudflare Zero Trust (Access)**, so only
-authorized people reach the CMS at all. Past that gate, the server-side token does
-the GitHub work — no per-user token pasting required.
+`/admin` (and its proxy) sits behind a **"Sign in with GitHub"** gate — a small
+Pages Function middleware (`functions/admin/_middleware.ts`). You log in with the
+GitHub account that owns the site; a signed, HttpOnly session cookie keeps you in.
+Only the login named in the `ADMIN_LOGIN` setting is allowed, so nobody else can
+reach the CMS. Past that gate, the server-side token does the GitHub work — no
+per-user token pasting required.
+
+(This replaced Cloudflare Zero Trust, whose free tier demands a credit card during
+setup — a non-starter for onboarding non-technical owners. See the Onboarding &
+hosting doc for the full reasoning.)
 
 ## Publishing
 
