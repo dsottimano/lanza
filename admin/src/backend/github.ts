@@ -302,6 +302,50 @@ export class GitHubClient {
     return commit.sha;
   }
 
+  // ── working branch + publish ─────────────────────────────────────────────
+
+  /**
+   * Ensure the working (drafts) branch exists, branching it from production if
+   * not. The CMS reads/writes REPO.branch (staging); on a fresh repo that branch
+   * doesn't exist yet, so this runs at boot before the first read — otherwise
+   * every read 404s and looks like an un-onboarded repo.
+   */
+  async ensureWorkingBranch(): Promise<void> {
+    const git = `/repos/${REPO.owner}/${REPO.name}/git`;
+    try {
+      await this.req(`${git}/ref/heads/${REPO.branch}`);
+      return; // already exists
+    } catch (e) {
+      if (!(e instanceof GitHubError && e.status === 404)) throw e;
+    }
+    const prod = (await this.req(`${git}/ref/heads/${REPO.productionBranch}`)) as {
+      object: { sha: string };
+    };
+    await this.req(`${git}/refs`, {
+      method: "POST",
+      body: JSON.stringify({ ref: `refs/heads/${REPO.branch}`, sha: prod.object.sha }),
+    });
+  }
+
+  /**
+   * Publish: merge the working branch into production (which triggers the public
+   * rebuild). Returns whether anything was merged (`false` = production already
+   * up to date). A merge conflict surfaces as GitHubError(409) for the caller to
+   * report ("resolve on GitHub") — it never silently overwrites production.
+   */
+  async publish(message: string): Promise<{ merged: boolean }> {
+    const res = (await this.req(`/repos/${REPO.owner}/${REPO.name}/merges`, {
+      method: "POST",
+      body: JSON.stringify({
+        base: REPO.productionBranch,
+        head: REPO.branch,
+        commit_message: message,
+      }),
+    })) as { sha: string } | null;
+    // 201 → merge commit; 204 (null) → base already contains head, nothing to do.
+    return { merged: res !== null };
+  }
+
   // ── Read-only history/diff endpoints (used by theme revert) ──────────────
 
   /** List commits on the branch, newest first (one page). */

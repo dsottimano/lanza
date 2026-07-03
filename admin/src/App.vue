@@ -45,9 +45,10 @@ const OnboardingWizard = lazyPane(() => import("./ui/OnboardingWizard.vue"));
 import { GitHubClient } from "./backend/github";
 import type { Locale } from "./backend/config";
 import { site, loadSiteConfig } from "./backend/site";
+import { loadSchema } from "./backend/schema";
 import { reportError } from "./errors";
 import { confirmDiscard } from "./ui/dirty";
-import { getCollection, type FolderCollection, type FileEntry } from "./schema";
+import { getCollection, folderCollections, type FolderCollection, type FileEntry } from "./schema";
 
 type Pane =
   | "list"
@@ -69,9 +70,17 @@ const client = shallowRef(new GitHubClient());
 // Load the data-driven site config (locales) from the repo before rendering, so
 // the language rail and default locale reflect frontend/data/site.json.
 const ready = ref(false);
-loadSiteConfig(client.value)
+// Make sure the working branch (staging) exists before the first read — a fresh
+// repo has only `main`, and reads against a missing branch 404 and masquerade as
+// an un-onboarded repo. Then load the data-driven config + content model from it.
+client.value
+  .ensureWorkingBranch()
+  .then(() => Promise.all([loadSiteConfig(client.value), loadSchema(client.value)]))
   .then(() => {
     locale.value = site.defaultLocale;
+    // Re-resolve the default collection against the loaded model — the seeded
+    // "posts" may have been renamed/removed via the content-type editor.
+    collection.value = (getCollection("posts") ?? folderCollections()[0]) as FolderCollection;
   })
   .catch((e) => reportError(e))
   .finally(() => {

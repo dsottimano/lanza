@@ -1,9 +1,14 @@
-// Repo coordinates — the repo the CMS reads and writes, and the branch Astro
-// builds from. The content model itself lives in admin/src/schema.ts.
+// Repo coordinates. The CMS reads and writes the WORKING branch (`staging`) — a
+// shared drafts branch, served at the Access-gated staging domain. Publishing
+// merges it into `productionBranch` (`main`), the branch Astro builds the public
+// site from. `branch` is the working branch so every existing read/write path
+// targets staging automatically. The proxy allowlist (functions/_lib/gh-proxy.ts)
+// MUST list both branches. The content model itself lives in admin/src/schema.ts.
 export const REPO = {
   owner: "dsottimano",
   name: "lanza",
-  branch: "main",
+  branch: "staging",
+  productionBranch: "main",
 } as const;
 
 export const POSTS_DIR = "frontend/content/posts";

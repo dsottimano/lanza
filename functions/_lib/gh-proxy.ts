@@ -5,10 +5,14 @@
 // bundler and Vite/esbuild.
 
 // Repo coordinates — MUST match admin/src/backend/config.ts (REPO). The proxy is
-// scoped to this one repo/branch; nothing else is reachable through it.
+// scoped to this one repo; nothing else is reachable through it. The CMS works on
+// the WORKING_BRANCH (drafts) and publishes by merging it into BRANCH (production
+// — the branch Astro builds from). Ref reads/writes are allowed for both.
 const OWNER = "dsottimano";
 const NAME = "lanza";
-const BRANCH = "main";
+const BRANCH = "main"; // production / publish target (Astro builds from this)
+const WORKING_BRANCH = "staging"; // CMS drafts branch
+const BRANCHES = [BRANCH, WORKING_BRANCH];
 const REPO_PREFIX = `repos/${OWNER}/${NAME}`;
 
 // Request headers worth forwarding upstream. Everything else (cookies, CF
@@ -54,7 +58,7 @@ export function isAllowed(method: string, path: string): boolean {
       return (
         p === "user" || // token validation / login
         p.startsWith(`${REPO_PREFIX}/contents/`) || // read + list entries
-        p === `${git}/ref/heads/${BRANCH}` || // branch head (commitFiles)
+        BRANCHES.some((b) => p === `${git}/ref/heads/${b}`) || // branch head (commitFiles / ensureWorkingBranch)
         p.startsWith(`${git}/commits/`) || // read a git-data commit (commitFiles)
         p.startsWith(`${git}/trees/`) || // read a tree, recursive (revert)
         p.startsWith(`${git}/blobs/`) || // read a blob (revert)
@@ -67,10 +71,14 @@ export function isAllowed(method: string, path: string): boolean {
       return p.startsWith(`${REPO_PREFIX}/contents/`); // create / update / delete
     case "POST":
       return (
-        p === `${git}/blobs` || p === `${git}/trees` || p === `${git}/commits`
+        p === `${git}/blobs` ||
+        p === `${git}/trees` ||
+        p === `${git}/commits` ||
+        p === `${git}/refs` || // create the working branch (ensureWorkingBranch)
+        p === `${REPO_PREFIX}/merges` // publish: merge working branch → production
       );
     case "PATCH":
-      return p === `${git}/refs/heads/${BRANCH}`; // fast-forward the branch
+      return BRANCHES.some((b) => p === `${git}/refs/heads/${b}`); // fast-forward a branch
     default:
       return false;
   }
