@@ -21,3 +21,6 @@ uploads/
 
 # Tooling working dir
 .superpowers/
+
+# Original (non-Lanza-format) theme source bundles — inputs, not deliverables
+themes/laperle-theme.tar.gz
