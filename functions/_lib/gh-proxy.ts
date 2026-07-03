@@ -86,8 +86,8 @@ export function isAllowed(method: string, path: string): boolean {
 
 // Cheap CSRF guard for state-changing methods: if the browser sent an Origin, its
 // host must match the request's host. An absent Origin (non-browser tooling) is
-// allowed. Cloudflare Access already gates the route; this blocks a cross-site
-// page from driving writes through an authenticated editor's session.
+// allowed. The GitHub-OAuth auth gate already protects the route; this blocks a
+// cross-site page from driving writes through an authenticated editor's session.
 const WRITE_METHODS = new Set(["PUT", "POST", "PATCH", "DELETE"]);
 export function crossOriginBlocked(
   method: string,

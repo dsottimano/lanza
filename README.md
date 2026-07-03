@@ -36,8 +36,9 @@ build, so a bare `npm run dev` won't serve `/admin` until you've built it
 
 ## Editing content — Lanza at `/admin`
 
-- Deploy, then visit `https://<your-site>/admin/`. Access is gated by Cloudflare
-  Zero Trust (Access) — once you're through, the CMS opens straight in.
+- Deploy, then visit `https://<your-site>/admin/`. Access is gated by "Sign in
+  with GitHub" — you're redirected to GitHub, and once your login matches the
+  `ADMIN_LOGIN` allowlist the CMS opens straight in.
 - No sign-in screen and no browser token: the GitHub token lives server-side and
   is injected by the `/admin/api/gh` proxy (a Cloudflare Pages Function). Set it
   as the `GITHUB_TOKEN` Pages secret (fine-grained PAT, **Contents: read &
@@ -72,15 +73,22 @@ The CMS never holds a GitHub token; every write reaches GitHub through the
    read & write on this one repo** — nothing else. Never broaden it (no other
    repos, no extra permissions) and never reuse it elsewhere; it is the only
    secret guarding the whole content store.
-2. **Cloudflare Access.** All of `/admin/*` (the SPA and the proxy) sits behind
-   Zero Trust — only authorized editors reach it.
+2. **GitHub-OAuth auth gate.** All of `/admin/*` (the SPA and the proxies) sits
+   behind a "Sign in with GitHub" gate (`functions/admin/_middleware.ts`). An
+   unauthenticated request is redirected into the OAuth flow; the callback
+   (`functions/admin/api/auth/callback.ts`) exchanges the code for a *scopeless*
+   user token, reads the GitHub login, and lets in only logins on the
+   `ADMIN_LOGIN` allowlist — then mints a signed, HttpOnly session cookie
+   (`SESSION_SECRET`). No GitHub token is ever stored in the session. Config:
+   `GITHUB_CLIENT_ID`, `GITHUB_CLIENT_SECRET`, `SESSION_SECRET`, `ADMIN_LOGIN`
+   (Pages secrets). The OAuth app's callback URL is `<site>/admin/api/auth/callback`.
 3. **Endpoint allowlist.** The proxy enforces a method+path allowlist
    (`functions/_lib/gh-proxy.ts`, shared by the prod Pages Function and the dev
    Vite middleware) *before* attaching the token: only the exact GitHub endpoints
    the CMS calls, on this repo/branch, are forwarded — everything else is 403.
 
 **CSRF** is mitigated by a same-origin check on state-changing methods (a write
-whose `Origin` host differs from the request host is rejected) layered on Access.
+whose `Origin` host differs from the request host is rejected) layered on the auth gate.
 The proxy also strips GitHub's token-scope and rate-limit headers from responses.
 
 The **Cloudflare API proxy** (`/admin/api/cf`, `functions/_lib/cf-proxy.ts` shared

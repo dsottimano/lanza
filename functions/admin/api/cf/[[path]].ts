@@ -5,8 +5,9 @@
 // Function runs at the edge, resolves the `self` placeholders (account + project)
 // to server-side values, and forwards the request to the Cloudflare API with
 // `Authorization: Bearer <CLOUDFLARE_API_TOKEN>` from a Pages runtime secret. The
-// whole /admin/* path (this route included) is already gated by Cloudflare Zero
-// Trust (Access), so only authorized editors reach it.
+// whole /admin/* path (this route included) is already gated by the GitHub-OAuth
+// auth gate (functions/admin/_middleware.ts), so only the allowlisted editor
+// reaches it.
 //
 // Set in the Pages project (Settings → Variables & Secrets, encrypted):
 //   CLOUDFLARE_API_TOKEN   — scoped token (KV/D1/R2/Pages: Edit — see README)
@@ -72,7 +73,7 @@ export const onRequest = async (context: {
   }
 
   // CSRF guard: a cross-origin write from an authenticated editor's browser is
-  // rejected. Access gates the route; this stops a malicious page riding along.
+  // rejected. The auth gate protects the route; this stops a malicious page riding along.
   if (crossOriginBlocked(request.method, request.headers.get("origin"), url.host)) {
     return json(403, { message: "Cross-origin write rejected." });
   }

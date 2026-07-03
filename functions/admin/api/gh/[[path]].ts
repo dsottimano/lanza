@@ -4,8 +4,9 @@
 // GitHub token NEVER reaches the browser or the build output. This Function runs
 // at the edge, forwards the request to https://api.github.com verbatim, and
 // injects `Authorization: Bearer <GITHUB_TOKEN>` from a Cloudflare Pages runtime
-// secret. The whole /admin/* path (this route included) is already gated by
-// Cloudflare Zero Trust (Access), so only authorized editors reach it.
+// secret. The whole /admin/* path (this route included) is already gated by the
+// GitHub-OAuth auth gate (functions/admin/_middleware.ts) — an unauthenticated
+// request never reaches this Function — so only the allowlisted editor gets here.
 //
 // Set the secret in the Pages project: Settings → Variables → GITHUB_TOKEN
 // (encrypted). A fine-grained PAT with Contents: read/write on the repo.
@@ -51,7 +52,7 @@ export const onRequest = async (context: {
   }
 
   // CSRF guard: a cross-origin write from an authenticated editor's browser is
-  // rejected. Access gates the route; this stops a malicious page riding along.
+  // rejected. The auth gate protects the route; this stops a malicious page riding along.
   if (crossOriginBlocked(request.method, request.headers.get("origin"), url.host)) {
     return json(403, { message: "Cross-origin write rejected." });
   }
