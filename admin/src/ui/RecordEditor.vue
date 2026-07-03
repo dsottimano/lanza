@@ -57,7 +57,7 @@ const { data, loading, save, markDirty } = useEntryEditor(props, {
         @input="markDirty"
         @change="markDirty"
       >
-        <FieldForm :fields="collection.fields" :data="data" :client="client" :locale="locale" />
+        <FieldForm :fields="collection.fields" :data="data" :client="client" :locale="locale" dense />
       </div>
     </main>
   </div>

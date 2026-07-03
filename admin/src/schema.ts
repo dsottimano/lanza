@@ -124,11 +124,12 @@ function seoField(opts: { ogTypeDefault: string; withAuthor: boolean }): Field {
   return { name: "seo", label: "SEO", widget: "object", required: false, collapsed: true, fields };
 }
 
-// Per-entry TEMPLATE — the WordPress-style layout variant, shared by posts +
-// pages. Options MUST mirror the frontend registry (frontend/lib/templates.ts,
-// the source of truth); keep them in sync — the house pattern for shared shapes
-// (cf. frontend/lib/site.ts ↔ MenuView.vue). Was named "layout" before the
-// template feature; the frontend still reads the legacy key so old content is safe.
+// Per-entry TEMPLATE — the WordPress-style layout variant. Options MUST mirror
+// the frontend registry (frontend/lib/templates.ts, the source of truth); keep
+// them in sync — the house pattern for shared shapes (cf. frontend/lib/site.ts ↔
+// MenuView.vue). Was named "layout" before the template feature; the frontend
+// still reads the legacy key so old content is safe. Any folder collection opts
+// in by dropping this shared const into its `fields` (posts, pages, listings do).
 const TEMPLATE_FIELD: Field = {
   name: "template",
   label: "Template",
@@ -387,6 +388,7 @@ export const COLLECTIONS: Collection[] = [
         required: false,
         hint: "Tags the 'find your place' quiz matches on (e.g. coastal, investment).",
       },
+      TEMPLATE_FIELD,
       seoField({ ogTypeDefault: "article", withAuthor: false }),
     ],
   },

@@ -1,8 +1,9 @@
 <script setup lang="ts">
-// Rich-body entry editor (posts & pages). The writing canvas stays front and
-// centre; every structured field lives in a Ghost-style slide-in drawer driven
-// by the collection schema. Title and the draft/publish toggle are surfaced in
-// the chrome, so they're excluded from the drawer.
+// Rich-body entry editor (posts, pages, listings). The writing canvas stays the
+// centre of gravity; on wide screens every structured field lives in a
+// persistent, independently-scrollable "details" column beside the paper. On
+// narrow screens that column stacks below the canvas. Title and the draft/
+// publish toggle are surfaced in the chrome, so they're excluded from the panel.
 import { computed, ref, useTemplateRef } from "vue";
 import Editor from "../editor/Editor.vue";
 import FieldForm from "../fields/FieldForm.vue";
@@ -24,7 +25,6 @@ const emit = defineEmits<{ (e: "back"): void }>();
 
 const editorRef = useTemplateRef<InstanceType<typeof Editor>>("editorRef");
 
-const drawerOpen = ref(false);
 const bodyHtml = ref("<p></p>");
 
 // Frontmatter lives in `data`; the body is the live editor HTML, read at save.
@@ -47,8 +47,8 @@ const { data, loading, save, dirty, markDirty } = useEntryEditor(props, {
   },
 });
 
-// Drawer shows every field except the ones promoted into the chrome.
-const drawerFields = computed<Field[]>(() =>
+// The details panel shows every field except the ones promoted into the chrome.
+const panelFields = computed<Field[]>(() =>
   props.collection.fields.filter((f) => f.name !== "title" && f.name !== "draft"),
 );
 </script>
@@ -88,10 +88,6 @@ const drawerFields = computed<Field[]>(() =>
           Published
         </label>
 
-        <button class="btn btn-ghost" title="Settings" @click="drawerOpen = true">
-          ⚙ Settings
-        </button>
-
         <SaveButton
           :action="save"
           :disabled="loading"
@@ -101,49 +97,63 @@ const drawerFields = computed<Field[]>(() =>
       </div>
     </header>
 
-    <main class="flex flex-1 justify-center px-5 pt-12 pb-24">
-      <!-- Layout-stable skeleton mirroring the title + first body lines. -->
-      <div v-if="loading" class="w-full max-w-5xl">
-        <div class="skeleton mb-8 h-12 w-3/4" />
-        <div class="skeleton mb-3 h-4 w-full" />
-        <div class="skeleton mb-3 h-4 w-11/12" />
-        <div class="skeleton h-4 w-4/5" />
-      </div>
-      <!-- Calm, near-opaque "paper" surface — writing comfort beats effect. -->
-      <div v-else class="editor-paper w-full max-w-5xl">
-        <input
-          v-model="data.title"
-          class="mx-auto mb-6 block w-full max-w-[46rem] border-none bg-transparent font-serif text-5xl font-bold leading-tight tracking-tight text-zinc-900 outline-none placeholder:text-zinc-300"
-          :placeholder="`${collection.labelSingular} title`"
+    <main class="flex flex-1 justify-center px-5 pt-10 pb-24">
+      <!-- Canvas + details share one layout container so widths stay stable
+           whether loading or loaded, and the two collapse to a single column
+           below `lg`. Paper (max 64rem) + column (~23rem) + gap fit under ~90rem. -->
+      <div class="flex w-full max-w-[90rem] flex-col gap-8 lg:flex-row lg:items-start">
+        <!-- Writing canvas -->
+        <div class="w-full min-w-0 lg:max-w-5xl lg:flex-1">
+          <!-- Layout-stable skeleton mirroring the title + first body lines. -->
+          <div v-if="loading" class="editor-paper w-full">
+            <div class="skeleton mb-8 h-12 w-3/4" />
+            <div class="skeleton mb-3 h-4 w-full" />
+            <div class="skeleton mb-3 h-4 w-11/12" />
+            <div class="skeleton h-4 w-4/5" />
+          </div>
+          <!-- Calm, near-opaque "paper" surface — writing comfort beats effect. -->
+          <div v-else class="editor-paper w-full">
+            <input
+              v-model="data.title"
+              class="mx-auto mb-6 block w-full max-w-[46rem] border-none bg-transparent font-serif text-5xl font-bold leading-tight tracking-tight text-zinc-900 outline-none placeholder:text-zinc-300"
+              :placeholder="`${collection.labelSingular} title`"
+              @input="markDirty"
+            />
+            <Editor ref="editorRef" :initial-html="bodyHtml" :client="client" @change="markDirty" />
+          </div>
+        </div>
+
+        <!-- Persistent details column: sticky + independently scrollable on wide
+             screens, stacked below the canvas on narrow ones. -->
+        <aside
+          class="w-full shrink-0 lg:sticky lg:top-20 lg:max-h-[calc(100vh-6rem)] lg:w-[23rem] lg:overflow-y-auto rail-scroll"
           @input="markDirty"
-        />
-        <Editor ref="editorRef" :initial-html="bodyHtml" :client="client" @change="markDirty" />
+          @change="markDirty"
+        >
+          <div class="card p-4">
+            <h2 class="mb-3 border-b border-white/40 pb-3 text-sm font-semibold text-zinc-900">
+              {{ collection.labelSingular }} details
+            </h2>
+            <div v-if="loading" class="space-y-4">
+              <div class="skeleton h-4 w-24" />
+              <div class="skeleton h-9 w-full" />
+              <div class="skeleton h-4 w-24" />
+              <div class="skeleton h-9 w-full" />
+              <div class="skeleton h-4 w-24" />
+              <div class="skeleton h-9 w-full" />
+            </div>
+            <FieldForm
+              v-else
+              :fields="panelFields"
+              :data="data"
+              :client="client"
+              :locale="locale"
+              dense
+            />
+          </div>
+        </aside>
       </div>
     </main>
-
-    <!-- Ghost-style settings drawer -->
-    <Transition
-      enter-active-class="transition-opacity duration-200"
-      leave-active-class="transition-opacity duration-200"
-      enter-from-class="opacity-0"
-      leave-to-class="opacity-0"
-    >
-      <div v-if="drawerOpen" class="fixed inset-0 z-40 bg-black/20" @click="drawerOpen = false" />
-    </Transition>
-    <aside
-      class="glass-strong fixed top-0 right-0 z-50 flex h-screen w-[min(420px,92vw)] flex-col transition-transform duration-200"
-      :class="drawerOpen ? 'translate-x-0' : 'translate-x-full'"
-      @input="markDirty"
-      @change="markDirty"
-    >
-      <div class="flex items-center justify-between border-b border-white/40 px-5 py-4">
-        <strong class="text-sm font-semibold text-zinc-900">{{ collection.labelSingular }} settings</strong>
-        <button class="text-zinc-500 transition hover:text-zinc-900" @click="drawerOpen = false">✕</button>
-      </div>
-      <div class="flex-1 overflow-y-auto p-5">
-        <FieldForm v-if="!loading" :fields="drawerFields" :data="data" :client="client" :locale="locale" />
-      </div>
-    </aside>
   </div>
 </template>
 

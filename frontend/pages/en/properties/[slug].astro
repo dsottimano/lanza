@@ -2,6 +2,7 @@
 import { getCollection } from "astro:content";
 import Base from "../../../layouts/Base.astro";
 import ListingDetail from "../../../components/ListingDetail.astro";
+import { resolveTemplate } from "../../../lib/templates";
 
 export async function getStaticPaths() {
   const listings = await getCollection("listings", ({ data }) =>
@@ -12,10 +13,12 @@ export async function getStaticPaths() {
 
 const { listing } = Astro.props;
 const d = listing.data;
+const template = resolveTemplate(d);
 ---
 
 <Base
   locale="en"
+  template={template}
   seo={{
     title: d.title,
     description: d.seo?.metaDescription,
@@ -24,5 +27,5 @@ const d = listing.data;
     ...(d.seo ?? {}),
   }}
 >
-  <ListingDetail listing={listing} locale="en" />
+  <ListingDetail listing={listing} locale="en" template={template} />
 </Base>

@@ -161,6 +161,11 @@ const listings = defineCollection({
     flowTags: z.array(z.string()).default([]),
     // Region term slug referencing the regions collection (CMS relation).
     region: z.string().optional(),
+    // Per-entry TEMPLATE — see the posts collection above / frontend/lib/templates.ts.
+    // Loose string so unknown/theme names never fail the build; resolveTemplate()
+    // clamps them. `layout` is the former key, kept read-side for old content.
+    template: z.string().optional(),
+    layout: z.string().optional(),
     seo: seoSchema,
   }),
 });

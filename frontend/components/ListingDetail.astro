@@ -2,15 +2,27 @@
 import { getEntry, getCollection } from "astro:content";
 import { sanitizeBody } from "../lib/sanitize";
 import { priceLine, statusBadge, type Locale } from "../lib/listings";
+import { resolveTemplate, templateClass, isLanding } from "../lib/templates";
 import ListingCard from "./ListingCard.astro";
 
 interface Props {
   listing: { id: string; data: Record<string, any>; body?: string };
   locale?: Locale;
+  // Resolved template name (optional — self-resolved from the entry when absent).
+  // Drives the <main> class + the landing chrome-drop, mirroring PageArticle.
+  template?: string;
 }
 const { listing, locale = "es" } = Astro.props;
 const d = listing.data;
 const body = sanitizeBody(listing.body ?? "");
+
+// Template variant (frontend/lib/templates.ts). "landing" drops the head/back
+// chrome so the body is the page; default/full-width keep the wide listing shell.
+const template = Astro.props.template ?? resolveTemplate(d);
+const landing = isLanding(template);
+const mainClass = [templateClass(template), !landing && "layout-wide", "listing"]
+  .filter(Boolean)
+  .join(" ");
 const badge = statusBadge(d.listingStatus, locale);
 const isEn = locale === "en";
 const propsBase = isEn ? "/en/properties" : "/propiedades";
@@ -40,17 +52,19 @@ const mapUrl =
 const gallery: Array<{ image: string; alt?: string }> = d.gallery ?? [];
 ---
 
-<main class="layout-wide listing">
-  <a class="listing__back" href={propsBase}>{L.back}</a>
+<main class={mainClass}>
+  {!landing && <a class="listing__back" href={propsBase}>{L.back}</a>}
 
-  <header class="listing__head">
-    <span class="lp-kicker">{region?.data.title ?? (isEn ? "Panama" : "Panamá")}</span>
-    <h1>{d.title}</h1>
-    <div class="listing__pricerow">
-      <span class="lp-price">{priceLine(d, locale)}</span>
-      {d.listingStatus !== "active" && <span class={`lp-badge ${badge.cls}`}>{badge.label}</span>}
-    </div>
-  </header>
+  {!landing && (
+    <header class="listing__head">
+      <span class="lp-kicker">{region?.data.title ?? (isEn ? "Panama" : "Panamá")}</span>
+      <h1>{d.title}</h1>
+      <div class="listing__pricerow">
+        <span class="lp-price">{priceLine(d, locale)}</span>
+        {d.listingStatus !== "active" && <span class={`lp-badge ${badge.cls}`}>{badge.label}</span>}
+      </div>
+    </header>
+  )}
 
   {d.featuredImage && (
     <img class="listing__hero" src={d.featuredImage} alt={d.title} width="1200" height="700" />

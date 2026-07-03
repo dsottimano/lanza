@@ -8,6 +8,7 @@ import type { Alternate } from "../lib/alternates";
 import { DEFAULT_LOCALE, type Locale } from "../lib/i18n";
 import { getMenu, getSeoDefaults, resolveDevices } from "../lib/site";
 import { mirrorPath } from "../lib/locale";
+import { isLanding } from "../lib/templates";
 
 interface Props {
   seo?: PageSeo;
@@ -19,9 +20,15 @@ interface Props {
   // components (PostPage/PagePage/…). Single content locale ⇒ unused here; the
   // ES·EN switcher is built from mirrorPath instead.
   alternates?: Alternate[];
+  // Resolved template name (frontend/lib/templates.ts). "landing" strips the
+  // header nav + ES·EN switcher, keeping just the brand as the way home —
+  // structurally omitted (not display:none) so the page stays clean + cacheable.
+  template?: string;
 }
 
-const { seo = {}, article = null, locale = DEFAULT_LOCALE } = Astro.props;
+const { seo = {}, article = null, locale = DEFAULT_LOCALE, template } = Astro.props;
+
+const landing = isLanding(template ?? "default");
 
 // Site-wide theme (Settings → Appearance). Drives the public CSS via data-theme.
 const theme = appearance.theme ?? "editorial";
@@ -53,23 +60,25 @@ const nav = resolveDevices(getMenu(locale).header).desktop;
     <Seo seo={seo} article={article} locale={locale} />
   </head>
   <body>
-    <header class="site-header">
+    <header class:list={["site-header", landing && "landing"]}>
       <div class="bar">
         <a class="brand" href={homeUrl}>{siteName}</a>
-        <nav class="site-nav">
-          {nav.map((item) => <a href={item.url}>{item.label}</a>)}
-          <span class="nav-locale">
-            {isEn ? <a href={altPath}>ES</a> : <span class="is-active">ES</span>}
-            <span>·</span>
-            {isEn ? <span class="is-active">EN</span> : <a href={altPath}>EN</a>}
-          </span>
-        </nav>
+        {!landing && (
+          <nav class="site-nav">
+            {nav.map((item) => <a href={item.url}>{item.label}</a>)}
+            <span class="nav-locale">
+              {isEn ? <a href={altPath}>ES</a> : <span class="is-active">ES</span>}
+              <span>·</span>
+              {isEn ? <span class="is-active">EN</span> : <a href={altPath}>EN</a>}
+            </span>
+          </nav>
+        )}
       </div>
     </header>
 
     <slot />
 
-    <footer class="site-footer">
+    <footer class:list={["site-footer", landing && "landing"]}>
       <div class="bar">© {year} {siteName}</div>
     </footer>
 
