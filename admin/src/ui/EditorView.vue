@@ -6,6 +6,7 @@
 // publish toggle are surfaced in the chrome, so they're excluded from the panel.
 import { computed, ref, useTemplateRef } from "vue";
 import Editor from "../editor/Editor.vue";
+import Toolbar from "../editor/Toolbar.vue";
 import FieldForm from "../fields/FieldForm.vue";
 import SaveButton from "./SaveButton.vue";
 import { GitHubClient } from "../backend/github";
@@ -113,6 +114,14 @@ const panelFields = computed<Field[]>(() =>
           </div>
           <!-- Calm, near-opaque "paper" surface — writing comfort beats effect. -->
           <div v-else class="editor-paper w-full">
+            <!-- Formatting bar hoisted above the title: it drives the editor
+                 instance (exposed by Editor.vue) and stays sticky while writing.
+                 Guarded until the editor is created on mount. -->
+            <Toolbar
+              v-if="editorRef?.editor"
+              :editor="editorRef.editor"
+              :on-link="editorRef.link"
+            />
             <input
               v-model="data.title"
               class="mx-auto mb-6 block w-full max-w-[46rem] border-none bg-transparent font-serif text-5xl font-bold leading-tight tracking-tight text-zinc-900 outline-none placeholder:text-zinc-300"

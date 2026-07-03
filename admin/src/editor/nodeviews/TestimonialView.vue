@@ -12,17 +12,6 @@ const { uploading, pick } = useImageUpload(client);
 const safeSrc = computed(() => safeImageUrl(props.node.attrs.avatar));
 const error = ref("");
 
-function setAvatarUrl() {
-  const next = window.prompt("Avatar image URL", props.node.attrs.avatar || "");
-  if (next === null) return; // cancelled
-  const url = safeImageUrl(next);
-  if (!url) {
-    window.alert("Enter a valid http(s) URL.");
-    return;
-  }
-  props.updateAttributes({ avatar: url });
-}
-
 function onPick(e: Event) {
   error.value = "";
   pick(
@@ -38,13 +27,7 @@ function onPick(e: Event) {
     <NodeViewContent class="testimonial-quote" as="blockquote" />
     <figcaption class="testimonial-foot" contenteditable="false">
       <template v-if="safeSrc">
-        <img
-          class="avatar"
-          :src="safeSrc"
-          :alt="node.attrs.avatarAlt"
-          title="Click to replace by URL"
-          @click="setAvatarUrl"
-        />
+        <img class="avatar" :src="safeSrc" :alt="node.attrs.avatarAlt" />
       </template>
       <label v-else class="avatar-add" :class="{ busy: uploading }" title="Add avatar">
         {{ uploading ? "…" : "＋" }}
@@ -109,7 +92,6 @@ function onPick(e: Event) {
 }
 .avatar {
   object-fit: cover;
-  cursor: pointer;
 }
 .avatar-add {
   display: grid;

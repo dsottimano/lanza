@@ -1,11 +1,10 @@
 <script setup lang="ts">
 // Image field: upload a file (committed to the repo under MEDIA.dir, served
-// from MEDIA.publicPrefix) or paste an external URL. The upload is its own
-// commit; the stored value is the public path/URL.
+// from MEDIA.publicPrefix). The upload is its own commit; the stored value is
+// the public path.
 import { computed, inject } from "vue";
 import { CLIENT_KEY } from "./context";
 import { reportError } from "../errors";
-import { inputCls } from "./styles";
 import { useImageUpload } from "./useImageUpload";
 import { safeImageUrl } from "../editor/url";
 
@@ -55,7 +54,5 @@ function onPick(e: Event) {
         Remove
       </button>
     </div>
-
-    <input type="text" v-model="model" placeholder="…or paste a URL / path" :class="inputCls" />
   </div>
 </template>

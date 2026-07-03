@@ -16,16 +16,6 @@ const logos = computed<Logo[]>(() => (props.node.attrs.logos as Logo[]) || []);
 function commit(next: Logo[]) {
   props.updateAttributes({ logos: next });
 }
-function addUrl() {
-  const url = window.prompt("Logo image URL");
-  if (url === null) return; // cancelled
-  const safe = safeImageUrl(url);
-  if (!safe) {
-    window.alert("Enter a valid http(s) URL.");
-    return;
-  }
-  commit([...logos.value, { src: safe, alt: "" }]);
-}
 function onPick(e: Event) {
   error.value = "";
   pick(
@@ -49,14 +39,10 @@ function remove(i: number) {
       <div v-if="!logos.length" class="logo-empty">No logos yet — add your first below.</div>
     </div>
     <div class="logo-actions">
-      <template v-if="client">
-        <label class="logo-btn" :class="{ busy: uploading }">
-          {{ uploading ? "Uploading…" : "Upload logo" }}
-          <input type="file" accept="image/*" :disabled="uploading" @change="onPick" />
-        </label>
-        <button class="logo-link" @click="addUrl">or paste a URL</button>
-      </template>
-      <button v-else class="logo-btn" @click="addUrl">Add logo URL</button>
+      <label class="logo-btn" :class="{ busy: uploading }">
+        {{ uploading ? "Uploading…" : "Upload logo" }}
+        <input type="file" accept="image/*" :disabled="uploading" @change="onPick" />
+      </label>
     </div>
     <small v-if="error" class="logo-error">{{ error }}</small>
   </NodeViewWrapper>
@@ -136,15 +122,6 @@ function remove(i: number) {
 }
 .logo-btn input {
   display: none;
-}
-.logo-link {
-  border: none;
-  background: none;
-  color: #8a8a8a;
-  cursor: pointer;
-  font: inherit;
-  text-decoration: underline;
-  text-underline-offset: 2px;
 }
 .logo-error {
   display: block;

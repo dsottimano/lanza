@@ -12,18 +12,6 @@ const { uploading, pick } = useImageUpload(client);
 const safeSrc = computed(() => safeImageUrl(props.node.attrs.src));
 const error = ref("");
 
-function setUrl() {
-  const next = window.prompt("Image URL", props.node.attrs.src || "");
-  if (next === null) return; // cancelled
-  const url = safeImageUrl(next);
-  if (!url) {
-    // Keep the current image rather than silently blanking it on a bad URL.
-    window.alert("Enter a valid http(s) URL.");
-    return;
-  }
-  props.updateAttributes({ src: url });
-}
-
 function setAlt() {
   const next = window.prompt("Alt text (describe the image for screen readers)", props.node.attrs.alt || "");
   if (next !== null) props.updateAttributes({ alt: next.trim() });
@@ -42,13 +30,7 @@ function onPick(e: Event) {
 <template>
   <NodeViewWrapper class="figure" data-drag-handle>
     <template v-if="safeSrc">
-      <img
-        :src="safeSrc"
-        :alt="node.attrs.alt"
-        contenteditable="false"
-        title="Click to replace by URL"
-        @click="setUrl"
-      />
+      <img :src="safeSrc" :alt="node.attrs.alt" contenteditable="false" />
       <button class="figure-alt" contenteditable="false" @click="setAlt">
         {{ node.attrs.alt ? "Alt: " + node.attrs.alt : "+ Add alt text" }}
       </button>
@@ -56,14 +38,10 @@ function onPick(e: Event) {
     <div v-else class="figure-empty" contenteditable="false">
       <span class="figure-emoji">🖼️</span>
       <div class="figure-actions">
-        <template v-if="client">
-          <label class="figure-btn" :class="{ busy: uploading }">
-            {{ uploading ? "Uploading…" : "Upload image" }}
-            <input type="file" accept="image/*" :disabled="uploading" @change="onPick" />
-          </label>
-          <button class="figure-link" @click="setUrl">or paste a URL</button>
-        </template>
-        <button v-else class="figure-btn" @click="setUrl">Set image URL</button>
+        <label class="figure-btn" :class="{ busy: uploading }">
+          {{ uploading ? "Uploading…" : "Upload image" }}
+          <input type="file" accept="image/*" :disabled="uploading" @change="onPick" />
+        </label>
       </div>
       <small v-if="error" class="figure-error">{{ error }}</small>
     </div>
@@ -79,7 +57,6 @@ function onPick(e: Event) {
 .figure img {
   max-width: 100%;
   border-radius: 6px;
-  cursor: pointer;
 }
 .figure-empty {
   display: flex;
@@ -120,15 +97,6 @@ function onPick(e: Event) {
 }
 .figure-btn input {
   display: none;
-}
-.figure-link {
-  border: none;
-  background: none;
-  color: #8a8a8a;
-  cursor: pointer;
-  font: inherit;
-  text-decoration: underline;
-  text-underline-offset: 2px;
 }
 .figure-error {
   color: #c0392b;

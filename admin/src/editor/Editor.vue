@@ -10,7 +10,6 @@ import Highlight from "@tiptap/extension-highlight";
 import TextAlign from "@tiptap/extension-text-align";
 import Superscript from "@tiptap/extension-superscript";
 import Subscript from "@tiptap/extension-subscript";
-import Toolbar from "./Toolbar.vue";
 import { Callout } from "./extensions/Callout";
 import { Figure } from "./extensions/Figure";
 import { Embed } from "./extensions/Embed";
@@ -140,6 +139,10 @@ const editor = useEditor({
 });
 
 defineExpose({
+  // The live editor instance + link handler are hoisted to EditorView, which
+  // renders the Toolbar above the title (outside this component's template).
+  editor,
+  link,
   getHTML: () => editor.value?.getHTML() ?? "",
   focus: () => editor.value?.commands.focus(),
 });
@@ -182,7 +185,6 @@ function link() {
 
 <template>
   <div class="sheet">
-    <Toolbar :editor="editor" :on-link="link" />
     <EditorContent :editor="editor" class="prose" />
 
     <SlashMenu
