@@ -1,6 +1,6 @@
 ---
 draft: true
-layout: default
+template: default
 pubDate: '2026-06-28T16:33:42.119Z'
 seo: {}
 title: f

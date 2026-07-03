@@ -8,6 +8,7 @@ import Base from "../layouts/Base.astro";
 import PostArticle from "./PostArticle.astro";
 import { splitId, type Locale } from "../lib/i18n";
 import { entryAlternates } from "../lib/alternates";
+import { resolveTemplate } from "../lib/templates";
 import type { ArticleInput } from "../lib/jsonld";
 
 interface Props {
@@ -17,6 +18,7 @@ interface Props {
 
 const { post, locale } = Astro.props;
 const alternates = await entryAlternates("posts", splitId(post.id).slug, "posts");
+const template = resolveTemplate(post.data);
 
 const siteUrl = (Astro.site ?? new URL("/", Astro.url)).href.replace(/\/$/, "");
 const url = new URL(Astro.url.pathname, siteUrl + "/").href;
@@ -45,6 +47,7 @@ const article: ArticleInput = {
 <Base
   locale={locale}
   alternates={alternates}
+  template={template}
   seo={{
     title: post.data.title,
     description: post.data.description,
@@ -57,6 +60,7 @@ const article: ArticleInput = {
   <PostArticle
     post={post}
     locale={locale}
+    template={template}
     author={authorName
       ? { name: authorName, slug: authorEntry ? post.data.author : undefined }
       : undefined}

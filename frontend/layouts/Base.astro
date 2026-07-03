@@ -7,6 +7,7 @@ import type { ArticleInput } from "../lib/jsonld";
 import { localeUrl, LOCALE_LABEL, DEFAULT_LOCALE, type Locale } from "../lib/i18n";
 import { getMenu, getSeoDefaults, groupByDevice, menuIsEmpty, type Device } from "../lib/site";
 import { fallbackNav } from "../lib/routing";
+import { isLanding } from "../lib/templates";
 import type { Alternate } from "../lib/alternates";
 
 interface Props {
@@ -16,9 +17,16 @@ interface Props {
   locale?: Locale;
   /** This page in its other languages — header switcher + hreflang. */
   alternates?: Alternate[];
+  /** Resolved template name. "landing" strips nav chrome (see frontend/lib/templates.ts). */
+  template?: string;
 }
 
-const { seo = {}, article = null, locale = DEFAULT_LOCALE, alternates = [] } = Astro.props;
+const { seo = {}, article = null, locale = DEFAULT_LOCALE, alternates = [], template } = Astro.props;
+
+// Landing template: chrome-light. Keep the brand (the way home) but drop the
+// header nav, language switcher, and footer nav — structurally omitted (not
+// display:none) so the markup stays clean and cacheable.
+const landing = isLanding(template ?? "default");
 
 // Site-wide theme + logo (Settings → Appearance / onboarding). Theme drives the
 // public CSS via data-theme; logo (if set) replaces the text wordmark.
@@ -71,20 +79,21 @@ function navClasses(base: string, groups: unknown[], devices: Device[]): string[
         </svg>
       )
     }
-    <header class="site-header">
+    <header class:list={["site-header", landing && "landing"]}>
       <div class="bar">
         <a class="brand" href={homeUrl}>
           {logo ? <img class="brand-logo" src={logo} alt={siteName} /> : siteName}
         </a>
         {
-          headerGroups.map((g) => (
+          !landing &&
+            headerGroups.map((g) => (
             <nav class:list={navClasses("site-nav", headerGroups, g.devices)}>
               {g.items.map((item) => <a href={item.url}>{item.label}</a>)}
             </nav>
           ))
         }
         {
-          alternates.length > 1 && (
+          !landing && alternates.length > 1 && (
             <nav class="lang-switch" aria-label="Language">
               {alternates.map((alt) =>
                 alt.locale === locale ? (
@@ -101,10 +110,11 @@ function navClasses(base: string, groups: unknown[], devices: Device[]): string[
 
     <slot />
 
-    <footer class="site-footer">
+    <footer class:list={["site-footer", landing && "landing"]}>
       <div class="bar">
         {
-          footerGroups.map((g) => (
+          !landing &&
+            footerGroups.map((g) => (
             <nav class:list={navClasses("footer-nav", footerGroups, g.devices)} aria-label="Footer">
               {g.items.map((item) => <a href={item.url}>{item.label}</a>)}
             </nav>

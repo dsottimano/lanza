@@ -6,12 +6,15 @@ import type { CollectionEntry } from "astro:content";
 import { sanitizeBody } from "../lib/sanitize";
 import { localeUrl, type Locale } from "../lib/i18n";
 import { resolveTerms } from "../lib/taxonomy";
+import { resolveTemplate, templateClass, isLanding } from "../lib/templates";
 
 interface Props {
   post: CollectionEntry<"posts">;
   locale: Locale;
   // Resolved author display name; `slug` present → link to the author archive.
   author?: { name: string; slug?: string };
+  // Resolved template name (from PostPage). Drives the <main> class + landing chrome.
+  template?: string;
 }
 
 const { post, locale, author } = Astro.props;
@@ -19,14 +22,12 @@ const body = sanitizeBody(post.body ?? "");
 // Chips show resolved term titles ("Web Development"), not the stored slug.
 const categories = await resolveTerms("categories", locale, post.data.categories);
 const tags = await resolveTerms("tags", locale, post.data.tags);
-const layoutClass =
-  post.data.layout && post.data.layout !== "default"
-    ? `layout-${post.data.layout}`
-    : undefined;
+const template = Astro.props.template ?? resolveTemplate(post.data);
+const landing = isLanding(template);
 ---
 
-<main class={layoutClass}>
-  <h1>{post.data.title}</h1>
+<main class={templateClass(template)}>
+  {!landing && <h1>{post.data.title}</h1>}
   {
     author?.name && (
       <p class="byline">

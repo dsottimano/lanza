@@ -6,6 +6,7 @@ import Base from "../layouts/Base.astro";
 import PageArticle from "./PageArticle.astro";
 import { splitId, type Locale } from "../lib/i18n";
 import { entryAlternates } from "../lib/alternates";
+import { resolveTemplate } from "../lib/templates";
 
 interface Props {
   page: CollectionEntry<"pages">;
@@ -14,11 +15,13 @@ interface Props {
 
 const { page, locale } = Astro.props;
 const alternates = await entryAlternates("pages", splitId(page.id).slug, "");
+const template = resolveTemplate(page.data);
 ---
 
 <Base
   locale={locale}
   alternates={alternates}
+  template={template}
   seo={{
     title: page.data.title,
     description: page.data.description,
@@ -27,5 +30,5 @@ const alternates = await entryAlternates("pages", splitId(page.id).slug, "");
     ogImage: page.data.seo?.ogImage || page.data.featuredImage,
   }}
 >
-  <PageArticle page={page} />
+  <PageArticle page={page} template={template} />
 </Base>

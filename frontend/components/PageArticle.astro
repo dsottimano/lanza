@@ -4,21 +4,22 @@
 import type { CollectionEntry } from "astro:content";
 import Blocks from "./Blocks.astro";
 import { sanitizeBody } from "../lib/sanitize";
+import { resolveTemplate, templateClass, isLanding } from "../lib/templates";
 
 interface Props {
   page: CollectionEntry<"pages">;
+  // Resolved template name (from PagePage). Drives the <main> class + landing chrome.
+  template?: string;
 }
 
 const { page } = Astro.props;
 const body = sanitizeBody(page.body ?? "");
-const layoutClass =
-  page.data.layout && page.data.layout !== "default"
-    ? `layout-${page.data.layout}`
-    : undefined;
+const template = Astro.props.template ?? resolveTemplate(page.data);
+const landing = isLanding(template);
 ---
 
-<main class={layoutClass}>
-  <h1>{page.data.title}</h1>
+<main class={templateClass(template)}>
+  {!landing && <h1>{page.data.title}</h1>}
   {
     page.data.featuredImage && (
       <img src={page.data.featuredImage} alt={page.data.title} />

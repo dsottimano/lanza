@@ -40,8 +40,12 @@ const posts = defineCollection({
     tags: z.array(z.string()).default([]),
     // Author slug referencing the authors collection (CMS relation).
     author: z.string().optional(),
-    // Per-page layout override (theme sets the baseline; this widens/breaks out).
-    layout: z.enum(["default", "wide", "landing"]).optional(),
+    // Per-entry TEMPLATE — layout variant (frontend/lib/templates.ts is the
+    // source of truth). Kept as a loose string so unknown/theme-supplied names
+    // never fail the build; resolveTemplate() clamps them. `layout` is the
+    // former name, retained read-side so pre-rename frontmatter still resolves.
+    template: z.string().optional(),
+    layout: z.string().optional(),
     seo: seoSchema,
   }),
 });
@@ -89,7 +93,9 @@ const pages = defineCollection({
     draft: z.boolean().default(false),
     description: z.string().optional(),
     featuredImage: z.string().optional(),
-    layout: z.enum(["default", "wide", "landing"]).optional(),
+    // Per-entry TEMPLATE — see the posts collection above / frontend/lib/templates.ts.
+    template: z.string().optional(),
+    layout: z.string().optional(),
     blocks: z.array(blockSchema).default([]),
     seo: seoSchema,
   }),

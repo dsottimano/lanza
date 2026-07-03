@@ -2,7 +2,8 @@
    One stylesheet, driven by CSS variables. The shared element rules below use
    the variables; each `[data-theme="…"]` block (further down) re-skins the site
    by overriding them. <html data-theme> is set in Base.astro from
-   frontend/data/appearance.json. Per-page `layout` adds a class on <main>. */
+   frontend/data/appearance.json. Per-entry `template` adds a `tpl-<name>` class
+   on <main> — see the "templates" section below. */
 
 /* ── tokens (defaults = Editorial) ─────────────────────────────────────── */
 :root {
@@ -175,23 +176,30 @@ a {
   }
 }
 
-/* ── content column + per-page layout ──────────────────────────────────── */
+/* ── content column ────────────────────────────────────────────────────── */
 main {
   max-width: var(--content);
   margin: 0 auto;
   padding: 3.5rem 1.25rem 1rem;
 }
-main.layout-wide {
+
+/* ── templates ─────────────────────────────────────────────────────────────
+   Per-entry layout variants. The template name (frontend/lib/templates.ts — the
+   source of truth) becomes a `tpl-<name>` class on <main>; "landing" also drops
+   site chrome (header/footer nav + page title) structurally in Base.astro, so it
+   stays cacheable. Styled on shared element rules so every theme inherits them;
+   a theme can add its own tpl-<name> rules (in its [data-theme] block) for any
+   name it registers. Unknown/absent template renders as default (no class). */
+main.tpl-full-width {
   max-width: var(--wide);
 }
-main.layout-landing {
+main.tpl-landing {
   max-width: none;
   padding: 0;
 }
-main.layout-landing > h1:first-child {
-  max-width: var(--wide);
-  margin-inline: auto;
-  padding-inline: 1.25rem;
+/* Landing's minimal header: brand-only, so tighten the chrome around it. */
+.site-header.landing .bar {
+  padding-block: 0.75rem;
 }
 
 /* ── headings + entry meta ─────────────────────────────────────────────── */
@@ -320,6 +328,89 @@ main > img {
   aspect-ratio: 16 / 9;
   border: 0;
   border-radius: var(--radius);
+}
+
+/* ── layout / content blocks (Lanza editor output) ─────────────────────────
+   Columns, testimonial and logo strip round-trip from the editor as plain
+   div/figure markup; these element rules give every theme a decent default. */
+.post-body .cols {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 1.5rem;
+  margin: 1.8em 0;
+}
+.post-body .cols[data-cols="3"] {
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+}
+.post-body .col {
+  min-width: 0;
+}
+.post-body .col > * {
+  margin-top: 0;
+}
+.post-body .col > * + * {
+  margin-top: 1em;
+}
+@media (max-width: 640px) {
+  .post-body .cols,
+  .post-body .cols[data-cols="3"] {
+    grid-template-columns: minmax(0, 1fr);
+  }
+}
+
+.post-body .testimonial {
+  margin: 1.8em 0;
+  padding: 1.6rem 1.8rem;
+  border-left: 3px solid var(--accent);
+  background: var(--surface);
+  border-radius: var(--radius);
+}
+.post-body .testimonial blockquote {
+  margin: 0;
+  padding: 0;
+  border: none;
+  font-size: 1.15em;
+  font-style: italic;
+  color: var(--ink);
+}
+.post-body .testimonial figcaption {
+  display: grid;
+  grid-template-columns: auto 1fr;
+  grid-template-areas: "avatar who" "avatar role";
+  align-items: center;
+  column-gap: 0.8rem;
+  margin-top: 1rem;
+}
+.post-body .testimonial .avatar {
+  grid-area: avatar;
+  width: 2.6rem;
+  height: 2.6rem;
+  border-radius: 999px;
+  object-fit: cover;
+}
+.post-body .testimonial .who {
+  grid-area: who;
+  font-weight: 600;
+  color: var(--ink);
+}
+.post-body .testimonial .role {
+  grid-area: role;
+  font-size: 0.88rem;
+  color: var(--muted);
+}
+
+.post-body .logo-strip {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: center;
+  gap: 2rem;
+  margin: 1.8em 0;
+}
+.post-body .logo-strip img {
+  max-height: 2.6rem;
+  width: auto;
+  object-fit: contain;
 }
 
 /* ── index post list ───────────────────────────────────────────────────── */
@@ -611,7 +702,7 @@ main > ul > li > a:hover {
 }
 
 /* ── reading + list surfaces: quiet near-opaque glass panels ────────────── */
-[data-theme="liquid-glass"] main:not(.layout-landing) {
+[data-theme="liquid-glass"] main:not(.tpl-landing) {
   margin-top: 2.5rem;
   margin-bottom: 2rem;
   padding: 2.5rem 2rem;
@@ -688,6 +779,16 @@ main > ul > li > a:hover {
   background: rgba(120, 145, 175, 0.12);
 }
 
+/* testimonial lifts onto a quiet glass panel to match the theme */
+[data-theme="liquid-glass"] .post-body .testimonial {
+  border-left: none;
+  background: rgba(255, 255, 255, 0.55);
+  -webkit-backdrop-filter: blur(12px) saturate(150%);
+  backdrop-filter: blur(12px) saturate(150%);
+  border: 1px solid var(--glass-edge);
+  box-shadow: var(--glass-shadow), inset 0 1px 0 var(--glass-line);
+}
+
 /* ── footer: subtler glass strip ────────────────────────────────────────── */
 [data-theme="liquid-glass"] .site-footer {
   border-top: none;
@@ -748,7 +849,7 @@ main > ul > li > a:hover {
   [data-theme="liquid-glass"] .site-header .bar::before {
     background: rgba(240, 245, 251, 0.94);
   }
-  [data-theme="liquid-glass"] main:not(.layout-landing) {
+  [data-theme="liquid-glass"] main:not(.tpl-landing) {
     background: rgba(248, 250, 253, 0.97);
   }
   [data-theme="liquid-glass"] .block-hero,

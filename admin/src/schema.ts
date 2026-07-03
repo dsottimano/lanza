@@ -124,6 +124,21 @@ function seoField(opts: { ogTypeDefault: string; withAuthor: boolean }): Field {
   return { name: "seo", label: "SEO", widget: "object", required: false, collapsed: true, fields };
 }
 
+// Per-entry TEMPLATE — the WordPress-style layout variant, shared by posts +
+// pages. Options MUST mirror the frontend registry (frontend/lib/templates.ts,
+// the source of truth); keep them in sync — the house pattern for shared shapes
+// (cf. frontend/lib/site.ts ↔ MenuView.vue). Was named "layout" before the
+// template feature; the frontend still reads the legacy key so old content is safe.
+const TEMPLATE_FIELD: Field = {
+  name: "template",
+  label: "Template",
+  widget: "select",
+  options: ["default", "full-width", "landing"],
+  default: "default",
+  required: false,
+  hint: "Layout variant: full-width breaks out to the wide measure; landing hides the page title and nav chrome.",
+};
+
 const PAGE_BLOCKS: Field = {
   name: "blocks",
   label: "Content blocks",
@@ -225,15 +240,7 @@ export const COLLECTIONS: Collection[] = [
         collection: "authors",
         required: false,
       },
-      {
-        name: "layout",
-        label: "Layout",
-        widget: "select",
-        options: ["default", "wide", "landing"],
-        default: "default",
-        required: false,
-        hint: "Overrides the site theme's default width for this entry.",
-      },
+      TEMPLATE_FIELD,
       seoField({ ogTypeDefault: "article", withAuthor: true }),
     ],
   },
@@ -251,15 +258,7 @@ export const COLLECTIONS: Collection[] = [
       { name: "draft", label: "Draft (uncheck to publish)", widget: "boolean", default: true },
       { name: "description", label: "Excerpt", widget: "text", required: false },
       { name: "featuredImage", label: "Featured image", widget: "image", required: false },
-      {
-        name: "layout",
-        label: "Layout",
-        widget: "select",
-        options: ["default", "wide", "landing"],
-        default: "default",
-        required: false,
-        hint: "Overrides the site theme's default width for this entry.",
-      },
+      TEMPLATE_FIELD,
       PAGE_BLOCKS,
       seoField({ ogTypeDefault: "website", withAuthor: false }),
     ],
