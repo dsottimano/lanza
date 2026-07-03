@@ -24,3 +24,6 @@ uploads/
 
 # Original (non-Lanza-format) theme source bundles — inputs, not deliverables
 themes/laperle-theme.tar.gz
+
+# Broker lives in its own private repo — never commit here
+lanza-broker/
