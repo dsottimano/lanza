@@ -53,9 +53,14 @@ export const onRequest = async (context: {
   if (!tokenBody.access_token) {
     const cid = env.GITHUB_CLIENT_ID ?? "";
     const sec = env.GITHUB_CLIENT_SECRET ?? "";
+    const keys = Object.keys(env)
+      .map((k) => JSON.stringify(k))
+      .sort()
+      .join(", ");
     return new Response(
       `OAuth token exchange failed: ${tokenBody.error ?? "no access_token"} — ${tokenBody.error_description ?? ""}\n` +
-        `DEBUG: client_id len ${cid.length} (expect 20); client_secret len ${sec.length} (expect 40)`,
+        `DEBUG: client_id len ${cid.length}; client_secret len ${sec.length}\n` +
+        `DEBUG env keys (exact, quoted): ${keys}`,
       { status: 401 },
     );
   }
