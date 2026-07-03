@@ -1,0 +1,15 @@
+{
+  "siteName": "La Perle Panamá",
+  "titleTemplate": "%s · La Perle Panamá",
+  "defaultTitle": "La Perle Panamá — Bienes raíces de lujo",
+  "defaultDescription": "Curaduría de propiedades en Ciudad de Panamá, la costa pacífica y las tierras altas.",
+  "defaultOgImage": "",
+  "locale": "es_PA",
+  "twitter": "",
+  "twitterCreator": "",
+  "organization": {
+    "name": "La Perle Panamá",
+    "logo": "",
+    "sameAs": []
+  }
+}

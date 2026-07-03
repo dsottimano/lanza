@@ -4,60 +4,39 @@ import Seo from "../components/Seo.astro";
 import appearance from "../data/appearance.json";
 import type { PageSeo } from "../lib/seo";
 import type { ArticleInput } from "../lib/jsonld";
-import { localeUrl, LOCALE_LABEL, DEFAULT_LOCALE, type Locale } from "../lib/i18n";
-import { getMenu, getSeoDefaults, groupByDevice, menuIsEmpty, type Device } from "../lib/site";
-import { fallbackNav } from "../lib/routing";
-import { isLanding } from "../lib/templates";
 import type { Alternate } from "../lib/alternates";
+import { DEFAULT_LOCALE, type Locale } from "../lib/i18n";
+import { getMenu, getSeoDefaults, resolveDevices } from "../lib/site";
+import { mirrorPath } from "../lib/locale";
 
 interface Props {
   seo?: PageSeo;
   article?: ArticleInput | null;
-  /** Active locale — drives <html lang>, the per-locale menu, and SEO defaults. */
+  // Active locale — drives <html lang>, the per-locale menu/SEO, and the ES·EN
+  // switcher. La Perle is UI-only bilingual: "es" (default, root) or "en" (/en/*).
   locale?: Locale;
-  /** This page in its other languages — header switcher + hreflang. */
+  // Accepted for drop-in compatibility with the platform's shared page
+  // components (PostPage/PagePage/…). Single content locale ⇒ unused here; the
+  // ES·EN switcher is built from mirrorPath instead.
   alternates?: Alternate[];
-  /** Resolved template name. "landing" strips nav chrome (see frontend/lib/templates.ts). */
-  template?: string;
 }
 
-const { seo = {}, article = null, locale = DEFAULT_LOCALE, alternates = [], template } = Astro.props;
+const { seo = {}, article = null, locale = DEFAULT_LOCALE } = Astro.props;
 
-// Landing template: chrome-light. Keep the brand (the way home) but drop the
-// header nav, language switcher, and footer nav — structurally omitted (not
-// display:none) so the markup stays clean and cacheable.
-const landing = isLanding(template ?? "default");
-
-// Site-wide theme + logo (Settings → Appearance / onboarding). Theme drives the
-// public CSS via data-theme; logo (if set) replaces the text wordmark.
+// Site-wide theme (Settings → Appearance). Drives the public CSS via data-theme.
 const theme = appearance.theme ?? "editorial";
-const logo = appearance.logo || "";
 const siteName = getSeoDefaults(locale).siteName || "Site";
 const year = new Date().getFullYear();
-const homeUrl = localeUrl(locale, "");
 
-// Nav comes from the editable per-locale Settings → Menu — WordPress-style menu
-// locations (header/footer), each with a per-device menu (tablet/mobile inherit
-// desktop unless customized). groupByDevice dedupes inherited devices so we emit
-// one <nav> per distinct list, revealed at its breakpoints by CSS (.resp/.at-*).
-const menu = getMenu(locale);
+const isEn = locale === "en";
+const path = Astro.url.pathname;
+const altPath = mirrorPath(path);
+const homeUrl = isEn ? "/en/" : "/";
 
-// Header: if no header menu is defined at all, fall back to auto-listing this
-// locale's published Pages so the nav is never blank.
-let header = menu.header;
-if (menuIsEmpty(header)) {
-  const items = [{ label: "Home", url: homeUrl }, ...(await fallbackNav(locale))];
-  header = { desktop: items, tablet: null, mobile: null };
-}
-const headerGroups = groupByDevice(header);
-const footerGroups = menuIsEmpty(menu.footer) ? [] : groupByDevice(menu.footer);
-
-// One group ⇒ every device shares one list ⇒ a plain always-visible nav. Two or
-// three groups ⇒ each nav is `.resp` + one `.at-<device>` per device it serves.
-function navClasses(base: string, groups: unknown[], devices: Device[]): string[] {
-  if (groups.length <= 1) return [base];
-  return [base, "resp", ...devices.map((d) => `at-${d}`)];
-}
+// Nav from the editable per-locale Settings → Menu. La Perle uses one flat
+// header list (its responsive CSS handles layout), so we render the desktop
+// menu; URLs are authored locale-correct in menu.es.json / menu.en.json.
+const nav = resolveDevices(getMenu(locale).header).desktop;
 ---
 
 <!doctype html>
@@ -65,63 +44,33 @@ function navClasses(base: string, groups: unknown[], devices: Device[]): string[
   <head>
     <meta charset="utf-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1" />
-    <Seo seo={seo} article={article} locale={locale} alternates={alternates} />
+    <link rel="preconnect" href="https://fonts.googleapis.com" />
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+    <link
+      href="https://fonts.googleapis.com/css2?family=Cormorant+Garamond:wght@400;500;600&family=Jost:wght@300;400;500&display=swap"
+      rel="stylesheet"
+    />
+    <Seo seo={seo} article={article} locale={locale} />
   </head>
   <body>
-    {
-      theme === "liquid-glass" && (
-        <svg width="0" height="0" style="position:absolute" aria-hidden="true" focusable="false">
-          <filter id="glass-distortion" x="-20%" y="-20%" width="140%" height="140%">
-            <feTurbulence type="fractalNoise" baseFrequency="0.008 0.012" numOctaves="2" seed="42" result="noise" />
-            <feGaussianBlur in="noise" stdDeviation="2" result="blurred" />
-            <feDisplacementMap in="SourceGraphic" in2="blurred" scale="36" xChannelSelector="R" yChannelSelector="G" />
-          </filter>
-        </svg>
-      )
-    }
-    <header class:list={["site-header", landing && "landing"]}>
+    <header class="site-header">
       <div class="bar">
-        <a class="brand" href={homeUrl}>
-          {logo ? <img class="brand-logo" src={logo} alt={siteName} /> : siteName}
-        </a>
-        {
-          !landing &&
-            headerGroups.map((g) => (
-            <nav class:list={navClasses("site-nav", headerGroups, g.devices)}>
-              {g.items.map((item) => <a href={item.url}>{item.label}</a>)}
-            </nav>
-          ))
-        }
-        {
-          !landing && alternates.length > 1 && (
-            <nav class="lang-switch" aria-label="Language">
-              {alternates.map((alt) =>
-                alt.locale === locale ? (
-                  <span class="lang-current" aria-current="true">{LOCALE_LABEL[alt.locale]}</span>
-                ) : (
-                  <a href={alt.url} hreflang={alt.locale}>{LOCALE_LABEL[alt.locale]}</a>
-                ),
-              )}
-            </nav>
-          )
-        }
+        <a class="brand" href={homeUrl}>{siteName}</a>
+        <nav class="site-nav">
+          {nav.map((item) => <a href={item.url}>{item.label}</a>)}
+          <span class="nav-locale">
+            {isEn ? <a href={altPath}>ES</a> : <span class="is-active">ES</span>}
+            <span>·</span>
+            {isEn ? <span class="is-active">EN</span> : <a href={altPath}>EN</a>}
+          </span>
+        </nav>
       </div>
     </header>
 
     <slot />
 
-    <footer class:list={["site-footer", landing && "landing"]}>
-      <div class="bar">
-        {
-          !landing &&
-            footerGroups.map((g) => (
-            <nav class:list={navClasses("footer-nav", footerGroups, g.devices)} aria-label="Footer">
-              {g.items.map((item) => <a href={item.url}>{item.label}</a>)}
-            </nav>
-          ))
-        }
-        <p class="footer-copy">© {year} {siteName}</p>
-      </div>
+    <footer class="site-footer">
+      <div class="bar">© {year} {siteName}</div>
     </footer>
 
     {/* Agent surface: window.lanza read API (see public/lanza.js). Static, deferred, cached site-wide. */}

@@ -1,9 +1,8 @@
 ---
-import HomePage from "../components/HomePage.astro";
-import { DEFAULT_LOCALE } from "../lib/i18n";
-
-// The root homepage lists default-locale (EN) posts; ES/FR have their own
-// homepage ([locale]/index.astro).
+import Base from "../layouts/Base.astro";
+import Home from "../components/Home.astro";
 ---
 
-<HomePage locale={DEFAULT_LOCALE} />
+<Base seo={{}}>
+  <Home locale="es" />
+</Base>

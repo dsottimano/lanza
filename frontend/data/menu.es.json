@@ -1,0 +1,18 @@
+{
+  "locations": {
+    "header": {
+      "desktop": [
+        { "label": "Propiedades", "url": "/propiedades" },
+        { "label": "Journal", "url": "/posts" },
+        { "label": "Encuentra", "url": "/encuentra" }
+      ],
+      "tablet": null,
+      "mobile": null
+    },
+    "footer": {
+      "desktop": [],
+      "tablet": null,
+      "mobile": null
+    }
+  }
+}

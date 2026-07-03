@@ -1,0 +1,54 @@
+---
+import { getCollection } from "astro:content";
+import Base from "../../layouts/Base.astro";
+import ListingCard from "../../components/ListingCard.astro";
+
+export async function getStaticPaths() {
+  const regions = await getCollection("regions");
+  return regions.map((region) => ({ params: { slug: region.id }, props: { region } }));
+}
+
+const { region } = Astro.props;
+const listings = (
+  await getCollection("listings", ({ data }) =>
+    import.meta.env.PROD ? data.draft !== true : true,
+  )
+)
+  .filter(
+    (l) =>
+      l.data.region === region.id &&
+      l.data.listingStatus !== "sold" &&
+      l.data.listingStatus !== "rented",
+  )
+  .sort((a, b) => (b.data.pubDate?.valueOf() ?? 0) - (a.data.pubDate?.valueOf() ?? 0));
+---
+
+<Base seo={{ title: region.data.title, description: region.data.description }}>
+  <main class="layout-wide">
+    <header class="region-head">
+      <span class="lp-kicker">Regiones</span>
+      <h1>{region.data.title}</h1>
+      {region.data.description && <p class="region-head__desc">{region.data.description}</p>}
+    </header>
+    {listings.length > 0 ? (
+      <div class="listings-grid">
+        {listings.map((l) => <ListingCard listing={l} locale="es" />)}
+      </div>
+    ) : (
+      <p class="region-empty">No hay propiedades disponibles en esta región por el momento.</p>
+    )}
+    <a class="region-back" href="/propiedades">← Ver todas las propiedades</a>
+  </main>
+</Base>
+
+<style>
+  .region-head { margin-bottom: 2rem; padding-bottom: 1.4rem; border-bottom: 1px solid var(--border-subtle); }
+  .region-head .lp-kicker { display: block; margin-bottom: 0.5rem; }
+  .region-head h1 { margin: 0 0 0.6rem; }
+  .region-head__desc { color: var(--text-secondary); line-height: 1.65; max-width: 56ch; margin: 0; }
+  .listings-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(260px, 1fr)); gap: 1.2rem; }
+  .region-empty { color: var(--muted); padding: 2rem 0; }
+  .region-back { display: inline-block; margin-top: 2.5rem; font-size: 0.75rem; letter-spacing: 0.12em; text-transform: uppercase; color: var(--muted); text-decoration: none; }
+  .region-back:hover { color: var(--ink); }
+  @media (max-width: 560px) { .listings-grid { grid-template-columns: 1fr; } }
+</style>

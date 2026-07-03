@@ -2,23 +2,15 @@
   "locations": {
     "header": {
       "desktop": [
-        { "label": "Home", "url": "/" },
-        { "label": "About", "url": "/about/" },
-        { "label": "Blog", "url": "/blog/" },
-        { "label": "Contact", "url": "/contact/" }
+        { "label": "Properties", "url": "/en/properties" },
+        { "label": "Journal", "url": "/en/journal" },
+        { "label": "Find", "url": "/en/find" }
       ],
       "tablet": null,
-      "mobile": [
-        { "label": "Home", "url": "/" },
-        { "label": "Blog", "url": "/blog/" }
-      ]
+      "mobile": null
     },
     "footer": {
-      "desktop": [
-        { "label": "About", "url": "/about/" },
-        { "label": "Contact", "url": "/contact/" },
-        { "label": "Privacy", "url": "/privacy/" }
-      ],
+      "desktop": [],
       "tablet": null,
       "mobile": null
     }

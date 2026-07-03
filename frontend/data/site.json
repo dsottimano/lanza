@@ -1,10 +1,10 @@
 {
-  "defaultLocale": "en",
+  "defaultLocale": "es",
   "locales": [
     {
-      "code": "en",
-      "label": "English",
-      "ogLocale": "en_US"
+      "code": "es",
+      "label": "Español",
+      "ogLocale": "es_PA"
     }
   ],
   "onboarded": true

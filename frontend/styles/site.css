@@ -2,8 +2,7 @@
    One stylesheet, driven by CSS variables. The shared element rules below use
    the variables; each `[data-theme="…"]` block (further down) re-skins the site
    by overriding them. <html data-theme> is set in Base.astro from
-   frontend/data/appearance.json. Per-entry `template` adds a `tpl-<name>` class
-   on <main> — see the "templates" section below. */
+   src/data/appearance.json. Per-page `layout` adds a class on <main>. */
 
 /* ── tokens (defaults = Editorial) ─────────────────────────────────────── */
 :root {
@@ -80,11 +79,6 @@ a {
   color: var(--ink);
   text-decoration: none;
 }
-.brand-logo {
-  display: block;
-  height: 2rem;
-  width: auto;
-}
 .site-nav {
   display: flex;
   gap: 1.2rem;
@@ -101,24 +95,6 @@ a {
 .site-nav a:hover {
   color: var(--ink);
 }
-.lang-switch {
-  display: flex;
-  gap: 0.5rem;
-  align-items: baseline;
-  font-size: 0.8rem;
-  letter-spacing: 0.02em;
-}
-.lang-switch a {
-  color: var(--muted);
-  text-decoration: none;
-}
-.lang-switch a:hover {
-  color: var(--ink);
-}
-.lang-switch .lang-current {
-  color: var(--ink);
-  font-weight: 600;
-}
 .site-footer {
   border-top: 1px solid var(--border);
   margin-top: 5rem;
@@ -130,76 +106,24 @@ a {
   color: var(--muted);
   font-size: 0.85rem;
 }
-.footer-nav {
-  display: flex;
-  flex-wrap: wrap;
-  gap: 1.2rem;
-  margin-bottom: 1rem;
-}
-.footer-nav a {
-  color: var(--muted);
-  text-decoration: none;
-  font-size: 0.9rem;
-  font-weight: var(--nav-weight);
-  text-transform: var(--nav-transform);
-  letter-spacing: 0.01em;
-}
-.footer-nav a:hover {
-  color: var(--ink);
-}
-.footer-copy {
-  margin: 0;
-}
 
-/* ── per-device menus ──────────────────────────────────────────────────────
-   Header/footer render one nav per distinct device group (see Base.astro +
-   lib/site.ts groupByDevice), so devices that inherit share markup. A nav
-   tagged `.resp` is hidden until a breakpoint matching one of its `.at-*`
-   classes reveals it — pure CSS, no JS. Menus where every device resolves to
-   the same list skip `.resp` entirely and stay always-visible. */
-.resp {
-  display: none;
-}
-@media (max-width: 640px) {
-  .resp.at-mobile {
-    display: flex;
-  }
-}
-@media (min-width: 641px) and (max-width: 1024px) {
-  .resp.at-tablet {
-    display: flex;
-  }
-}
-@media (min-width: 1025px) {
-  .resp.at-desktop {
-    display: flex;
-  }
-}
-
-/* ── content column ────────────────────────────────────────────────────── */
+/* ── content column + per-page layout ──────────────────────────────────── */
 main {
   max-width: var(--content);
   margin: 0 auto;
   padding: 3.5rem 1.25rem 1rem;
 }
-
-/* ── templates ─────────────────────────────────────────────────────────────
-   Per-entry layout variants. The template name (frontend/lib/templates.ts — the
-   source of truth) becomes a `tpl-<name>` class on <main>; "landing" also drops
-   site chrome (header/footer nav + page title) structurally in Base.astro, so it
-   stays cacheable. Styled on shared element rules so every theme inherits them;
-   a theme can add its own tpl-<name> rules (in its [data-theme] block) for any
-   name it registers. Unknown/absent template renders as default (no class). */
-main.tpl-full-width {
+main.layout-wide {
   max-width: var(--wide);
 }
-main.tpl-landing {
+main.layout-landing {
   max-width: none;
   padding: 0;
 }
-/* Landing's minimal header: brand-only, so tighten the chrome around it. */
-.site-header.landing .bar {
-  padding-block: 0.75rem;
+main.layout-landing > h1:first-child {
+  max-width: var(--wide);
+  margin-inline: auto;
+  padding-inline: 1.25rem;
 }
 
 /* ── headings + entry meta ─────────────────────────────────────────────── */
@@ -328,89 +252,6 @@ main > img {
   aspect-ratio: 16 / 9;
   border: 0;
   border-radius: var(--radius);
-}
-
-/* ── layout / content blocks (Lanza editor output) ─────────────────────────
-   Columns, testimonial and logo strip round-trip from the editor as plain
-   div/figure markup; these element rules give every theme a decent default. */
-.post-body .cols {
-  display: grid;
-  grid-template-columns: repeat(2, minmax(0, 1fr));
-  gap: 1.5rem;
-  margin: 1.8em 0;
-}
-.post-body .cols[data-cols="3"] {
-  grid-template-columns: repeat(3, minmax(0, 1fr));
-}
-.post-body .col {
-  min-width: 0;
-}
-.post-body .col > * {
-  margin-top: 0;
-}
-.post-body .col > * + * {
-  margin-top: 1em;
-}
-@media (max-width: 640px) {
-  .post-body .cols,
-  .post-body .cols[data-cols="3"] {
-    grid-template-columns: minmax(0, 1fr);
-  }
-}
-
-.post-body .testimonial {
-  margin: 1.8em 0;
-  padding: 1.6rem 1.8rem;
-  border-left: 3px solid var(--accent);
-  background: var(--surface);
-  border-radius: var(--radius);
-}
-.post-body .testimonial blockquote {
-  margin: 0;
-  padding: 0;
-  border: none;
-  font-size: 1.15em;
-  font-style: italic;
-  color: var(--ink);
-}
-.post-body .testimonial figcaption {
-  display: grid;
-  grid-template-columns: auto 1fr;
-  grid-template-areas: "avatar who" "avatar role";
-  align-items: center;
-  column-gap: 0.8rem;
-  margin-top: 1rem;
-}
-.post-body .testimonial .avatar {
-  grid-area: avatar;
-  width: 2.6rem;
-  height: 2.6rem;
-  border-radius: 999px;
-  object-fit: cover;
-}
-.post-body .testimonial .who {
-  grid-area: who;
-  font-weight: 600;
-  color: var(--ink);
-}
-.post-body .testimonial .role {
-  grid-area: role;
-  font-size: 0.88rem;
-  color: var(--muted);
-}
-
-.post-body .logo-strip {
-  display: flex;
-  flex-wrap: wrap;
-  align-items: center;
-  justify-content: center;
-  gap: 2rem;
-  margin: 1.8em 0;
-}
-.post-body .logo-strip img {
-  max-height: 2.6rem;
-  width: auto;
-  object-fit: contain;
 }
 
 /* ── index post list ───────────────────────────────────────────────────── */
@@ -582,284 +423,138 @@ main > ul > li > a:hover {
   font-weight: 600;
 }
 
-/* ═══ THEME: Liquid Glass — layered translucent glass on an ambient scene ═══
-   Apple-style: a fixed CSS gradient scene behind everything, a floating glass
-   nav dock (the one signature element, with an SVG turbulence distortion), and
-   quiet near-opaque glass panels for reading. Everything below is scoped under
-   [data-theme="liquid-glass"] so the other themes are untouched. Backdrop-filter
-   is limited to a handful of surfaces (dock, content panel, hero/CTA, footer);
-   list rows use a plain translucent tint, never their own blur. */
-[data-theme="liquid-glass"] {
-  --font-ui: ui-sans-serif, system-ui, -apple-system, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif;
-  --font-heading: var(--font-ui);
-  --font-prose: var(--font-ui);
+/* ═══ THEME: La Perle — tropical-editorial luxury ═══════════════════════════
+   Deep Ink (#16242c) + warm Paper (#faf8f4), terracotta accent, gold for
+   kickers/meta. Cormorant Garamond display over Jost. Sharp corners, hairline
+   rules. Brand primitives (.lp-*) are global so every page + component shares
+   them; section/card layout lives in the page/component <style> blocks. */
+[data-theme="laperle"] {
+  --font-ui: "Jost", ui-sans-serif, system-ui, sans-serif;
+  --font-prose: "Jost", ui-sans-serif, system-ui, sans-serif;
+  --font-heading: "Cormorant Garamond", Georgia, "Times New Roman", serif;
 
-  --ink: #0d1b2a;      /* deep slate ink — high contrast over pale glass */
-  --muted: #48586a;    /* readable secondary (~7:1 on light panels) */
-  --accent: #1f5fd6;   /* trustworthy azure; white text ≈5.2:1 */
-  --bg: #e8eef5;       /* base behind the fixed scene (fallback bg color) */
-  --surface: rgba(255, 255, 255, 0.5);
-  --border: rgba(120, 145, 175, 0.28);
+  --bg: #faf8f4;
+  --surface: #f1ece1;
+  --ink: #16242c;
+  --muted: #8a939a;
+  --accent: #b6452f;
+  --border: #e3dccd;
 
-  --content: 46rem;
-  --wide: 66rem;
-  --radius: 20px;
+  --content: 44rem;
+  --wide: 1200px;
+  --radius: 0;
 
-  --h1-size: 3rem;
-  --h1-weight: 750;
-  --prose-size: 1.16rem;
-  --prose-leading: 1.8;
-  --header-border: none;
-  --nav-weight: 550;
+  --h1-size: clamp(2.2rem, 4.5vw, 3.4rem);
+  --h1-weight: 500;
+  --prose-size: 1.12rem;
+  --prose-leading: 1.75;
+  --header-border: 1px solid var(--border);
+  --nav-transform: uppercase;
+  --nav-weight: 500;
 
-  /* glass mixing surface (raised to solid in the no-backdrop-filter fallback) */
-  --glass-tint: rgba(255, 255, 255, 0.5);
-  --glass-panel: rgba(255, 255, 255, 0.74); /* near-opaque reading panel */
-  --glass-line: rgba(255, 255, 255, 0.65);  /* inset shine / hairline */
-  --glass-edge: rgba(120, 145, 175, 0.3);
-  --glass-shadow: 0 10px 34px -12px rgba(18, 38, 64, 0.4);
-  --glass-blur: blur(18px) saturate(160%);
-  --spring: cubic-bezier(0.175, 0.885, 0.32, 2.2);
+  /* brand extras (not part of the generic theme contract) */
+  --gold: #9c7a3c;
+  --text-secondary: #455159;
+  --border-subtle: #ece6da;
+  --on-accent: #faf8f4;
+  --wide-width: var(--wide);
 }
 
-/* Ambient scene: fixed, CSS-only, self-contained (no external images). Three
-   airy radial blooms + one small warm accent, over a soft cool base. */
-[data-theme="liquid-glass"] body {
-  background:
-    radial-gradient(60% 55% at 16% 18%, rgba(180, 214, 255, 0.75), transparent 70%),
-    radial-gradient(38% 40% at 84% 12%, rgba(255, 214, 186, 0.6), transparent 70%),
-    radial-gradient(55% 60% at 78% 88%, rgba(206, 196, 255, 0.6), transparent 72%),
-    linear-gradient(160deg, #eef4fb 0%, #e5ecf6 55%, #e9e6f4 100%);
-  background-attachment: fixed;
-  min-height: 100vh;
+[data-theme="laperle"] h1,
+[data-theme="laperle"] h2,
+[data-theme="laperle"] h3,
+[data-theme="laperle"] h4 {
+  font-family: var(--font-heading);
+  font-weight: 500;
+  line-height: 1.12;
+  letter-spacing: 0;
 }
 
-/* ── header dock: the signature floating glass pill ─────────────────────── */
-[data-theme="liquid-glass"] .site-header {
-  position: sticky;
-  top: 0;
-  z-index: 50;
-  border-bottom: none;
-  background: none;
-  padding: 0.7rem 1rem 0.2rem;
+/* Header: wordmark in the display serif, uppercase hairline nav + locale switch */
+[data-theme="laperle"] .brand {
+  font-family: var(--font-heading);
+  font-weight: 600;
+  font-size: 1.6rem;
+  letter-spacing: 0.04em;
 }
-[data-theme="liquid-glass"] .site-header .bar {
-  position: relative;
-  isolation: isolate;
-  max-width: var(--wide);
-  padding: 0.6rem 1.1rem;
-  border-radius: 999px;
+[data-theme="laperle"] .site-nav a {
+  font-size: 0.72rem;
+  letter-spacing: 0.2em;
+  color: var(--text-secondary);
+}
+[data-theme="laperle"] .nav-locale {
+  display: inline-flex;
+  gap: 0.4rem;
   align-items: center;
-  gap: 1rem;
-  box-shadow: var(--glass-shadow), inset 0 1px 0 var(--glass-line);
-  border: 1px solid var(--glass-edge);
-  overflow: hidden;
+  font-size: 0.7rem;
+  letter-spacing: 0.18em;
+  text-transform: uppercase;
+  color: var(--muted);
 }
-/* backdrop layer (blur + distortion) sits behind the content, so the SVG
-   turbulence only warps the blurred scene — never the nav text. */
-[data-theme="liquid-glass"] .site-header .bar::before {
-  content: "";
-  position: absolute;
-  inset: 0;
-  z-index: -1;
-  background: var(--glass-tint);
-  -webkit-backdrop-filter: var(--glass-blur);
-  backdrop-filter: var(--glass-blur);
-}
-[data-theme="liquid-glass"] .brand {
-  position: relative;
-  font-weight: 750;
-  letter-spacing: -0.02em;
-}
-/* nav links become quiet glass chips with a springy hover */
-[data-theme="liquid-glass"] .site-nav {
-  gap: 0.35rem;
-  align-items: center;
-}
-[data-theme="liquid-glass"] .site-nav a {
-  position: relative;
-  padding: 0.4rem 0.85rem;
-  border-radius: 999px;
-  /* Full ink, not --muted: resting chips sit on a ~0.5-opacity dock that can
-     overlap a bright scene bloom — muted text only reaches ~AA there. */
-  color: var(--ink);
-  font-weight: var(--nav-weight);
-  transition:
-    transform 0.4s var(--spring),
-    background-color 0.25s ease,
-    color 0.25s ease,
-    box-shadow 0.25s ease;
-}
-[data-theme="liquid-glass"] .site-nav a:hover {
-  color: var(--ink);
-  background: rgba(255, 255, 255, 0.55);
-  box-shadow: inset 0 1px 0 var(--glass-line), 0 4px 12px -6px rgba(18, 38, 64, 0.4);
-  transform: translateY(-1px) scale(1.04);
-}
-[data-theme="liquid-glass"] .lang-switch {
-  position: relative;
-  align-items: center;
-}
-
-/* ── reading + list surfaces: quiet near-opaque glass panels ────────────── */
-[data-theme="liquid-glass"] main:not(.tpl-landing) {
-  margin-top: 2.5rem;
-  margin-bottom: 2rem;
-  padding: 2.5rem 2rem;
-  background: var(--glass-panel);
-  -webkit-backdrop-filter: blur(12px);
-  backdrop-filter: blur(12px);
-  border: 1px solid var(--glass-edge);
-  border-radius: var(--radius);
-  box-shadow: var(--glass-shadow), inset 0 1px 0 var(--glass-line);
-}
-/* archive/home list rows: translucent tint only — no per-row backdrop-filter */
-[data-theme="liquid-glass"] main > ul {
-  display: grid;
-  gap: 0.7rem;
-}
-[data-theme="liquid-glass"] main > ul > li {
-  padding: 1rem 1.2rem;
-  border-bottom: none;
-  border: 1px solid var(--glass-edge);
-  border-radius: 14px;
-  background: rgba(255, 255, 255, 0.42);
-  transition:
-    transform 0.4s var(--spring),
-    box-shadow 0.25s ease,
-    background-color 0.25s ease;
-}
-[data-theme="liquid-glass"] main > ul > li:hover {
-  background: rgba(255, 255, 255, 0.62);
-  box-shadow: 0 8px 22px -12px rgba(18, 38, 64, 0.45);
-  transform: translateY(-2px);
-}
-
-/* taxonomy + subcategory chips as small glass pills */
-[data-theme="liquid-glass"] .taxonomy a {
-  display: inline-block;
-  margin: 0 0.35rem 0.35rem 0;
-  padding: 0.2rem 0.7rem;
-  border-radius: 999px;
-  background: rgba(255, 255, 255, 0.5);
-  border: 1px solid var(--glass-edge);
+[data-theme="laperle"] .nav-locale a {
   color: var(--muted);
   text-decoration: none;
-  font-size: 0.82rem;
-  transition: transform 0.4s var(--spring), color 0.2s ease;
 }
-[data-theme="liquid-glass"] .taxonomy a:hover {
-  color: var(--accent);
-  transform: translateY(-1px) scale(1.04);
-}
-
-/* ── hero / CTA blocks on glass ─────────────────────────────────────────── */
-[data-theme="liquid-glass"] .block-hero,
-[data-theme="liquid-glass"] .block-cta {
-  background: rgba(255, 255, 255, 0.55);
-  -webkit-backdrop-filter: blur(14px) saturate(150%);
-  backdrop-filter: blur(14px) saturate(150%);
-  border: 1px solid var(--glass-edge);
-  border-radius: var(--radius);
-  box-shadow: var(--glass-shadow), inset 0 1px 0 var(--glass-line);
-}
-[data-theme="liquid-glass"] .block-hero h2 {
-  letter-spacing: -0.02em;
-}
-[data-theme="liquid-glass"] .button {
-  box-shadow: 0 10px 24px -10px rgba(31, 95, 214, 0.7), inset 0 1px 0 rgba(255, 255, 255, 0.3);
-  transition: transform 0.4s var(--spring), box-shadow 0.25s ease;
-}
-[data-theme="liquid-glass"] .button:hover {
-  transform: translateY(-2px) scale(1.03);
-}
-
-/* callouts / code inside prose read on their own quiet tint */
-[data-theme="liquid-glass"] .post-body :is(.callout, code) {
-  background: rgba(120, 145, 175, 0.12);
-}
-
-/* testimonial lifts onto a quiet glass panel to match the theme */
-[data-theme="liquid-glass"] .post-body .testimonial {
-  border-left: none;
-  background: rgba(255, 255, 255, 0.55);
-  -webkit-backdrop-filter: blur(12px) saturate(150%);
-  backdrop-filter: blur(12px) saturate(150%);
-  border: 1px solid var(--glass-edge);
-  box-shadow: var(--glass-shadow), inset 0 1px 0 var(--glass-line);
-}
-
-/* ── footer: subtler glass strip ────────────────────────────────────────── */
-[data-theme="liquid-glass"] .site-footer {
-  border-top: none;
-}
-[data-theme="liquid-glass"] .site-footer .bar {
-  position: relative;
-  isolation: isolate;
-  border-radius: var(--radius) var(--radius) 0 0;
-  background: rgba(255, 255, 255, 0.4);
-  -webkit-backdrop-filter: blur(10px);
-  backdrop-filter: blur(10px);
-  border: 1px solid var(--glass-edge);
-  border-bottom: none;
-  box-shadow: inset 0 1px 0 var(--glass-line);
-}
-[data-theme="liquid-glass"] .footer-nav a {
-  padding: 0.3rem 0.7rem;
-  border-radius: 999px;
-  transition: transform 0.4s var(--spring), background-color 0.2s ease, color 0.2s ease;
-}
-[data-theme="liquid-glass"] .footer-nav a:hover {
+[data-theme="laperle"] .nav-locale a:hover {
   color: var(--ink);
-  background: rgba(255, 255, 255, 0.5);
-  transform: translateY(-1px);
+}
+[data-theme="laperle"] .nav-locale .is-active {
+  color: var(--ink);
+}
+[data-theme="laperle"] .site-footer {
+  background: var(--ink);
+  color: #d8d2c6;
+  margin-top: 0;
+  border-top: 0;
+}
+[data-theme="laperle"] .site-footer .bar {
+  color: #d8d2c6;
+}
+[data-theme="laperle"] .site-footer a {
+  color: #e8c8a0;
 }
 
-/* ── focus: visible keyboard ring on every interactive glass surface ─────── */
-[data-theme="liquid-glass"] a:focus-visible,
-[data-theme="liquid-glass"] .button:focus-visible {
-  outline: 2px solid var(--accent);
-  outline-offset: 3px;
-  border-radius: 999px;
+/* ── brand primitives (global) ──────────────────────────────────────────── */
+.lp-kicker {
+  font-size: 0.7rem;
+  letter-spacing: 0.22em;
+  text-transform: uppercase;
+  color: var(--gold);
+  font-family: var(--font-ui);
 }
-
-/* ── accessibility: no motion, no distortion ────────────────────────────── */
-@media (prefers-reduced-motion: reduce) {
-  [data-theme="liquid-glass"] * {
-    transition: none !important;
-  }
-  [data-theme="liquid-glass"] .site-header .bar::before {
-    filter: none !important;
-  }
+.lp-btn {
+  display: inline-block;
+  background: var(--ink);
+  color: var(--bg);
+  border: 0;
+  padding: 0.85rem 1.6rem;
+  font-size: 0.72rem;
+  letter-spacing: 0.2em;
+  text-transform: uppercase;
+  cursor: pointer;
+  text-decoration: none;
+  font-family: var(--font-ui);
 }
-
-/* Distortion is applied ONLY to the dock's backdrop layer, and only where both
-   the SVG filter and backdrop-filter are supported. */
-@supports (backdrop-filter: blur(1px)) or (-webkit-backdrop-filter: blur(1px)) {
-  @media (prefers-reduced-motion: no-preference) {
-    [data-theme="liquid-glass"] .site-header .bar::before {
-      filter: url(#glass-distortion);
-    }
-  }
+.lp-btn--accent { background: var(--accent); color: var(--on-accent); }
+.lp-btn--ghost {
+  background: transparent;
+  color: var(--ink);
+  border: 1px solid color-mix(in srgb, var(--ink) 50%, transparent);
 }
-
-/* Fallback: no backdrop-filter → raise every glass surface to a translucent
-   solid so text keeps its contrast (WCAG-ish) without the blur. */
-@supports not ((backdrop-filter: blur(1px)) or (-webkit-backdrop-filter: blur(1px))) {
-  [data-theme="liquid-glass"] .site-header .bar::before {
-    background: rgba(240, 245, 251, 0.94);
-  }
-  [data-theme="liquid-glass"] main:not(.tpl-landing) {
-    background: rgba(248, 250, 253, 0.97);
-  }
-  [data-theme="liquid-glass"] .block-hero,
-  [data-theme="liquid-glass"] .block-cta {
-    background: rgba(244, 248, 252, 0.96);
-  }
-  [data-theme="liquid-glass"] .site-footer .bar {
-    background: rgba(240, 245, 251, 0.95);
-  }
-  [data-theme="liquid-glass"] main > ul > li {
-    background: rgba(248, 250, 253, 0.9);
-  }
+.lp-badge {
+  display: inline-block;
+  font-size: 0.62rem;
+  letter-spacing: 0.16em;
+  text-transform: uppercase;
+  padding: 0.25rem 0.6rem;
+  border: 1px solid var(--border);
+  color: var(--text-secondary);
+  background: color-mix(in srgb, var(--bg) 70%, transparent);
+}
+.lp-badge--sold, .lp-badge--rented { color: var(--muted); border-color: var(--border-subtle); }
+.lp-badge--under_offer { color: var(--gold); border-color: var(--gold); }
+.lp-price {
+  font-family: var(--font-heading);
+  font-size: 1.35rem;
+  color: var(--gold);
 }

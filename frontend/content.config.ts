@@ -127,4 +127,60 @@ const tags = defineCollection({
   schema: termSchema,
 });
 
-export const collections = { posts, pages, authors, categories, tags };
+// ── La Perle real-estate collections (added by the laperle theme) ───────────
+// Flat (non-localized): the theme ships a single Spanish content set and mirrors
+// it with English UI chrome (no translated content), so `id` is the bare stem.
+
+// Property listings — "a post with a gallery". Structured facets live in
+// frontmatter; the long writeup is the HTML body (rendered with set:html).
+const listings = defineCollection({
+  loader: glob({ pattern: "**/*.{md,mdx}", base: "./frontend/content/listings" }),
+  schema: z.object({
+    title: z.string(),
+    draft: z.boolean().default(false),
+    pubDate: z.coerce.date().optional(),
+    featuredImage: z.string().optional(),
+    gallery: z
+      .array(z.object({ image: z.string(), alt: z.string().optional() }))
+      .default([]),
+    listingType: z.enum(["sale", "rent", "sale_and_rent"]).default("sale"),
+    listingStatus: z
+      .enum(["active", "under_offer", "sold", "rented"])
+      .default("active"),
+    priceSale: z.number().optional(),
+    priceRent: z.number().optional(),
+    bedrooms: z.number().optional(),
+    bathrooms: z.number().optional(),
+    areaM2: z.number().optional(),
+    lotM2: z.number().optional(),
+    latitude: z.number().optional(),
+    longitude: z.number().optional(),
+    // Agent slug referencing the agents collection (CMS relation).
+    agent: z.string().optional(),
+    features: z.array(z.string()).default([]),
+    flowTags: z.array(z.string()).default([]),
+    // Region term slug referencing the regions collection (CMS relation).
+    region: z.string().optional(),
+    seo: seoSchema,
+  }),
+});
+
+const regions = defineCollection({
+  loader: glob({ pattern: "**/*.{md,mdx}", base: "./frontend/content/regions" }),
+  schema: termSchema,
+});
+
+const agents = defineCollection({
+  loader: glob({ pattern: "**/*.{md,mdx}", base: "./frontend/content/agents" }),
+  schema: z.object({
+    title: z.string(),
+    photo: z.string().optional(),
+    role: z.string().optional(),
+    phone: z.string().optional(),
+    whatsapp: z.string().optional(),
+    email: z.string().optional(),
+    telegramChatId: z.string().optional(),
+  }),
+});
+
+export const collections = { posts, pages, authors, categories, tags, listings, regions, agents };
