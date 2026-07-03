@@ -1,7 +1,7 @@
 <script setup lang="ts">
 import type { SlashItem } from "./extensions/slash";
 
-defineProps<{
+const props = defineProps<{
   items: SlashItem[];
   selected: number;
   top: number;
@@ -12,25 +12,33 @@ defineEmits<{
   (e: "select", index: number): void;
   (e: "hover", index: number): void;
 }>();
+
+// Show a group divider before the first item of each named group (e.g. the
+// "My blocks" entries appended after the built-ins).
+function groupHeader(i: number): string | null {
+  const g = props.items[i].group;
+  return g && g !== props.items[i - 1]?.group ? g : null;
+}
 </script>
 
 <template>
   <div class="slash-menu" :style="{ top: `${top}px`, left: `${left}px` }">
     <div v-if="!items.length" class="slash-empty">No matches</div>
-    <button
-      v-for="(item, i) in items"
-      :key="item.title"
-      class="slash-item"
-      :class="{ active: i === selected }"
-      @mouseenter="$emit('hover', i)"
-      @mousedown.prevent="$emit('select', i)"
-    >
-      <span class="slash-icon">{{ item.icon }}</span>
-      <span class="slash-text">
-        <span class="slash-title">{{ item.title }}</span>
-        <span class="slash-hint">{{ item.hint }}</span>
-      </span>
-    </button>
+    <template v-for="(item, i) in items" :key="i">
+      <p v-if="groupHeader(i)" class="slash-group">{{ groupHeader(i) }}</p>
+      <button
+        class="slash-item"
+        :class="{ active: i === selected }"
+        @mouseenter="$emit('hover', i)"
+        @mousedown.prevent="$emit('select', i)"
+      >
+        <span class="slash-icon">{{ item.icon }}</span>
+        <span class="slash-text">
+          <span class="slash-title">{{ item.title }}</span>
+          <span class="slash-hint">{{ item.hint }}</span>
+        </span>
+      </button>
+    </template>
   </div>
 </template>
 
@@ -53,6 +61,15 @@ defineEmits<{
   padding: 0.6rem 0.7rem;
   color: #9a9a9a;
   font-size: 0.88rem;
+}
+.slash-group {
+  margin: 0.35rem 0 0.15rem;
+  padding: 0 0.55rem;
+  font-size: 0.68rem;
+  font-weight: 600;
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+  color: #9a9a9a;
 }
 .slash-item {
   display: flex;

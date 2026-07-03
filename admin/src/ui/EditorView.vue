@@ -103,17 +103,17 @@ const drawerFields = computed<Field[]>(() =>
 
     <main class="flex flex-1 justify-center px-5 pt-12 pb-24">
       <!-- Layout-stable skeleton mirroring the title + first body lines. -->
-      <div v-if="loading" class="w-full max-w-2xl">
+      <div v-if="loading" class="w-full max-w-5xl">
         <div class="skeleton mb-8 h-12 w-3/4" />
         <div class="skeleton mb-3 h-4 w-full" />
         <div class="skeleton mb-3 h-4 w-11/12" />
         <div class="skeleton h-4 w-4/5" />
       </div>
       <!-- Calm, near-opaque "paper" surface — writing comfort beats effect. -->
-      <div v-else class="editor-paper w-full max-w-2xl">
+      <div v-else class="editor-paper w-full max-w-5xl">
         <input
           v-model="data.title"
-          class="mb-6 w-full border-none bg-transparent font-serif text-5xl font-bold leading-tight tracking-tight text-zinc-900 outline-none placeholder:text-zinc-300"
+          class="mx-auto mb-6 block w-full max-w-[46rem] border-none bg-transparent font-serif text-5xl font-bold leading-tight tracking-tight text-zinc-900 outline-none placeholder:text-zinc-300"
           :placeholder="`${collection.labelSingular} title`"
           @input="markDirty"
         />

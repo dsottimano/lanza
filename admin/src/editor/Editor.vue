@@ -10,7 +10,11 @@ import { BubbleMenuPlugin } from "@tiptap/extension-bubble-menu";
 import { Callout } from "./extensions/Callout";
 import { Figure } from "./extensions/Figure";
 import { Embed } from "./extensions/Embed";
+import { Columns, Column } from "./extensions/Columns";
+import { Testimonial } from "./extensions/Testimonial";
+import { LogoStrip } from "./extensions/LogoStrip";
 import { SlashCommand, filterSlashItems, type SlashItem } from "./extensions/slash";
+import { loadBlocks, blockSlashItems } from "../backend/blocks";
 import SlashMenu from "./SlashMenu.vue";
 import { safeLinkUrl } from "./url";
 
@@ -33,6 +37,9 @@ const slashSelected = ref(0);
 const slashTop = ref(0);
 const slashLeft = ref(0);
 const slashCommand = shallowRef<((item: SlashItem) => void) | null>(null);
+// The user's saved "My blocks", loaded once per mount and appended to the slash
+// catalog. Empty until (and unless) the async load resolves — never blocks boot.
+const myBlocks = ref<SlashItem[]>([]);
 
 function runSlash(index: number) {
   const item = slashItems.value[index];
@@ -61,9 +68,13 @@ const editor = useEditor({
     Callout,
     Figure,
     Embed,
+    Columns,
+    Column,
+    Testimonial,
+    LogoStrip,
     SlashCommand.configure({
       suggestion: {
-        items: ({ query }) => filterSlashItems(query),
+        items: ({ query }) => filterSlashItems(query, myBlocks.value),
         render: () => ({
           onStart: (props) => {
             slashItems.value = props.items;
@@ -137,6 +148,14 @@ onMounted(() => {
         from !== to && e.isEditable && !e.state.selection.empty,
     }),
   );
+
+  // Load the user's saved "My blocks" into the slash catalog. Async and
+  // failure-tolerant: a missing/broken blocks.json just leaves the group empty.
+  if (props.client) {
+    loadBlocks(props.client)
+      .then(({ blocks }) => (myBlocks.value = blockSlashItems(blocks)))
+      .catch(() => {});
+  }
 });
 
 // ── HTML inspector (verifies the HTML round-trip) ──
@@ -200,7 +219,7 @@ function link() {
 <style scoped>
 .sheet {
   width: 100%;
-  max-width: 44rem;
+  max-width: 100%;
 }
 
 .prose :deep(.tiptap) {
@@ -212,6 +231,47 @@ function link() {
 }
 .prose :deep(.tiptap > * + *) {
   margin-top: 1.1em;
+}
+/* Plain prose keeps a readable line length; structural blocks (columns,
+   figures, embeds, testimonials, logo strips) span the full, wider paper. */
+.prose :deep(.tiptap > p),
+.prose :deep(.tiptap > h2),
+.prose :deep(.tiptap > h3),
+.prose :deep(.tiptap > ul),
+.prose :deep(.tiptap > ol),
+.prose :deep(.tiptap > blockquote),
+.prose :deep(.tiptap > pre),
+.prose :deep(.tiptap > hr),
+.prose :deep(.tiptap > .callout) {
+  max-width: 46rem;
+  margin-inline: auto;
+}
+
+/* Columns — mirror the published grid so editing looks like the result; the
+   dashed cell borders are an editing affordance only (not in the output HTML). */
+.prose :deep(.cols) {
+  display: grid;
+  gap: 1.25rem;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  margin: 1.4em 0;
+}
+.prose :deep(.cols[data-cols="3"]) {
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+}
+.prose :deep(.col) {
+  min-width: 0;
+  padding: 0.85rem 1rem;
+  border: 1px dashed #e2e2e2;
+  border-radius: 8px;
+}
+.prose :deep(.col > * + *) {
+  margin-top: 0.8em;
+}
+@media (max-width: 640px) {
+  .prose :deep(.cols),
+  .prose :deep(.cols[data-cols="3"]) {
+    grid-template-columns: minmax(0, 1fr);
+  }
 }
 .prose :deep(h2) {
   font-size: 1.7rem;

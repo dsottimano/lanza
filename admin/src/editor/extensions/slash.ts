@@ -6,8 +6,14 @@ export interface SlashItem {
   icon: string;
   hint: string;
   keywords: string[];
+  // Optional group label. Built-ins leave it unset; dynamic "My blocks" entries
+  // set it so SlashMenu can render a divider before the group.
+  group?: string;
   command: (ctx: { editor: Editor; range: Range }) => void;
 }
+
+// A column pre-filled with one empty paragraph, for the Columns slash inserts.
+const emptyColumn = () => ({ type: "column", content: [{ type: "paragraph" }] });
 
 // The `/` command catalog. Each runs after deleting the typed `/query`.
 export const SLASH_ITEMS: SlashItem[] = [
@@ -76,6 +82,52 @@ export const SLASH_ITEMS: SlashItem[] = [
       editor.chain().focus().deleteRange(range).insertContent({ type: "figure" }).run(),
   },
   {
+    title: "2 columns",
+    icon: "▊▊",
+    hint: "Two-column layout",
+    keywords: ["columns", "column", "grid", "layout", "two", "2"],
+    command: ({ editor, range }) =>
+      editor
+        .chain()
+        .focus()
+        .deleteRange(range)
+        .insertContent({ type: "columns", attrs: { cols: 2 }, content: [emptyColumn(), emptyColumn()] })
+        .run(),
+  },
+  {
+    title: "3 columns",
+    icon: "▊▊▊",
+    hint: "Three-column layout",
+    keywords: ["columns", "column", "grid", "layout", "three", "3"],
+    command: ({ editor, range }) =>
+      editor
+        .chain()
+        .focus()
+        .deleteRange(range)
+        .insertContent({
+          type: "columns",
+          attrs: { cols: 3 },
+          content: [emptyColumn(), emptyColumn(), emptyColumn()],
+        })
+        .run(),
+  },
+  {
+    title: "Testimonial",
+    icon: "❝",
+    hint: "Quote with author",
+    keywords: ["testimonial", "quote", "review", "customer"],
+    command: ({ editor, range }) =>
+      editor.chain().focus().deleteRange(range).insertContent({ type: "testimonial" }).run(),
+  },
+  {
+    title: "Logo strip",
+    icon: "🏷️",
+    hint: "Row of logos",
+    keywords: ["logos", "logo", "brands", "clients", "as seen in"],
+    command: ({ editor, range }) =>
+      editor.chain().focus().deleteRange(range).insertContent({ type: "logoStrip" }).run(),
+  },
+  {
     title: "Embed",
     icon: "🔗",
     hint: "Video / iframe by URL",
@@ -85,10 +137,13 @@ export const SLASH_ITEMS: SlashItem[] = [
   },
 ];
 
-export function filterSlashItems(query: string): SlashItem[] {
+// Filters the built-in catalog plus any dynamic `extra` items (the user's saved
+// "My blocks"). Built-ins come first, then the blocks group.
+export function filterSlashItems(query: string, extra: SlashItem[] = []): SlashItem[] {
+  const all = extra.length ? [...SLASH_ITEMS, ...extra] : SLASH_ITEMS;
   const q = query.toLowerCase().trim();
-  if (!q) return SLASH_ITEMS;
-  return SLASH_ITEMS.filter(
+  if (!q) return all;
+  return all.filter(
     (item) =>
       item.title.toLowerCase().includes(q) ||
       item.keywords.some((k) => k.includes(q)),

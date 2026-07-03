@@ -35,6 +35,7 @@ const EditorView = lazyPane(() => import("./ui/EditorView.vue"));
 const RecordEditor = lazyPane(() => import("./ui/RecordEditor.vue"));
 const SettingsView = lazyPane(() => import("./ui/SettingsView.vue"));
 const MenuView = lazyPane(() => import("./ui/MenuView.vue"));
+const BlocksView = lazyPane(() => import("./ui/BlocksView.vue"));
 const RedirectsView = lazyPane(() => import("./ui/RedirectsView.vue"));
 const SiteHealthView = lazyPane(() => import("./ui/SiteHealthView.vue"));
 const HelpView = lazyPane(() => import("./ui/HelpView.vue"));
@@ -58,7 +59,8 @@ type Pane =
   | "health"
   | "help"
   | "languages"
-  | "themes";
+  | "themes"
+  | "blocks";
 
 // The token lives server-side (the /admin/api/gh proxy). Past Cloudflare Access
 // the CMS just boots — no sign-in screen, no localStorage PAT. The client carries
@@ -141,6 +143,13 @@ function openThemes() {
   pane.value = "themes";
 }
 
+function openBlocks() {
+  if (!confirmDiscard()) return;
+  settingsFile.value = null;
+  editingPath.value = null;
+  pane.value = "blocks";
+}
+
 // Languages saved: the config store is already refreshed. If the active editing
 // locale was just removed, fall back to the default. Return to the list.
 function onLanguagesSaved() {
@@ -198,6 +207,7 @@ function onOnboarded() {
       "
       :languages-open="pane === 'languages'"
       :themes-open="pane === 'themes'"
+      :blocks-open="pane === 'blocks'"
       :health-open="pane === 'health'"
       :locale="locale"
       :help-open="pane === 'help'"
@@ -206,6 +216,7 @@ function onOnboarded() {
       @open-settings="openSettings"
       @languages="openLanguages"
       @themes="openThemes"
+      @blocks="openBlocks"
       @health="openHealth"
       @help="openHelp"
     />
@@ -256,6 +267,7 @@ function onOnboarded() {
       <SiteHealthView v-else-if="pane === 'health'" :client="client" @back="backToList" />
       <HelpView v-else-if="pane === 'help'" @back="backToList" />
       <ThemesView v-else-if="pane === 'themes'" :client="client" @back="backToList" />
+      <BlocksView v-else-if="pane === 'blocks'" :client="client" @back="backToList" />
       <LanguagesView
         v-else-if="pane === 'languages'"
         :client="client"

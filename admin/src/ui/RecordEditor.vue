@@ -41,7 +41,7 @@ const { data, loading, save, markDirty } = useEntryEditor(props, {
       />
     </header>
 
-    <main class="mx-auto max-w-2xl px-6 pt-10 pb-24">
+    <main class="mx-auto max-w-3xl px-6 pt-10 pb-24">
       <h1 class="mb-6 font-serif text-3xl font-bold tracking-tight text-zinc-900">
         {{ path ? "Edit" : "New" }} {{ collection.labelSingular.toLowerCase() }}
       </h1>

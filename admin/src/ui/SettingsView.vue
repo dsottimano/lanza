@@ -74,7 +74,7 @@ async function save() {
       />
     </header>
 
-    <main class="mx-auto max-w-2xl px-6 pt-8 pb-24">
+    <main class="mx-auto max-w-3xl px-6 pt-8 pb-24">
       <h1 class="mb-6 font-serif text-3xl font-bold tracking-tight text-zinc-900">
         {{ file.label }}
         <span v-if="file.localized" class="ml-2 align-middle text-base font-medium text-zinc-500">

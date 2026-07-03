@@ -10,6 +10,7 @@ defineProps<{
   activeSettings: string | null;
   languagesOpen: boolean;
   themesOpen: boolean;
+  blocksOpen: boolean;
   healthOpen: boolean;
   locale: Locale;
   helpOpen: boolean;
@@ -20,6 +21,7 @@ const emit = defineEmits<{
   (e: "openSettings", file: FileEntry): void;
   (e: "languages"): void;
   (e: "themes"): void;
+  (e: "blocks"): void;
   (e: "health"): void;
   (e: "help"): void;
 }>();
@@ -103,6 +105,12 @@ const itemActive = "nav-item--active";
         @click="emit('openSettings', f)"
       >
         {{ f.label }}
+      </button>
+      <button
+        :class="[item, blocksOpen ? itemActive : '']"
+        @click="emit('blocks')"
+      >
+        Blocks
       </button>
       <button
         :class="[item, themesOpen ? itemActive : '']"
