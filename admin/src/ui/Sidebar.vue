@@ -16,6 +16,8 @@ const props = defineProps<{
   themesOpen: boolean;
   blocksOpen: boolean;
   healthOpen: boolean;
+  contentTypesOpen: boolean;
+  publishOpen: boolean;
   locale: Locale;
   helpOpen: boolean;
 }>();
@@ -27,6 +29,8 @@ const emit = defineEmits<{
   (e: "themes"): void;
   (e: "blocks"): void;
   (e: "health"): void;
+  (e: "contentTypes"): void;
+  (e: "publish"): void;
   (e: "help"): void;
 }>();
 
@@ -79,7 +83,8 @@ const settingsActive = computed(
     props.languagesOpen ||
     props.themesOpen ||
     props.blocksOpen ||
-    props.healthOpen,
+    props.healthOpen ||
+    props.contentTypesOpen,
 );
 const activeGroup = computed<GroupId | null>(() => {
   if (settingsActive.value) return "settings";
@@ -200,6 +205,12 @@ const itemActive = "nav-item--active";
         <div class="group-body" :class="{ 'group-body--open': isOpen('settings') }">
           <div class="group-body__inner flex flex-col gap-0.5">
             <button
+              :class="[item, contentTypesOpen ? itemActive : '']"
+              @click="emit('contentTypes')"
+            >
+              Content types
+            </button>
+            <button
               :class="[item, languagesOpen ? itemActive : '']"
               @click="emit('languages')"
             >
@@ -236,7 +247,14 @@ const itemActive = "nav-item--active";
       </div>
     </div>
 
-    <div class="flex-shrink-0 border-t border-white/40 pt-2">
+    <div class="flex-shrink-0 border-t border-white/40 pt-2 flex flex-col gap-0.5">
+      <button
+        class="nav-item flex items-center gap-1.5"
+        :class="{ 'nav-item--active': publishOpen }"
+        @click="emit('publish')"
+      >
+        <span aria-hidden="true">🚀</span> Publish
+      </button>
       <button
         class="nav-item flex items-center gap-1.5"
         :class="{ 'nav-item--active': helpOpen }"

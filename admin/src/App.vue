@@ -41,6 +41,8 @@ const SiteHealthView = lazyPane(() => import("./ui/SiteHealthView.vue"));
 const HelpView = lazyPane(() => import("./ui/HelpView.vue"));
 const LanguagesView = lazyPane(() => import("./ui/LanguagesView.vue"));
 const ThemesView = lazyPane(() => import("./ui/ThemesView.vue"));
+const ContentTypesView = lazyPane(() => import("./ui/ContentTypesView.vue"));
+const PublishView = lazyPane(() => import("./ui/PublishView.vue"));
 const OnboardingWizard = lazyPane(() => import("./ui/OnboardingWizard.vue"));
 import { GitHubClient } from "./backend/github";
 import type { Locale } from "./backend/config";
@@ -61,7 +63,9 @@ type Pane =
   | "help"
   | "languages"
   | "themes"
-  | "blocks";
+  | "blocks"
+  | "contentTypes"
+  | "publish";
 
 // The token lives server-side (the /admin/api/gh proxy). Past Cloudflare Access
 // the CMS just boots — no sign-in screen, no localStorage PAT. The client carries
@@ -159,6 +163,20 @@ function openBlocks() {
   pane.value = "blocks";
 }
 
+function openContentTypes() {
+  if (!confirmDiscard()) return;
+  settingsFile.value = null;
+  editingPath.value = null;
+  pane.value = "contentTypes";
+}
+
+function openPublish() {
+  if (!confirmDiscard()) return;
+  settingsFile.value = null;
+  editingPath.value = null;
+  pane.value = "publish";
+}
+
 // Languages saved: the config store is already refreshed. If the active editing
 // locale was just removed, fall back to the default. Return to the list.
 function onLanguagesSaved() {
@@ -218,6 +236,8 @@ function onOnboarded() {
       :themes-open="pane === 'themes'"
       :blocks-open="pane === 'blocks'"
       :health-open="pane === 'health'"
+      :content-types-open="pane === 'contentTypes'"
+      :publish-open="pane === 'publish'"
       :locale="locale"
       :help-open="pane === 'help'"
       @select="selectCollection"
@@ -227,6 +247,8 @@ function onOnboarded() {
       @themes="openThemes"
       @blocks="openBlocks"
       @health="openHealth"
+      @content-types="openContentTypes"
+      @publish="openPublish"
       @help="openHelp"
     />
     <main class="min-w-0 flex-1">
@@ -282,6 +304,16 @@ function onOnboarded() {
         :client="client"
         @back="backToList"
         @saved="onLanguagesSaved"
+      />
+      <ContentTypesView
+        v-else-if="pane === 'contentTypes'"
+        :client="client"
+        @back="backToList"
+      />
+      <PublishView
+        v-else-if="pane === 'publish'"
+        :client="client"
+        @back="backToList"
       />
       <CollectionList
         v-else
