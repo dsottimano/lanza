@@ -147,7 +147,7 @@ export class GitHubClient {
   /** Save a JSON settings file (2-space indented, trailing newline). */
   async saveJson(
     path: string,
-    data: Record<string, unknown>,
+    data: Record<string, unknown> | unknown[],
     message: string,
     sha?: string,
   ): Promise<string> {
