@@ -55,8 +55,7 @@ export const onRequest = async (context: {
     const sec = env.GITHUB_CLIENT_SECRET ?? "";
     return new Response(
       `OAuth token exchange failed: ${tokenBody.error ?? "no access_token"} — ${tokenBody.error_description ?? ""}\n` +
-        `DEBUG: this deploy is using client_id="${cid}" (len ${cid.length}); ` +
-        `client_secret len ${sec.length}, ends "…${sec.slice(-4)}"`,
+        `DEBUG: client_id len ${cid.length} (expect 20); client_secret len ${sec.length} (expect 40)`,
       { status: 401 },
     );
   }
