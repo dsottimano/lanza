@@ -246,20 +246,10 @@ export class GitHubClient {
     onProgress?: (done: number, total: number) => void,
   ): Promise<string> {
     if (files.length === 0) throw new Error("No files to commit.");
-    const { owner, name, branch } = REPO;
-    const git = `/repos/${owner}/${name}/git`;
+    const git = `/repos/${REPO.owner}/${REPO.name}/git`;
 
-    // 1. current branch head and the tree it points at (our base).
-    const ref = (await this.req(`${git}/ref/heads/${branch}`)) as {
-      object: { sha: string };
-    };
-    const headSha = ref.object.sha;
-    const headCommit = (await this.req(`${git}/commits/${headSha}`)) as {
-      tree: { sha: string };
-    };
-
-    // 2. upload each file as a blob, collecting tree entries.
-    const tree: { path: string; mode: "100644"; type: "blob"; sha: string }[] = [];
+    // Upload each file as a blob, collecting tree entries; then one commit.
+    const tree: TreeEntry[] = [];
     let done = 0;
     for (const f of files) {
       const blob = (await this.req(`${git}/blobs`, {
@@ -269,8 +259,34 @@ export class GitHubClient {
       tree.push({ path: f.path, mode: "100644", type: "blob", sha: blob.sha });
       onProgress?.(++done, files.length);
     }
+    return this.writeCommit(tree, message);
+  }
 
-    // 3. new tree on top of the current one, 4. one commit, 5. fast-forward ref.
+  /**
+   * Commit tree changes that reference EXISTING blobs (or delete paths) in one
+   * commit — no blob upload. Used by revert: restored files point at the blob
+   * sha they had before the apply, and added files are removed with `sha: null`
+   * (the Git Data API's deletion form). Every other file is left untouched.
+   */
+  async commitTreeChanges(entries: TreeEntry[], message: string): Promise<string> {
+    if (entries.length === 0) throw new Error("No changes to commit.");
+    return this.writeCommit(entries, message);
+  }
+
+  // Build a new tree on top of the current branch head, commit it, and
+  // fast-forward the branch. Shared by commitFiles / commitTreeChanges.
+  private async writeCommit(tree: TreeEntry[], message: string): Promise<string> {
+    const { branch } = REPO;
+    const git = `/repos/${REPO.owner}/${REPO.name}/git`;
+
+    const ref = (await this.req(`${git}/ref/heads/${branch}`)) as {
+      object: { sha: string };
+    };
+    const headSha = ref.object.sha;
+    const headCommit = (await this.req(`${git}/commits/${headSha}`)) as {
+      tree: { sha: string };
+    };
+
     const newTree = (await this.req(`${git}/trees`, {
       method: "POST",
       body: JSON.stringify({ base_tree: headCommit.tree.sha, tree }),
@@ -285,4 +301,85 @@ export class GitHubClient {
     });
     return commit.sha;
   }
+
+  // ── Read-only history/diff endpoints (used by theme revert) ──────────────
+
+  /** List commits on the branch, newest first (one page). */
+  async listCommits(perPage: number, page = 1): Promise<CommitListItem[]> {
+    const { owner, name, branch } = REPO;
+    const q = `sha=${branch}&per_page=${perPage}&page=${page}`;
+    return (await this.req(
+      `/repos/${owner}/${name}/commits?${q}`,
+    )) as CommitListItem[];
+  }
+
+  /** One commit via the REST API — includes parents and per-file statuses. */
+  async getCommit(sha: string): Promise<CommitDetail> {
+    return (await this.req(
+      `/repos/${REPO.owner}/${REPO.name}/commits/${sha}`,
+    )) as CommitDetail;
+  }
+
+  /** Diff base…head. `status` tells us whether base is an ancestor of head. */
+  async compare(base: string, head: string): Promise<CompareResult> {
+    return (await this.req(
+      `/repos/${REPO.owner}/${REPO.name}/compare/${base}...${head}`,
+    )) as CompareResult;
+  }
+
+  /** Read a tree; recursive lists every blob path under it. */
+  async getTree(sha: string, recursive = true): Promise<TreeResult> {
+    const q = recursive ? "?recursive=1" : "";
+    return (await this.req(
+      `/repos/${REPO.owner}/${REPO.name}/git/trees/${sha}${q}`,
+    )) as TreeResult;
+  }
+
+  /** Read a blob (base64 content). */
+  async getBlob(sha: string): Promise<BlobResult> {
+    return (await this.req(
+      `/repos/${REPO.owner}/${REPO.name}/git/blobs/${sha}`,
+    )) as BlobResult;
+  }
+}
+
+// A Git Data API tree entry: point a path at an existing blob, or delete it
+// with `sha: null`.
+export type TreeEntry =
+  | { path: string; mode: "100644"; type: "blob"; sha: string }
+  | { path: string; mode: "100644"; type: "blob"; sha: null };
+
+export interface CommitListItem {
+  sha: string;
+  commit: { message: string; author: { date: string } };
+}
+
+export interface CommitFile {
+  filename: string;
+  status: string; // added | modified | removed | renamed | ...
+  previous_filename?: string;
+}
+
+export interface CommitDetail {
+  sha: string;
+  commit: { message: string; tree: { sha: string }; author: { date: string } };
+  parents: { sha: string }[];
+  files?: CommitFile[];
+}
+
+export interface CompareResult {
+  status: string; // ahead | behind | identical | diverged
+  files?: { filename: string; status: string }[];
+}
+
+export interface TreeResult {
+  sha: string;
+  tree: { path: string; type: string; sha: string; mode: string }[];
+  truncated: boolean;
+}
+
+export interface BlobResult {
+  sha: string;
+  content: string;
+  encoding: string;
 }

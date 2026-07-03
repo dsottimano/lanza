@@ -6,6 +6,8 @@
 import { ref, shallowRef } from "vue";
 import { GitHubClient } from "../backend/github";
 import { parseTheme, applyTheme, type ParsedTheme } from "../backend/theme";
+import ThemeHistory from "./ThemeHistory.vue";
+import ThemeExport from "./ThemeExport.vue";
 import { reportError, clearError } from "../errors";
 
 const props = defineProps<{ client: GitHubClient }>();
@@ -144,6 +146,10 @@ async function apply() {
           </button>
         </div>
       </div>
+
+      <ThemeExport />
+
+      <ThemeHistory :client="props.client" />
     </main>
   </div>
 </template>

@@ -55,7 +55,12 @@ export function isAllowed(method: string, path: string): boolean {
         p === "user" || // token validation / login
         p.startsWith(`${REPO_PREFIX}/contents/`) || // read + list entries
         p === `${git}/ref/heads/${BRANCH}` || // branch head (commitFiles)
-        p.startsWith(`${git}/commits/`) // read a commit (commitFiles)
+        p.startsWith(`${git}/commits/`) || // read a git-data commit (commitFiles)
+        p.startsWith(`${git}/trees/`) || // read a tree, recursive (revert)
+        p.startsWith(`${git}/blobs/`) || // read a blob (revert)
+        p === `${REPO_PREFIX}/commits` || // list commits (theme history)
+        p.startsWith(`${REPO_PREFIX}/commits/`) || // read a REST commit (revert)
+        p.startsWith(`${REPO_PREFIX}/compare/`) // compare base...head (conflict detection)
       );
     case "PUT":
     case "DELETE":
