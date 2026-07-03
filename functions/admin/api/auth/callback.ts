@@ -45,26 +45,10 @@ export const onRequest = async (context: {
       redirect_uri: new URL("/admin/api/auth/callback", request.url).toString(),
     }),
   });
-  const tokenBody = (await tokenRes.json()) as {
-    access_token?: string;
-    error?: string;
-    error_description?: string;
-  };
-  if (!tokenBody.access_token) {
-    const cid = env.GITHUB_CLIENT_ID ?? "";
-    const sec = env.GITHUB_CLIENT_SECRET ?? "";
-    const keys = Object.keys(env)
-      .map((k) => JSON.stringify(k))
-      .sort()
-      .join(", ");
-    return new Response(
-      `OAuth token exchange failed: ${tokenBody.error ?? "no access_token"} — ${tokenBody.error_description ?? ""}\n` +
-        `DEBUG: client_id len ${cid.length}; client_secret len ${sec.length}\n` +
-        `DEBUG env keys (exact, quoted): ${keys}`,
-      { status: 401 },
-    );
+  const token = ((await tokenRes.json()) as { access_token?: string }).access_token;
+  if (!token) {
+    return new Response("OAuth token exchange failed.", { status: 401 });
   }
-  const token = tokenBody.access_token;
 
   const userRes = await fetch("https://api.github.com/user", {
     headers: {
