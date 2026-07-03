@@ -254,6 +254,69 @@ body::before {
       inset 0 0 0 1px rgba(255, 255, 255, 0.06);
   }
 
+  /* ── Sidebar collapsible groups ─────────────────────────────────────────
+     Group header is a real button (aria-expanded lives in markup). The body
+     uses the grid 0fr↔1fr trick so it animates height without measuring JS and
+     without layout jank; the inner wrapper clips overflow while collapsing. */
+  .rail-group + .rail-group {
+    margin-top: 0.5rem;
+  }
+  .group-toggle {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    width: 100%;
+    border-radius: 9px;
+    padding: 0.3rem 0.5rem 0.3rem 0.625rem;
+    margin-bottom: 0.125rem;
+    color: #52525b; /* zinc-600 — ≥4.5:1 on the rail tint; matches Language label */
+    transition: color 0.18s ease, background-color 0.18s ease;
+  }
+  .group-toggle:hover {
+    color: var(--ink);
+    background: rgba(255, 255, 255, 0.4);
+  }
+  .group-toggle:focus-visible {
+    outline: none;
+    box-shadow: var(--focus-ring);
+  }
+  .group-chevron {
+    width: 0.75rem;
+    height: 0.75rem;
+    flex-shrink: 0;
+    opacity: 0.7;
+    transform: rotate(-90deg);
+    transition: transform 0.24s var(--spring);
+  }
+  .group-chevron--open {
+    transform: rotate(0deg);
+  }
+  .group-body {
+    display: grid;
+    grid-template-rows: 0fr;
+    transition: grid-template-rows 0.24s ease;
+  }
+  .group-body--open {
+    grid-template-rows: 1fr;
+  }
+  .group-body__inner {
+    overflow: hidden;
+    min-height: 0;
+  }
+
+  /* Thin, unobtrusive scrollbar for the rail's scroll region. */
+  .rail-scroll {
+    scrollbar-width: thin;
+    scrollbar-color: rgba(30, 41, 80, 0.22) transparent;
+  }
+  .rail-scroll::-webkit-scrollbar {
+    width: 6px;
+  }
+  .rail-scroll::-webkit-scrollbar-thumb {
+    background: rgba(30, 41, 80, 0.22);
+    border-radius: 999px;
+  }
+
   /* ── Segmented control (language / menu-location tabs) ─────────────────── */
   .segment {
     display: flex;
@@ -284,6 +347,29 @@ body::before {
   .segment-btn:focus-visible {
     outline: none;
     box-shadow: var(--focus-ring);
+  }
+
+  /* ── Dense field grid (FieldForm `dense`) ───────────────────────────────
+     Two-per-row for compact scalars, full row for wide widgets. Container-query
+     driven: the two-column pass only turns on when the FORM itself is wide
+     enough (~19rem of inner width), so a narrow side panel self-selects a single
+     column while a roomy form card (RecordEditor) gets two. Vertical rhythm
+     stays on each FieldInput's own margin; the grid only adds the column gap. */
+  .field-grid {
+    container-type: inline-size;
+  }
+  .field-grid__items {
+    display: grid;
+    grid-template-columns: 1fr;
+    column-gap: 0.9rem;
+  }
+  @container (min-width: 19rem) {
+    .field-grid__items {
+      grid-template-columns: repeat(2, minmax(0, 1fr));
+    }
+    .field-grid__items > .field-span-full {
+      grid-column: 1 / -1;
+    }
   }
 
   /* ── Loading skeleton (layout-stable; shimmer only while mounted) ──────── */
@@ -354,5 +440,11 @@ body::before {
   .btn-danger:not(:disabled):hover,
   .nav-item:hover {
     transform: none;
+  }
+  .group-body {
+    transition: none;
+  }
+  .group-chevron {
+    transition: none;
   }
 }
