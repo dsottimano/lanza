@@ -72,6 +72,9 @@ export interface FileEntry {
   // When true, the file has one variant per locale: `file` is the base name and
   // the active locale is spliced in before `.json` (menu.json → menu.es.json).
   localized?: boolean;
+  // When set, App.vue opens a purpose-built pane instead of the generic
+  // FieldForm (e.g. "menu" → MenuView.vue). `fields` is then unused.
+  view?: "menu" | "redirects";
   fields: Field[];
 }
 
@@ -120,6 +123,21 @@ function seoField(opts: { ogTypeDefault: string; withAuthor: boolean }): Field {
   }
   return { name: "seo", label: "SEO", widget: "object", required: false, collapsed: true, fields };
 }
+
+// Per-entry TEMPLATE — the WordPress-style layout variant, shared by posts +
+// pages. Options MUST mirror the frontend registry (frontend/lib/templates.ts,
+// the source of truth); keep them in sync — the house pattern for shared shapes
+// (cf. frontend/lib/site.ts ↔ MenuView.vue). Was named "layout" before the
+// template feature; the frontend still reads the legacy key so old content is safe.
+const TEMPLATE_FIELD: Field = {
+  name: "template",
+  label: "Template",
+  widget: "select",
+  options: ["default", "full-width", "landing"],
+  default: "default",
+  required: false,
+  hint: "Layout variant: full-width breaks out to the wide measure; landing hides the page title and nav chrome.",
+};
 
 const PAGE_BLOCKS: Field = {
   name: "blocks",
@@ -222,15 +240,7 @@ export const COLLECTIONS: Collection[] = [
         collection: "authors",
         required: false,
       },
-      {
-        name: "layout",
-        label: "Layout",
-        widget: "select",
-        options: ["default", "wide", "landing"],
-        default: "default",
-        required: false,
-        hint: "Overrides the site theme's default width for this entry.",
-      },
+      TEMPLATE_FIELD,
       seoField({ ogTypeDefault: "article", withAuthor: true }),
     ],
   },
@@ -248,15 +258,7 @@ export const COLLECTIONS: Collection[] = [
       { name: "draft", label: "Draft (uncheck to publish)", widget: "boolean", default: true },
       { name: "description", label: "Excerpt", widget: "text", required: false },
       { name: "featuredImage", label: "Featured image", widget: "image", required: false },
-      {
-        name: "layout",
-        label: "Layout",
-        widget: "select",
-        options: ["default", "wide", "landing"],
-        default: "default",
-        required: false,
-        hint: "Overrides the site theme's default width for this entry.",
-      },
+      TEMPLATE_FIELD,
       PAGE_BLOCKS,
       seoField({ ogTypeDefault: "website", withAuthor: false }),
     ],
@@ -306,6 +308,116 @@ export const COLLECTIONS: Collection[] = [
       { name: "title", label: "Name", widget: "string" },
       { name: "bio", label: "Bio", widget: "text", required: false },
       { name: "avatar", label: "Avatar", widget: "image", required: false },
+    ],
+  },
+  // ── La Perle real-estate collections (added by the laperle theme) ──────────
+  // Flat (not localized): the theme ships a single Spanish content set and
+  // mirrors it with English UI chrome, so listings/regions/agents are shared.
+  {
+    kind: "folder",
+    name: "listings",
+    label: "Listings",
+    labelSingular: "Listing",
+    folder: "frontend/content/listings",
+    body: "rich",
+    thumbnail: "featuredImage",
+    fields: [
+      { name: "title", label: "Title", widget: "string" },
+      { name: "draft", label: "Draft (uncheck to publish)", widget: "boolean", default: true },
+      { name: "pubDate", label: "Publish date", widget: "datetime", required: false },
+      { name: "featuredImage", label: "Featured image", widget: "image", required: false },
+      {
+        name: "gallery",
+        label: "Gallery",
+        labelSingular: "Photo",
+        widget: "list",
+        required: false,
+        fields: [
+          { name: "image", label: "Image", widget: "image" },
+          { name: "alt", label: "Alt text", widget: "string", required: false },
+        ],
+      },
+      {
+        name: "listingType",
+        label: "Listing type",
+        widget: "select",
+        options: ["sale", "rent", "sale_and_rent"],
+        default: "sale",
+      },
+      {
+        name: "listingStatus",
+        label: "Status",
+        widget: "select",
+        options: ["active", "under_offer", "sold", "rented"],
+        default: "active",
+      },
+      { name: "priceSale", label: "Sale price (USD)", widget: "number", valueType: "int", required: false },
+      { name: "priceRent", label: "Rent price (USD / month)", widget: "number", valueType: "int", required: false },
+      { name: "bedrooms", label: "Bedrooms", widget: "number", valueType: "int", required: false },
+      { name: "bathrooms", label: "Bathrooms", widget: "number", valueType: "int", required: false },
+      { name: "areaM2", label: "Built area (m²)", widget: "number", valueType: "int", required: false },
+      { name: "lotM2", label: "Lot size (m²)", widget: "number", valueType: "int", required: false },
+      { name: "latitude", label: "Latitude", widget: "number", valueType: "float", required: false },
+      { name: "longitude", label: "Longitude", widget: "number", valueType: "float", required: false },
+      {
+        name: "region",
+        label: "Region",
+        widget: "relation",
+        collection: "regions",
+        required: false,
+      },
+      {
+        name: "agent",
+        label: "Agent",
+        widget: "relation",
+        collection: "agents",
+        required: false,
+      },
+      {
+        name: "features",
+        label: "Features",
+        widget: "list",
+        required: false,
+        hint: "One feature per item (e.g. pool, ocean_view).",
+      },
+      {
+        name: "flowTags",
+        label: "Quiz match tags",
+        widget: "list",
+        required: false,
+        hint: "Tags the 'find your place' quiz matches on (e.g. coastal, investment).",
+      },
+      seoField({ ogTypeDefault: "article", withAuthor: false }),
+    ],
+  },
+  {
+    kind: "folder",
+    name: "regions",
+    label: "Regions",
+    labelSingular: "Region",
+    folder: "frontend/content/regions",
+    body: "none",
+    fields: [
+      { name: "title", label: "Name", widget: "string" },
+      { name: "description", label: "Description", widget: "text", required: false },
+    ],
+  },
+  {
+    kind: "folder",
+    name: "agents",
+    label: "Agents",
+    labelSingular: "Agent",
+    folder: "frontend/content/agents",
+    body: "rich",
+    thumbnail: "photo",
+    fields: [
+      { name: "title", label: "Name", widget: "string" },
+      { name: "photo", label: "Photo", widget: "image", required: false },
+      { name: "role", label: "Role", widget: "string", required: false },
+      { name: "phone", label: "Phone", widget: "string", required: false },
+      { name: "whatsapp", label: "WhatsApp number", widget: "string", required: false, hint: "Digits only, incl. country code (e.g. 50760000001)." },
+      { name: "email", label: "Email", widget: "string", required: false },
+      { name: "telegramChatId", label: "Telegram chat ID", widget: "string", required: false },
     ],
   },
   {
@@ -388,41 +500,19 @@ export const COLLECTIONS: Collection[] = [
         label: "Menu",
         file: "frontend/data/menu.json",
         localized: true,
-        fields: [
-          {
-            name: "items",
-            label: "Menu items",
-            labelSingular: "Menu item",
-            widget: "list",
-            fields: [
-              { name: "label", label: "Label", widget: "string" },
-              {
-                name: "url",
-                label: "URL / path",
-                widget: "string",
-                hint: "e.g. /, /about/, or https://example.com",
-              },
-            ],
-          },
-        ],
+        // Custom editor: menu locations (header/footer) × per-device menus.
+        // Shape lives in frontend/lib/site.ts; edited by MenuView.vue, not FieldForm.
+        view: "menu",
+        fields: [],
       },
       {
         name: "redirects",
         label: "Redirects",
         file: "frontend/data/redirects.json",
-        fields: [
-          {
-            name: "redirects",
-            label: "Redirects",
-            labelSingular: "Redirect",
-            widget: "list",
-            fields: [
-              { name: "from", label: "From path", widget: "string" },
-              { name: "to", label: "To path / URL", widget: "string" },
-              { name: "status", label: "Status code", widget: "number", default: 301, valueType: "int" },
-            ],
-          },
-        ],
+        // Validation lives in backend/redirect-rules.ts; edited by
+        // RedirectsView.vue, not FieldForm.
+        view: "redirects",
+        fields: [],
       },
     ],
   },

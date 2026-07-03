@@ -1,0 +1,104 @@
+{
+	"startNode": "n_cover",
+	"nodes": [
+		{ "id": "n_cover", "type": "info", "kicker": "Panamá", "kicker_en": "Panama",
+			"prompt": "Encuentre su lugar en el paraíso", "prompt_en": "Find your place in paradise",
+			"sub": "Un camino de dos minutos hacia su hogar ideal en Panamá.", "sub_en": "A two-minute path to your perfect Panama home.",
+			"cta": "Comenzar", "cta_en": "Begin", "image": "/img/flow/cover.jpg" },
+		{ "id": "n_move", "type": "single", "kicker": "Su decisión", "kicker_en": "Your move",
+			"prompt": "¿Comprar, alquilar o invertir?", "prompt_en": "Buy, rent, or invest?", "image": "/img/flow/move.jpg",
+			"options": [
+				{ "id": "buy", "label": "Comprar un hogar", "label_en": "Buy a home", "value": "buy" },
+				{ "id": "rent", "label": "Alquilar por ahora", "label_en": "Rent for now", "value": "rent" },
+				{ "id": "invest", "label": "Invertir para renta", "label_en": "Invest for income", "value": "invest" }
+			],
+			"profileWeights": { "coastal_investor": { "invest": 3 }, "city_professional": { "buy": 1 }, "relaxed_expat": { "rent": 1 } } },
+		{ "id": "n_rent_term", "type": "single", "kicker": "Su estadía", "kicker_en": "Your stay",
+			"prompt": "¿Por cuánto tiempo alquila?", "prompt_en": "How long are you renting for?", "image": "/img/flow/rent.jpg",
+			"options": [
+				{ "id": "short", "label": "Unos meses", "label_en": "A few months", "value": "short" },
+				{ "id": "year", "label": "Un año o más", "label_en": "A year or more", "value": "year" }
+			],
+			"profileWeights": { "relaxed_expat": { "short": 2, "year": 1 } } },
+		{ "id": "n_budget", "type": "range", "kicker": "Su presupuesto", "kicker_en": "Your budget",
+			"prompt": "¿Cuál es su presupuesto?", "prompt_en": "What's your budget?", "image": "/img/flow/budget.jpg",
+			"min": 100000, "max": 2000000, "step": 50000, "default": 450000, "prefix": "$", "suffix": "USD",
+			"profileWeights": { "coastal_investor": 1 } },
+		{ "id": "n_region", "type": "single", "kicker": "Su mapa", "kicker_en": "Your map",
+			"prompt": "¿Qué lugar le llama?", "prompt_en": "Where calls to you?", "image": "/img/flow/region.jpg",
+			"options": [
+				{ "id": "city", "label": "Ciudad de Panamá", "label_en": "Panama City", "value": "city" },
+				{ "id": "beach", "label": "La costa y las islas", "label_en": "The coast & islands", "value": "beach" },
+				{ "id": "mountains", "label": "Boquete y las tierras altas", "label_en": "Boquete & the highlands", "value": "mountains" }
+			],
+			"profileWeights": { "city_professional": { "city": 3 }, "coastal_investor": { "beach": 2 }, "relaxed_expat": { "mountains": 2 } } },
+		{ "id": "n_beds", "type": "range", "kicker": "Su espacio", "kicker_en": "Your space",
+			"prompt": "¿Cuántas habitaciones?", "prompt_en": "How many bedrooms?", "image": "/img/flow/beds.jpg",
+			"min": 1, "max": 5, "step": 1, "default": 2, "suffix": "habitaciones", "suffix_en": "bedrooms" },
+		{ "id": "n_musthaves", "type": "multi", "kicker": "Sus esenciales", "kicker_en": "Your essentials",
+			"prompt": "Elija lo que más importa.", "prompt_en": "Pick what matters most.", "image": "/img/flow/musthaves.jpg",
+			"options": [
+				{ "id": "pool", "label": "Piscina", "label_en": "Pool", "value": "pool" },
+				{ "id": "ocean", "label": "Vista al mar", "label_en": "Ocean view", "value": "ocean" },
+				{ "id": "walk", "label": "Caminable", "label_en": "Walkable", "value": "walk" },
+				{ "id": "income", "label": "Renta por alquiler", "label_en": "Rental income", "value": "income" }
+			],
+			"profileWeights": { "coastal_investor": { "ocean": 1, "income": 2 }, "city_professional": { "walk": 2 } } },
+		{ "id": "n_timeline", "type": "single", "kicker": "Su momento", "kicker_en": "Your timing",
+			"prompt": "¿Cuándo espera mudarse?", "prompt_en": "When do you hope to move?", "image": "/img/flow/timeline.jpg",
+			"options": [
+				{ "id": "now", "label": "De inmediato", "label_en": "Right away", "value": "now" },
+				{ "id": "soon", "label": "Dentro de un año", "label_en": "Within a year", "value": "soon" },
+				{ "id": "exploring", "label": "Solo explorando", "label_en": "Just exploring", "value": "exploring" }
+			],
+			"profileWeights": { "city_professional": { "now": 1 } } },
+		{ "id": "n_swipe", "type": "swipe", "kicker": "Defina su gusto", "kicker_en": "Build your taste",
+			"prompt": "Deslice lo que le habla.", "prompt_en": "Swipe what speaks to you.", "deck": "main" },
+		{ "id": "n_capture", "type": "capture", "kicker": "Último paso", "kicker_en": "Last step",
+			"prompt": "¿Adónde enviamos su match?", "prompt_en": "Where shall we send your match?", "image": "/img/flow/capture.jpg",
+			"cta": "Revelar mi perfil", "cta_en": "Reveal my profile" },
+		{ "id": "n_reveal", "type": "reveal", "kicker": "Su perfil", "kicker_en": "Your profile",
+			"cta": "Ver propiedad", "cta_en": "View property" }
+	],
+	"edges": [
+		{ "source": "n_cover", "target": "n_move" },
+		{ "source": "n_move", "sourceOption": "rent", "target": "n_rent_term" },
+		{ "source": "n_move", "sourceOption": "buy", "target": "n_budget" },
+		{ "source": "n_move", "sourceOption": "invest", "target": "n_budget" },
+		{ "source": "n_rent_term", "target": "n_region" },
+		{ "source": "n_budget", "target": "n_region" },
+		{ "source": "n_region", "target": "n_beds" },
+		{ "source": "n_beds", "target": "n_musthaves" },
+		{ "source": "n_musthaves", "target": "n_timeline" },
+		{ "source": "n_timeline", "target": "n_swipe" },
+		{ "source": "n_swipe", "target": "n_capture" },
+		{ "source": "n_capture", "target": "n_reveal" }
+	],
+	"swipeDeck": {
+		"main": [
+			{ "id": "s_villa", "kind": "property", "label": "Villa frente al mar", "label_en": "Beachfront villa", "image": "/img/flow/swipe/villa.jpg", "profileWeights": { "coastal_investor": 2 } },
+			{ "id": "s_penthouse", "kind": "property", "label": "Penthouse urbano", "label_en": "City penthouse", "image": "/img/flow/swipe/penthouse.jpg", "profileWeights": { "city_professional": 2 } },
+			{ "id": "s_cabin", "kind": "property", "label": "Refugio de altura", "label_en": "Highland retreat", "image": "/img/flow/swipe/cabin.jpg", "profileWeights": { "relaxed_expat": 2 } },
+			{ "id": "s_surf", "kind": "lifestyle", "label": "Surf y arena", "label_en": "Surf & sand", "image": "/img/flow/swipe/surf.jpg", "profileWeights": { "coastal_investor": 1, "relaxed_expat": 1 } },
+			{ "id": "s_cafe", "kind": "lifestyle", "label": "Cultura de café", "label_en": "Café culture", "image": "/img/flow/swipe/cafe.jpg", "profileWeights": { "city_professional": 1 } },
+			{ "id": "s_rainforest", "kind": "lifestyle", "label": "Mañanas de selva", "label_en": "Rainforest mornings", "image": "/img/flow/swipe/rainforest.jpg", "profileWeights": { "relaxed_expat": 2 } },
+			{ "id": "s_pool", "kind": "amenity", "label": "Piscina infinita", "label_en": "Infinity pool", "image": "/img/flow/swipe/pool.jpg", "profileWeights": { "coastal_investor": 1 } },
+			{ "id": "s_marina", "kind": "amenity", "label": "Acceso a marina", "label_en": "Marina access", "image": "/img/flow/swipe/marina.jpg", "profileWeights": { "coastal_investor": 1, "city_professional": 1 } },
+			{ "id": "s_garden", "kind": "amenity", "label": "Jardín privado", "label_en": "Private garden", "image": "/img/flow/swipe/garden.jpg", "profileWeights": { "relaxed_expat": 1 } }
+		]
+	},
+	"archetypes": [
+		{ "id": "coastal_investor", "name": "El Inversionista Costero", "name_en": "The Coastal Investor",
+			"blurb": "Sol, vistas al mar y buen rendimiento de alquiler. Usted ve la costa panameña como estilo de vida y activo inteligente.",
+			"blurb_en": "Sun, ocean views and strong rental yield. You see Panama's coast as both a lifestyle and a smart asset.",
+			"image": "/img/flow/archetype/coastal.jpg", "flowTags": ["coastal", "investment"] },
+		{ "id": "city_professional", "name": "El Profesional Urbano", "name_en": "The City Professional",
+			"blurb": "Caminable, conectado y moderno. El skyline de Ciudad de Panamá es su hábitat natural.",
+			"blurb_en": "Walkable, connected and modern. Panama City's skyline is your natural habitat.",
+			"image": "/img/flow/archetype/city.jpg", "flowTags": ["city"] },
+		{ "id": "relaxed_expat", "name": "El Expat Relajado", "name_en": "The Relaxed Expat",
+			"blurb": "Aire fresco, mañanas lentas, comunidad cercana. Las tierras altas y la costa tranquila le llaman.",
+			"blurb_en": "Cooler air, slower mornings, a tight community. The highlands and quiet coast are calling.",
+			"image": "/img/flow/archetype/expat.jpg", "flowTags": ["highlands", "lifestyle"] }
+	]
+}

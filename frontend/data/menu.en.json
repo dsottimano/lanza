@@ -1,6 +1,18 @@
 {
-  "items": [
-    { "label": "Home", "url": "/" },
-    { "label": "About", "url": "/about/" }
-  ]
+  "locations": {
+    "header": {
+      "desktop": [
+        { "label": "Properties", "url": "/en/properties" },
+        { "label": "Journal", "url": "/en/journal" },
+        { "label": "Find", "url": "/en/find" }
+      ],
+      "tablet": null,
+      "mobile": null
+    },
+    "footer": {
+      "desktop": [],
+      "tablet": null,
+      "mobile": null
+    }
+  }
 }

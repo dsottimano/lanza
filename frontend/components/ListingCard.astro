@@ -1,0 +1,43 @@
+---
+import { listingUrl, priceLine, statusBadge, UI, type Locale } from "../lib/listings";
+
+interface Props {
+  listing: { id: string; data: Record<string, any> };
+  locale?: Locale;
+}
+const { listing, locale = "es" } = Astro.props;
+const d = listing.data;
+const badge = statusBadge(d.listingStatus, locale);
+const photo = d.featuredImage;
+---
+
+<a class="listing-card" href={listingUrl(listing.id, locale)} data-region={d.region ?? ""} data-type={d.listingType ?? ""}>
+  <div class="listing-card__media">
+    {photo && (
+      <img src={photo} alt={d.title} width="400" height="300" loading="lazy" decoding="async" />
+    )}
+    {d.listingStatus !== "active" && (
+      <span class={`lp-badge ${badge.cls} listing-card__badge`}>{badge.label}</span>
+    )}
+  </div>
+  <div class="listing-card__body">
+    <h3 class="listing-card__title">{d.title}</h3>
+    <div class="lp-price">{priceLine(d, locale)}</div>
+    <div class="listing-card__meta">
+      {d.bedrooms != null && <span>{d.bedrooms} {UI[locale].beds}</span>}
+      {d.bathrooms != null && <span>{d.bathrooms} {UI[locale].baths}</span>}
+      {d.areaM2 != null && <span>{d.areaM2} m²</span>}
+    </div>
+  </div>
+</a>
+
+<style>
+  .listing-card { display: block; text-decoration: none; color: inherit; border: 1px solid var(--border-subtle); background: var(--surface); transition: border-color 0.15s; }
+  .listing-card:hover { border-color: var(--gold); }
+  .listing-card__media { position: relative; aspect-ratio: 4/3; overflow: hidden; background: var(--surface); }
+  .listing-card__media img { width: 100%; height: 100%; object-fit: cover; display: block; }
+  .listing-card__badge { position: absolute; top: 0.75rem; left: 0.75rem; }
+  .listing-card__body { padding: 1rem 1.1rem 1.2rem; }
+  .listing-card__title { font-size: 1.15rem; margin: 0 0 0.4rem; }
+  .listing-card__meta { display: flex; gap: 0.9rem; margin-top: 0.45rem; font-size: 0.78rem; letter-spacing: 0.08em; color: var(--muted); text-transform: uppercase; }
+</style>

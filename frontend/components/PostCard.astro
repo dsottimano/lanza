@@ -1,0 +1,34 @@
+---
+// Journal teaser card. Posts aren't translated — both locales link to the ES
+// post detail at /posts/<stem>/ (see project rules; EN is UI-only). Posts are a
+// localized collection, so `id` is "<locale>/<stem>"; the route serves the stem.
+import { splitId } from "../lib/i18n";
+interface Props {
+  post: { id: string; data: Record<string, any> };
+}
+const { post } = Astro.props;
+const d = post.data;
+const href = `/posts/${splitId(post.id).slug}/`;
+---
+
+<a class="post-card" href={href}>
+  {d.featuredImage && (
+    <div class="post-card__media">
+      <img src={d.featuredImage} alt={d.title} width="400" height="260" loading="lazy" decoding="async" />
+    </div>
+  )}
+  <div class="post-card__body">
+    <h3 class="post-card__title">{d.title}</h3>
+    {d.description && <p class="post-card__excerpt">{d.description}</p>}
+  </div>
+</a>
+
+<style>
+  .post-card { display: block; text-decoration: none; color: inherit; border: 1px solid var(--border-subtle); background: var(--surface); transition: border-color 0.15s; }
+  .post-card:hover { border-color: var(--gold); }
+  .post-card__media { aspect-ratio: 16/10; overflow: hidden; background: var(--surface); }
+  .post-card__media img { width: 100%; height: 100%; object-fit: cover; display: block; }
+  .post-card__body { padding: 1.1rem 1.2rem 1.4rem; }
+  .post-card__title { font-size: 1.3rem; margin: 0 0 0.5rem; }
+  .post-card__excerpt { color: var(--text-secondary); line-height: 1.6; font-size: 0.92rem; margin: 0; }
+</style>
