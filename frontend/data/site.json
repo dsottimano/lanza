@@ -5,6 +5,11 @@
       "code": "en",
       "label": "English",
       "ogLocale": "en_US"
+    },
+    {
+      "code": "fr",
+      "label": "Français",
+      "ogLocale": "fr_FR"
     }
   ],
   "onboarded": true
