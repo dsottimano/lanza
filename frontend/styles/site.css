@@ -177,6 +177,16 @@ main > img {
 .post-body a {
   text-decoration: underline;
 }
+/* Highlight mark emitted by the editor. Uses the accent so it tracks each
+   theme; box-decoration-break keeps the wash intact across wrapped lines. */
+.post-body mark {
+  background: color-mix(in srgb, var(--accent) 26%, transparent);
+  color: inherit;
+  padding: 0.05em 0.15em;
+  border-radius: 3px;
+  box-decoration-break: clone;
+  -webkit-box-decoration-break: clone;
+}
 .post-body ul,
 .post-body ol {
   padding-left: 1.4em;

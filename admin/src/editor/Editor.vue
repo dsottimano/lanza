@@ -6,7 +6,11 @@ import { CLIENT_KEY } from "../fields/context";
 import StarterKit from "@tiptap/starter-kit";
 import Link from "@tiptap/extension-link";
 import Placeholder from "@tiptap/extension-placeholder";
-import { BubbleMenuPlugin } from "@tiptap/extension-bubble-menu";
+import Highlight from "@tiptap/extension-highlight";
+import TextAlign from "@tiptap/extension-text-align";
+import Superscript from "@tiptap/extension-superscript";
+import Subscript from "@tiptap/extension-subscript";
+import Toolbar from "./Toolbar.vue";
 import { Callout } from "./extensions/Callout";
 import { Figure } from "./extensions/Figure";
 import { Embed } from "./extensions/Embed";
@@ -27,8 +31,6 @@ const emit = defineEmits<{ (e: "change"): void }>();
 // Expose the client to node views (Figure upload). TipTap vue-3 mounts node
 // views with this component's app context, so inject() reaches them here.
 provide(CLIENT_KEY, props.client as GitHubClient);
-
-const bubbleEl = ref<HTMLElement>();
 
 // ── Slash menu reactive state (driven by the suggestion render callbacks) ──
 const slashOpen = ref(false);
@@ -65,6 +67,12 @@ const editor = useEditor({
           ? "Type / for commands, or just start writing…"
           : "",
     }),
+    Highlight,
+    // Only text blocks carry alignment; it writes `style="text-align: …"`, which
+    // survives the frontend sanitizer unchanged (verified round-trip).
+    TextAlign.configure({ types: ["heading", "paragraph"] }),
+    Superscript,
+    Subscript,
     Callout,
     Figure,
     Embed,
@@ -136,19 +144,7 @@ defineExpose({
   focus: () => editor.value?.commands.focus(),
 });
 
-// ── Bubble toolbar (v3 ships the plugin only; we own the element) ──
 onMounted(() => {
-  if (!editor.value || !bubbleEl.value) return;
-  editor.value.registerPlugin(
-    BubbleMenuPlugin({
-      pluginKey: "bubbleMenu",
-      editor: editor.value,
-      element: bubbleEl.value,
-      shouldShow: ({ editor: e, from, to }) =>
-        from !== to && e.isEditable && !e.state.selection.empty,
-    }),
-  );
-
   // Load the user's saved "My blocks" into the slash catalog. Async and
   // failure-tolerant: a missing/broken blocks.json just leaves the group empty.
   if (props.client) {
@@ -186,20 +182,8 @@ function link() {
 
 <template>
   <div class="sheet">
+    <Toolbar :editor="editor" :on-link="link" />
     <EditorContent :editor="editor" class="prose" />
-
-    <!-- Bubble toolbar: positioned by the BubbleMenu plugin -->
-    <div ref="bubbleEl" class="bubble">
-      <template v-if="editor">
-        <button :class="{ on: editor.isActive('bold') }" @click="editor.chain().focus().toggleBold().run()"><b>B</b></button>
-        <button :class="{ on: editor.isActive('italic') }" @click="editor.chain().focus().toggleItalic().run()"><i>i</i></button>
-        <button :class="{ on: editor.isActive('link') }" @click="link"> link </button>
-        <span class="sep" />
-        <button :class="{ on: editor.isActive('heading', { level: 2 }) }" @click="editor.chain().focus().toggleHeading({ level: 2 }).run()">H2</button>
-        <button :class="{ on: editor.isActive('heading', { level: 3 }) }" @click="editor.chain().focus().toggleHeading({ level: 3 }).run()">H3</button>
-        <button :class="{ on: editor.isActive('blockquote') }" @click="editor.chain().focus().toggleBlockquote().run()">❝</button>
-      </template>
-    </div>
 
     <SlashMenu
       v-if="slashOpen"
@@ -340,6 +324,16 @@ function link() {
   text-decoration: underline;
   text-underline-offset: 2px;
 }
+/* Highlight — soft amber wash that reads on the light paper; mirrors the
+   .post-body mark token so editing matches the published result. */
+.prose :deep(mark) {
+  background: #fdeaa8;
+  color: inherit;
+  padding: 0.05em 0.15em;
+  border-radius: 3px;
+  box-decoration-break: clone;
+  -webkit-box-decoration-break: clone;
+}
 /* Placeholder for empty nodes */
 .prose :deep(p.is-empty::before) {
   content: attr(data-placeholder);
@@ -347,49 +341,6 @@ function link() {
   height: 0;
   color: #c4c4c4;
   pointer-events: none;
-}
-
-/* Bubble toolbar — starts out-of-flow + hidden; the plugin reveals/positions
-   it on text selection (it only runs its hide path after the first update). */
-.bubble {
-  position: absolute;
-  top: 0;
-  left: 0;
-  visibility: hidden;
-  display: flex;
-  align-items: center;
-  gap: 0.15rem;
-  padding: 0.25rem;
-  background: rgba(23, 25, 32, 0.82);
-  backdrop-filter: blur(12px) saturate(160%);
-  -webkit-backdrop-filter: blur(12px) saturate(160%);
-  border: 1px solid rgba(255, 255, 255, 0.12);
-  border-radius: 12px;
-  box-shadow: 0 12px 30px rgba(15, 18, 30, 0.4),
-    inset 0 1px 0 rgba(255, 255, 255, 0.14);
-}
-.bubble button {
-  min-width: 1.9rem;
-  height: 1.9rem;
-  padding: 0 0.45rem;
-  border: none;
-  background: none;
-  color: #fff;
-  font-size: 0.85rem;
-  border-radius: 5px;
-  cursor: pointer;
-}
-.bubble button:hover {
-  background: rgba(255, 255, 255, 0.15);
-}
-.bubble button.on {
-  background: rgba(255, 255, 255, 0.28);
-}
-.bubble .sep {
-  width: 1px;
-  height: 1.2rem;
-  margin: 0 0.2rem;
-  background: rgba(255, 255, 255, 0.25);
 }
 
 /* HTML inspector */
