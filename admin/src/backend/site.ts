@@ -1,5 +1,6 @@
 import { reactive } from "vue";
 import { GitHubError, type GitHubClient } from "./github";
+import { REPO } from "./config";
 
 // Runtime site configuration — the locale set (and onboarding state) the CMS
 // edits and stores in the repo at frontend/data/site.json, the SAME file the
@@ -44,25 +45,36 @@ export const site = reactive<{
   loaded: false,
 });
 
-/** Load site.json via the proxy. A 404 means "no config yet" → first run. */
+function applySite(data: Record<string, unknown>, sha: string | null): void {
+  const locales = Array.isArray(data.locales) && data.locales.length
+    ? (data.locales as LocaleDef[])
+    : FALLBACK.locales;
+  site.defaultLocale = (data.defaultLocale as string) || locales[0].code;
+  site.locales = locales;
+  site.onboarded = data.onboarded === true;
+  site.sha = sha;
+}
+
+/**
+ * Load site.json via the proxy. Reads the working branch (staging); on a 404 —
+ * which happens on a freshly-created working branch before its ref propagates —
+ * falls back to the authoritative production copy so a lag never masquerades as
+ * a first run and re-triggers onboarding. A 404 on BOTH is a genuine first run.
+ * (sha is null when read from production: the next write re-reads on the working
+ * branch, and the client's 409 retry covers a stale sha regardless.)
+ */
 export async function loadSiteConfig(client: GitHubClient): Promise<void> {
   try {
     const { data, sha } = await client.loadJson(SITE_CONFIG_PATH);
-    const locales = Array.isArray(data.locales) && data.locales.length
-      ? (data.locales as LocaleDef[])
-      : FALLBACK.locales;
-    site.defaultLocale = (data.defaultLocale as string) || locales[0].code;
-    site.locales = locales;
-    site.onboarded = data.onboarded === true;
-    site.sha = sha;
+    applySite(data, sha);
   } catch (e) {
-    if (e instanceof GitHubError && e.status === 404) {
-      site.defaultLocale = FALLBACK.defaultLocale;
-      site.locales = FALLBACK.locales;
-      site.onboarded = false;
-      site.sha = null;
-    } else {
-      throw e;
+    if (!(e instanceof GitHubError && e.status === 404)) throw e;
+    try {
+      const prod = await client.loadJson(SITE_CONFIG_PATH, REPO.productionBranch);
+      applySite(prod.data, null);
+    } catch (e2) {
+      if (!(e2 instanceof GitHubError && e2.status === 404)) throw e2;
+      applySite({}, null); // genuine first run → FALLBACK locale, onboarded:false
     }
   } finally {
     site.loaded = true;

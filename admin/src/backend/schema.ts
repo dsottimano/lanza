@@ -1,5 +1,6 @@
 import { reactive } from "vue";
 import { GitHubError, type GitHubClient } from "./github";
+import { REPO } from "./config";
 import { setCollections, type Collection } from "../schema";
 
 // Runtime content model — the collections + fields the CMS edits, stored in the
@@ -18,20 +19,29 @@ export const schemaState = reactive<{
   loaded: false,
 });
 
-/** Load schema.json via the proxy. A 404 means "no committed schema yet" → keep
- *  the seed baked into schema.ts. */
+/** Load schema.json via the proxy. Reads the working branch; on a 404 (fresh
+ *  working branch, ref lag) falls back to production. A 404 on both means no
+ *  committed schema yet → keep the seed baked into schema.ts. */
 export async function loadSchema(client: GitHubClient): Promise<void> {
   try {
-    const { data, sha } = await client.loadJson(SCHEMA_PATH);
-    if (Array.isArray(data) && data.length) {
-      setCollections(data as Collection[]);
-      schemaState.sha = sha;
+    let loaded: { data: unknown; sha: string | null } | null;
+    try {
+      loaded = await client.loadJson(SCHEMA_PATH);
+    } catch (e) {
+      if (!(e instanceof GitHubError && e.status === 404)) throw e;
+      try {
+        const prod = await client.loadJson(SCHEMA_PATH, REPO.productionBranch);
+        loaded = { data: prod.data, sha: null };
+      } catch (e2) {
+        if (!(e2 instanceof GitHubError && e2.status === 404)) throw e2;
+        loaded = null; // no repo copy on either branch — the seed stands
+      }
     }
-  } catch (e) {
-    if (e instanceof GitHubError && e.status === 404) {
-      schemaState.sha = null; // no repo copy yet — the seed stands
+    if (loaded && Array.isArray(loaded.data) && loaded.data.length) {
+      setCollections(loaded.data as Collection[]);
+      schemaState.sha = loaded.sha;
     } else {
-      throw e;
+      schemaState.sha = null;
     }
   } finally {
     schemaState.loaded = true;

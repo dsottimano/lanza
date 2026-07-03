@@ -84,9 +84,9 @@ export class GitHubClient {
     return user.login;
   }
 
-  private contentsUrl(p: string, withRef = true): string {
+  private contentsUrl(p: string, withRef = true, ref: string = REPO.branch): string {
     const base = `/repos/${REPO.owner}/${REPO.name}/contents/${p}`;
-    return withRef ? `${base}?ref=${REPO.branch}` : base;
+    return withRef ? `${base}?ref=${ref}` : base;
   }
 
   /**
@@ -134,9 +134,9 @@ export class GitHubClient {
     return this.putFile(path, serializeFrontmatter(data, body), message, sha);
   }
 
-  /** Load a JSON settings file. */
-  async loadJson(path: string): Promise<LoadedJson> {
-    const file = (await this.req(this.contentsUrl(path))) as {
+  /** Load a JSON settings file (from `ref`, the working branch by default). */
+  async loadJson(path: string, ref: string = REPO.branch): Promise<LoadedJson> {
+    const file = (await this.req(this.contentsUrl(path, true, ref))) as {
       content: string;
       sha: string;
     };
