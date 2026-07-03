@@ -12,6 +12,7 @@
 // a hand-rolled ustar writer + zlib.gzipSync.
 import { readFileSync, writeFileSync, statSync, readdirSync } from "node:fs";
 import { join, relative, sep } from "node:path";
+import { pathToFileURL } from "node:url";
 import { gzipSync } from "node:zlib";
 
 const BLOCK = 512;
@@ -68,31 +69,30 @@ function splitName(path) {
   return { name: path.slice(cut + 1), prefix: path.slice(0, cut) };
 }
 
-function tarEntry(archivePath, data, mtime) {
+export function tarEntry(archivePath, data, mtime) {
   const { name, prefix } = splitName(archivePath);
   const header = ustarHeader(name, prefix, data.length, mtime);
   const pad = (BLOCK - (data.length % BLOCK)) % BLOCK;
   return Buffer.concat([header, data, Buffer.alloc(pad)]);
 }
 
-function main() {
-  const [srcDir, outArg] = process.argv.slice(2);
-  if (!srcDir) {
-    console.error("usage: node scripts/pack-theme.mjs <src-dir> [out.tar.gz]");
-    process.exit(1);
-  }
+/**
+ * Pack a staging directory (theme.json + files/**) into a gzipped ustar bundle.
+ * Returns { out, entries } for logging. mtime 0 keeps bundles byte-reproducible:
+ * packing the same source twice yields an identical tarball (nothing reads the
+ * timestamps on import).
+ */
+export function packThemeDir(srcDir, outArg) {
   const manifestPath = join(srcDir, "theme.json");
   const filesDir = join(srcDir, "files");
   const manifest = JSON.parse(readFileSync(manifestPath, "utf8"));
   if (!manifest.name || !manifest.title) {
-    throw new Error("theme.json must include \"name\" and \"title\".");
+    throw new Error('theme.json must include "name" and "title".');
   }
   const out = outArg || `${manifest.name}.tar.gz`;
 
   // Archive entries: theme.json first, then every files/** entry. Paths are
   // relative to srcDir with forward slashes, no leading "./".
-  // mtime 0 keeps bundles byte-reproducible: packing the same source twice
-  // yields an identical tarball (nothing reads the timestamps on import).
   const mtime = 0;
   const chunks = [];
   const toArchivePath = (abs) => relative(srcDir, abs).split(sep).join("/");
@@ -106,7 +106,20 @@ function main() {
 
   const gz = gzipSync(Buffer.concat(chunks), { level: 9 });
   writeFileSync(out, gz);
-  console.log(`Packed ${files.length + 1} entries → ${out} (${gz.length} bytes)`);
+  return { out, entries: files.length + 1, bytes: gz.length };
 }
 
-main();
+function main() {
+  const [srcDir, outArg] = process.argv.slice(2);
+  if (!srcDir) {
+    console.error("usage: node scripts/pack-theme.mjs <src-dir> [out.tar.gz]");
+    process.exit(1);
+  }
+  const { out, entries, bytes } = packThemeDir(srcDir, outArg);
+  console.log(`Packed ${entries} entries → ${out} (${bytes} bytes)`);
+}
+
+// Only run the CLI when invoked directly, not when imported for its functions.
+if (import.meta.url === pathToFileURL(process.argv[1] ?? "").href) {
+  main();
+}
