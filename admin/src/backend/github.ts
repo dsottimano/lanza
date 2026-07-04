@@ -85,7 +85,7 @@ export class GitHubClient {
   }
 
   private contentsUrl(p: string, withRef = true, ref: string = REPO.branch): string {
-    const base = `/repos/${REPO.owner}/${REPO.name}/contents/${p}`;
+    const base = `/contents/${p}`;
     return withRef ? `${base}?ref=${ref}` : base;
   }
 
@@ -246,7 +246,7 @@ export class GitHubClient {
     onProgress?: (done: number, total: number) => void,
   ): Promise<string> {
     if (files.length === 0) throw new Error("No files to commit.");
-    const git = `/repos/${REPO.owner}/${REPO.name}/git`;
+    const git = "/git";
 
     // Upload each file as a blob, collecting tree entries; then one commit.
     const tree: TreeEntry[] = [];
@@ -277,7 +277,7 @@ export class GitHubClient {
   // fast-forward the branch. Shared by commitFiles / commitTreeChanges.
   private async writeCommit(tree: TreeEntry[], message: string): Promise<string> {
     const { branch } = REPO;
-    const git = `/repos/${REPO.owner}/${REPO.name}/git`;
+    const git = "/git";
 
     const ref = (await this.req(`${git}/ref/heads/${branch}`)) as {
       object: { sha: string };
@@ -311,7 +311,7 @@ export class GitHubClient {
    * every read 404s and looks like an un-onboarded repo.
    */
   async ensureWorkingBranch(): Promise<void> {
-    const git = `/repos/${REPO.owner}/${REPO.name}/git`;
+    const git = "/git";
     try {
       await this.req(`${git}/ref/heads/${REPO.branch}`);
       return; // already exists
@@ -334,7 +334,7 @@ export class GitHubClient {
    * report ("resolve on GitHub") — it never silently overwrites production.
    */
   async publish(message: string): Promise<{ merged: boolean }> {
-    const res = (await this.req(`/repos/${REPO.owner}/${REPO.name}/merges`, {
+    const res = (await this.req(`/merges`, {
       method: "POST",
       body: JSON.stringify({
         base: REPO.productionBranch,
@@ -350,24 +350,24 @@ export class GitHubClient {
 
   /** List commits on the branch, newest first (one page). */
   async listCommits(perPage: number, page = 1): Promise<CommitListItem[]> {
-    const { owner, name, branch } = REPO;
+    const { branch } = REPO;
     const q = `sha=${branch}&per_page=${perPage}&page=${page}`;
     return (await this.req(
-      `/repos/${owner}/${name}/commits?${q}`,
+      `/commits?${q}`,
     )) as CommitListItem[];
   }
 
   /** One commit via the REST API — includes parents and per-file statuses. */
   async getCommit(sha: string): Promise<CommitDetail> {
     return (await this.req(
-      `/repos/${REPO.owner}/${REPO.name}/commits/${sha}`,
+      `/commits/${sha}`,
     )) as CommitDetail;
   }
 
   /** Diff base…head. `status` tells us whether base is an ancestor of head. */
   async compare(base: string, head: string): Promise<CompareResult> {
     return (await this.req(
-      `/repos/${REPO.owner}/${REPO.name}/compare/${base}...${head}`,
+      `/compare/${base}...${head}`,
     )) as CompareResult;
   }
 
@@ -375,14 +375,14 @@ export class GitHubClient {
   async getTree(sha: string, recursive = true): Promise<TreeResult> {
     const q = recursive ? "?recursive=1" : "";
     return (await this.req(
-      `/repos/${REPO.owner}/${REPO.name}/git/trees/${sha}${q}`,
+      `/git/trees/${sha}${q}`,
     )) as TreeResult;
   }
 
   /** Read a blob (base64 content). */
   async getBlob(sha: string): Promise<BlobResult> {
     return (await this.req(
-      `/repos/${REPO.owner}/${REPO.name}/git/blobs/${sha}`,
+      `/git/blobs/${sha}`,
     )) as BlobResult;
   }
 }

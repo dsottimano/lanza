@@ -51,17 +51,16 @@ interface TreeEntry {
 
 /** Resolve the branch's root tree sha (ref → commit → tree), like commitFiles. */
 async function resolveTreeSha(): Promise<string> {
-  const { owner, name, branch } = REPO;
-  const git = `/repos/${owner}/${name}/git`;
+  const { branch } = REPO;
+  const git = "/git";
   const ref = (await gh(`${git}/ref/heads/${branch}`)) as { object: { sha: string } };
   const commit = (await gh(`${git}/commits/${ref.object.sha}`)) as { tree: { sha: string } };
   return commit.tree.sha;
 }
 
 async function listTree(): Promise<TreeEntry[]> {
-  const { owner, name } = REPO;
   const sha = await resolveTreeSha();
-  const res = (await gh(`/repos/${owner}/${name}/git/trees/${sha}?recursive=1`)) as {
+  const res = (await gh(`/git/trees/${sha}?recursive=1`)) as {
     tree: TreeEntry[];
     truncated?: boolean;
   };
@@ -79,8 +78,7 @@ function b64ToBytes(b64: string): Uint8Array {
 }
 
 async function fetchBlob(sha: string): Promise<Uint8Array> {
-  const { owner, name } = REPO;
-  const blob = (await gh(`/repos/${owner}/${name}/git/blobs/${sha}`)) as { content: string };
+  const blob = (await gh(`/git/blobs/${sha}`)) as { content: string };
   return b64ToBytes(blob.content);
 }
 

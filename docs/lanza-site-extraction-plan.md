@@ -147,9 +147,23 @@ independent of the split; do it in the broker whenever.
   admin vue-tsc + vite build. Note: 1 **pre-existing** gh-proxy test failure (stale
   `POST git/refs` assertion) unrelated to P1. Docs (README, project CLAUDE.md) still
   cite `frontend/content/posts` — update at P1 merge. Not yet merged to main.
-- **P2 — Package boundary.** Introduce the `lanza` CLI + astro config factory; make the
-  repo build *as if* code were a package (via a local `file:` link) without publishing.
-  Verify: build + dev both work through the CLI.
+- **P2 — Package boundary. ✅ DONE (2026-07-04).** Three commits on
+  `feat/lanza-site-extraction-p1`. **P2a** `lanza` CLI + `lanzaConfig()` factory
+  (absolute srcDir → package/frontend; content+data from cwd), dogfooded in-place.
+  **P2b** public/ merge — platform assets (brand/favicon/social/lanza.js + prebuilt
+  admin SPA) ship in the package; factory sets publicDir → package/public; `lanza
+  build` overlays the tenant's public/ (uploads + generated _redirects) onto dist/.
+  **P2c** packaging: CLI resolves Astro via `createRequire` (real installs hoist it);
+  package.json version/files(enumerated public subdirs)/engines(node≥22)/prepack;
+  `.npmignore` (ships the gitignored public/admin) + `.nvmrc`.
+  **Validated the clean way — no symlinks:** `npm pack` → real tarball install into a
+  fresh content-only tenant → `npm run build` → 12 pages, tenant content + prebuilt
+  admin + tenant upload + generated _redirects; tarball audited (no
+  content/data/source/node_modules leaks). srcDir-under-root + dep-hoisting confirmed.
+  **OPEN SEAM surfaced:** `functions/` (Pages Functions) ship in the package, but
+  Cloudflare Pages deploys `functions/` from the tenant *repo root*, not node_modules
+  — so the tenant template needs functions/ at root (thin re-export, or `lanza build`
+  copies them out). Resolve in P3 (identity touches functions anyway) or the template step.
 - **P3 — Identity (Thread #2).** `lanza.config.json`; `gh-proxy`/`admin` read it;
   broker writes it; App-install redirect. Verify: dogfood edits its own repo via config.
 - **P4 — Publish + thin template.** Publish `@lanza/site@x`; create the thin template
