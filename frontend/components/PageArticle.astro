@@ -3,7 +3,7 @@
 // localized mirror (/es/about/). Pages render frontmatter blocks + the rich body.
 import type { CollectionEntry } from "astro:content";
 import Blocks from "./Blocks.astro";
-import Preset from "./Preset.astro";
+import HtmlTemplate from "./HtmlTemplate.astro";
 import { sanitizeBody } from "../lib/sanitize";
 import { resolveTemplate, templateClass, isLanding } from "../lib/templates";
 
@@ -23,7 +23,7 @@ const landing = isLanding(template);
   {
     page.data.preset ? (
       // A chosen template owns the whole page — skip the default title/body chrome.
-      <Preset name={page.data.preset} slots={page.data.slots ?? {}} />
+      <HtmlTemplate name={page.data.preset} data={page.data.slots ?? {}} />
     ) : (
       <>
         {!landing && <h1>{page.data.title}</h1>}

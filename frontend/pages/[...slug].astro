@@ -9,7 +9,10 @@ import { splitEntries } from "../lib/paths";
 // Default-locale (EN) only; ES/FR pages come from [locale]/[...slug].astro.
 export async function getStaticPaths() {
   const { root } = splitEntries(await publishedPages());
-  return root.map(({ entry, slug }) => ({ params: { slug }, props: { page: entry } }));
+  // "home" is the site root — rendered by pages/index.astro, not at /home.
+  return root
+    .filter(({ slug }) => slug !== "home")
+    .map(({ entry, slug }) => ({ params: { slug }, props: { page: entry } }));
 }
 
 const { page } = Astro.props;

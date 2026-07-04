@@ -1,0 +1,63 @@
+{
+  "name": "manifesto",
+  "label": "Manifesto (landing)",
+  "description": "The flagship landing page — hero with a live ask→publish demo, a 5-step spine, three audience doors, cost tiles, and a closing call to action. Pair with the Landing template.",
+  "fields": [
+    { "name": "tag", "label": "Hero eyebrow", "widget": "string", "required": false },
+    { "name": "headline", "label": "Hero headline", "widget": "string" },
+    { "name": "sub", "label": "Hero subheading", "widget": "text", "required": false },
+    { "name": "cta1", "label": "Primary button text", "widget": "string", "required": false },
+    { "name": "cta1Url", "label": "Primary button URL", "widget": "string", "required": false },
+    { "name": "cta2", "label": "Secondary button text", "widget": "string", "required": false },
+    { "name": "cta2Url", "label": "Secondary button URL", "widget": "string", "required": false },
+    { "name": "demoYouWho", "label": "Demo — your name", "widget": "string", "required": false },
+    { "name": "demoYou", "label": "Demo — your message", "widget": "text", "required": false },
+    { "name": "demoAgentWho", "label": "Demo — agent name", "widget": "string", "required": false },
+    { "name": "demoAgent", "label": "Demo — agent reply", "widget": "text", "required": false },
+    { "name": "demoCaption", "label": "Demo — caption", "widget": "text", "required": false },
+    { "name": "spineEyebrow", "label": "Spine eyebrow", "widget": "string", "required": false },
+    { "name": "spineHeadline", "label": "Spine headline", "widget": "string", "required": false },
+    {
+      "name": "steps",
+      "label": "Spine steps",
+      "widget": "list",
+      "required": false,
+      "fields": [
+        { "name": "label", "label": "Step label", "widget": "string" },
+        { "name": "svc", "label": "Service tag", "widget": "string", "required": false },
+        { "name": "body", "label": "Step body", "widget": "text", "required": false }
+      ]
+    },
+    { "name": "doorsEyebrow", "label": "Doors eyebrow", "widget": "string", "required": false },
+    { "name": "doorsHeadline", "label": "Doors headline", "widget": "string", "required": false },
+    {
+      "name": "cards",
+      "label": "Audience doors",
+      "widget": "list",
+      "required": false,
+      "fields": [
+        { "name": "who", "label": "Who it's for", "widget": "string" },
+        { "name": "body", "label": "Body", "widget": "text", "required": false },
+        { "name": "cta", "label": "Link text", "widget": "string", "required": false },
+        { "name": "href", "label": "Link URL", "widget": "string", "required": false }
+      ]
+    },
+    { "name": "ownEyebrow", "label": "Ownership eyebrow", "widget": "string", "required": false },
+    { "name": "ownHeadline", "label": "Ownership headline", "widget": "string", "required": false },
+    { "name": "ownBody", "label": "Ownership body", "widget": "text", "required": false },
+    {
+      "name": "tiles",
+      "label": "Cost / time tiles",
+      "widget": "list",
+      "required": false,
+      "fields": [
+        { "name": "value", "label": "Value", "widget": "string" },
+        { "name": "label", "label": "Label", "widget": "string", "required": false }
+      ]
+    },
+    { "name": "closeHeadline", "label": "Closing headline", "widget": "string", "required": false },
+    { "name": "closeSub", "label": "Closing subheading", "widget": "text", "required": false },
+    { "name": "closeCta", "label": "Closing button text", "widget": "string", "required": false },
+    { "name": "closeCtaUrl", "label": "Closing button URL", "widget": "string", "required": false }
+  ]
+}

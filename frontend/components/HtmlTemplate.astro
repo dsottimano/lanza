@@ -1,0 +1,38 @@
+---
+// Renders an author-written HTML template with a page's data via the minimal engine
+// in frontend/lib/template-render.ts. Templates live in the TENANT repo root
+// (templates/<name>/template.html) — agent-authored, hand-editable HTML/CSS with
+// {{placeholders}}, so they survive @lanza/site package updates. The leading-slash
+// glob resolves against the Vite/Astro project ROOT (cwd), which is the tenant repo
+// in both the monorepo dogfood and an installed tenant — NOT srcDir (the package).
+//
+// The template owns the whole page; its {{placeholders}} are filled from the entry's
+// freeform `slots`. The template markup is author-trusted (emitted verbatim); the
+// engine HTML-escapes only the interpolated values, so no sanitize pass here.
+import { render } from "../lib/template-render";
+
+interface Props {
+  name: string;
+  data?: Record<string, unknown>;
+}
+
+const { name, data = {} } = Astro.props;
+
+// Eager, raw glob so the template map resolves at build time (static site).
+const templates = import.meta.glob<string>("/templates/*/template.html", {
+  query: "?raw",
+  import: "default",
+  eager: true,
+});
+const source = templates[`/templates/${name}/template.html`];
+const html = source ? render(source, data) : null;
+---
+
+{
+  html !== null ? (
+    <Fragment set:html={html} />
+  ) : (
+    // Unknown/removed template — never break the render; surface it plainly instead.
+    <p class="preset-missing">Unknown template “{name}”.</p>
+  )
+}
