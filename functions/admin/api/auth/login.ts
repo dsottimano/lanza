@@ -27,7 +27,9 @@ export const onRequest = async (context: {
   const broker = env.BROKER_ORIGIN ?? "https://lanzacms.com";
   const origin = new URL(request.url).origin;
   const nonce = crypto.randomUUID();
-  const state = btoa(JSON.stringify({ origin, nonce }));
+  // URL-safe base64 (swap +/ → -_) so the state survives the OAuth round-trip
+  // without a `+` being decoded to a space and corrupting it; keep padding (=).
+  const state = btoa(JSON.stringify({ origin, nonce })).replace(/\+/g, "-").replace(/\//g, "_");
 
   const authorize = new URL("https://github.com/login/oauth/authorize");
   authorize.searchParams.set("client_id", env.GITHUB_CLIENT_ID);
