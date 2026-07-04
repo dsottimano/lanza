@@ -78,6 +78,12 @@
         "widget": "datetime"
       },
       {
+        "name": "updatedDate",
+        "label": "Last updated",
+        "widget": "datetime",
+        "required": false
+      },
+      {
         "name": "draft",
         "label": "Draft (uncheck to publish)",
         "widget": "boolean",
@@ -220,7 +226,7 @@
       },
       {
         "name": "template",
-        "label": "Template",
+        "label": "Layout",
         "widget": "select",
         "options": [
           "default",
@@ -230,6 +236,20 @@
         "default": "default",
         "required": false,
         "hint": "Layout variant: full-width breaks out to the wide measure; landing hides the page title and nav chrome."
+      },
+      {
+        "name": "preset",
+        "label": "Template",
+        "widget": "preset",
+        "required": false,
+        "hint": "Pick a ready-made page design. When set, the design owns the page and you edit only its slots."
+      },
+      {
+        "name": "slots",
+        "label": "Template content",
+        "widget": "slots",
+        "required": false,
+        "hint": "The editable text/images for the chosen Template. Shape depends on the Template."
       },
       {
         "name": "blocks",
@@ -757,12 +777,14 @@
             "label": "Site theme",
             "widget": "select",
             "options": [
+              "freehold",
               "editorial",
               "magazine",
               "landing",
-              "classic"
+              "classic",
+              "laperle"
             ],
-            "default": "editorial",
+            "default": "freehold",
             "hint": "The public site's look. Per-entry Layout can still override the width."
           },
           {
