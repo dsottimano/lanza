@@ -3,7 +3,7 @@
 // the two locales for the header's ES · EN switcher.
 //
 // This is the theme's own UI-only bilingual layer, deliberately separate from
-// the platform's content-locale system (frontend/lib/i18n.ts): La Perle ships a
+// the platform's content-locale system (frontend/lib/i18n.ts): the site ships a
 // single Spanish content set and mirrors it with English chrome, so site.json
 // stays single-locale (es) and English is served by the physical /en/* pages.
 

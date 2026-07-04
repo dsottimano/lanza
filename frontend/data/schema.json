@@ -481,8 +481,7 @@
               "editorial",
               "magazine",
               "landing",
-              "classic",
-              "laperle"
+              "classic"
             ],
             "default": "freehold",
             "hint": "The public site's look. Per-entry Layout can still override the width."

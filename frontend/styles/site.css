@@ -433,97 +433,6 @@ main > ul > li > a:hover {
   font-weight: 600;
 }
 
-/* ═══ THEME: La Perle — tropical-editorial luxury ═══════════════════════════
-   Deep Ink (#16242c) + warm Paper (#faf8f4), terracotta accent, gold for
-   kickers/meta. Cormorant Garamond display over Jost. Sharp corners, hairline
-   rules. Brand primitives (.lp-*) are global so every page + component shares
-   them; section/card layout lives in the page/component <style> blocks. */
-[data-theme="laperle"] {
-  --font-ui: "Jost", ui-sans-serif, system-ui, sans-serif;
-  --font-prose: "Jost", ui-sans-serif, system-ui, sans-serif;
-  --font-heading: "Cormorant Garamond", Georgia, "Times New Roman", serif;
-
-  --bg: #faf8f4;
-  --surface: #f1ece1;
-  --ink: #16242c;
-  --muted: #8a939a;
-  --accent: #b6452f;
-  --border: #e3dccd;
-
-  --content: 44rem;
-  --wide: 1200px;
-  --radius: 0;
-
-  --h1-size: clamp(2.2rem, 4.5vw, 3.4rem);
-  --h1-weight: 500;
-  --prose-size: 1.12rem;
-  --prose-leading: 1.75;
-  --header-border: 1px solid var(--border);
-  --nav-transform: uppercase;
-  --nav-weight: 500;
-
-  /* brand extras (not part of the generic theme contract) */
-  --gold: #9c7a3c;
-  --text-secondary: #455159;
-  --border-subtle: #ece6da;
-  --on-accent: #faf8f4;
-  --wide-width: var(--wide);
-}
-
-[data-theme="laperle"] h1,
-[data-theme="laperle"] h2,
-[data-theme="laperle"] h3,
-[data-theme="laperle"] h4 {
-  font-family: var(--font-heading);
-  font-weight: 500;
-  line-height: 1.12;
-  letter-spacing: 0;
-}
-
-/* Header: wordmark in the display serif, uppercase hairline nav + locale switch */
-[data-theme="laperle"] .brand {
-  font-family: var(--font-heading);
-  font-weight: 600;
-  font-size: 1.6rem;
-  letter-spacing: 0.04em;
-}
-[data-theme="laperle"] .site-nav a {
-  font-size: 0.72rem;
-  letter-spacing: 0.2em;
-  color: var(--text-secondary);
-}
-[data-theme="laperle"] .nav-locale {
-  display: inline-flex;
-  gap: 0.4rem;
-  align-items: center;
-  font-size: 0.7rem;
-  letter-spacing: 0.18em;
-  text-transform: uppercase;
-  color: var(--muted);
-}
-[data-theme="laperle"] .nav-locale a {
-  color: var(--muted);
-  text-decoration: none;
-}
-[data-theme="laperle"] .nav-locale a:hover {
-  color: var(--ink);
-}
-[data-theme="laperle"] .nav-locale .is-active {
-  color: var(--ink);
-}
-[data-theme="laperle"] .site-footer {
-  background: var(--ink);
-  color: #d8d2c6;
-  margin-top: 0;
-  border-top: 0;
-}
-[data-theme="laperle"] .site-footer .bar {
-  color: #d8d2c6;
-}
-[data-theme="laperle"] .site-footer a {
-  color: #e8c8a0;
-}
-
 /* ── brand primitives (global) ──────────────────────────────────────────── */
 .lp-kicker {
   font-size: 0.7rem;
@@ -612,6 +521,10 @@ main > ul > li > a:hover {
   --parchment-card: #fbf8f0;
   --rule: #d8d0bd;
   --text-secondary: #43514a;
+  /* Aliases so the shared .lp-* brand primitives (blog index, 404) inherit
+     Freehold's palette now that the La Perle skin is gone. */
+  --gold: var(--brass);
+  --border-subtle: var(--rule);
   --on-accent: #f2ede1;
   --wide-width: var(--wide);
 }
