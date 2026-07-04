@@ -1,0 +1,5 @@
+# @lanza/site ships CODE only; the `files` allowlist in package.json is the source
+# of truth for what's included (it enumerates the platform public/ subdirs, so tenant
+# media and generated files are never listed). This file exists solely so npm does
+# NOT fall back to .gitignore for packing — which would drop the prebuilt admin SPA
+# under public/admin (gitignored in the repo, produced by the prepack build).

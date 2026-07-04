@@ -27,3 +27,6 @@ themes/laperle-theme.tar.gz
 
 # Broker lives in its own private repo — never commit here
 lanza-broker/
+
+# npm pack artifacts
+*.tgz

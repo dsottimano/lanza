@@ -34,6 +34,12 @@ export function lanzaConfig() {
     // path so it resolves the same whether this package is the repo itself
     // (monorepo dogfood) or installed under the tenant's node_modules.
     srcDir: join(PKG_ROOT, "frontend"),
+    // Platform static assets (brand, favicon, social, lanza.js, the prebuilt
+    // admin SPA) ship INSIDE the package. The tenant's own public/ (their media
+    // uploads + generated _redirects) is overlaid onto dist/ after the build by
+    // `lanza build` — see bin/lanza.mjs. In the monorepo dogfood the two are the
+    // same directory, so the overlay is a harmless no-op.
+    publicDir: join(PKG_ROOT, "public"),
     // Multilingual: default locale at the root, others prefixed. Locale set from
     // the tenant's site.json (above).
     i18n: {
