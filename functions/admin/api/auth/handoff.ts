@@ -19,7 +19,9 @@ import {
   verifyRS256,
 } from "../../../_lib/session";
 import { HANDOFF_PUBLIC_KEY as CONFIG_PUBLIC_KEY } from "../../../_lib/tenant-config";
-import { ADMIN_LOGIN as CONFIG_ADMIN_LOGIN } from "../../../_lib/tenant-owner";
+// Per-tenant identity (owner/name/adminLogin) — the broker writes this at repo
+// creation. adminLogin is the /admin gate; functions/ stays pure package code.
+import repo from "../../../../lanza.config.json";
 
 interface Env {
   HANDOFF_PUBLIC_KEY?: string;
@@ -65,7 +67,7 @@ export const onRequest = async (context: {
 
   // The security boundary: only the site owner's login(s) may enter. Case-insensitive
   // and comma-list ready so extra editors can be added without a redeploy.
-  const allowed = (env.ADMIN_LOGIN || CONFIG_ADMIN_LOGIN)
+  const allowed = (env.ADMIN_LOGIN || repo.adminLogin)
     .toLowerCase()
     .split(",")
     .map((s) => s.trim())

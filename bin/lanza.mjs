@@ -10,7 +10,7 @@
 // package's srcDir; see scripts/gen-*.mjs. Astro runs from cwd (the project
 // root) with the package's astro binary and config factory (astro-config.mjs).
 import { spawnSync } from "node:child_process";
-import { cpSync, existsSync } from "node:fs";
+import { cpSync, existsSync, realpathSync } from "node:fs";
 import { createRequire } from "node:module";
 import { fileURLToPath } from "node:url";
 import { dirname, join } from "node:path";
@@ -54,5 +54,15 @@ if (mode === "build") {
   const dist = join(process.cwd(), "dist");
   if (existsSync(tenantPublic)) {
     cpSync(tenantPublic, dist, { recursive: true });
+  }
+
+  // External tenants deploy Pages Functions from their REPO ROOT, but the function
+  // code ships in @lanza/site. Copy functions/ into the tenant root so Pages
+  // compiles it. functions/ is pure package code (per-tenant identity lives in the
+  // repo-root lanza.config.json, not here), so overwriting on every build is safe.
+  // Skip in the monorepo dogfood (package === cwd → functions are already at root).
+  if (realpathSync(PKG_ROOT) !== realpathSync(process.cwd())) {
+    const pkgFns = join(PKG_ROOT, "functions");
+    if (existsSync(pkgFns)) cpSync(pkgFns, join(process.cwd(), "functions"), { recursive: true });
   }
 }
