@@ -137,10 +137,16 @@ independent of the split; do it in the broker whenever.
   resolves against tenant root, not the package; **#4** tenant data via
   `readFileSync(join(process.cwd(), "data/site.json"))`. The rental mechanism is proven.
   Spike lives in the session scratchpad. **Next: P1.**
-- **P1 — Restructure in place.** Move `frontend/content/` → `content/`,
-  `frontend/data/` → `data/` at repo root; update the ~7 seam files (#1,#3,#4,#6) to
-  read the new locations; keep everything in one repo still. Verify: `npm run build`
-  + `/admin` loads. (Split into ≤5-file sub-phases.)
+- **P1 — Restructure in place. ✅ DONE (2026-07-04, branch `feat/lanza-site-extraction-p1`).**
+  `frontend/content/` → `content/`, `frontend/data/` → `data/` at repo root; ~25 refs
+  repointed (not the "~7" first estimated). Two commits: **P1a** Astro render side
+  (config/scripts/schema.json/lib/layouts; data imports use root-relative `/data/*`),
+  **P1b** CMS write-paths + theme-fileset mirror + bot `CONTENT_DIR` + comment sweep.
+  `frontend/*` code prefixes + `frontend/content.config.ts` intentionally stay (they're
+  code → move in P2). Verified: astro build (12 pages, test post renders from `content/`),
+  admin vue-tsc + vite build. Note: 1 **pre-existing** gh-proxy test failure (stale
+  `POST git/refs` assertion) unrelated to P1. Docs (README, project CLAUDE.md) still
+  cite `frontend/content/posts` — update at P1 merge. Not yet merged to main.
 - **P2 — Package boundary.** Introduce the `lanza` CLI + astro config factory; make the
   repo build *as if* code were a package (via a local `file:` link) without publishing.
   Verify: build + dev both work through the CLI.

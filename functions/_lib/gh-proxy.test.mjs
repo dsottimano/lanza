@@ -56,7 +56,7 @@ test("write allowlist unchanged (regression)", () => {
   assert.ok(isAllowed("POST", `${GIT}/trees`));
   assert.ok(isAllowed("POST", `${GIT}/commits`));
   assert.ok(isAllowed("PATCH", `${GIT}/refs/heads/main`));
-  assert.ok(!isAllowed("POST", `${GIT}/refs`));
+  assert.ok(isAllowed("POST", `${GIT}/refs`)); // create the working branch (ensureWorkingBranch)
 });
 
 test("crossOriginBlocked unchanged", () => {

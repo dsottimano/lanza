@@ -3,7 +3,7 @@
 Astro front-end in `frontend/` (repo root holds config; Astro `srcDir` points at
 it) + **Lanza**, a self-owned Vue 3 + TipTap CMS (`admin/`, served at `/admin`) +
 a Telegram draft bot (`bot/`), all on Cloudflare's free tier. Content is git-based
-markdown under `frontend/content/posts`; post/page
+markdown under `content/posts`; post/page
 **bodies are HTML** (Lanza is the source of truth — Astro renders them with
 `set:html`, sanitized; see `frontend/lib/sanitize.ts`). `draft: true` is the publish
 gate (the build hides drafts). The bot still drafts in markdown; Lanza imports

@@ -23,9 +23,9 @@ repository; the "server" is GitHub's API plus Cloudflare's static hosting.
 Everything you edit is plain text committed to the repo:
 
 - **Posts, pages, taxonomies, authors** → markdown files under
-  `frontend/content/…` (one subfolder per language for translated collections).
+  `content/…` (one subfolder per language for translated collections).
 - **Site settings** (SEO defaults, menus, redirects) → JSON files under
-  `frontend/data/…`.
+  `data/…`.
 - **Images** → committed under `public/images/uploads/` and served as static files.
 
 Post and page **bodies are stored as HTML** (Lanza is the source of truth); the
@@ -37,13 +37,13 @@ one file, `admin/src/schema.ts`.
 The site's setup isn't hard-coded — it's committed JSON the CMS edits, read by both
 the Astro front-end and the CMS:
 
-- **`frontend/data/site.json`** — the **languages** (which locales exist + the
+- **`data/site.json`** — the **languages** (which locales exist + the
   default) and an `onboarded` flag. Written by the first-run wizard and by
   Settings → Languages. Astro reads it (`astro.config.mjs`, `frontend/lib/i18n.ts`)
   to build the right locale routes; the CMS reads it at boot for the language rail.
   Disabled locales are excluded from the build, so removing a language genuinely
   hides it (leftover content files are ignored, not published).
-- **`frontend/data/appearance.json`** — the **theme**, optional **logo**, and the
+- **`data/appearance.json`** — the **theme**, optional **logo**, and the
   **brand** block (palette / corners / motion / fonts) from Settings → Brand.
   Written by the wizard and Settings → Brand; `Base.astro` turns the brand block
   into inline custom-property overrides (see `frontend/lib/appearance.ts`) that
@@ -95,6 +95,6 @@ hosting doc for the full reasoning.)
 ## The bot (optional)
 
 The Telegram Worker lets you fire off a quick draft from your phone. It commits a
-`draft: true` markdown file to `frontend/content/posts/` through the same GitHub
+`draft: true` markdown file to `content/posts/` through the same GitHub
 API. Nothing it sends publishes automatically — you review and publish it here in
 the CMS like any other draft.
