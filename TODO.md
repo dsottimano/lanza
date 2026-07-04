@@ -25,22 +25,54 @@
   `{{#each}}`, `{{#if}}`; per Dave's stdlib-first rule). Syntax (Handlebars-ish):
   `{{ headline }}`, `{{#each cards}}…{{ who }}…{{/each}}`, `{{#if x}}…{{/if}}`.
 
-**NEXT ACTIONS (rebuild the prototype in the right format):**
-1. Write the engine `frontend/lib/template-render.ts` — parse `{{var}}` / `{{#each}}` /
-   `{{#if}}` → AST → render(data). Escape `{{ }}` values; expose `@index`/`@number`
-   (1-based, zero-padded) inside `#each`. (Templates are author-trusted; values escaped.)
-2. Convert the home to the format: `templates/manifesto/template.html` (Manifesto's
-   HTML/CSS with `{{placeholders}}`) + `templates/manifesto/fields.json` (the field
-   schema, = the current `.slots.json` content). Data source = the slots already in
+**NEXT ACTIONS 1–4 — ☑ DONE 2026-07-04 (uncommitted on `main`):** the HTML-template
+engine + tenant-templates wiring render `/` end-to-end. See memory
+`lanza-html-template-authoring.md` for the full "piece 1 shipped" detail.
+1. ☑ Engine `frontend/lib/template-render.ts` — `render(template, data)`; `{{var}}`
+   (escaped) / `{{a.b}}` / `{{#each}}` / `{{#if}}` (empty array falsy) / `@index` /
+   `@number` (1-based, zero-padded w2). Template author-trusted, values escaped.
+2. ☑ `templates/manifesto/template.html` (Manifesto HTML/CSS + `{{placeholders}}`,
+   `<style>` inlined) + `templates/manifesto/fields.json` (`.slots.json`, key
+   `slots`→`fields`). At the **tenant repo ROOT** `templates/`. Data = `slots` in
    `content/pages/es/home.md`.
-3. `frontend/components/HtmlTemplate.astro` — glob `/templates/*/template.html` (`?raw`),
-   run the engine with the page data, `<Fragment set:html={…}>`. Wire `index.astro` to it.
-4. Delete the `.astro` dead-end (`frontend/presets/manifesto.astro` + `.slots.json`).
-   Verify `/` renders identically via the HTML engine.
-Then the bigger pieces: tenant `templates/` home wired into the build (config factory
-glob) + CMS reads them; CMS UI (template picker + fields editor reusing `FieldInput` +
-an HTML/CSS source editor — note the admin has NO preset/slots widget today, both fall
-to a text box in `admin/src/fields/FieldInput.vue`); the agent conversion skill.
+3. ☑ `frontend/components/HtmlTemplate.astro` — LEADING-SLASH glob
+   `/templates/*/template.html?raw` (→ Vite/Astro ROOT = cwd = tenant repo, portable
+   to installed tenants), runs the engine, `<Fragment set:html>`. Mounted by
+   `PageArticle.astro` on any page with `preset`. (index.astro/[...slug].astro already
+   route "home" through PagePage → PageArticle.)
+4. ☑ Retired the whole `.astro` preset system: deleted `Preset.astro`,
+   `presets/manifesto.{astro,slots.json}`, and the already-unused
+   `presets/about.{astro,slots.json}`. Verified: astro check 0 errors, build 12 pages,
+   `dist/index.html` 0 leftover mustaches, `@number`→01–05, each-loop hrefs correct.
+
+**Pieces 2 & 3 — ☑ DONE 2026-07-04 (uncommitted on `main`):**
+- Piece 2 — **CMS UI** (admin build clean: vue-tsc 0 errors + vite build):
+  - `admin/src/backend/github.ts` — added `listSubdirs(dir)` (dirs only, 404→[]),
+    `loadText`/`saveText` (raw text, no frontmatter) + `LoadedText`.
+  - `admin/src/backend/templates.ts` (NEW) — `listTemplates(client)` reads
+    `templates/*/fields.json` → `[{name,label,description,fields}]` (dir name = the
+    `preset`). `templateHtmlPath(name)`.
+  - `admin/src/ui/TemplateEditor.vue` (NEW) — the Template surface: picker → dynamic
+    `FieldForm` driven by the chosen template's `fields.json`, bound to the page's
+    `slots`; an "Advanced" `<details>` edits the shared `template.html` (own commit).
+  - `admin/src/ui/EditorView.vue` — mounts TemplateEditor in the details rail (gated on
+    the collection having a `preset` field); `preset`+`slots` filtered out of the
+    generic field panel (they were falling to text boxes). `schema.ts` Widget union
+    gained `preset`/`slots`.
+  - Reads from the `staging` branch → the picker is EMPTY until `templates/manifesto/`
+    is committed + pushed to GitHub staging (CMS reads GitHub, not local — expected).
+- Piece 3 — **agent authoring guide**: `docs/authoring-templates.md` — the convention
+  for converting web HTML/CSS → `template.html` + `fields.json` (+ where post types
+  live). Authoritative engine-syntax reference + a minimal end-to-end example.
+  Optional follow-up: link it from CLAUDE.md / llms.txt / the `/agents` page for agent
+  discoverability.
+
+**Still TODO:**
+- Dave's live QA in the CMS: open a page in the admin, confirm the Template picker
+  lists manifesto (after committing `templates/` to staging), the slot fields render +
+  save, and the Advanced HTML editor loads/saves.
+- Dave's live visual QA that `/` looks pixel-identical to the old `.astro` render (the
+  `<style>` is now global, not Astro-scoped — same selectors, but eyeball it).
 
 ---
 
