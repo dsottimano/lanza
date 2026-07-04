@@ -2,9 +2,7 @@
   "locations": {
     "header": {
       "desktop": [
-        { "label": "Propiedades", "url": "/propiedades" },
-        { "label": "Journal", "url": "/posts" },
-        { "label": "Encuentra", "url": "/encuentra" }
+        { "label": "Blog", "url": "/posts" }
       ],
       "tablet": null,
       "mobile": null

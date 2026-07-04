@@ -1,14 +1,14 @@
 {
-  "siteName": "La Perle Panamá",
-  "titleTemplate": "%s · La Perle Panamá",
-  "defaultTitle": "La Perle Panamá — Bienes raíces de lujo",
-  "defaultDescription": "Curaduría de propiedades en Ciudad de Panamá, la costa pacífica y las tierras altas.",
+  "siteName": "Lanza",
+  "titleTemplate": "%s · Lanza",
+  "defaultTitle": "Lanza — Sé dueño de tu lugar en la web abierta",
+  "defaultDescription": "Un sitio web gratuito y propio en GitHub y Cloudflare, editable hablando con un agente de IA. El CMS anti-WordPress.",
   "defaultOgImage": "",
-  "locale": "es_PA",
+  "locale": "es_ES",
   "twitter": "",
   "twitterCreator": "",
   "organization": {
-    "name": "La Perle Panamá",
+    "name": "Lanza",
     "logo": "",
     "sameAs": []
   }

@@ -1,14 +1,14 @@
 {
-  "siteName": "La Perle Panamá",
-  "titleTemplate": "%s · La Perle Panamá",
-  "defaultTitle": "La Perle Panamá — Luxury real estate",
-  "defaultDescription": "A curated selection of properties in Panama City, the Pacific coast and the highlands.",
+  "siteName": "Lanza",
+  "titleTemplate": "%s · Lanza",
+  "defaultTitle": "Lanza — Own your corner of the open web",
+  "defaultDescription": "A free, self-owned website on GitHub and Cloudflare, editable by talking to an AI agent. The anti-WordPress CMS.",
   "defaultOgImage": "",
   "locale": "en_US",
   "twitter": "",
   "twitterCreator": "",
   "organization": {
-    "name": "La Perle Panamá",
+    "name": "Lanza",
     "logo": "",
     "sameAs": []
   }
