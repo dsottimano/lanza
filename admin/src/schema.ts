@@ -29,7 +29,11 @@ export type Widget =
   | "select"
   | "relation"
   | "object"
-  | "list";
+  | "list"
+  // Page-template surface (rendered by ui/TemplateEditor.vue, not FieldInput):
+  // `preset` picks a tenant template, `slots` holds its editable content.
+  | "preset"
+  | "slots";
 
 export interface Field {
   name: string;

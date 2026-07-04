@@ -8,6 +8,7 @@ import { computed, ref, useTemplateRef } from "vue";
 import Editor from "../editor/Editor.vue";
 import Toolbar from "../editor/Toolbar.vue";
 import FieldForm from "../fields/FieldForm.vue";
+import TemplateEditor from "./TemplateEditor.vue";
 import SaveButton from "./SaveButton.vue";
 import { GitHubClient } from "../backend/github";
 import { type FolderCollection, type Field } from "../schema";
@@ -48,9 +49,17 @@ const { data, loading, save, dirty, markDirty } = useEntryEditor(props, {
   },
 });
 
-// The details panel shows every field except the ones promoted into the chrome.
+// Collections with a `preset` field get the dedicated Template surface (picker +
+// slot fields + HTML source), so those two fields leave the generic panel.
+const hasTemplate = computed(() =>
+  props.collection.fields.some((f) => f.name === "preset"),
+);
+
+// The details panel shows every field except the ones promoted into the chrome
+// (title/draft) or into the Template surface (preset/slots).
+const PROMOTED = new Set(["title", "draft", "preset", "slots"]);
 const panelFields = computed<Field[]>(() =>
-  props.collection.fields.filter((f) => f.name !== "title" && f.name !== "draft"),
+  props.collection.fields.filter((f) => !PROMOTED.has(f.name)),
 );
 </script>
 
@@ -139,6 +148,13 @@ const panelFields = computed<Field[]>(() =>
           @input="markDirty"
           @change="markDirty"
         >
+          <TemplateEditor
+            v-if="hasTemplate && !loading"
+            :client="client"
+            :data="data"
+            :locale="locale"
+            class="mb-4"
+          />
           <div class="card p-4">
             <h2 class="mb-3 border-b border-[var(--border)] pb-3 text-sm font-semibold text-zinc-900">
               {{ collection.labelSingular }} details

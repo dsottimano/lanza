@@ -25,6 +25,12 @@ export interface LoadedJson {
   data: Record<string, unknown>;
 }
 
+export interface LoadedText {
+  path: string;
+  sha: string;
+  text: string; // raw file text (no frontmatter parse)
+}
+
 // ── base64 <-> UTF-8 (GitHub content is base64 of UTF-8 bytes) ──
 function b64ToUtf8(b64: string): string {
   const bin = atob(b64.replace(/\n/g, ""));
@@ -107,6 +113,24 @@ export class GitHubClient {
       .map(({ name, path, sha }) => ({ name, path, sha }));
   }
 
+  /**
+   * List the immediate SUBDIRECTORIES of a repo directory (e.g. the per-template
+   * folders under `templates/`). A 404 (directory absent) is an empty list, same
+   * as listDir. Returns dir name + path; a template dir's name IS its `preset`.
+   */
+  async listSubdirs(dir: string): Promise<{ name: string; path: string }[]> {
+    let items: Array<{ name: string; path: string; type: string }>;
+    try {
+      items = (await this.req(this.contentsUrl(dir))) as typeof items;
+    } catch (e) {
+      if (e instanceof GitHubError && e.status === 404) return [];
+      throw e;
+    }
+    return items
+      .filter((it) => it.type === "dir")
+      .map(({ name, path }) => ({ name, path }));
+  }
+
   /** Does a file exist at `path` on the branch? Used to detect media name clashes. */
   async exists(path: string): Promise<boolean> {
     return (await this.currentSha(path)) !== undefined;
@@ -152,6 +176,25 @@ export class GitHubClient {
     sha?: string,
   ): Promise<string> {
     return this.putFile(path, `${JSON.stringify(data, null, 2)}\n`, message, sha);
+  }
+
+  /** Load a raw text file (no frontmatter parse) — e.g. a template's HTML. */
+  async loadText(path: string, ref: string = REPO.branch): Promise<LoadedText> {
+    const file = (await this.req(this.contentsUrl(path, true, ref))) as {
+      content: string;
+      sha: string;
+    };
+    return { path, sha: file.sha, text: b64ToUtf8(file.content) };
+  }
+
+  /** Create or update a raw text file (e.g. a template's HTML). Omit `sha` to create. */
+  async saveText(
+    path: string,
+    text: string,
+    message: string,
+    sha?: string,
+  ): Promise<string> {
+    return this.putFile(path, text, message, sha);
   }
 
   /**
