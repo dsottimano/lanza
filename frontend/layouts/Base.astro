@@ -5,21 +5,19 @@ import appearance from "/data/appearance.json";
 import type { PageSeo } from "../lib/seo";
 import type { ArticleInput } from "../lib/jsonld";
 import type { Alternate } from "../lib/alternates";
-import { DEFAULT_LOCALE, type Locale } from "../lib/i18n";
+import { DEFAULT_LOCALE, LOCALES, localeUrl, type Locale } from "../lib/i18n";
 import { getMenu, getSeoDefaults, resolveDevices } from "../lib/site";
-import { mirrorPath } from "../lib/locale";
 import { isLanding } from "../lib/templates";
 import { resolveBrand } from "../lib/appearance";
 
 interface Props {
   seo?: PageSeo;
   article?: ArticleInput | null;
-  // Active locale — drives <html lang>, the per-locale menu/SEO, and the ES·EN
-  // switcher. The site is UI-only bilingual: "es" (default, root) or "en" (/en/*).
+  // Active locale — drives <html lang>, the per-locale menu/SEO, and the language
+  // switcher. Which locales exist and which is default come from data/site.json.
   locale?: Locale;
-  // Accepted for drop-in compatibility with the platform's shared page
-  // components (PostPage/PagePage/…). Single content locale ⇒ unused here; the
-  // ES·EN switcher is built from mirrorPath instead.
+  // This page's cross-locale URLs — feeds the hreflang tags (via Seo) and the
+  // header language switcher (one link per locale, active one marked).
   alternates?: Alternate[];
   // Resolved template name (frontend/lib/templates.ts). "landing" strips the
   // header nav + ES·EN switcher, keeping just the brand as the way home —
@@ -27,7 +25,7 @@ interface Props {
   template?: string;
 }
 
-const { seo = {}, article = null, locale = DEFAULT_LOCALE, template } = Astro.props;
+const { seo = {}, article = null, locale = DEFAULT_LOCALE, alternates = [], template } = Astro.props;
 
 const landing = isLanding(template ?? "default");
 
@@ -38,10 +36,8 @@ const brand = resolveBrand(appearance);
 const siteName = getSeoDefaults(locale).siteName || "Site";
 const year = new Date().getFullYear();
 
-const isEn = locale === "en";
-const path = Astro.url.pathname;
-const altPath = mirrorPath(path);
-const homeUrl = isEn ? "/en/" : "/";
+// The brand links home in the active locale; the default locale sits at the root.
+const homeUrl = localeUrl(locale, "");
 
 // Nav from the editable per-locale Settings → Menu. The theme uses one flat
 // header list (its responsive CSS handles layout), so we render the desktop
@@ -71,7 +67,7 @@ const nav = resolveDevices(getMenu(locale).header).desktop;
     <link rel="manifest" href="/favicon/site.webmanifest" />
     <meta name="theme-color" content="#f3f1ea" media="(prefers-color-scheme: light)" />
     <meta name="theme-color" content="#17140f" media="(prefers-color-scheme: dark)" />
-    <Seo seo={seo} article={article} locale={locale} />
+    <Seo seo={seo} article={article} locale={locale} alternates={alternates} />
   </head>
   <body>
     <header class:list={["site-header", landing && "landing"]}>
@@ -94,11 +90,24 @@ const nav = resolveDevices(getMenu(locale).header).desktop;
         {!landing && (
           <nav class="site-nav">
             {nav.map((item) => <a href={item.url}>{item.label}</a>)}
-            <span class="nav-locale">
-              {isEn ? <a href={altPath}>ES</a> : <span class="is-active">ES</span>}
-              <span>·</span>
-              {isEn ? <span class="is-active">EN</span> : <a href={altPath}>EN</a>}
-            </span>
+            {LOCALES.length > 1 && (
+              <span class="nav-locale">
+                {LOCALES.map((l, i) => {
+                  const url = alternates.find((a) => a.locale === l)?.url ?? localeUrl(l, "");
+                  const code = l.toUpperCase();
+                  return (
+                    <>
+                      {i > 0 && <span>·</span>}
+                      {l === locale ? (
+                        <span class="is-active">{code}</span>
+                      ) : (
+                        <a href={url}>{code}</a>
+                      )}
+                    </>
+                  );
+                })}
+              </span>
+            )}
           </nav>
         )}
       </div>

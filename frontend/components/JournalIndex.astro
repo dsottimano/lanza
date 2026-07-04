@@ -1,19 +1,16 @@
 ---
-import { getCollection } from "astro:content";
 import PostCard from "./PostCard.astro";
-import type { Locale } from "../lib/locale";
+import { DEFAULT_LOCALE, type Locale } from "../lib/i18n";
+import { localePosts } from "../lib/routing";
 
 interface Props {
   locale?: Locale;
 }
-const { locale = "es" } = Astro.props;
-const heading = { es: "Blog", en: "Blog" }[locale];
+const { locale = DEFAULT_LOCALE } = Astro.props;
+const heading = "Blog";
 
-const posts = (
-  await getCollection("posts", ({ data }) =>
-    import.meta.env.PROD ? data.draft !== true : true,
-  )
-).sort((a, b) => b.data.pubDate.valueOf() - a.data.pubDate.valueOf());
+// This locale's published posts, newest first (shared publish-gate/sort helper).
+const posts = await localePosts(locale);
 ---
 
 <main class="layout-wide">

@@ -2,7 +2,7 @@
   "locations": {
     "header": {
       "desktop": [
-        { "label": "Blog", "url": "/en/journal" }
+        { "label": "Blog", "url": "/posts" }
       ],
       "tablet": null,
       "mobile": null

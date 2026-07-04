@@ -1,0 +1,39 @@
+---
+// Renders a FIXED page (lib/fixed-pages.ts) for one locale: pick the component by
+// slug, wrap it in Base with the registry's per-locale SEO and cross-locale
+// alternates. A fixed page exists in every locale, so its alternates are the same
+// slug across all of them (allLocaleAlternates) — that feeds both the hreflang tags
+// and the header language switcher. The slug→component map here is the ONE place a
+// fixed page binds to its component; everything else about it is data in the registry.
+import Base from "../layouts/Base.astro";
+import Agents from "./Agents.astro";
+import HowItWorks from "./HowItWorks.astro";
+import Start from "./Start.astro";
+import JournalIndex from "./JournalIndex.astro";
+import { FIXED_PAGES } from "../lib/fixed-pages";
+import { allLocaleAlternates } from "../lib/alternates";
+import { DEFAULT_LOCALE, type Locale } from "../lib/i18n";
+
+interface Props {
+  slug: string;
+  locale: Locale;
+}
+
+const { slug, locale } = Astro.props;
+
+const COMPONENTS: Record<string, unknown> = {
+  agents: Agents,
+  "how-it-works": HowItWorks,
+  start: Start,
+  posts: JournalIndex,
+};
+
+const page = FIXED_PAGES.find((p) => p.slug === slug)!;
+const Component = COMPONENTS[slug] as (props: { locale: Locale }) => unknown;
+const seo = page.seo[locale] ?? page.seo[DEFAULT_LOCALE];
+const alternates = allLocaleAlternates(`${slug}/`);
+---
+
+<Base locale={locale} template={page.template} seo={seo} alternates={alternates}>
+  <Component locale={locale} />
+</Base>
