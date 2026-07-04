@@ -1,14 +1,21 @@
 ---
 import Base from "../../layouts/Base.astro";
 import Home from "../../components/Home.astro";
+import Manifesto from "../../components/Manifesto.astro";
+import appearance from "../../data/appearance.json";
+
+// See pages/index.astro — Freehold ships the manifesto, other themes the demo.
+const freehold = (appearance.theme ?? "freehold") === "freehold";
 ---
 
 <Base
   locale="en"
+  template={freehold ? "landing" : undefined}
   seo={{
-    description:
-      "A curated selection of luxury properties in Panama City, the Pacific coast and the highlands.",
+    description: freehold
+      ? "Own your presence on the open web — a free, self-owned website on GitHub and Cloudflare, editable by talking to an AI agent. The anti-WordPress CMS."
+      : "A curated selection of luxury properties in Panama City, the Pacific coast and the highlands.",
   }}
 >
-  <Home locale="en" />
+  {freehold ? <Manifesto locale="en" /> : <Home locale="en" />}
 </Base>

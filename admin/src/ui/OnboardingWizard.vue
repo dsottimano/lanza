@@ -18,6 +18,7 @@ const APPEARANCE_PATH = "frontend/data/appearance.json";
 // Starter themes — must match the [data-theme] blocks in frontend/styles/site.css.
 // Swatches are representative (ink / paper / accent) for the picker.
 const THEMES = [
+  { id: "freehold", name: "Freehold", desc: "Own the open web — the flagship default", swatch: ["#123128", "#f2ede1", "#a9772a"] },
   { id: "editorial", name: "Editorial", desc: "Clean serif — a classic blog", swatch: ["#18181b", "#fafafa", "#b91c1c"] },
   { id: "magazine", name: "Magazine", desc: "Bold, dense, editorial", swatch: ["#0a0a0a", "#f5f5f4", "#d97706"] },
   { id: "landing", name: "Landing", desc: "Marketing one-pager", swatch: ["#0f172a", "#ffffff", "#2563eb"] },
@@ -43,7 +44,7 @@ onBeforeUnmount(() => {
 });
 
 // Step 2 — theme
-const theme = ref("editorial");
+const theme = ref("freehold");
 
 // Step 3 — languages
 const multilingual = ref(false);

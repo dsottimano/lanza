@@ -31,7 +31,7 @@ const { seo = {}, article = null, locale = DEFAULT_LOCALE, template } = Astro.pr
 const landing = isLanding(template ?? "default");
 
 // Site-wide theme (Settings → Appearance). Drives the public CSS via data-theme.
-const theme = appearance.theme ?? "editorial";
+const theme = appearance.theme ?? "freehold";
 const siteName = getSeoDefaults(locale).siteName || "Site";
 const year = new Date().getFullYear();
 
@@ -53,10 +53,18 @@ const nav = resolveDevices(getMenu(locale).header).desktop;
     <meta name="viewport" content="width=device-width, initial-scale=1" />
     <link rel="preconnect" href="https://fonts.googleapis.com" />
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
-    <link
-      href="https://fonts.googleapis.com/css2?family=Cormorant+Garamond:wght@400;500;600&family=Jost:wght@300;400;500&display=swap"
-      rel="stylesheet"
-    />
+    {theme === "laperle" && (
+      <link
+        href="https://fonts.googleapis.com/css2?family=Cormorant+Garamond:wght@400;500;600&family=Jost:wght@300;400;500&display=swap"
+        rel="stylesheet"
+      />
+    )}
+    {theme === "freehold" && (
+      <link
+        href="https://fonts.googleapis.com/css2?family=Fraunces:ital,opsz,wght@0,9..144,400..600;1,9..144,400&family=Space+Grotesk:wght@400;500;600&family=JetBrains+Mono:wght@400;500&display=swap"
+        rel="stylesheet"
+      />
+    )}
     <Seo seo={seo} article={article} locale={locale} />
   </head>
   <body>

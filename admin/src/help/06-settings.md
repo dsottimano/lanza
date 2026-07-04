@@ -32,8 +32,8 @@ full story. Removing a language hides it but leaves its content files in the rep
 
 ## Appearance — *global*
 
-The site's **theme** (the public look — `editorial`, `magazine`, `landing`,
-`classic`) and an optional **logo** image shown in the site header in place of the
+The site's **theme** (the public look — `freehold`, `editorial`, `magazine`,
+`landing`, `classic`) and an optional **logo** image shown in the site header in place of the
 text wordmark. Applies to all languages. Leave the logo empty to use the site name.
 
 ## Redirects — *global*

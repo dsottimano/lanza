@@ -22,8 +22,8 @@ The very first time you open a brand-new site, Lanza shows a short **setup wizar
 instead of the editor:
 
 1. **Logo** — upload one now, or skip and add it later (Settings → Appearance).
-2. **Starter theme** — pick the public look (`editorial`, `magazine`, `landing`,
-   `classic`). Changeable any time in Settings → Appearance.
+2. **Starter theme** — pick the public look (`freehold`, `editorial`, `magazine`,
+   `landing`, `classic`). Changeable any time in Settings → Appearance.
 3. **Languages** — choose one language or several, and the default.
 
 Click **Finish** and Lanza saves these to your repo and opens the editor. The

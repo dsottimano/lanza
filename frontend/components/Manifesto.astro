@@ -1,0 +1,760 @@
+---
+// Freehold — the flagship default home. A manifesto that (a) tells Lanza's
+// vision and (b) diagrams the architecture (repo → CDN → AI agent → open web)
+// as "the chain of title". Bilingual (es default / en), rendered by
+// pages/index.astro + pages/en/index.astro when appearance.theme === "freehold".
+// Chrome-light: pages pass template="landing" so Base drops the nav; the
+// manifesto carries its own language toggle + CTAs. Pure CSS/type — no images,
+// no JS — so it stays static, cacheable and free of assets.
+import type { Locale } from "../lib/i18n";
+
+interface Props {
+  locale?: Locale;
+}
+const { locale = "es" } = Astro.props;
+const isEn = locale === "en";
+const altHome = isEn ? "/" : "/en/";
+
+const es = {
+  toggle: { label: "Idioma", here: "ES", there: "EN" },
+  hero: {
+    tag: "LA WEB ABIERTA · EN DOMINIO PLENO",
+    headline: "La web abierta es tierra. Adueñe su dominio.",
+    sub: "En todo el mundo, los pequeños negocios alquilan su presencia en Instagram y Facebook — y no son dueños de nada. Freehold le da una dirección permanente en la web abierta: suya por completo, alojada gratis y modificable con solo pedirlo.",
+    cta1: "Cómo funciona",
+    cta2: "Por qué hoy no posee nada",
+  },
+  deed: {
+    stamp: "REGISTRO · WEB ABIERTA",
+    title: "Título de Dominio Pleno",
+    body: "Esta parcela de la web abierta se posee en dominio pleno a nombre del portador — a perpetuidad, transferible y sin ningún arrendador.",
+    fields: [
+      ["PARCELA", "su-nombre.com"],
+      ["TENENCIA", "dominio pleno · a perpetuidad"],
+      ["ALOJADO EN", "github + cloudflare"],
+      ["REGISTRADO", "commit 7f3a9c · código abierto"],
+    ],
+    sealTop: "DOMINIO",
+    sealMid: "F",
+    sealBot: "PLENO",
+  },
+  lease: {
+    eyebrow: "El problema",
+    headline: "Ahora mismo, usted es inquilino.",
+    lede: "Instagram y Facebook son alquiler. Usted construye su audiencia en tierra que no es suya — el arrendador pone las reglas, entierra sus publicaciones y puede cerrarle la puerta mañana. Y cuando el mundo busca en Google lo que usted vende, no aparece.",
+    colA: "ALQUILER · HOY",
+    colB: "DOMINIO · LANZA",
+    rows: [
+      ["Su dirección", "un usuario dentro de su app", "su propio dominio"],
+      ["Quién es dueño", "la plataforma", "usted — es su repositorio"],
+      ["Aparece en Google", "apenas", "sí — es la web abierta"],
+      ["Quién pone las reglas", "ellos, y las cambian", "usted"],
+      ["Si cierran", "lo pierde todo", "conserva cada archivo"],
+      ["Costo de que le vean", "anuncios, para siempre", "gratis hasta que crezca"],
+    ],
+  },
+  chain: {
+    eyebrow: "Cómo funciona · La cadena de título",
+    headline: "Cuatro manos sostienen su parcela. Ninguna es la del arrendador.",
+    steps: [
+      ["Usted es dueño", "repositorio github", "Cada palabra, página e imagen vive en un repositorio que le pertenece. Ese repositorio es el título. Llévelo a donde quiera, cuando quiera."],
+      ["Alojado gratis", "cloudflare pages", "Cloudflare sirve su sitio desde una red que cubre el planeta — rápido en todas partes, sin pagar nada, y solo escala si de verdad crece."],
+      ["Edite hablando", "chatgpt / claude", "Dígale a un agente de IA qué cambiar en lenguaje sencillo, en cualquier idioma. Edita el repositorio y publica. Sin programador, sin agencia, sin esperas."],
+      ["Le encuentran en Google", "la web abierta", "Al ser un sitio real en la web abierta, Google lo encuentra — y también cualquiera, en cualquier lugar, que busque justo lo que usted ofrece."],
+    ],
+  },
+  talk: {
+    eyebrow: "Sin programador",
+    headline: "Usted no edita el sitio. Solo lo pide.",
+    you: "Agrega una página con nuestro menú y precios, y pon el nuevo logo en la cabecera.",
+    youWho: "usted",
+    agent: "Listo. Publicado en su-nombre.com — Google lo verá en un día.",
+    agentWho: "agente",
+    caption: "El agente sabe cómo está hecho su sitio. Usted solo tiene que saber qué quiere decir.",
+  },
+  wp: {
+    eyebrow: "No es WordPress",
+    headline: "Nada que hackear. Nada que parchar.",
+    body: "WordPress mueve buena parte de la web vieja, y se nota: una superficie de ataque enorme donde los sitios son vulnerados sin parar, plugins que se pudren y una plataforma con su propia política. Freehold no tiene base de datos ni servidor propio — solo archivos, guardados por dos empresas cuyo negocio es mantener la web en pie.",
+    tiles: [
+      ["0", "bases de datos que vulnerar"],
+      ["0", "servidores que parchar"],
+      ["$0", "hasta que usted escale"],
+    ],
+  },
+  ground: {
+    eyebrow: "Terreno firme",
+    headline: "Construido sobre terreno firme.",
+    body: "Usted se apoya en GitHub y Cloudflare — empresas serias cuyo plan gratuito es de verdad gratuito, y que solo cobran cuando usted es lo bastante grande para necesitar más. Sin ataduras, sin facturas sorpresa. Y es código abierto: bifúrquelo, modifíquelo, aloje usted mismo. Lo use como lo use, es suyo.",
+  },
+  close: {
+    headline: "Reclame lo suyo.",
+    sub: "Un rincón de la web abierta, en dominio pleno, le espera. Tómelo.",
+    cta: "Empezar en GitHub",
+  },
+};
+
+const en = {
+  toggle: { label: "Language", here: "EN", there: "ES" },
+  hero: {
+    tag: "THE OPEN WEB · HELD IN FREEHOLD",
+    headline: "The open web is land. Own the freehold.",
+    sub: "Small businesses everywhere rent their presence on Instagram and Facebook — and own nothing. Freehold gives you a permanent address on the open web: yours outright, hosted for free, and changed just by asking.",
+    cta1: "See how it works",
+    cta2: "Why you own nothing today",
+  },
+  deed: {
+    stamp: "REGISTRY · THE OPEN WEB",
+    title: "Certificate of Freehold",
+    body: "This parcel of the open web is held in freehold by the bearer — in perpetuity, transferable, and free of any landlord.",
+    fields: [
+      ["PARCEL", "your-name.com"],
+      ["TENURE", "freehold · in perpetuity"],
+      ["HELD ON", "github + cloudflare"],
+      ["REGISTERED", "commit 7f3a9c · open source"],
+    ],
+    sealTop: "FREE",
+    sealMid: "F",
+    sealBot: "HOLD",
+  },
+  lease: {
+    eyebrow: "The problem",
+    headline: "Right now, you're a tenant.",
+    lede: "Instagram and Facebook are leasehold. You build an audience on land you don't own — the landlord sets the rules, buries your posts, and can lock the door tomorrow. And when the world searches Google for what you sell, you're nowhere.",
+    colA: "LEASEHOLD · TODAY",
+    colB: "FREEHOLD · LANZA",
+    rows: [
+      ["Your address", "a handle inside their app", "your own domain name"],
+      ["Who owns it", "the platform does", "you do — it's your repo"],
+      ["Found on Google", "barely", "yes — it's the open web"],
+      ["Who sets the rules", "them, and they change", "you"],
+      ["If they shut down", "you lose everything", "you keep every file"],
+      ["Cost to be seen", "ads, forever", "free until you're big"],
+    ],
+  },
+  chain: {
+    eyebrow: "How it works · The chain of title",
+    headline: "Four hands hold your plot. Not one of them is a landlord.",
+    steps: [
+      ["You own it", "github repository", "Every word, page and image lives in a repository that belongs to you. That repository is the deed. Take it anywhere, any time."],
+      ["Hosted for free", "cloudflare pages", "Cloudflare serves your site from a network that spans the globe — fast everywhere, nothing to pay, and it scales up only if you actually get big."],
+      ["Edit by talking", "chatgpt / claude", "Tell an AI agent what to change in plain language, in any language. It edits the repository and publishes. No developer, no agency, no wait."],
+      ["Found on Google", "the open web", "Because it's a real site on the open web, Google can find it — and so can anyone, anywhere, searching for exactly what you offer."],
+    ],
+  },
+  talk: {
+    eyebrow: "No developer required",
+    headline: "You don't edit the site. You just ask.",
+    you: "Add a page with our menu and prices, and put the new logo in the header.",
+    youWho: "you",
+    agent: "Done. Published to your-name.com — Google will pick it up within a day.",
+    agentWho: "agent",
+    caption: "The agent knows how your site is built. You only have to know what you want to say.",
+  },
+  wp: {
+    eyebrow: "Not WordPress",
+    headline: "Nothing to hack. Nothing to patch.",
+    body: "WordPress runs much of the old web, and it shows: a sprawling attack surface where sites are breached constantly, plugins that rot, and a platform with its own politics. Freehold has no database and no server of its own — just files, kept by two companies whose whole business is keeping the web online.",
+    tiles: [
+      ["0", "databases to breach"],
+      ["0", "servers to patch"],
+      ["$0", "until you scale"],
+    ],
+  },
+  ground: {
+    eyebrow: "Solid ground",
+    headline: "Built on ground that holds.",
+    body: "You're standing on GitHub and Cloudflare — serious companies whose free tiers are genuinely free, and which only charge when you're big enough to need more. No lock-in, no surprise invoice. And it's open source: fork it, change it, host it yourself. However you use it, it's yours.",
+  },
+  close: {
+    headline: "Stake your claim.",
+    sub: "A corner of the open web, owned outright, is waiting. Take it.",
+    cta: "Get started on GitHub",
+  },
+};
+
+const t = isEn ? en : es;
+const startUrl = "https://github.com/";
+---
+
+<div class="fh">
+  <!-- ── Hero: the Certificate of Freehold ─────────────────────────────── -->
+  <section class="fh-hero">
+    <div class="fh-hero__grid">
+      <div class="fh-hero__lede">
+        <span class="fh-tag">{t.hero.tag}</span>
+        <h1 class="fh-hero__headline">{t.hero.headline}</h1>
+        <p class="fh-hero__sub">{t.hero.sub}</p>
+        <div class="fh-hero__ctas">
+          <a class="fh-btn fh-btn--brass" href="#chain">{t.hero.cta1}</a>
+          <a class="fh-btn fh-btn--ghost" href="#lease">{t.hero.cta2}</a>
+        </div>
+        <a class="fh-lang" href={altHome} aria-label={t.toggle.label}>
+          <span class="fh-lang__here">{t.toggle.here}</span>
+          <span class="fh-lang__sep">→</span>
+          <span class="fh-lang__there">{t.toggle.there}</span>
+        </a>
+      </div>
+
+      <div class="fh-deed" role="img" aria-label={t.deed.title}>
+        <div class="fh-deed__stamp">{t.deed.stamp}</div>
+        <h2 class="fh-deed__title">{t.deed.title}</h2>
+        <p class="fh-deed__body">{t.deed.body}</p>
+        <dl class="fh-deed__fields">
+          {t.deed.fields.map(([k, v]) => (
+            <div class="fh-deed__row">
+              <dt>{k}</dt>
+              <dd>{v}</dd>
+            </div>
+          ))}
+        </dl>
+        <div class="fh-deed__foot">
+          <div class="fh-seal" aria-hidden="true">
+            <span class="fh-seal__top">{t.deed.sealTop}</span>
+            <span class="fh-seal__mid">{t.deed.sealMid}</span>
+            <span class="fh-seal__bot">{t.deed.sealBot}</span>
+          </div>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <!-- ── The problem: leasehold vs freehold ────────────────────────────── -->
+  <section class="fh-band fh-band--paper" id="lease">
+    <div class="fh-wrap">
+      <span class="fh-eyebrow">{t.lease.eyebrow}</span>
+      <h2 class="fh-h2">{t.lease.headline}</h2>
+      <p class="fh-lede">{t.lease.lede}</p>
+
+      <div class="fh-ledger" role="table" aria-label={t.lease.headline}>
+        <div class="fh-ledger__head" role="row">
+          <span role="columnheader"></span>
+          <span class="fh-ledger__ca" role="columnheader">{t.lease.colA}</span>
+          <span class="fh-ledger__cb" role="columnheader">{t.lease.colB}</span>
+        </div>
+        {t.lease.rows.map(([label, a, b]) => (
+          <div class="fh-ledger__row" role="row">
+            <span class="fh-ledger__label" role="rowheader">{label}</span>
+            <span class="fh-ledger__a" role="cell">{a}</span>
+            <span class="fh-ledger__b" role="cell">{b}</span>
+          </div>
+        ))}
+      </div>
+    </div>
+  </section>
+
+  <!-- ── The chain of title: the architecture (repo→CDN→agent→Google) ──── -->
+  <section class="fh-band fh-band--surface" id="chain">
+    <div class="fh-wrap">
+      <span class="fh-eyebrow">{t.chain.eyebrow}</span>
+      <h2 class="fh-h2">{t.chain.headline}</h2>
+      <ol class="fh-chain">
+        {t.chain.steps.map(([label, svc, body], i) => (
+          <li class="fh-node">
+            <div class="fh-node__marker" aria-hidden="true"></div>
+            <span class="fh-node__num">{String(i + 1).padStart(2, "0")}</span>
+            <h3 class="fh-node__label">{label}</h3>
+            <code class="fh-node__svc">{svc}</code>
+            <p class="fh-node__body">{body}</p>
+          </li>
+        ))}
+      </ol>
+    </div>
+  </section>
+
+  <!-- ── Edit by talking (dark band, the conversation glows) ───────────── -->
+  <section class="fh-band fh-band--green">
+    <div class="fh-wrap fh-wrap--narrow">
+      <span class="fh-eyebrow fh-eyebrow--onGreen">{t.talk.eyebrow}</span>
+      <h2 class="fh-h2 fh-h2--onGreen">{t.talk.headline}</h2>
+      <div class="fh-chat">
+        <div class="fh-msg fh-msg--you">
+          <span class="fh-msg__who">{t.talk.youWho}</span>
+          <p class="fh-msg__text">{t.talk.you}</p>
+        </div>
+        <div class="fh-msg fh-msg--agent">
+          <span class="fh-msg__who">{t.talk.agentWho}</span>
+          <p class="fh-msg__text">{t.talk.agent}</p>
+        </div>
+      </div>
+      <p class="fh-chat__caption">{t.talk.caption}</p>
+    </div>
+  </section>
+
+  <!-- ── Why not WordPress ─────────────────────────────────────────────── -->
+  <section class="fh-band fh-band--paper">
+    <div class="fh-wrap">
+      <span class="fh-eyebrow">{t.wp.eyebrow}</span>
+      <h2 class="fh-h2">{t.wp.headline}</h2>
+      <p class="fh-lede">{t.wp.body}</p>
+      <div class="fh-tiles">
+        {t.wp.tiles.map(([n, l]) => (
+          <div class="fh-tile">
+            <span class="fh-tile__n">{n}</span>
+            <span class="fh-tile__l">{l}</span>
+          </div>
+        ))}
+      </div>
+    </div>
+  </section>
+
+  <!-- ── Solid ground (trust / free-tier) ──────────────────────────────── -->
+  <section class="fh-band fh-band--surface">
+    <div class="fh-wrap fh-wrap--narrow">
+      <span class="fh-eyebrow">{t.ground.eyebrow}</span>
+      <h2 class="fh-h2">{t.ground.headline}</h2>
+      <p class="fh-lede">{t.ground.body}</p>
+    </div>
+  </section>
+
+  <!-- ── Closing: stake your claim ─────────────────────────────────────── -->
+  <section class="fh-band fh-band--green fh-close">
+    <div class="fh-wrap fh-wrap--narrow">
+      <h2 class="fh-close__headline">{t.close.headline}</h2>
+      <p class="fh-close__sub">{t.close.sub}</p>
+      <a class="fh-btn fh-btn--brass fh-btn--lg" href={startUrl}>{t.close.cta}</a>
+    </div>
+  </section>
+</div>
+
+<style>
+  .fh {
+    --fh-line: var(--rule);
+    color: var(--ink);
+    font-family: var(--font-ui);
+  }
+
+  /* shared blocks */
+  .fh-wrap { max-width: var(--wide); margin: 0 auto; padding: 0 1.5rem; }
+  .fh-wrap--narrow { max-width: 60rem; }
+  .fh-band { padding: clamp(3.5rem, 8vw, 6.5rem) 0; }
+  .fh-band--paper { background: var(--parchment); }
+  .fh-band--surface { background: var(--surface); }
+  .fh-band--green { background: var(--deed-green); color: #e7e3d6; }
+
+  .fh-eyebrow {
+    display: inline-block;
+    font-family: var(--font-mono);
+    font-size: 0.7rem;
+    letter-spacing: 0.22em;
+    text-transform: uppercase;
+    color: var(--brass);
+    margin-bottom: 1.1rem;
+  }
+  .fh-eyebrow--onGreen { color: var(--brass-bright); }
+  .fh-h2 {
+    font-family: var(--font-heading);
+    font-weight: 500;
+    font-size: clamp(1.9rem, 4vw, 3rem);
+    line-height: 1.08;
+    letter-spacing: -0.02em;
+    margin: 0 0 1.2rem;
+    max-width: 22ch;
+  }
+  .fh-h2--onGreen { color: #fbf8f0; }
+  .fh-lede {
+    font-size: 1.14rem;
+    line-height: 1.7;
+    color: var(--text-secondary);
+    max-width: 62ch;
+    margin: 0 0 2.4rem;
+  }
+  .fh-band--green .fh-lede { color: #c6cfc7; }
+
+  /* buttons */
+  .fh-btn {
+    display: inline-flex;
+    align-items: center;
+    font-family: var(--font-mono);
+    font-size: 0.74rem;
+    letter-spacing: 0.14em;
+    text-transform: uppercase;
+    padding: 0.9rem 1.5rem;
+    text-decoration: none;
+    border: 1px solid transparent;
+    transition: transform 120ms ease, background 120ms ease, color 120ms ease;
+  }
+  .fh-btn--brass { background: var(--brass-bright); color: #1a1305; }
+  .fh-btn--brass:hover { transform: translateY(-1px); background: #dcae55; }
+  .fh-btn--ghost { background: transparent; color: #efe9d9; border-color: rgba(239,233,217,0.4); }
+  .fh-btn--ghost:hover { border-color: var(--brass-bright); color: var(--brass-bright); }
+  .fh-btn--lg { padding: 1.05rem 2rem; font-size: 0.8rem; }
+
+  /* ── Hero ─────────────────────────────────────────────────────────── */
+  .fh-hero {
+    background: var(--deed-green);
+    color: #efe9d9;
+    /* faint surveyor's grid — the plat */
+    background-image:
+      linear-gradient(rgba(255,255,255,0.028) 1px, transparent 1px),
+      linear-gradient(90deg, rgba(255,255,255,0.028) 1px, transparent 1px);
+    background-size: 46px 46px;
+    padding: clamp(3rem, 7vw, 6rem) 0 clamp(4rem, 9vw, 7rem);
+    overflow: hidden;
+  }
+  .fh-hero__grid {
+    max-width: var(--wide);
+    margin: 0 auto;
+    padding: 0 1.5rem;
+    display: grid;
+    grid-template-columns: 1.05fr 0.95fr;
+    gap: clamp(2rem, 5vw, 4.5rem);
+    align-items: center;
+  }
+  .fh-tag {
+    display: inline-block;
+    font-family: var(--font-mono);
+    font-size: 0.7rem;
+    letter-spacing: 0.24em;
+    color: var(--brass-bright);
+    padding-bottom: 0.9rem;
+    margin-bottom: 1.4rem;
+    border-bottom: 1px solid rgba(207,159,69,0.35);
+  }
+  .fh-hero__headline {
+    font-family: var(--font-heading);
+    font-weight: 500;
+    font-size: clamp(2.6rem, 5.6vw, 4.6rem);
+    line-height: 1.02;
+    letter-spacing: -0.02em;
+    margin: 0 0 1.3rem;
+    color: #fbf8f0;
+    text-wrap: balance;
+  }
+  .fh-hero__sub {
+    font-size: 1.12rem;
+    line-height: 1.7;
+    color: #cdd4cb;
+    max-width: 46ch;
+    margin: 0 0 2rem;
+  }
+  .fh-hero__ctas { display: flex; gap: 0.9rem; flex-wrap: wrap; }
+  .fh-lang {
+    display: inline-flex;
+    gap: 0.5rem;
+    align-items: center;
+    margin-top: 2.2rem;
+    font-family: var(--font-mono);
+    font-size: 0.68rem;
+    letter-spacing: 0.16em;
+    text-decoration: none;
+    color: #9aa79c;
+  }
+  .fh-lang__here { color: #efe9d9; }
+  .fh-lang__there { color: #9aa79c; }
+  .fh-lang:hover .fh-lang__there { color: var(--brass-bright); }
+
+  /* the deed card — the signature element */
+  .fh-deed {
+    position: relative;
+    background: var(--parchment-card);
+    color: var(--ink);
+    padding: 2.3rem 2.1rem 2rem;
+    border: 1px solid #cabf9f;
+    box-shadow: 0 26px 50px -26px rgba(0,0,0,0.55);
+    /* double-rule frame, like an engraved certificate */
+    outline: 1px solid #cabf9f;
+    outline-offset: 6px;
+  }
+  .fh-deed__stamp {
+    font-family: var(--font-mono);
+    font-size: 0.62rem;
+    letter-spacing: 0.28em;
+    color: var(--brass);
+    padding-bottom: 1rem;
+    margin-bottom: 1.2rem;
+    border-bottom: 1px solid var(--rule);
+  }
+  .fh-deed__title {
+    font-family: var(--font-heading);
+    font-weight: 600;
+    font-size: 1.85rem;
+    line-height: 1.05;
+    margin: 0 0 0.9rem;
+    letter-spacing: -0.01em;
+  }
+  .fh-deed__body {
+    font-size: 0.92rem;
+    line-height: 1.6;
+    color: var(--text-secondary);
+    margin: 0 0 1.5rem;
+  }
+  .fh-deed__fields { margin: 0; display: grid; gap: 0.05rem; }
+  .fh-deed__row {
+    display: grid;
+    grid-template-columns: 8.5rem 1fr;
+    gap: 0.8rem;
+    padding: 0.62rem 0;
+    border-top: 1px solid var(--rule);
+    align-items: baseline;
+  }
+  .fh-deed__row dt {
+    font-family: var(--font-mono);
+    font-size: 0.62rem;
+    letter-spacing: 0.12em;
+    color: var(--muted);
+  }
+  .fh-deed__row dd {
+    margin: 0;
+    font-family: var(--font-mono);
+    font-size: 0.82rem;
+    color: var(--ink);
+    word-break: break-word;
+  }
+  .fh-deed__foot {
+    display: flex;
+    justify-content: flex-end;
+    margin-top: 1.3rem;
+  }
+  /* brass wax seal — CSS only */
+  .fh-seal {
+    position: relative;
+    width: 84px;
+    height: 84px;
+    border-radius: 50%;
+    display: grid;
+    place-content: center;
+    text-align: center;
+    color: #4a3410;
+    background:
+      radial-gradient(circle at 34% 30%, #e6c471, #c39a3f 55%, #a97c28 100%);
+    box-shadow: inset 0 0 0 3px rgba(74,52,16,0.35), inset 0 0 0 8px rgba(255,255,255,0.12);
+    transform: rotate(-9deg);
+  }
+  .fh-seal::before {
+    content: "";
+    position: absolute;
+    inset: 5px;
+    border-radius: 50%;
+    border: 1px dashed rgba(74,52,16,0.5);
+  }
+  .fh-seal__top, .fh-seal__bot {
+    font-family: var(--font-mono);
+    font-size: 0.44rem;
+    letter-spacing: 0.18em;
+    line-height: 1;
+  }
+  .fh-seal__mid {
+    font-family: var(--font-heading);
+    font-weight: 600;
+    font-size: 1.5rem;
+    line-height: 1;
+    margin: 0.12rem 0;
+  }
+
+  /* ── Ledger (leasehold vs freehold) ──────────────────────────────── */
+  .fh-ledger {
+    border: 1px solid var(--rule);
+    background: var(--parchment-card);
+  }
+  .fh-ledger__head, .fh-ledger__row {
+    display: grid;
+    grid-template-columns: 1fr 1.15fr 1.15fr;
+  }
+  .fh-ledger__head {
+    border-bottom: 2px solid var(--ink);
+  }
+  .fh-ledger__head span {
+    padding: 0.85rem 1.1rem;
+    font-family: var(--font-mono);
+    font-size: 0.66rem;
+    letter-spacing: 0.14em;
+  }
+  .fh-ledger__ca { color: var(--muted); }
+  .fh-ledger__cb { color: var(--brass); border-left: 1px solid var(--rule); }
+  .fh-ledger__row { border-top: 1px solid var(--rule); }
+  .fh-ledger__row:first-of-type { border-top: 0; }
+  .fh-ledger__row span { padding: 0.85rem 1.1rem; font-size: 0.9rem; line-height: 1.45; }
+  .fh-ledger__label { font-weight: 500; color: var(--ink); }
+  .fh-ledger__a { color: var(--muted); }
+  .fh-ledger__b {
+    color: var(--ink);
+    border-left: 1px solid var(--rule);
+    background: rgba(18,49,40,0.045);
+    font-weight: 500;
+  }
+
+  /* ── Chain of title (the architecture) ───────────────────────────── */
+  .fh-chain {
+    list-style: none;
+    margin: 0;
+    padding: 0;
+    display: grid;
+    grid-template-columns: repeat(4, 1fr);
+    gap: 0;
+    counter-reset: node;
+  }
+  .fh-node {
+    position: relative;
+    padding: 2.2rem 1.4rem 0.5rem 0;
+    border-top: 2px solid var(--ink);
+  }
+  .fh-node:not(:last-child) { padding-right: 1.6rem; }
+  .fh-node__marker {
+    position: absolute;
+    top: -7px;
+    left: 0;
+    width: 12px;
+    height: 12px;
+    background: var(--brass-bright);
+    border-radius: 50%;
+    box-shadow: 0 0 0 4px var(--surface);
+  }
+  .fh-node__num {
+    font-family: var(--font-mono);
+    font-size: 0.8rem;
+    letter-spacing: 0.1em;
+    color: var(--brass);
+  }
+  .fh-node__label {
+    font-family: var(--font-heading);
+    font-weight: 600;
+    font-size: 1.4rem;
+    line-height: 1.1;
+    margin: 0.5rem 0 0.5rem;
+  }
+  .fh-node__svc {
+    display: inline-block;
+    font-family: var(--font-mono);
+    font-size: 0.72rem;
+    letter-spacing: 0.04em;
+    color: var(--text-secondary);
+    background: rgba(18,49,40,0.06);
+    padding: 0.2rem 0.5rem;
+    margin-bottom: 0.9rem;
+  }
+  .fh-node__body {
+    font-size: 0.92rem;
+    line-height: 1.6;
+    color: var(--text-secondary);
+    margin: 0;
+  }
+
+  /* ── Edit by talking (chat) ──────────────────────────────────────── */
+  .fh-chat {
+    display: grid;
+    gap: 0.9rem;
+    margin: 0.6rem 0 1.6rem;
+    max-width: 44rem;
+  }
+  .fh-msg {
+    border: 1px solid rgba(207,159,69,0.28);
+    background: rgba(255,255,255,0.04);
+    padding: 1rem 1.15rem;
+    max-width: 88%;
+  }
+  .fh-msg--you { justify-self: end; border-color: rgba(207,159,69,0.5); }
+  .fh-msg--agent { justify-self: start; background: rgba(207,159,69,0.09); }
+  .fh-msg__who {
+    display: block;
+    font-family: var(--font-mono);
+    font-size: 0.6rem;
+    letter-spacing: 0.2em;
+    text-transform: uppercase;
+    color: var(--brass-bright);
+    margin-bottom: 0.45rem;
+  }
+  .fh-msg__text { margin: 0; font-size: 1rem; line-height: 1.55; color: #efe9d9; }
+  .fh-chat__caption {
+    font-family: var(--font-mono);
+    font-size: 0.78rem;
+    line-height: 1.6;
+    color: #aab4ab;
+    max-width: 52ch;
+    margin: 0;
+  }
+
+  /* ── Tiles (why not WordPress) ───────────────────────────────────── */
+  .fh-tiles {
+    display: grid;
+    grid-template-columns: repeat(3, 1fr);
+    gap: 1rem;
+  }
+  .fh-tile {
+    border: 1px solid var(--rule);
+    background: var(--parchment-card);
+    padding: 1.6rem 1.4rem;
+    display: grid;
+    gap: 0.5rem;
+  }
+  .fh-tile__n {
+    font-family: var(--font-heading);
+    font-weight: 600;
+    font-size: 2.8rem;
+    line-height: 1;
+    color: var(--deed-green);
+  }
+  .fh-tile__l {
+    font-family: var(--font-mono);
+    font-size: 0.74rem;
+    letter-spacing: 0.06em;
+    color: var(--text-secondary);
+    line-height: 1.45;
+  }
+
+  /* ── Closing ─────────────────────────────────────────────────────── */
+  .fh-close { text-align: center; }
+  .fh-close__headline {
+    font-family: var(--font-heading);
+    font-weight: 500;
+    font-size: clamp(2.6rem, 6vw, 4.4rem);
+    line-height: 1;
+    letter-spacing: -0.02em;
+    color: #fbf8f0;
+    margin: 0 0 1rem;
+  }
+  .fh-close__sub {
+    font-size: 1.14rem;
+    line-height: 1.6;
+    color: #c6cfc7;
+    max-width: 44ch;
+    margin: 0 auto 2rem;
+  }
+
+  /* subtle page-load reveal — one orchestrated moment, motion-safe only */
+  @media (prefers-reduced-motion: no-preference) {
+    .fh-hero__lede > *, .fh-deed {
+      animation: fh-rise 640ms cubic-bezier(0.2, 0.7, 0.2, 1) both;
+    }
+    .fh-deed { animation-delay: 140ms; }
+    .fh-hero__headline { animation-delay: 60ms; }
+    .fh-hero__sub { animation-delay: 120ms; }
+    .fh-hero__ctas { animation-delay: 180ms; }
+    @keyframes fh-rise {
+      from { opacity: 0; transform: translateY(14px); }
+      to { opacity: 1; transform: translateY(0); }
+    }
+  }
+
+  /* focus visibility */
+  .fh a:focus-visible, .fh-btn:focus-visible {
+    outline: 2px solid var(--brass-bright);
+    outline-offset: 3px;
+  }
+
+  /* ── Responsive ──────────────────────────────────────────────────── */
+  @media (max-width: 900px) {
+    .fh-hero__grid { grid-template-columns: 1fr; }
+    .fh-deed { max-width: 30rem; }
+    .fh-chain { grid-template-columns: 1fr 1fr; }
+    .fh-node { border-top: 0; padding: 1.4rem 0 1.4rem 1.4rem; border-left: 2px solid var(--ink); }
+    .fh-node__marker { top: 0; left: -7px; }
+  }
+  @media (max-width: 620px) {
+    .fh-chain { grid-template-columns: 1fr; }
+    .fh-tiles { grid-template-columns: 1fr; }
+    .fh-ledger__head, .fh-ledger__row { grid-template-columns: 1fr 1fr; }
+    .fh-ledger__label {
+      grid-column: 1 / -1;
+      border-bottom: 1px solid var(--rule);
+      font-family: var(--font-mono);
+      font-size: 0.64rem;
+      letter-spacing: 0.12em;
+      text-transform: uppercase;
+      color: var(--muted);
+      padding-bottom: 0.4rem;
+    }
+    .fh-deed__row { grid-template-columns: 1fr; gap: 0.2rem; }
+    .fh-msg { max-width: 100%; }
+  }
+</style>

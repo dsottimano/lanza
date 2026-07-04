@@ -568,3 +568,100 @@ main > ul > li > a:hover {
   font-size: 1.35rem;
   color: var(--gold);
 }
+
+/* ═══ THEME: Freehold — the flagship default ════════════════════════════════
+   Lanza's own manifesto theme. The pitch: the open web is land; Instagram is
+   leasehold (you rent, you own nothing), Lanza is FREEHOLD (owned outright, in
+   perpetuity, no landlord). Deed-green (#123128) hero/footer + warm parchment
+   body + a brass seal accent. Fraunces (warm archival display) over Space
+   Grotesk (no-frills UI); JetBrains Mono carries the "machine truth" — repo
+   paths, commit hashes, URLs — because those really are code. Sharp corners,
+   hairline survey rules. Manifesto layout lives in components/Manifesto.astro;
+   the tokens + shared-chrome skins live here. */
+[data-theme="freehold"] {
+  --font-ui: "Space Grotesk", ui-sans-serif, system-ui, -apple-system, sans-serif;
+  --font-prose: "Space Grotesk", ui-sans-serif, system-ui, sans-serif;
+  --font-heading: "Fraunces", Georgia, "Times New Roman", serif;
+  --font-mono: "JetBrains Mono", ui-monospace, "SFMono-Regular", Menlo, monospace;
+
+  --bg: #f2ede1;          /* parchment — the document */
+  --surface: #ebe4d3;     /* deeper parchment */
+  --ink: #17241f;         /* green-black text */
+  --muted: #5f6d63;       /* faded green-grey */
+  --accent: #123128;      /* deed green — links + primary ink */
+  --border: #ddd6c5;
+
+  --content: 46rem;
+  --wide: 1120px;
+  --radius: 2px;
+
+  --h1-size: clamp(2.6rem, 6vw, 4.4rem);
+  --h1-weight: 500;
+  --prose-size: 1.12rem;
+  --prose-leading: 1.75;
+  --header-border: 1px solid var(--border);
+  --nav-transform: uppercase;
+  --nav-weight: 500;
+
+  /* brand extras (not part of the generic theme contract) */
+  --deed-green: #123128;
+  --deed-green-deep: #0d2019;
+  --brass: #a9772a;       /* accent on parchment */
+  --brass-bright: #cf9f45;/* accent on green + the seal */
+  --parchment: #f2ede1;
+  --parchment-card: #fbf8f0;
+  --rule: #d8d0bd;
+  --text-secondary: #43514a;
+  --on-accent: #f2ede1;
+  --wide-width: var(--wide);
+}
+
+[data-theme="freehold"] h1,
+[data-theme="freehold"] h2,
+[data-theme="freehold"] h3,
+[data-theme="freehold"] h4 {
+  font-family: var(--font-heading);
+  font-weight: 500;
+  line-height: 1.08;
+  letter-spacing: -0.015em;
+  font-optical-sizing: auto;
+}
+[data-theme="freehold"] .brand {
+  font-family: var(--font-heading);
+  font-weight: 600;
+  font-size: 1.6rem;
+  letter-spacing: -0.01em;
+}
+[data-theme="freehold"] .site-nav a {
+  font-family: var(--font-mono);
+  font-size: 0.7rem;
+  letter-spacing: 0.14em;
+  color: var(--text-secondary);
+}
+[data-theme="freehold"] .nav-locale {
+  display: inline-flex;
+  gap: 0.4rem;
+  align-items: center;
+  font-family: var(--font-mono);
+  font-size: 0.68rem;
+  letter-spacing: 0.12em;
+  color: var(--muted);
+}
+[data-theme="freehold"] .nav-locale a { color: var(--muted); text-decoration: none; }
+[data-theme="freehold"] .nav-locale a:hover,
+[data-theme="freehold"] .nav-locale .is-active { color: var(--ink); }
+
+/* Dark deed-green footer — the registry's closing seal */
+[data-theme="freehold"] .site-footer {
+  background: var(--deed-green);
+  color: #c6cfc7;
+  margin-top: 0;
+  border-top: 0;
+}
+[data-theme="freehold"] .site-footer .bar {
+  color: #c6cfc7;
+  font-family: var(--font-mono);
+  font-size: 0.72rem;
+  letter-spacing: 0.06em;
+}
+[data-theme="freehold"] .site-footer a { color: var(--brass-bright); }
