@@ -162,7 +162,7 @@ function urlWarns(url: string): boolean {
 
 const inputCls = "input min-w-0 flex-1";
 const iconBtn =
-  "grid size-8 flex-shrink-0 place-items-center rounded-md text-zinc-500 transition hover:bg-white/60 hover:text-zinc-800 disabled:cursor-default disabled:opacity-30 disabled:hover:bg-transparent";
+  "grid size-8 flex-shrink-0 place-items-center rounded-md text-zinc-500 transition hover:bg-[var(--surface)] hover:text-zinc-800 disabled:cursor-default disabled:opacity-30 disabled:hover:bg-transparent";
 </script>
 
 <template>
@@ -211,7 +211,7 @@ const iconBtn =
         </div>
 
         <!-- Device sub-tabs -->
-        <div class="mb-4 flex gap-4 border-b border-white/40">
+        <div class="mb-4 flex gap-4 border-b border-[var(--border)]">
           <button
             v-for="d in DEVICES"
             :key="d.key"
@@ -242,7 +242,7 @@ const iconBtn =
         </label>
 
         <!-- Inheriting: read-only preview of the desktop menu -->
-        <div v-if="inherits" class="rounded-lg border border-dashed border-white/50 bg-white/40 px-4 py-3 text-sm text-zinc-600">
+        <div v-if="inherits" class="rounded-lg border border-dashed border-[var(--border)] bg-[var(--surface)] px-4 py-3 text-sm text-zinc-600">
           <p v-if="items.length === 0">Uses the desktop menu (currently empty).</p>
           <template v-else>
             <p class="mb-2 text-xs font-semibold uppercase tracking-wide text-zinc-500">Following desktop</p>

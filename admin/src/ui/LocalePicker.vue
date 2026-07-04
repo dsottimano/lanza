@@ -30,7 +30,7 @@ function toggle(code: string) {
         v-for="l in LANG_CATALOG"
         :key="l.code"
         type="button"
-        :class="['flex items-center gap-2 rounded-xl border px-3 py-2 text-left text-sm transition', chosen.includes(l.code) ? 'border-zinc-900/70 bg-white/70' : 'border-white/50 bg-white/40 hover:border-white/80']"
+        :class="['flex items-center gap-2 rounded-xl border px-3 py-2 text-left text-sm transition', chosen.includes(l.code) ? 'border-zinc-900/70 bg-[var(--paper-card)]' : 'border-[var(--border)] bg-[var(--surface)] hover:border-[var(--ink-soft)]']"
         @click="toggle(l.code)"
       >
         <span :class="['grid size-4 place-items-center rounded border text-[10px]', chosen.includes(l.code) ? 'border-zinc-900 bg-zinc-900 text-white' : 'border-zinc-400']">

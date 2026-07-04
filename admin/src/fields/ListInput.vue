@@ -52,7 +52,7 @@ function move(i: number, dir: -1 | 1) {
 
 <template>
   <div class="flex flex-col gap-2.5">
-    <div v-for="(item, i) in items" :key="i" class="rounded-xl border border-white/50 bg-white/40 p-3">
+    <div v-for="(item, i) in items" :key="i" class="rounded-xl border border-[var(--border)] bg-[var(--paper-card)] p-3">
       <div class="mb-2.5 flex items-center justify-between">
         <span class="text-[0.7rem] font-bold tracking-wide text-zinc-500 uppercase">
           {{ variantOf(item)?.label ?? `${singular} ${i + 1}` }}
@@ -61,20 +61,20 @@ function move(i: number, dir: -1 | 1) {
           <button
             type="button"
             :disabled="i === 0"
-            class="size-7 rounded-md border border-white/50 bg-white/50 text-zinc-500 transition hover:text-zinc-900 disabled:opacity-35 disabled:hover:text-zinc-500"
+            class="size-7 rounded-md border border-[var(--border)] bg-[var(--surface)] text-zinc-500 transition hover:text-zinc-900 disabled:opacity-35 disabled:hover:text-zinc-500"
             title="Move up"
             @click="move(i, -1)"
           >↑</button>
           <button
             type="button"
             :disabled="i === items.length - 1"
-            class="size-7 rounded-md border border-white/50 bg-white/50 text-zinc-500 transition hover:text-zinc-900 disabled:opacity-35 disabled:hover:text-zinc-500"
+            class="size-7 rounded-md border border-[var(--border)] bg-[var(--surface)] text-zinc-500 transition hover:text-zinc-900 disabled:opacity-35 disabled:hover:text-zinc-500"
             title="Move down"
             @click="move(i, 1)"
           >↓</button>
           <button
             type="button"
-            class="size-7 rounded-md border border-white/50 bg-white/50 text-rose-500 transition hover:bg-rose-50"
+            class="size-7 rounded-md border border-[var(--border)] bg-[var(--surface)] text-rose-500 transition hover:bg-rose-50"
             title="Remove"
             @click="remove(i)"
           >✕</button>
@@ -123,7 +123,7 @@ function move(i: number, dir: -1 | 1) {
           v-for="v in field.types"
           :key="v.name"
           type="button"
-          class="px-3.5 py-2.5 text-left text-sm text-zinc-700 transition hover:bg-white/50"
+          class="px-3.5 py-2.5 text-left text-sm text-zinc-700 transition hover:bg-[var(--surface)]"
           @click="addVariant(v)"
         >
           {{ v.label }}

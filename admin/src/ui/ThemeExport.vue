@@ -76,7 +76,7 @@ async function run() {
           type="text"
           placeholder="my-theme"
           :disabled="busy"
-          class="w-full rounded-lg border border-white/60 bg-white/60 px-3 py-2 text-sm text-zinc-900 outline-none focus:border-zinc-400"
+          class="w-full rounded-lg border border-[var(--border)] bg-[var(--paper-card)] px-3 py-2 text-sm text-zinc-900 outline-none focus:border-zinc-400"
         />
         <span v-if="manifest.name && slug !== manifest.name" class="mt-1 block text-xs text-zinc-400">→ {{ slug }}</span>
       </label>
@@ -87,7 +87,7 @@ async function run() {
           type="text"
           placeholder="My Theme"
           :disabled="busy"
-          class="w-full rounded-lg border border-white/60 bg-white/60 px-3 py-2 text-sm text-zinc-900 outline-none focus:border-zinc-400"
+          class="w-full rounded-lg border border-[var(--border)] bg-[var(--paper-card)] px-3 py-2 text-sm text-zinc-900 outline-none focus:border-zinc-400"
         />
       </label>
       <label class="text-sm">
@@ -97,7 +97,7 @@ async function run() {
           type="text"
           placeholder="1.0.0"
           :disabled="busy"
-          class="w-full rounded-lg border border-white/60 bg-white/60 px-3 py-2 text-sm text-zinc-900 outline-none focus:border-zinc-400"
+          class="w-full rounded-lg border border-[var(--border)] bg-[var(--paper-card)] px-3 py-2 text-sm text-zinc-900 outline-none focus:border-zinc-400"
         />
       </label>
       <label class="text-sm sm:col-span-2">
@@ -107,7 +107,7 @@ async function run() {
           rows="2"
           placeholder="One-line summary shown in the preview."
           :disabled="busy"
-          class="w-full rounded-lg border border-white/60 bg-white/60 px-3 py-2 text-sm text-zinc-900 outline-none focus:border-zinc-400"
+          class="w-full rounded-lg border border-[var(--border)] bg-[var(--paper-card)] px-3 py-2 text-sm text-zinc-900 outline-none focus:border-zinc-400"
         />
       </label>
     </div>

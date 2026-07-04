@@ -141,14 +141,14 @@ function preview(html: string): string {
               </span>
             </button>
             <button
-              class="grid size-7 flex-shrink-0 place-items-center rounded-md text-zinc-400 transition hover:bg-white/60 hover:text-zinc-800"
+              class="grid size-7 flex-shrink-0 place-items-center rounded-md text-zinc-400 transition hover:bg-[var(--surface)] hover:text-zinc-800"
               title="Rename"
               @click="rename(b)"
             >
               ✎
             </button>
             <button
-              class="grid size-7 flex-shrink-0 place-items-center rounded-md text-zinc-400 transition hover:bg-white/60 hover:text-red-600"
+              class="grid size-7 flex-shrink-0 place-items-center rounded-md text-zinc-400 transition hover:bg-[var(--surface)] hover:text-red-600"
               title="Delete"
               @click="remove(b)"
             >

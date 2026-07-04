@@ -1,6 +1,6 @@
 <script setup lang="ts">
-// Persistent glass toolbar above the writing canvas — the Tiptap "Simple Editor"
-// layout, built natively in Vue to match Lanza's liquid-glass chrome. All marks
+// Persistent Paper toolbar above the writing canvas — the Tiptap "Simple Editor"
+// layout, built natively in Vue to match Lanza's flat Freehold chrome. All marks
 // and node commands come from the same extensions the slash menu and keyboard
 // shortcuts drive; the "Add" menu reuses the slash catalog's insert commands so
 // there's a single source of truth for insertables.
@@ -211,12 +211,9 @@ const icons: Record<string, string> = {
   gap: 0.15rem;
   margin: -0.5rem 0 1.5rem;
   padding: 0.35rem 0.5rem;
-  border-radius: 14px;
-  background: var(--glass-tint-strong);
-  backdrop-filter: blur(18px) saturate(180%);
-  -webkit-backdrop-filter: blur(18px) saturate(180%);
-  border: 1px solid var(--glass-border-soft);
-  box-shadow: var(--glass-shadow-sm), var(--glass-sheen);
+  border-radius: var(--radius);
+  background: var(--paper-card);
+  border: 1px solid var(--border);
 }
 
 .tb-group {
@@ -228,7 +225,7 @@ const icons: Record<string, string> = {
   width: 1px;
   align-self: stretch;
   margin: 0.2rem 0.3rem;
-  background: rgba(27, 29, 36, 0.12);
+  background: rgba(32, 29, 27, 0.12);
 }
 
 .tb-btn {
@@ -257,7 +254,7 @@ const icons: Record<string, string> = {
   stroke-linejoin: round;
 }
 .tb-btn:not(:disabled):hover {
-  background: rgba(27, 29, 36, 0.07);
+  background: rgba(32, 29, 27, 0.07);
   color: var(--ink);
 }
 .tb-btn:focus-visible {
@@ -271,7 +268,7 @@ const icons: Record<string, string> = {
 /* Active = pressed glass, mirroring .nav-item--active. */
 .tb-btn.on,
 .tb-btn.on:hover {
-  background: rgba(23, 25, 32, 0.9);
+  background: rgba(32, 29, 27, 0.9);
   color: #fff;
   box-shadow: inset 0 1px 2px rgba(0, 0, 0, 0.4);
 }
@@ -317,12 +314,10 @@ const icons: Record<string, string> = {
   z-index: 40;
   min-width: 11rem;
   padding: 0.3rem;
-  border-radius: 12px;
-  background: var(--glass-tint-strong);
-  backdrop-filter: blur(20px) saturate(180%);
-  -webkit-backdrop-filter: blur(20px) saturate(180%);
-  border: 1px solid var(--glass-border);
-  box-shadow: var(--glass-shadow), var(--glass-sheen);
+  border-radius: var(--radius);
+  background: var(--paper-card);
+  border: 1px solid var(--border);
+  box-shadow: 0 4px 14px -8px rgba(32, 29, 27, 0.35);
 }
 .tb-item {
   display: flex;
@@ -338,7 +333,7 @@ const icons: Record<string, string> = {
   cursor: pointer;
 }
 .tb-item:hover {
-  background: rgba(27, 29, 36, 0.07);
+  background: rgba(32, 29, 27, 0.07);
   color: var(--ink);
 }
 .tb-item.on {

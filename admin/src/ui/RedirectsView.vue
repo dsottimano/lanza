@@ -212,7 +212,7 @@ onMounted(() => {
 // ── shared class strings (match MenuView) ───────────────────────────────────
 const cellInput = "input min-w-0 font-mono text-[13px]";
 const iconBtn =
-  "grid size-7 flex-shrink-0 place-items-center rounded-md text-zinc-500 transition hover:bg-white/60 hover:text-zinc-800 disabled:cursor-default disabled:opacity-30 disabled:hover:bg-transparent";
+  "grid size-7 flex-shrink-0 place-items-center rounded-md text-zinc-500 transition hover:bg-[var(--surface)] hover:text-zinc-800 disabled:cursor-default disabled:opacity-30 disabled:hover:bg-transparent";
 const toneRing: Record<string, string> = {
   emerald: "bg-emerald-500",
   blue: "bg-blue-500",
@@ -277,7 +277,7 @@ const toneRing: Record<string, string> = {
       <div v-else class="card overflow-x-auto">
         <table class="w-full border-collapse text-left">
           <thead>
-            <tr class="border-b border-white/40 text-[11px] font-semibold uppercase tracking-wide text-zinc-500">
+            <tr class="border-b border-[var(--border)] text-[11px] font-semibold uppercase tracking-wide text-zinc-500">
               <th class="w-14 px-2 py-2"></th>
               <th class="px-2 py-2">From</th>
               <th class="px-2 py-2">To</th>
@@ -328,7 +328,7 @@ const toneRing: Record<string, string> = {
                 </td>
               </tr>
               <!-- Per-row diagnostics -->
-              <tr v-if="diagnostics[i].error || diagnostics[i].warnings.length" class="border-b border-white/30">
+              <tr v-if="diagnostics[i].error || diagnostics[i].warnings.length" class="border-b border-[var(--border)]">
                 <td></td>
                 <td colspan="4" class="px-2 pb-2">
                   <p v-if="diagnostics[i].error" class="text-xs text-rose-600">
@@ -354,9 +354,9 @@ const toneRing: Record<string, string> = {
         </table>
 
         <!-- Inline add row -->
-        <div class="border-t border-white/40 px-2 py-2">
+        <div class="border-t border-[var(--border)] px-2 py-2">
           <button
-            class="rounded-lg px-2.5 py-1.5 text-sm font-medium text-zinc-600 transition hover:bg-white/50 hover:text-zinc-900"
+            class="rounded-lg px-2.5 py-1.5 text-sm font-medium text-zinc-600 transition hover:bg-[var(--surface)] hover:text-zinc-900"
             @click="addRow"
           >
             + Add redirect

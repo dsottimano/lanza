@@ -227,7 +227,7 @@ async function save() {
       <h1 class="mb-1 font-serif text-3xl font-bold tracking-tight text-zinc-900">Content types</h1>
       <p class="mb-6 text-sm text-zinc-600">
         Define the collections and fields (templates) the CMS edits. Changes commit
-        <code class="rounded bg-white/60 px-1 py-0.5 text-xs">frontend/data/schema.json</code> and take effect
+        <code class="rounded bg-[var(--surface)] px-1 py-0.5 text-xs">frontend/data/schema.json</code> and take effect
         immediately.
       </p>
 
@@ -251,7 +251,7 @@ async function save() {
               </span>
             </button>
             <button
-              class="grid size-7 flex-shrink-0 place-items-center rounded-md text-zinc-400 transition hover:bg-white/60 hover:text-red-600"
+              class="grid size-7 flex-shrink-0 place-items-center rounded-md text-zinc-400 transition hover:bg-[var(--surface)] hover:text-red-600"
               title="Delete content type"
               @click="deleteType(t)"
             >

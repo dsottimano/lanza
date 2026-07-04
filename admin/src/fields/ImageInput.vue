@@ -29,7 +29,7 @@ function onPick(e: Event) {
     <img
       v-if="safeSrc"
       :src="safeSrc"
-      class="max-h-40 rounded-lg border border-white/50 object-contain"
+      class="max-h-40 rounded-lg border border-[var(--border)] object-contain"
       alt=""
     />
 

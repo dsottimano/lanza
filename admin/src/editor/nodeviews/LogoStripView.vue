@@ -52,9 +52,9 @@ function remove(i: number) {
 .logo-strip-edit {
   margin: 1.8em 0;
   padding: 1.2rem;
-  border: 1px dashed #e0e0e0;
+  border: 1px dashed var(--border);
   border-radius: 10px;
-  background: #fafafa;
+  background: var(--surface);
 }
 .logos {
   display: flex;
@@ -82,7 +82,7 @@ function remove(i: number) {
   place-items: center;
   border: none;
   border-radius: 999px;
-  background: #1a1a1a;
+  background: var(--ink);
   color: #fff;
   font-size: 0.65rem;
   cursor: pointer;
@@ -93,7 +93,7 @@ function remove(i: number) {
   opacity: 1;
 }
 .logo-empty {
-  color: #9a9a9a;
+  color: var(--muted);
   font-size: 0.9rem;
 }
 .logo-actions {
@@ -107,14 +107,14 @@ function remove(i: number) {
   display: inline-flex;
   align-items: center;
   padding: 0.4rem 0.9rem;
-  border: 1px solid #d4d4d8;
+  border: 1px solid var(--border);
   border-radius: 8px;
   background: #fff;
-  color: #3f3f46;
+  color: var(--ink-soft);
   cursor: pointer;
 }
 .logo-btn:hover {
-  border-color: #a1a1aa;
+  border-color: var(--muted);
 }
 .logo-btn.busy {
   opacity: 0.6;
@@ -126,7 +126,7 @@ function remove(i: number) {
 .logo-error {
   display: block;
   margin-top: 0.5rem;
-  color: #c0392b;
+  color: #c1121f;
   font-size: 0.78rem;
 }
 </style>

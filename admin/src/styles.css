@@ -1,50 +1,90 @@
 @import "tailwindcss";
 
-/* ── Design tokens (Lanza) ────────────────────────────────────────────────
-   Apple-style "liquid glass": translucent, blurred surfaces floating over a
-   soft ambient gradient mesh. A serif for headings/brand/writing, a clean sans
-   for the chrome. No web-font dependency — system stacks only, so the admin
-   loads instantly and works offline.
-
-   The glass system is defined once here (CSS vars + component classes) so views
-   compose it instead of hand-rolling four wrapper divs each:
-     .glass / .glass-strong   generic translucent surfaces
-     .rail-glass              the signature sidebar (SVG-distorted backdrop)
-     .card                    quiet glass panel (cards, tables, forms)
-     .toolbar                 sticky glass header bar
+/* ── Design tokens (Lanza admin — the Freehold identity) ───────────────────
+   The CMS now wears the same design as the default public theme: monochrome
+   Ink (#201d1b) on Paper (#f3f1ea), set in Jost (Futura-like geometric sans),
+   plus ONE hot "launch" accent (#e4431b) — the colour of the wordmark's ↗
+   arrow. JetBrains Mono carries the machine truth (repo paths, hashes). Sharp
+   2px corners, hairline rules, flat surfaces — no glass, no blur, no drop
+   shadows, no gradient mesh. The whole system is defined once here (CSS vars +
+   component classes) so views compose it instead of hand-rolling wrappers:
+     .glass / .glass-strong   quiet Paper surfaces (legacy names, now flat)
+     .rail-glass              the sidebar shell (legacy name, now a flat panel)
+     .card                    Paper panel (cards, tables, forms)
+     .toolbar                 sticky Paper header bar
      .btn / .btn-primary / .btn-ghost / .btn-danger
      .input                   shared control surface (see fields/styles.ts)
      .nav-item                sidebar / TOC rows (+ --active pressed state)
      .segment                 segmented control (language / location tabs)
      .skeleton                layout-stable loading placeholder
-   Springy hover uses --spring. backdrop-filter is reserved for the sidebar,
-   toolbars, and cards (never per list-row) to stay light on the GPU. */
+   Self-hosted fonts (public/fonts/*.woff2) — no CDN, loads offline. Fonts and
+   the corner scale are wired through Tailwind's @theme so `font-serif`,
+   `font-sans` and every `rounded-*` utility already in the markup snap to the
+   Freehold look with no per-file edits (rounded-full stays circular). */
+
+/* Self-hosted variable fonts. Served from /admin/fonts/ (Vite publicDir under
+   the /admin/ base) — no external request, works offline. */
+@font-face {
+  font-family: "Jost";
+  font-style: normal;
+  font-weight: 100 900;
+  font-display: swap;
+  src: url("/admin/fonts/jost-var.woff2") format("woff2");
+}
+@font-face {
+  font-family: "JetBrains Mono";
+  font-style: normal;
+  font-weight: 100 800;
+  font-display: swap;
+  src: url("/admin/fonts/jetbrains-mono-var.woff2") format("woff2");
+}
+
 @theme {
-  --font-sans:
-    ui-sans-serif, system-ui, -apple-system, "Segoe UI", Roboto, Helvetica,
-    Arial, sans-serif;
-  --font-serif: Georgia, "Times New Roman", serif;
+  /* Jost is the identity everywhere — headings, brand, body. The legacy
+     `serif` utility (used on every view heading) is remapped to Jost so the
+     admin matches the site without touching 36 files. JetBrains Mono carries
+     machine truth. */
+  --font-sans: "Jost", ui-sans-serif, system-ui, -apple-system, "Segoe UI",
+    Roboto, Helvetica, Arial, sans-serif;
+  --font-serif: "Jost", ui-sans-serif, system-ui, -apple-system, sans-serif;
+  --font-mono: "JetBrains Mono", ui-monospace, "SFMono-Regular", Menlo, monospace;
+
+  /* Sharp corners. Remapping Tailwind's radius scale turns every rounded-sm..3xl
+     in the markup into a 2px hairline corner; rounded-full is calc-based and
+     stays circular (avatars, toggles, dots). */
+  --radius-xs: 2px;
+  --radius-sm: 2px;
+  --radius-md: 2px;
+  --radius-lg: 2px;
+  --radius-xl: 2px;
+  --radius-2xl: 2px;
+  --radius-3xl: 2px;
+  --radius-4xl: 2px;
 }
 
 :root {
-  --ink: #1b1d24;
-  --ink-soft: #3a3d47;
-  --muted: #5c6270;
+  /* the monochrome + launch palette (mirrors the site's site.css :root) */
+  --paper: #f3f1ea;
+  --paper-card: #fbf9f3;
+  --ink: #201d1b;
+  --ink-deep: #17140f;
+  --ink-soft: #4a453f;
+  --muted: #6b655e;
+  --accent: #e4431b; /* launch — links, primary CTAs, focus, the live dot */
+  --accent-bright: #ff5a2c;
 
-  --glass-tint: rgba(255, 255, 255, 0.55);
-  --glass-tint-strong: rgba(255, 255, 255, 0.74);
-  --glass-tint-card: rgba(255, 255, 255, 0.62);
-  --glass-border: rgba(255, 255, 255, 0.6);
-  --glass-border-soft: rgba(255, 255, 255, 0.42);
-  --glass-shadow: 0 12px 40px -10px rgba(30, 41, 80, 0.24);
-  --glass-shadow-sm: 0 5px 18px -6px rgba(30, 41, 80, 0.18);
-  /* Inset top sheen + hairline that reads as the "shine" layer without a div. */
-  --glass-sheen: inset 0 1px 0 rgba(255, 255, 255, 0.8),
-    inset 0 0 0 1px rgba(255, 255, 255, 0.08);
+  --bg: var(--paper);
+  --surface: #eae7dd;
+  --border: #ddd8cc;
+  --rule: #ddd8cc;
 
-  --focus-ring: 0 0 0 3px rgba(72, 101, 196, 0.4);
-  --radius: 18px;
-  --spring: cubic-bezier(0.175, 0.885, 0.32, 2.2);
+  --focus-ring: 0 0 0 3px rgba(228, 67, 27, 0.35);
+  --radius: 2px;
+  --spring: cubic-bezier(0.2, 0.8, 0.3, 1);
+
+  /* fonts referenced inline by a few Vue components */
+  --font-heading: var(--font-serif);
+  --font-body: var(--font-sans);
 }
 
 html,
@@ -52,96 +92,60 @@ body {
   margin: 0;
 }
 
-/* Ambient background: a calm cool gradient mesh with one warm bloom — dawn sky
-   behind frosted glass. Fixed + CSS-only so glass has something colourful to
-   refract; kept static (no drift) given the flicker-sensitivity of this admin. */
+/* Flat Paper ground — no ambient gradient mesh. Editorial and static. */
 body {
   min-height: 100vh;
   color: var(--ink);
-  background-color: #e7ecf6;
+  background-color: var(--paper);
+  font-family: var(--font-sans);
   -webkit-font-smoothing: antialiased;
   text-rendering: optimizeLegibility;
-}
-body::before {
-  content: "";
-  position: fixed;
-  inset: -10%;
-  z-index: -1;
-  background:
-    radial-gradient(52% 56% at 14% 18%, #cbdcf7 0%, rgba(203, 220, 247, 0) 60%),
-    radial-gradient(46% 52% at 86% 12%, #e1d3f3 0%, rgba(225, 211, 243, 0) 58%),
-    radial-gradient(58% 62% at 80% 84%, #cce7e6 0%, rgba(204, 231, 230, 0) 60%),
-    radial-gradient(44% 46% at 22% 90%, #f6dccb 0%, rgba(246, 220, 203, 0) 56%),
-    linear-gradient(180deg, #eaeff9 0%, #e6ecf5 100%);
 }
 
 #app {
   min-height: 100vh;
 }
 
+a {
+  color: var(--accent);
+  text-underline-offset: 2px;
+}
+
 @layer components {
-  /* ── Glass surfaces ─────────────────────────────────────────────────── */
-  .glass {
-    position: relative;
-    background: var(--glass-tint);
-    backdrop-filter: blur(16px) saturate(180%);
-    -webkit-backdrop-filter: blur(16px) saturate(180%);
-    border: 1px solid var(--glass-border);
-    box-shadow: var(--glass-shadow), var(--glass-sheen);
-  }
+  /* ── Flat Paper surfaces ─────────────────────────────────────────────────
+     Legacy `.glass`/`.glass-strong` names kept so markup doesn't churn; they
+     are now opaque Paper panels with a hairline rule and no blur. */
+  .glass,
   .glass-strong {
     position: relative;
-    background: var(--glass-tint-strong);
-    backdrop-filter: blur(22px) saturate(180%);
-    -webkit-backdrop-filter: blur(22px) saturate(180%);
-    border: 1px solid var(--glass-border);
-    box-shadow: var(--glass-shadow), var(--glass-sheen);
+    background: var(--paper-card);
+    border: 1px solid var(--border);
   }
 
   .card {
     position: relative;
     border-radius: var(--radius);
-    background: var(--glass-tint-card);
-    backdrop-filter: blur(14px) saturate(170%);
-    -webkit-backdrop-filter: blur(14px) saturate(170%);
-    border: 1px solid var(--glass-border-soft);
-    box-shadow: var(--glass-shadow-sm), var(--glass-sheen);
+    background: var(--paper-card);
+    border: 1px solid var(--border);
   }
 
-  /* Sticky glass header. Layout (flex/padding) stays as utilities in markup. */
+  /* Sticky Paper header. Opaque (stays cacheable, no GPU blur); a hairline
+     bottom rule separates it from the scrolling content. */
   .toolbar {
     position: sticky;
     top: 0;
     z-index: 30;
-    background: var(--glass-tint-strong);
-    backdrop-filter: blur(20px) saturate(180%);
-    -webkit-backdrop-filter: blur(20px) saturate(180%);
-    border-bottom: 1px solid var(--glass-border-soft);
-    box-shadow: 0 1px 0 rgba(255, 255, 255, 0.5) inset,
-      0 6px 20px -12px rgba(30, 41, 80, 0.35);
+    background: var(--paper);
+    border-bottom: 1px solid var(--border);
   }
 
   /* ── Sidebar rail — the signature element ───────────────────────────────
-     The distortion filter is GPU-heavy, so it lives ONLY here. It runs on a
-     dedicated absolutely-positioned child (.rail-glass__distortion) rather than
-     the rail itself: `filter` on the rail would smear its own text. isolation
-     keeps the child's negative z-index local so it sits behind the rail's tint
-     but above the page. */
+     A flat Paper panel with a hairline border; the glass distortion layer is
+     gone (its wrapper div + the SVG filter in index.html were removed). */
   .rail-glass {
     position: relative;
-    isolation: isolate;
-    background: var(--glass-tint-strong);
-    border: 1px solid var(--glass-border);
-    box-shadow: var(--glass-shadow), var(--glass-sheen);
-  }
-  .rail-glass__distortion {
-    position: absolute;
-    inset: 0;
-    z-index: -1;
-    border-radius: inherit;
-    backdrop-filter: blur(16px) saturate(180%);
-    -webkit-backdrop-filter: blur(16px) saturate(180%);
-    filter: url(#glass-distortion);
+    background: var(--paper-card);
+    border: 1px solid var(--border);
   }
 
   /* ── Buttons ────────────────────────────────────────────────────────── */
@@ -150,14 +154,14 @@ body::before {
     align-items: center;
     justify-content: center;
     gap: 0.4rem;
-    border-radius: 11px;
+    border-radius: var(--radius);
     padding: 0.5rem 0.9rem;
     font-size: 0.875rem;
     font-weight: 500;
     line-height: 1.2;
     cursor: pointer;
-    transition: transform 0.28s var(--spring), background-color 0.2s ease,
-      color 0.2s ease, box-shadow 0.2s ease, border-color 0.2s ease;
+    transition: background-color 0.18s ease, color 0.18s ease,
+      box-shadow 0.18s ease, border-color 0.18s ease;
   }
   .btn:focus-visible {
     outline: none;
@@ -168,48 +172,43 @@ body::before {
     opacity: 0.55;
   }
 
+  /* Primary CTA — solid Ink, Paper text (the site's dark-band button). */
   .btn-primary {
     background: var(--ink);
-    color: #fff;
-    box-shadow: 0 6px 18px -6px rgba(27, 29, 36, 0.55),
-      inset 0 1px 0 rgba(255, 255, 255, 0.16);
+    color: var(--paper);
   }
   .btn-primary:not(:disabled):hover {
-    background: #0d0e12;
-    transform: translateY(-1px);
+    background: var(--ink-deep);
   }
 
+  /* Ghost — Paper with a hairline; the quiet default action. */
   .btn-ghost {
-    background: var(--glass-tint);
-    backdrop-filter: blur(8px);
-    -webkit-backdrop-filter: blur(8px);
-    border: 1px solid var(--glass-border-soft);
+    background: transparent;
+    border: 1px solid var(--border);
     color: var(--ink-soft);
   }
   .btn-ghost:not(:disabled):hover {
-    background: var(--glass-tint-strong);
+    background: var(--surface);
     color: var(--ink);
-    transform: translateY(-1px);
   }
 
+  /* Destructive — a deep red distinct from the launch accent. */
   .btn-danger {
-    background: #e11d48;
+    background: #c1121f;
     color: #fff;
-    box-shadow: 0 6px 18px -6px rgba(225, 29, 72, 0.5);
   }
   .btn-danger:not(:disabled):hover {
-    background: #be123c;
-    transform: translateY(-1px);
+    background: #a20e19;
   }
 
   /* ── Inputs (shared via fields/styles.ts) ───────────────────────────────
-     Translucent solid, no backdrop-filter — forms hold many inputs and text
-     must stay crisp; the tint alone keeps them consistent with the glass. */
+     Flat Paper-card field with a hairline rule; focus lights the launch
+     accent. */
   .input {
     width: 100%;
-    border-radius: 11px;
-    border: 1px solid rgba(255, 255, 255, 0.55);
-    background: rgba(255, 255, 255, 0.62);
+    border-radius: var(--radius);
+    border: 1px solid var(--border);
+    background: var(--paper-card);
     padding: 0.5rem 0.75rem;
     font-size: 0.875rem;
     color: var(--ink);
@@ -218,28 +217,27 @@ body::before {
   }
   .input::placeholder {
     color: var(--muted);
-    opacity: 0.7;
+    opacity: 0.8;
   }
   .input:focus {
     outline: none;
-    border-color: rgba(72, 101, 196, 0.65);
-    background: rgba(255, 255, 255, 0.85);
+    border-color: var(--accent);
+    background: #fff;
     box-shadow: var(--focus-ring);
   }
 
   /* ── Sidebar / TOC rows ─────────────────────────────────────────────── */
   .nav-item {
     width: 100%;
-    border-radius: 11px;
+    border-radius: var(--radius);
     padding: 0.5rem 0.625rem;
     text-align: left;
     font-size: 0.875rem;
     color: var(--ink-soft);
-    transition: background-color 0.18s ease, color 0.18s ease,
-      transform 0.28s var(--spring);
+    transition: background-color 0.15s ease, color 0.15s ease;
   }
   .nav-item:hover {
-    background: rgba(255, 255, 255, 0.55);
+    background: var(--surface);
     color: var(--ink);
   }
   .nav-item:focus-visible {
@@ -248,16 +246,13 @@ body::before {
   }
   .nav-item--active,
   .nav-item--active:hover {
-    background: rgba(23, 25, 32, 0.9);
-    color: #fff;
-    box-shadow: inset 0 1px 2px rgba(0, 0, 0, 0.45),
-      inset 0 0 0 1px rgba(255, 255, 255, 0.06);
+    background: var(--ink);
+    color: var(--paper);
   }
 
   /* ── Sidebar collapsible groups ─────────────────────────────────────────
      Group header is a real button (aria-expanded lives in markup). The body
-     uses the grid 0fr↔1fr trick so it animates height without measuring JS and
-     without layout jank; the inner wrapper clips overflow while collapsing. */
+     uses the grid 0fr↔1fr trick so it animates height without measuring JS. */
   .rail-group + .rail-group {
     margin-top: 0.5rem;
   }
@@ -266,15 +261,15 @@ body::before {
     align-items: center;
     justify-content: space-between;
     width: 100%;
-    border-radius: 9px;
+    border-radius: var(--radius);
     padding: 0.3rem 0.5rem 0.3rem 0.625rem;
     margin-bottom: 0.125rem;
-    color: #52525b; /* zinc-600 — ≥4.5:1 on the rail tint; matches Language label */
-    transition: color 0.18s ease, background-color 0.18s ease;
+    color: var(--muted);
+    transition: color 0.15s ease, background-color 0.15s ease;
   }
   .group-toggle:hover {
     color: var(--ink);
-    background: rgba(255, 255, 255, 0.4);
+    background: var(--surface);
   }
   .group-toggle:focus-visible {
     outline: none;
@@ -307,13 +302,13 @@ body::before {
   /* Thin, unobtrusive scrollbar for the rail's scroll region. */
   .rail-scroll {
     scrollbar-width: thin;
-    scrollbar-color: rgba(30, 41, 80, 0.22) transparent;
+    scrollbar-color: var(--border) transparent;
   }
   .rail-scroll::-webkit-scrollbar {
     width: 6px;
   }
   .rail-scroll::-webkit-scrollbar-thumb {
-    background: rgba(30, 41, 80, 0.22);
+    background: var(--border);
     border-radius: 999px;
   }
 
@@ -321,28 +316,28 @@ body::before {
   .segment {
     display: flex;
     gap: 0.25rem;
-    border-radius: 12px;
+    border-radius: var(--radius);
     padding: 0.25rem;
-    background: rgba(23, 25, 32, 0.06);
-    border: 1px solid var(--glass-border-soft);
+    background: var(--surface);
+    border: 1px solid var(--border);
   }
   .segment-btn {
     flex: 1;
-    border-radius: 9px;
+    border-radius: var(--radius);
     padding: 0.25rem 0.5rem;
     font-size: 0.75rem;
     font-weight: 600;
     color: var(--muted);
-    transition: background-color 0.18s ease, color 0.18s ease, box-shadow 0.18s ease;
+    transition: background-color 0.15s ease, color 0.15s ease;
   }
   .segment-btn:hover {
     color: var(--ink);
   }
   .segment-btn--active,
   .segment-btn--active:hover {
-    background: rgba(255, 255, 255, 0.9);
+    background: var(--paper-card);
     color: var(--ink);
-    box-shadow: 0 1px 3px rgba(30, 41, 80, 0.18);
+    box-shadow: inset 0 0 0 1px var(--border);
   }
   .segment-btn:focus-visible {
     outline: none;
@@ -352,9 +347,7 @@ body::before {
   /* ── Dense field grid (FieldForm `dense`) ───────────────────────────────
      Two-per-row for compact scalars, full row for wide widgets. Container-query
      driven: the two-column pass only turns on when the FORM itself is wide
-     enough (~19rem of inner width), so a narrow side panel self-selects a single
-     column while a roomy form card (RecordEditor) gets two. Vertical rhythm
-     stays on each FieldInput's own margin; the grid only adds the column gap. */
+     enough (~19rem of inner width). */
   .field-grid {
     container-type: inline-size;
   }
@@ -376,8 +369,8 @@ body::before {
   .skeleton {
     position: relative;
     overflow: hidden;
-    background: rgba(255, 255, 255, 0.45);
-    border-radius: 9px;
+    background: var(--surface);
+    border-radius: var(--radius);
   }
   .skeleton::after {
     content: "";
@@ -387,7 +380,7 @@ body::before {
     background: linear-gradient(
       90deg,
       transparent,
-      rgba(255, 255, 255, 0.65),
+      rgba(251, 249, 243, 0.85),
       transparent
     );
     animation: skeleton-shimmer 1.4s ease-in-out infinite;
@@ -410,19 +403,7 @@ body::before {
   opacity: 0;
 }
 
-/* @supports fallback: where backdrop-filter is unsupported, fall back to a
-   near-opaque translucent solid so surfaces stay legible. */
-@supports not ((backdrop-filter: blur(1px)) or (-webkit-backdrop-filter: blur(1px))) {
-  .glass,
-  .glass-strong,
-  .card,
-  .toolbar,
-  .rail-glass {
-    background: rgba(255, 255, 255, 0.92);
-  }
-}
-
-/* Respect prefers-reduced-motion: no crossfade, no shimmer, no springy lift. */
+/* Respect prefers-reduced-motion: no crossfade, no shimmer. */
 @media (prefers-reduced-motion: reduce) {
   .pane-enter-active,
   .pane-leave-active {
@@ -431,19 +412,7 @@ body::before {
   .skeleton::after {
     animation: none;
   }
-  .btn,
-  .nav-item {
-    transition: background-color 0.18s ease, color 0.18s ease;
-  }
-  .btn-primary:not(:disabled):hover,
-  .btn-ghost:not(:disabled):hover,
-  .btn-danger:not(:disabled):hover,
-  .nav-item:hover {
-    transform: none;
-  }
-  .group-body {
-    transition: none;
-  }
+  .group-body,
   .group-chevron {
     transition: none;
   }

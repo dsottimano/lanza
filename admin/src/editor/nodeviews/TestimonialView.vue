@@ -58,8 +58,8 @@ function onPick(e: Event) {
 .testimonial {
   margin: 1.8em 0;
   padding: 1.4rem 1.6rem;
-  border-left: 3px solid #1a1a1a;
-  background: #faf9f7;
+  border-left: 3px solid var(--ink);
+  background: var(--surface);
   border-radius: 8px;
 }
 .testimonial-quote {
@@ -68,11 +68,11 @@ function onPick(e: Event) {
   padding: 0;
   font-style: italic;
   font-size: 1.15em;
-  color: #2a2a2a;
+  color: var(--ink);
 }
 .testimonial-quote:empty::before {
   content: "Type the quote…";
-  color: #bbb;
+  color: var(--muted);
 }
 .testimonial-foot {
   display: grid;
@@ -96,9 +96,9 @@ function onPick(e: Event) {
 .avatar-add {
   display: grid;
   place-items: center;
-  border: 1px dashed #c9c9c9;
+  border: 1px dashed var(--border);
   background: #fff;
-  color: #9a9a9a;
+  color: var(--muted);
   cursor: pointer;
   font-size: 1rem;
 }
@@ -126,19 +126,19 @@ function onPick(e: Event) {
 }
 .who-input {
   font-weight: 600;
-  color: #1a1a1a;
+  color: var(--ink);
 }
 .who-input::placeholder,
 .role-input::placeholder {
-  color: #bbb;
+  color: var(--muted);
 }
 .role-input {
   font-size: 0.88rem;
-  color: #8a8a8a;
+  color: var(--muted);
 }
 .testimonial-error {
   grid-column: 1 / -1;
-  color: #c0392b;
+  color: #c1121f;
   font-size: 0.78rem;
 }
 </style>

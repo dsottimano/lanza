@@ -164,7 +164,7 @@ const fontOptions = FONT_IDS.map((id) => ({ id, label: FONT_CATALOG[id].label })
               <button
                 v-for="p in PRESETS"
                 :key="p.name"
-                class="group flex items-center gap-2 rounded-full border border-zinc-200 bg-white/70 py-1.5 pl-1.5 pr-3 text-xs font-medium text-zinc-700 transition hover:border-zinc-400"
+                class="group flex items-center gap-2 rounded-full border border-zinc-200 bg-[var(--surface)] py-1.5 pl-1.5 pr-3 text-xs font-medium text-zinc-700 transition hover:border-zinc-400"
                 @click="applyPreset(p.brand)"
               >
                 <span class="flex -space-x-1">

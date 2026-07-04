@@ -110,9 +110,6 @@ const itemActive = "nav-item--active";
 
 <template>
   <nav class="rail-glass sticky top-3 m-3 flex h-[calc(100vh-1.5rem)] w-60 flex-shrink-0 flex-col gap-3 rounded-3xl px-3 py-4">
-    <!-- Distortion layer (backdrop only) — the one place the SVG filter runs. -->
-    <div class="rail-glass__distortion" aria-hidden="true" />
-
     <div class="flex-shrink-0 px-2.5 pt-1">
       <span class="font-serif text-xl font-bold tracking-tight text-zinc-900">Lanza</span>
     </div>
@@ -256,7 +253,7 @@ const itemActive = "nav-item--active";
       </div>
     </div>
 
-    <div class="flex-shrink-0 border-t border-white/40 pt-2 flex flex-col gap-0.5">
+    <div class="flex-shrink-0 border-t border-[var(--border)] pt-2 flex flex-col gap-0.5">
       <button
         class="nav-item flex items-center gap-1.5"
         :class="{ 'nav-item--active': publishOpen }"

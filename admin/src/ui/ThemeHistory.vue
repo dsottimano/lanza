@@ -114,7 +114,7 @@ async function confirmRevert() {
 
     <p
       v-else-if="themes.length === 0"
-      class="rounded-2xl border border-dashed border-white/60 bg-white/40 px-5 py-8 text-center text-sm text-zinc-500"
+      class="rounded-2xl border border-dashed border-[var(--border)] bg-[var(--paper-card)] px-5 py-8 text-center text-sm text-zinc-500"
     >
       No themes have been applied yet.
     </p>
@@ -133,7 +133,7 @@ async function confirmRevert() {
           <p class="text-xs text-zinc-500">{{ relative(t.date) }}</p>
         </div>
         <button
-          class="shrink-0 rounded-lg border border-white/60 bg-white/50 px-3 py-1.5 text-xs font-medium text-zinc-700 transition hover:bg-white/80 disabled:opacity-50"
+          class="shrink-0 rounded-lg border border-[var(--border)] bg-[var(--paper-card)] px-3 py-1.5 text-xs font-medium text-zinc-700 transition hover:bg-[var(--surface)] disabled:opacity-50"
           :disabled="planning || reverting"
           @click="startRevert(t)"
         >

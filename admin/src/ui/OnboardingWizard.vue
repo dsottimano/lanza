@@ -85,7 +85,8 @@ async function finish() {
   }
 }
 
-const card = "rounded-xl border bg-white/50 p-4 text-left transition";
+const card =
+  "rounded-md border border-[var(--border)] bg-[var(--paper-card)] p-4 text-left transition";
 </script>
 
 <template>
@@ -98,7 +99,7 @@ const card = "rounded-xl border bg-white/50 p-4 text-left transition";
           <span
             v-for="n in 2"
             :key="n"
-            :class="['h-1.5 w-8 rounded-full', n <= step ? 'bg-zinc-900' : 'bg-zinc-200']"
+            :class="['h-1.5 w-8 rounded-full', n <= step ? 'bg-[var(--ink)]' : 'bg-[var(--border)]']"
           />
         </div>
       </div>
@@ -111,7 +112,7 @@ const card = "rounded-xl border bg-white/50 p-4 text-left transition";
             Shown in the site header. Optional — you can skip and add one later.
           </p>
           <div class="flex items-center gap-4">
-            <div class="grid size-20 place-items-center overflow-hidden rounded-xl border border-dashed border-white/60 bg-white/40">
+            <div class="grid size-20 place-items-center overflow-hidden rounded-md border border-dashed border-[var(--border)] bg-[var(--surface)]">
               <img v-if="logoPreview" :src="logoPreview" alt="Logo preview" class="max-h-full max-w-full" />
               <span v-else class="text-xs text-zinc-500">No logo</span>
             </div>
@@ -129,13 +130,13 @@ const card = "rounded-xl border bg-white/50 p-4 text-left transition";
 
           <div class="flex gap-2">
             <button
-              :class="[card, 'flex-1 text-center', !multilingual ? 'border-zinc-900 ring-4 ring-zinc-900/10' : 'border-white/50 hover:border-white/80']"
+              :class="[card, 'flex-1 text-center', !multilingual ? 'border-[var(--accent)] ring-4 ring-[color-mix(in_oklab,var(--accent)_18%,transparent)]' : 'border-[var(--border)] hover:border-[var(--ink-soft)]']"
               @click="multilingual = false"
             >
               <span class="block text-sm font-medium text-zinc-900">One language</span>
             </button>
             <button
-              :class="[card, 'flex-1 text-center', multilingual ? 'border-zinc-900 ring-4 ring-zinc-900/10' : 'border-white/50 hover:border-white/80']"
+              :class="[card, 'flex-1 text-center', multilingual ? 'border-[var(--accent)] ring-4 ring-[color-mix(in_oklab,var(--accent)_18%,transparent)]' : 'border-[var(--border)] hover:border-[var(--ink-soft)]']"
               @click="multilingual = true"
             >
               <span class="block text-sm font-medium text-zinc-900">Multiple languages</span>
@@ -164,7 +165,7 @@ const card = "rounded-xl border bg-white/50 p-4 text-left transition";
         <div class="mt-7 flex items-center justify-between">
           <button
             v-if="step > 1"
-            class="rounded-lg px-3 py-2 text-sm text-zinc-600 transition hover:bg-white/60"
+            class="rounded-md px-3 py-2 text-sm text-zinc-600 transition hover:bg-[var(--surface)]"
             :disabled="busy"
             @click="step--"
           >
