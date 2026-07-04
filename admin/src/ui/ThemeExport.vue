@@ -58,7 +58,7 @@ async function run() {
         </label>
         <label class="flex items-start gap-2 text-sm text-zinc-700">
           <input v-model="selection.content" type="checkbox" class="mt-0.5" :disabled="busy" />
-          <span><span class="font-medium">Content</span> — every post, page and entry under <code class="rounded bg-zinc-100 px-1 text-xs">frontend/content/</code>.</span>
+          <span><span class="font-medium">Content</span> — every post, page and entry under <code class="rounded bg-zinc-100 px-1 text-xs">content/</code>.</span>
         </label>
         <label class="flex items-start gap-2 text-sm text-zinc-700">
           <input v-model="selection.media" type="checkbox" class="mt-0.5" :disabled="busy" />

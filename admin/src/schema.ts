@@ -3,7 +3,7 @@
 // entirely by this.
 //
 // It is now DATA, not code: the editable model lives in
-// `frontend/data/schema.json` (read + write-committed by the CMS through the
+// `data/schema.json` (read + write-committed by the CMS through the
 // GitHub proxy — see backend/schema.ts). The JSON is imported below as the
 // build-time SEED so the CMS still boots if the runtime fetch fails, and so
 // there is no second hand-maintained copy of the model. At boot the CMS overlays
@@ -17,7 +17,7 @@
 
 import { reactive } from "vue";
 import type { Locale } from "./backend/config";
-import seed from "../../frontend/data/schema.json";
+import seed from "../../data/schema.json";
 
 export type Widget =
   | "string"
@@ -126,7 +126,7 @@ export function entryFolder(c: FolderCollection, locale: Locale): string {
 }
 
 // Repo path for a settings file in the active locale. Localized files splice the
-// locale before `.json` (frontend/data/menu.json → frontend/data/menu.es.json); shared
+// locale before `.json` (data/menu.json → data/menu.es.json); shared
 // files (appearance, redirects) keep their path.
 export function fileEntryPath(f: FileEntry, locale: Locale): string {
   return f.localized ? f.file.replace(/\.json$/, `.${locale}.json`) : f.file;

@@ -1,7 +1,7 @@
 <script setup lang="ts">
 // Settings → Blocks. Manager for reusable "My blocks" — named HTML snippets the
 // user composes here and drops into any post/page from the slash menu. Stored
-// shared (not localized) at frontend/data/blocks.json; a 404 = no blocks yet.
+// shared (not localized) at data/blocks.json; a 404 = no blocks yet.
 // Each block's content is edited in the same rich Editor the posts use.
 import { computed, onUnmounted, reactive, ref, useTemplateRef } from "vue";
 import Editor from "../editor/Editor.vue";

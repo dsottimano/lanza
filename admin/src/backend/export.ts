@@ -86,7 +86,7 @@ async function fetchBlob(sha: string): Promise<Uint8Array> {
 
 // ── file selection ───────────────────────────────────────────────────────────
 export interface ExportSelection {
-  content: boolean; // frontend/content/**
+  content: boolean; // content/**
   media: boolean; // public/images/uploads/**
 }
 

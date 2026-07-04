@@ -1,6 +1,6 @@
 <script setup lang="ts">
 // Settings → Languages. Edit the site's locale set after onboarding: which
-// languages exist + the default. Writes frontend/data/site.json (preserving the
+// languages exist + the default. Writes data/site.json (preserving the
 // onboarded flag) through the proxy, then refreshes the in-memory config so the
 // language rail updates immediately.
 import { ref, computed } from "vue";

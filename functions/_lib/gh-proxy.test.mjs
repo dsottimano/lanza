@@ -9,7 +9,7 @@ const GIT = `${REPO}/git`;
 
 test("GET: existing allowed endpoints", () => {
   assert.ok(isAllowed("GET", "user"));
-  assert.ok(isAllowed("GET", `${REPO}/contents/frontend/content/posts`));
+  assert.ok(isAllowed("GET", `${REPO}/contents/content/posts`));
   assert.ok(isAllowed("GET", `${GIT}/ref/heads/main`));
   assert.ok(isAllowed("GET", `${GIT}/commits/abc123`));
 });

@@ -4,9 +4,9 @@ import type { SlashItem } from "../editor/extensions/slash";
 
 // Reusable "My blocks": named HTML snippets the user composes in BlocksView and
 // drops into any post/page from the slash menu. Stored shared (not localized) at
-// frontend/data/blocks.json as { "blocks": [{ id, name, html }] }; a 404 on first
+// data/blocks.json as { "blocks": [{ id, name, html }] }; a 404 on first
 // load means the file doesn't exist yet → empty list.
-export const BLOCKS_PATH = "frontend/data/blocks.json";
+export const BLOCKS_PATH = "data/blocks.json";
 
 export interface Block {
   id: string;

@@ -5,7 +5,7 @@
 //
 // The live model (schema.ts COLLECTIONS) is deep-cloned into local editable
 // state on mount — nothing touches the live store until Save, which commits
-// frontend/data/schema.json AND applies the change in place (backend/schema.ts).
+// data/schema.json AND applies the change in place (backend/schema.ts).
 //
 // Scope (v1): folder collections only. The system "settings" files collection is
 // carried through untouched but never shown. Nested object.fields / list.types
@@ -127,7 +127,7 @@ function createType() {
     name,
     label: draft.label.trim(),
     labelSingular: draft.labelSingular.trim(),
-    folder: `frontend/content/${name}`,
+    folder: `content/${name}`,
     body: draft.body,
     ...(draft.localized ? { localized: true } : {}),
     fields: [{ name: "title", label: "Title", widget: "string", required: true }],
@@ -227,7 +227,7 @@ async function save() {
       <h1 class="mb-1 font-serif text-3xl font-bold tracking-tight text-zinc-900">Content types</h1>
       <p class="mb-6 text-sm text-zinc-600">
         Define the collections and fields (templates) the CMS edits. Changes commit
-        <code class="rounded bg-[var(--surface)] px-1 py-0.5 text-xs">frontend/data/schema.json</code> and take effect
+        <code class="rounded bg-[var(--surface)] px-1 py-0.5 text-xs">data/schema.json</code> and take effect
         immediately.
       </p>
 
@@ -268,7 +268,7 @@ async function save() {
             <label class="block">
               <span class="mb-1 block text-xs font-semibold text-zinc-600">Name (slug)</span>
               <input v-model="draft.name" placeholder="e.g. events" class="input font-mono" />
-              <span class="mt-1 block text-xs text-zinc-500">Lowercase letters, numbers, hyphens. Sets the folder frontend/content/{{ draft.name || "…" }}.</span>
+              <span class="mt-1 block text-xs text-zinc-500">Lowercase letters, numbers, hyphens. Sets the folder content/{{ draft.name || "…" }}.</span>
             </label>
             <p v-if="newTypeError" class="text-xs font-medium text-red-600">{{ newTypeError }}</p>
             <div class="grid gap-4 sm:grid-cols-2">

@@ -4,12 +4,12 @@ import { REPO } from "./config";
 import { setCollections, type Collection } from "../schema";
 
 // Runtime content model — the collections + fields the CMS edits, stored in the
-// repo at frontend/data/schema.json (read + write-committed through the GitHub
+// repo at data/schema.json (read + write-committed through the GitHub
 // proxy, like site.json/menu.json). The CMS loads it at boot and overlays the
 // build-time seed baked into schema.ts, so a schema change takes effect on the
 // next load without rebuilding the SPA.
 
-export const SCHEMA_PATH = "frontend/data/schema.json";
+export const SCHEMA_PATH = "data/schema.json";
 
 export const schemaState = reactive<{
   sha: string | null; // blob sha of schema.json, for in-place updates

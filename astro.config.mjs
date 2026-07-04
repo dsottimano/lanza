@@ -1,7 +1,7 @@
 import { defineConfig } from "astro/config";
 import { readFileSync } from "node:fs";
 
-// Locale set is data-driven — single source of truth is frontend/data/site.json
+// Locale set is data-driven — single source of truth is data/site.json
 // (also read by frontend/lib/i18n.ts). Read it here so Astro's i18n routing and
 // the app agree on which languages exist.
 const site = JSON.parse(

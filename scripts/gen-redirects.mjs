@@ -1,4 +1,4 @@
-// Compiles the CMS-editable frontend/data/redirects.json into Cloudflare's native
+// Compiles the CMS-editable data/redirects.json into Cloudflare's native
 // public/_redirects file. Runs before `astro build`.
 //
 // The JSON is CMS/git-edited untrusted input compiled straight into a routing

@@ -14,7 +14,7 @@ import { reportError } from "../errors";
 const props = defineProps<{ client: GitHubClient }>();
 const emit = defineEmits<{ (e: "done"): void }>();
 
-const APPEARANCE_PATH = "frontend/data/appearance.json";
+const APPEARANCE_PATH = "data/appearance.json";
 
 const step = ref(1);
 const busy = ref(false);

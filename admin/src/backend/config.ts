@@ -11,12 +11,12 @@ export const REPO = {
   productionBranch: "main",
 } as const;
 
-export const POSTS_DIR = "frontend/content/posts";
+export const POSTS_DIR = "content/posts";
 
 // A locale is its short code. The actual set is data-driven and loaded at runtime
-// from frontend/data/site.json — see backend/site.ts (`site`, loadSiteConfig).
+// from data/site.json — see backend/site.ts (`site`, loadSiteConfig).
 // Localized collections (schema `localized: true`) store one subfolder per
-// locale, e.g. frontend/content/posts/es/<slug>.md. Authors and media are shared.
+// locale, e.g. content/posts/es/<slug>.md. Authors and media are shared.
 export type Locale = string;
 
 // Media: uploaded images are committed under MEDIA.dir and served as static

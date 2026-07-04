@@ -3,12 +3,12 @@ import { GitHubError, type GitHubClient } from "./github";
 import { REPO } from "./config";
 
 // Runtime site configuration — the locale set (and onboarding state) the CMS
-// edits and stores in the repo at frontend/data/site.json, the SAME file the
+// edits and stores in the repo at data/site.json, the SAME file the
 // Astro front-end reads (frontend/lib/i18n.ts + astro.config.mjs). The CMS loads
 // it at boot through the GitHub proxy (like seo.json/menu.json), so changes the
 // onboarding wizard makes take effect on the next load without a rebuild.
 
-export const SITE_CONFIG_PATH = "frontend/data/site.json";
+export const SITE_CONFIG_PATH = "data/site.json";
 
 export interface LocaleDef {
   code: string;

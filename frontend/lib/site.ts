@@ -1,5 +1,5 @@
 // Per-locale site data (menu + SEO defaults). Each locale has its own
-// frontend/data/menu.<locale>.json and seo.<locale>.json, edited in the CMS settings
+// data/menu.<locale>.json and seo.<locale>.json, edited in the CMS settings
 // for the active language. Falls back to the default locale if one is missing.
 import { DEFAULT_LOCALE, type Locale } from "./i18n";
 
