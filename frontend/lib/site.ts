@@ -109,14 +109,14 @@ export interface SeoDefaults {
   organization: { name: string; logo: string; sameAs: string[] };
 }
 
-const menus = import.meta.glob<{ default: unknown }>("../data/menu.*.json", {
+const menus = import.meta.glob<{ default: unknown }>("/data/menu.*.json", {
   eager: true,
 });
-const seos = import.meta.glob<{ default: SeoDefaults }>("../data/seo.*.json", {
+const seos = import.meta.glob<{ default: SeoDefaults }>("/data/seo.*.json", {
   eager: true,
 });
 
-// Index a glob map ("../data/menu.es.json" → data) by the locale in the filename.
+// Index a glob map ("/data/menu.es.json" → data) by the locale in the filename.
 // Allow letters + hyphen so region codes (e.g. pt-BR) match the splitId convention.
 function byLocale<T>(map: Record<string, { default: T }>): Record<string, T> {
   const out: Record<string, T> = {};

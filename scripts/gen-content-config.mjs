@@ -27,7 +27,7 @@
 import { readFileSync, writeFileSync } from "node:fs";
 import { fileURLToPath } from "node:url";
 
-const schemaPath = fileURLToPath(new URL("../frontend/data/schema.json", import.meta.url));
+const schemaPath = fileURLToPath(new URL("../data/schema.json", import.meta.url));
 const outPath = fileURLToPath(new URL("../frontend/content.config.ts", import.meta.url));
 
 const schema = JSON.parse(readFileSync(schemaPath, "utf8"));

@@ -4,7 +4,7 @@
     "name": "posts",
     "label": "Posts",
     "labelSingular": "Post",
-    "folder": "frontend/content/posts",
+    "folder": "content/posts",
     "body": "rich",
     "localized": true,
     "thumbnail": "featuredImage",
@@ -144,7 +144,7 @@
     "name": "pages",
     "label": "Pages",
     "labelSingular": "Page",
-    "folder": "frontend/content/pages",
+    "folder": "content/pages",
     "body": "rich",
     "localized": true,
     "thumbnail": "featuredImage",
@@ -388,7 +388,7 @@
     "name": "categories",
     "label": "Categories",
     "labelSingular": "Category",
-    "folder": "frontend/content/categories",
+    "folder": "content/categories",
     "body": "none",
     "localized": true,
     "fields": [
@@ -417,7 +417,7 @@
     "name": "tags",
     "label": "Tags",
     "labelSingular": "Tag",
-    "folder": "frontend/content/tags",
+    "folder": "content/tags",
     "body": "none",
     "localized": true,
     "fields": [
@@ -439,7 +439,7 @@
     "name": "authors",
     "label": "Authors",
     "labelSingular": "Author",
-    "folder": "frontend/content/authors",
+    "folder": "content/authors",
     "body": "none",
     "thumbnail": "avatar",
     "fields": [
@@ -470,7 +470,7 @@
       {
         "name": "appearance",
         "label": "Appearance",
-        "file": "frontend/data/appearance.json",
+        "file": "data/appearance.json",
         "fields": [
           {
             "name": "theme",
@@ -498,7 +498,7 @@
       {
         "name": "seo_defaults",
         "label": "SEO defaults",
-        "file": "frontend/data/seo.json",
+        "file": "data/seo.json",
         "localized": true,
         "fields": [
           {
@@ -577,7 +577,7 @@
       {
         "name": "menu",
         "label": "Menu",
-        "file": "frontend/data/menu.json",
+        "file": "data/menu.json",
         "localized": true,
         "view": "menu",
         "fields": []
@@ -585,7 +585,7 @@
       {
         "name": "redirects",
         "label": "Redirects",
-        "file": "frontend/data/redirects.json",
+        "file": "data/redirects.json",
         "view": "redirects",
         "fields": []
       }

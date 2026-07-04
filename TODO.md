@@ -1,3 +1,18 @@
+# Lanza — `@lanza/site` extraction is the active workstream (2026-07-04, session 3)
+
+**DECIDED this session — the "rental" model + update control.** The photocopy problem
+(`/generate` clones the whole repo → tenants never get our fixes) is solved by splitting
+**content (thin tenant repo) from code (`@lanza/site` versioned npm package)**. Thread #2
+(per-tenant identity) folds into it — identity is per-tenant content. Update posture:
+**pinned + notify-only, never auto-apply** (reversed the old floating-`stable` auto-update).
+De-risked the load-bearing seam: content `base` resolves against Astro `root`, not srcDir
+(validated in astro@7.0.3 source). **Full decision-complete plan + phased build order:
+`docs/lanza-site-extraction-plan.md`.** Next action = **P0 spike** (prove `lanza build`
+end-to-end on a throwaway before touching `main`). Everything below (session 2) is still
+current context.
+
+---
+
 # Lanza — onboarding architecture handoff (2026-07-04, session 2)
 
 **The whole multi-tenant onboarding architecture is BUILT, PROVEN, and LIVE.** The

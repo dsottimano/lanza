@@ -12,7 +12,7 @@
 // `posts/es/about.md` are the same entry in two languages.
 
 import { getRelativeLocaleUrl } from "astro:i18n";
-import site from "../data/site.json";
+import site from "/data/site.json";
 
 // A locale is just its short code. The set comes from site.json, so `Locale` is
 // a string rather than a fixed union.

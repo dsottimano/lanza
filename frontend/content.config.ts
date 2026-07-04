@@ -12,7 +12,7 @@ import { z } from "astro:schema";
 import { glob } from "astro/loaders";
 
 const posts = defineCollection({
-  loader: glob({ pattern: "**/*.{md,mdx}", base: "./frontend/content/posts" }),
+  loader: glob({ pattern: "**/*.{md,mdx}", base: "./content/posts" }),
   schema: z.object({
     title: z.string(),
     seo: z.object({
@@ -40,7 +40,7 @@ const posts = defineCollection({
 });
 
 const pages = defineCollection({
-  loader: glob({ pattern: "**/*.{md,mdx}", base: "./frontend/content/pages" }),
+  loader: glob({ pattern: "**/*.{md,mdx}", base: "./content/pages" }),
   schema: z.object({
     title: z.string(),
     draft: z.boolean().default(true),
@@ -97,7 +97,7 @@ const pages = defineCollection({
 });
 
 const categories = defineCollection({
-  loader: glob({ pattern: "**/*.{md,mdx}", base: "./frontend/content/categories" }),
+  loader: glob({ pattern: "**/*.{md,mdx}", base: "./content/categories" }),
   schema: z.object({
     title: z.string(),
     description: z.string().optional(),
@@ -106,7 +106,7 @@ const categories = defineCollection({
 });
 
 const tags = defineCollection({
-  loader: glob({ pattern: "**/*.{md,mdx}", base: "./frontend/content/tags" }),
+  loader: glob({ pattern: "**/*.{md,mdx}", base: "./content/tags" }),
   schema: z.object({
     title: z.string(),
     description: z.string().optional(),
@@ -114,7 +114,7 @@ const tags = defineCollection({
 });
 
 const authors = defineCollection({
-  loader: glob({ pattern: "**/*.{md,mdx}", base: "./frontend/content/authors" }),
+  loader: glob({ pattern: "**/*.{md,mdx}", base: "./content/authors" }),
   schema: z.object({
     title: z.string(),
     bio: z.string().optional(),

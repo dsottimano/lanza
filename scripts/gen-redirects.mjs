@@ -7,7 +7,7 @@
 import { readFileSync, writeFileSync } from "node:fs";
 import { fileURLToPath } from "node:url";
 
-const dataPath = fileURLToPath(new URL("../frontend/data/redirects.json", import.meta.url));
+const dataPath = fileURLToPath(new URL("../data/redirects.json", import.meta.url));
 const outPath = fileURLToPath(new URL("../public/_redirects", import.meta.url));
 
 // The validation below is MIRRORED in admin/src/backend/redirect-rules.ts (the
