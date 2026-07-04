@@ -71,7 +71,7 @@ export const onRequest = async (context: {
     });
   }
 
-  const headers = new Headers({ Location: "/admin/" });
+  const headers = new Headers({ Location: "/admin/", "Cache-Control": "no-store" });
   headers.append("Set-Cookie", cookie(SESSION_COOKIE, token, SESSION_TTL_SEC));
   headers.append("Set-Cookie", "lanza_oauth_nonce=; Path=/admin; Max-Age=0");
   return new Response(null, { status: 302, headers });

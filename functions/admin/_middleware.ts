@@ -40,11 +40,14 @@ export const onRequest = async (context: {
   if (url.pathname.startsWith("/admin/api/")) {
     return new Response(JSON.stringify({ message: "Not authenticated." }), {
       status: 401,
-      headers: { "content-type": "application/json" },
+      headers: { "content-type": "application/json", "cache-control": "no-store" },
     });
   }
-  return Response.redirect(
-    new URL("/admin/api/auth/login", request.url).toString(),
-    302,
-  );
+  return new Response(null, {
+    status: 302,
+    headers: {
+      Location: new URL("/admin/api/auth/login", request.url).toString(),
+      "Cache-Control": "no-store",
+    },
+  });
 };

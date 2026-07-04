@@ -41,6 +41,9 @@ export const onRequest = async (context: {
     headers: {
       Location: authorize.toString(),
       "Set-Cookie": cookie("lanza_oauth_nonce", nonce, 600, "None"),
+      // Never cache: this redirect carries a one-shot state+nonce; a cached copy
+      // would replay a stale authorize request (the "worked in incognito only" bug).
+      "Cache-Control": "no-store",
     },
   });
 };
