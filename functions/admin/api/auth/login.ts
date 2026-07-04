@@ -7,6 +7,7 @@
 // The nonce cookie is SameSite=None so it survives the broker's cross-site POST
 // back to the handoff endpoint (a Lax cookie would be dropped on a cross-site POST).
 import { cookie } from "../../../_lib/session";
+import { BROKER_ORIGIN } from "../../../_lib/tenant-config";
 
 interface Env {
   GITHUB_CLIENT_ID?: string;
@@ -24,7 +25,7 @@ export const onRequest = async (context: {
     });
   }
 
-  const broker = env.BROKER_ORIGIN ?? "https://lanzacms.com";
+  const broker = env.BROKER_ORIGIN || BROKER_ORIGIN;
   const origin = new URL(request.url).origin;
   const nonce = crypto.randomUUID();
   // URL-safe base64 (swap +/ → -_) so the state survives the OAuth round-trip

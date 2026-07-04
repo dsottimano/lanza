@@ -18,6 +18,8 @@ import {
   importPublicKey,
   verifyRS256,
 } from "../../../_lib/session";
+import { HANDOFF_PUBLIC_KEY as CONFIG_PUBLIC_KEY } from "../../../_lib/tenant-config";
+import { ADMIN_LOGIN as CONFIG_ADMIN_LOGIN } from "../../../_lib/tenant-owner";
 
 interface Env {
   HANDOFF_PUBLIC_KEY?: string;
@@ -39,13 +41,16 @@ export const onRequest = async (context: {
   const nonceCookie = readCookie(request.headers.get("Cookie"), "lanza_oauth_nonce");
 
   if (!token) return new Response("Missing handoff token.", { status: 400 });
-  if (!env.HANDOFF_PUBLIC_KEY) {
+  // Env var overrides the committed config (dogfood/preview); otherwise the
+  // template-baked public key is used — no manual setup on a generated tenant.
+  const publicKey = env.HANDOFF_PUBLIC_KEY || CONFIG_PUBLIC_KEY;
+  if (!publicKey) {
     return new Response("Auth is not configured: HANDOFF_PUBLIC_KEY is missing.", {
       status: 500,
     });
   }
 
-  const key = await importPublicKey(env.HANDOFF_PUBLIC_KEY);
+  const key = await importPublicKey(publicKey);
   const payload = await verifyRS256(token, key);
   if (!payload) return new Response("Invalid handoff signature.", { status: 401 });
 
@@ -60,7 +65,7 @@ export const onRequest = async (context: {
 
   // The security boundary: only the site owner's login(s) may enter. Case-insensitive
   // and comma-list ready so extra editors can be added without a redeploy.
-  const allowed = (env.ADMIN_LOGIN ?? "")
+  const allowed = (env.ADMIN_LOGIN || CONFIG_ADMIN_LOGIN)
     .toLowerCase()
     .split(",")
     .map((s) => s.trim())

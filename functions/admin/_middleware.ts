@@ -8,6 +8,7 @@
 // unauthenticated. The session cookie is a broker-signed RS256 token, verified
 // here with the baked-in public key + bound to this site's origin (design §3.4-B).
 import { SESSION_COOKIE, verifySession, importPublicKey, readCookie } from "../_lib/session";
+import { HANDOFF_PUBLIC_KEY as CONFIG_PUBLIC_KEY } from "../_lib/tenant-config";
 
 interface Env {
   HANDOFF_PUBLIC_KEY?: string;
@@ -25,8 +26,9 @@ export const onRequest = async (context: {
   if (url.pathname.startsWith("/admin/api/auth/")) return next();
 
   let login: string | null = null;
-  if (env.HANDOFF_PUBLIC_KEY) {
-    const key = await importPublicKey(env.HANDOFF_PUBLIC_KEY);
+  const publicKey = env.HANDOFF_PUBLIC_KEY || CONFIG_PUBLIC_KEY;
+  if (publicKey) {
+    const key = await importPublicKey(publicKey);
     login = await verifySession(
       readCookie(request.headers.get("Cookie"), SESSION_COOKIE),
       key,
