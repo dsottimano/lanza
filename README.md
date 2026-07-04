@@ -58,8 +58,8 @@ build, so a bare `npm run dev` won't serve `/admin` until you've built it
 - **Media:** images upload straight to `public/images/uploads` and are served as
   static assets.
 - **SEO:** per-entry in the settings drawer; site-wide defaults under
-  *Settings → SEO defaults* (`frontend/data/seo.json`).
-- **Redirects:** *Settings → Redirects* (`frontend/data/redirects.json`), compiled to
+  *Settings → SEO defaults* (`data/seo.json`).
+- **Redirects:** *Settings → Redirects* (`data/redirects.json`), compiled to
   Cloudflare's native `public/_redirects` at build time by `scripts/gen-redirects.mjs`.
 
 See `admin/PROGRESS.md` for the build history and architecture notes.

@@ -1,7 +1,7 @@
 // Redirect-rule validation for the CMS Redirects editor.
 //
 // This MIRRORS the validation in scripts/gen-redirects.mjs (the build step that
-// compiles frontend/data/redirects.json into Cloudflare's native _redirects
+// compiles data/redirects.json into Cloudflare's native _redirects
 // file). They live in separate build roots — this is Vite/TS, that is Node ESM —
 // so the logic is duplicated on purpose, the same way frontend/lib/site.ts and
 // admin/src/ui/MenuView.vue mirror each other. If you change a rule here, change

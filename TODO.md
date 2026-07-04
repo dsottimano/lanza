@@ -1,3 +1,40 @@
+# Lanza — `@lanza/site` extraction is the active workstream (2026-07-04, session 3)
+
+**DECIDED this session — the "rental" model + update control.** The photocopy problem
+(`/generate` clones the whole repo → tenants never get our fixes) is solved by splitting
+**content (thin tenant repo) from code (`@lanza/site` versioned npm package)**. Thread #2
+(per-tenant identity) folds into it — identity is per-tenant content. Update posture:
+**pinned + notify-only, never auto-apply** (reversed the old floating-`stable` auto-update).
+De-risked the load-bearing seam: content `base` resolves against Astro `root`, not srcDir
+(validated in astro@7.0.3 source). **Full decision-complete plan + phased build order:
+`docs/lanza-site-extraction-plan.md`.**
+
+**PROGRESS (branch `feat/lanza-site-extraction-p1`, not merged):**
+- ☑ **P0 spike** — package/tenant split builds (proven).
+- ☑ **P1** — content/ + data/ moved to repo root; ~25 refs repointed (3 commits).
+- ☑ **P2** — `@lanza/site` package boundary: `lanza` CLI + config factory, public/ merge,
+  packaging (files/engines/prepack/.npmignore/.nvmrc). Validated the clean way: `npm pack`
+  → real tarball install into a fresh content-only tenant → `npm run build` → 12 pages,
+  no symlinks. Adds ZERO new deps.
+- ☑ **P3** — per-tenant identity un-hardcoded. `lanza.config.json` {owner,name}, SERVER-owned
+  (SPA sends repo-relative paths, proxy prepends via `upstreamPath`; prebuilt SPA can't
+  address another repo). Broker (separate repo) `putFile`s lanza.config.json + tenant-owner.ts
+  at creation. Verified: gh-proxy 9/9, vue-tsc, astro check, full build, broker tsc.
+
+**LEFT for a real stranger to self-serve (all beyond the painful core, now done):**
+- ☐ **P4** — thin template repo + publish `@lanza/site`; **wire functions/ to deploy from
+  the tenant repo root** (Pages compiles functions/ from root, not node_modules — copy in
+  `lanza build`, or thin re-exports). + docs (README/CLAUDE.md still say frontend/content).
+- ☐ **P5** — update UX (stable pointer + safe-revert flag + CMS "update available" banner).
+- ☐ **Broker** — App-install-on-new-repo (design §4 step 3) so the broker can mint that
+  repo's token; the current generate-via-App path needs the OAuth-creation redesign.
+- ☐ Housekeeping (from session 2): rotate screenshotted secrets, delete feat/phase1-login,
+  drop test post.
+
+Everything below (session 2) is still current context.
+
+---
+
 # Lanza — onboarding architecture handoff (2026-07-04, session 2)
 
 **The whole multi-tenant onboarding architecture is BUILT, PROVEN, and LIVE.** The

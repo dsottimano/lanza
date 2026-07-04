@@ -1,10 +1,10 @@
 // Locale model for the public site. Which languages exist is data-driven —
-// edited in the CMS and stored in frontend/data/site.json (read here and by
+// edited in the CMS and stored in data/site.json (read here and by
 // astro.config.mjs). This module derives the runtime helpers from it and defines
 // how a content `id` maps to a locale + slug.
 //
 // Storage convention: localized collections keep one subfolder per locale, e.g.
-// `frontend/content/posts/en/about.md`. The Astro glob loader turns that into
+// `content/posts/en/about.md`. The Astro glob loader turns that into
 // `id = "en/about"`, so the locale is the first path segment. Legacy flat files
 // (`posts/about.md`, no locale folder) are treated as the default locale.
 //
@@ -12,7 +12,7 @@
 // `posts/es/about.md` are the same entry in two languages.
 
 import { getRelativeLocaleUrl } from "astro:i18n";
-import site from "../data/site.json";
+import site from "/data/site.json";
 
 // A locale is just its short code. The set comes from site.json, so `Locale` is
 // a string rather than a fixed union.

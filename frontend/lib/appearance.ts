@@ -1,5 +1,5 @@
 // Brand appearance → render inputs. The CMS (Settings → Brand) writes a `brand`
-// block into frontend/data/appearance.json; Base.astro turns it into an inline
+// block into data/appearance.json; Base.astro turns it into an inline
 // `<html style>` (custom-property overrides that beat the base design tokens in
 // site.css :root), a `data-motion` flag, and a Google-Fonts <link>. Everything
 // here is pure data — no Astro/DOM — so it stays trivially testable and static-safe.

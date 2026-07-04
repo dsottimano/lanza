@@ -74,7 +74,7 @@ type Pane =
 // no token; the proxy injects it.
 const client = shallowRef(new GitHubClient());
 // Load the data-driven site config (locales) from the repo before rendering, so
-// the language rail and default locale reflect frontend/data/site.json.
+// the language rail and default locale reflect data/site.json.
 const ready = ref(false);
 // Make sure the working branch (staging) exists before the first read — a fresh
 // repo has only `main`, and reads against a missing branch 404 and masquerade as

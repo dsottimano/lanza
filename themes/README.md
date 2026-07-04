@@ -14,7 +14,7 @@ A gzipped tarball with this layout:
 theme.json            ← manifest (metadata shown in the preview)
 files/<repo-path>     ← every file the theme ships, at its real repo path
   files/frontend/styles/site.css
-  files/frontend/data/appearance.json
+  files/data/appearance.json
   …
 ```
 
@@ -52,4 +52,4 @@ extra top-level folder).
 
 - **`lanza-theme-ocean.tar.gz`** — a skin (cool blues, teal accent). Demo theme
   that proves the upload → commit → rebuild flow. Changes only
-  `frontend/data/appearance.json` and `frontend/styles/site.css`.
+  `data/appearance.json` and `frontend/styles/site.css`.

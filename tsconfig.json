@@ -1,5 +1,13 @@
 {
   "extends": "astro/tsconfigs/strict",
+  "compilerOptions": {
+    // Render code loads tenant data via root-relative imports (`/data/*.json`) —
+    // Vite resolves `/` to the project root natively; this mapping teaches tsc the
+    // same so `astro check` type-resolves them. See docs/lanza-site-extraction-plan.md.
+    "paths": {
+      "/data/*": ["./data/*"]
+    }
+  },
   "include": [".astro/types.d.ts", "**/*"],
   // admin/ is the Vue CMS — a separate package with its own tsconfig + vue-tsc
   // check; exclude it so `astro check` only validates the Astro front-end.

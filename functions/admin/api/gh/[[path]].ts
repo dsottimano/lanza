@@ -16,9 +16,11 @@ import {
   STRIP_RESPONSE_HEADERS,
   crossOriginBlocked,
   isAllowed,
-  OWNER,
-  NAME,
+  upstreamPath,
 } from "../../../_lib/gh-proxy";
+// Per-tenant repo identity — the broker writes this at repo creation; the proxy is
+// the single place that turns repo-relative CMS paths into repos/<owner>/<name>/…
+import repo from "../../../../lanza.config.json";
 import { SESSION_COOKIE, readCookie, importPublicKey, verifySession } from "../../../_lib/session";
 import { BROKER_ORIGIN as CONFIG_BROKER, HANDOFF_PUBLIC_KEY as CONFIG_PUBLIC_KEY } from "../../../_lib/tenant-config";
 
@@ -36,13 +38,13 @@ const GITHUB_API = "https://api.github.com";
 const tokenCache = new Map<string, { token: string; exp: number }>();
 
 async function brokerToken(broker: string, session: string): Promise<string | null> {
-  const key = `${OWNER}/${NAME}`;
+  const key = `${repo.owner}/${repo.name}`;
   const cached = tokenCache.get(key);
   if (cached && cached.exp > Date.now() + 60_000) return cached.token;
   const res = await fetch(`${broker}/api/token`, {
     method: "POST",
     headers: { "X-Lanza-Session": session, "Content-Type": "application/json" },
-    body: JSON.stringify({ owner: OWNER, repo: NAME }),
+    body: JSON.stringify({ owner: repo.owner, repo: repo.name }),
   });
   if (!res.ok) return null;
   const data = (await res.json()) as { token?: string; expiresAt?: string };
@@ -103,7 +105,7 @@ export const onRequest = async (context: {
     });
   }
 
-  const target = `${GITHUB_API}/${subPath}${url.search}`;
+  const target = `${GITHUB_API}/${upstreamPath(subPath, repo.owner, repo.name)}${url.search}`;
 
   const headers = new Headers();
   for (const name of FORWARD_REQUEST_HEADERS) {

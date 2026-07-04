@@ -3,8 +3,9 @@
 // needs no manual setup to log in. Env vars of the same name override them
 // (BROKER_ORIGIN / HANDOFF_PUBLIC_KEY), which the dogfood + preview sites use.
 //
-// The per-site owner login is NOT here — it lives in tenant-owner.ts, which the
-// onboarding broker overwrites per tenant at repo creation.
+// Per-tenant identity (owner/name/adminLogin) is NOT here — it lives in the repo-root
+// lanza.config.json, which the onboarding broker writes per tenant at repo creation.
+// Keeping it out of functions/ lets the whole dir ship as pure @lanza/site code.
 export const BROKER_ORIGIN = "https://lanza-broker.pages.dev";
 
 export const HANDOFF_PUBLIC_KEY =

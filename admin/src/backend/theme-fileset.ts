@@ -21,15 +21,15 @@ export const DESIGN_DIR_PREFIXES = [
 // derives content.config.ts from it at build); we ship both so a bundle carries
 // the model whether or not the target rebuilds.
 export const DESIGN_EXPLICIT_FILES = [
-  "frontend/data/schema.json",
+  "data/schema.json",
   "frontend/content.config.ts",
   "admin/src/schema.ts",
 ];
 
-// … plus the design's data defaults (top-level files in frontend/data/ only).
+// … plus the design's data defaults (top-level files in data/ only).
 // Selective on purpose: appearance/site + every seo.<locale>.json / menu.<locale>.json,
 // but NOT generated files like redirects.json.
-export const DATA_DIR = "frontend/data/";
+export const DATA_DIR = "data/";
 
 function isDesignDataFile(path: string): boolean {
   if (!path.startsWith(DATA_DIR)) return false;
@@ -52,5 +52,5 @@ export function isDesignPath(path: string): boolean {
 
 // Export options beyond the design (used by the in-browser exporter). Content and
 // media are opt-in "site dump" additions, never part of the base design bundle.
-export const CONTENT_PREFIX = "frontend/content/";
+export const CONTENT_PREFIX = "content/";
 export const MEDIA_PREFIX = "public/images/uploads/";

@@ -1,5 +1,5 @@
 <script setup lang="ts">
-// Settings → Redirects. Purpose-built editor for frontend/data/redirects.json
+// Settings → Redirects. Purpose-built editor for data/redirects.json
 // ({ redirects: [{ from, to, status }] }). At deploy, scripts/gen-redirects.mjs
 // validates this file and compiles the valid rules into Cloudflare's native
 // public/_redirects. This screen mirrors that validation live (see
@@ -23,7 +23,7 @@ import { isDirty } from "./dirty";
 const props = defineProps<{ client: GitHubClient }>();
 const emit = defineEmits<{ (e: "back"): void }>();
 
-const REDIRECTS_PATH = "frontend/data/redirects.json";
+const REDIRECTS_PATH = "data/redirects.json";
 // Cloudflare Pages' static _redirects file caps at 2,000 rules.
 const RULE_CEILING = 2000;
 

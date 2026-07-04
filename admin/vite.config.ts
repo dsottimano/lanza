@@ -3,7 +3,8 @@ import vue from "@vitejs/plugin-vue";
 import tailwindcss from "@tailwindcss/vite";
 // Shared proxy policy — same modules the prod Pages Functions use, so the
 // allowlists and CSRF checks can't drift between dev and prod.
-import { crossOriginBlocked, isAllowed } from "../functions/_lib/gh-proxy";
+import { crossOriginBlocked, isAllowed, upstreamPath } from "../functions/_lib/gh-proxy";
+import repo from "../lanza.config.json";
 import {
   isAllowed as cfIsAllowed,
   resolveProject as cfResolveProject,
@@ -70,7 +71,9 @@ function githubProxyDev(token: string | undefined): Plugin {
             return;
           }
 
-          const target = `https://api.github.com${r.url ?? ""}`;
+          // Repo-relative subPath → repos/<owner>/<name>/… (same as prod, via the
+          // shared upstreamPath); /user passes through account-scoped.
+          const target = `https://api.github.com/${upstreamPath(subPath, repo.owner, repo.name)}`;
 
           let body = "";
           if (r.method !== "GET" && r.method !== "HEAD") {

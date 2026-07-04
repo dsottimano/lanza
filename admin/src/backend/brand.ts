@@ -11,7 +11,7 @@ import type { GitHubClient } from "./github";
 import { GitHubError } from "./github";
 import { putJsonSafe } from "./site";
 
-export const APPEARANCE_PATH = "frontend/data/appearance.json";
+export const APPEARANCE_PATH = "data/appearance.json";
 
 export interface BrandColors {
   bg: string;

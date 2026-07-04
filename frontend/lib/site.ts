@@ -1,5 +1,5 @@
 // Per-locale site data (menu + SEO defaults). Each locale has its own
-// frontend/data/menu.<locale>.json and seo.<locale>.json, edited in the CMS settings
+// data/menu.<locale>.json and seo.<locale>.json, edited in the CMS settings
 // for the active language. Falls back to the default locale if one is missing.
 import { DEFAULT_LOCALE, type Locale } from "./i18n";
 
@@ -109,14 +109,14 @@ export interface SeoDefaults {
   organization: { name: string; logo: string; sameAs: string[] };
 }
 
-const menus = import.meta.glob<{ default: unknown }>("../data/menu.*.json", {
+const menus = import.meta.glob<{ default: unknown }>("/data/menu.*.json", {
   eager: true,
 });
-const seos = import.meta.glob<{ default: SeoDefaults }>("../data/seo.*.json", {
+const seos = import.meta.glob<{ default: SeoDefaults }>("/data/seo.*.json", {
   eager: true,
 });
 
-// Index a glob map ("../data/menu.es.json" → data) by the locale in the filename.
+// Index a glob map ("/data/menu.es.json" → data) by the locale in the filename.
 // Allow letters + hyphen so region codes (e.g. pt-BR) match the splitId convention.
 function byLocale<T>(map: Record<string, { default: T }>): Record<string, T> {
   const out: Record<string, T> = {};
