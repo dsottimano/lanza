@@ -3,17 +3,17 @@
 // mirrors it (admin/src/schema.ts `template` select — keep the option list in
 // sync, the house pattern for shared shapes, see frontend/lib/site.ts ↔ MenuView.vue).
 //
-// Rendering: the resolved name becomes a `tpl-<name>` class on <main> (see the
-// "templates" section of frontend/styles/site.css), and "landing" additionally
-// drops site chrome (header nav / footer nav / page title) in Base.astro +
+// Rendering: the resolved name maps (via templateClass) to a `<main>` layout class
+// defined in the "per-page layout" section of frontend/styles/site.css, and
+// "landing" additionally drops site chrome (header nav / footer nav / page title) in Base.astro +
 // PageArticle/PostArticle — structurally omitted, not display:none, so the page
 // stays clean and cacheable. Unknown/absent template = "default" (never breaks
 // old content).
 //
 // Theme extension (future, cheap): a theme ships its own templates by adding a
-// `tpl-<name>` rule in its CSS block and appending an entry here (kebab-case
-// name). No plugin system — just a class + a registry row. Names not in the
-// registry fall back to "default".
+// `main.layout-<x>` rule in its CSS block, a TEMPLATE_CLASS mapping, and an entry
+// here (kebab-case name). No plugin system — just a class + a registry row. Names
+// not in the registry fall back to "default".
 
 export interface Template {
   name: string;
@@ -58,9 +58,18 @@ export function resolveTemplate(data: { template?: string; layout?: string }): s
   return TEMPLATE_NAMES.includes(name) ? name : DEFAULT_TEMPLATE;
 }
 
+// The <main> CSS class each non-default template maps to — the classes defined in
+// the "per-page layout" section of frontend/styles/site.css. "default" has no class
+// (the normal reading column). A theme adds a template by adding a rule here + in
+// site.css and a TEMPLATE row above.
+const TEMPLATE_CLASS: Record<string, string> = {
+  "full-width": "layout-wide",
+  landing: "layout-landing",
+};
+
 /** The `<main>` class for a template, or undefined for the default (no class). */
 export function templateClass(name: string): string | undefined {
-  return name && name !== DEFAULT_TEMPLATE ? `tpl-${name}` : undefined;
+  return TEMPLATE_CLASS[name];
 }
 
 /** Landing drops site chrome (nav/footer nav/title). Used by Base + articles. */
