@@ -1,3 +1,48 @@
+# Lanza — onboarding architecture handoff (2026-07-04, session 2)
+
+**The whole multi-tenant onboarding architecture is BUILT, PROVEN, and LIVE.** The
+dogfood (`lanzacms.com`) now runs with **zero standing secrets** — login, save, and
+publish all go through the broker. Full detail in the memory file
+`lanza-cms-github-app.md`; design in `docs/onboarding-broker-design.md`.
+
+### ☑ Shipped this session (all live)
+- **Broker login** (`lanza-broker` repo → `lanza-broker.pages.dev`): one shared
+  GitHub-App callback → RS256 handoff → broker-signed session, delivered by POST form
+  (not URL). Tenant verifies with a committed public key. `lanzacms.com` cut over.
+- **Repo creation**: OAuth `public_repo` (App `Ov23liyHlbHNLEBENmgH`) → `/generate`
+  from the `dsottimano/lanza` template (public + template repo). No Administration.
+- **Self-configuring tenant**: `functions/_lib/tenant-config.ts` (BROKER_ORIGIN +
+  HANDOFF_PUBLIC_KEY, committed) + `tenant-owner.ts` (ADMIN_LOGIN, broker-written).
+- **Edit-token**: broker `POST /api/token` mints repo-scoped installation tokens
+  (Contents:write) verified by the session; tenant `gh-proxy` uses them instead of a
+  PAT. Prod `GITHUB_TOKEN` removed and save+publish confirmed live.
+
+### ☐ THREAD #2 — per-tenant identity (the ONLY thing left for real customers)
+Every CMS instance currently edits `dsottimano/lanza` because the repo is HARDCODED.
+Make it per-tenant:
+1. **Repo identity in config.** `functions/_lib/gh-proxy.ts` (`OWNER`/`NAME`) and
+   `admin/src/backend/config.ts` (`REPO`) are hardcoded to `dsottimano/lanza`. Move
+   `owner`/`name` into a single committed file both read (branches stay staging/main);
+   have the broker write it at creation like it does `tenant-owner.ts` (add a
+   `setTenantRepo`-style call in `functions/api/onboard/oauth/callback.ts`). Watch: the
+   admin SPA config is bundled at build, so each tenant's admin build must pick up its
+   own repo.
+2. **Install the App on the new repo during onboarding** (design §4 step 3, not built —
+   dogfood was installed by hand). Add an App-install redirect after repo creation so
+   the broker can mint that repo's token.
+
+### Housekeeping / notes
+- `feat/phase1-login` is merged to main — safe to delete.
+- Test post `frontend/content/posts/es/test.md` is real content now on main — delete
+  it via the CMS if unwanted (it'll show on lanzacms.com).
+- **Secrets rotation still owed** (Dave deferred): broker `OAUTH_CLIENT_SECRET`/App
+  client secret and the tenant `GITHUB_TOKEN` (now unused on prod) were pasted/screenshotted
+  — rotate. Broker private keys are already Secret type.
+- Verify scripts: `scratchpad/mint-test.ts`, `write-test.ts` (sign a session with the
+  handoff key, hit the broker) — pattern for testing broker endpoints without a browser.
+
+---
+
 # Lanza — session handoff (2026-07-04)
 
 ## ☑ Admin Freehold reskin — SHIPPED (merged to main)
