@@ -1,18 +1,10 @@
 ---
-// The home page is now CMS CONTENT, not hard-coded: it's the page with slug "home"
-// in the default locale, rendered through the exact same template pipeline as any
-// other page (PagePage → the chosen preset). Edit it in the CMS: Pages → "Inicio",
-// pick a Template, fill its slots. This is the loop — a designed page, owned by the
-// user, editable without code.
-import PagePage from "../components/PagePage.astro";
-import { DEFAULT_LOCALE, splitId } from "../lib/i18n";
-import { publishedPages } from "../lib/routing";
-
-const pages = await publishedPages();
-const home = pages.find((p) => {
-  const { locale, slug } = splitId(p.id);
-  return slug === "home" && locale === DEFAULT_LOCALE;
-});
+// The site root — the default locale's home. Rendered as CMS content (the page
+// with slug "home" in the default locale) through the shared HomeRoute, exactly
+// like the localized mirror at /<locale>/. Edit it in the CMS: Pages → "Home",
+// pick a Template, fill its slots.
+import HomeRoute from "../components/HomeRoute.astro";
+import { DEFAULT_LOCALE } from "../lib/i18n";
 ---
 
-{home && <PagePage page={home} locale={DEFAULT_LOCALE} />}
+<HomeRoute locale={DEFAULT_LOCALE} />

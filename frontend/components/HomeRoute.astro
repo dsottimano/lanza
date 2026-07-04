@@ -1,0 +1,28 @@
+---
+// A locale's homepage: render its CMS "home" page (content/pages/<locale>/home.md,
+// via the chosen template) when one exists, else fall back to the posts archive.
+// Shared by the root route (/) and the localized mirror (/es/) so both resolve the
+// home the same way — the route files differ only in which locale they pass.
+import type { CollectionEntry } from "astro:content";
+import PagePage from "./PagePage.astro";
+import HomePage from "./HomePage.astro";
+import { splitId, type Locale } from "../lib/i18n";
+import { publishedPages } from "../lib/routing";
+import { allLocaleAlternates } from "../lib/alternates";
+
+interface Props {
+  locale: Locale;
+}
+
+const { locale } = Astro.props;
+const pages = await publishedPages();
+const home = pages.find((p) => {
+  const s = splitId(p.id);
+  return s.slug === "home" && s.locale === locale;
+}) as CollectionEntry<"pages"> | undefined;
+// The home lives at the locale root ("/", "/es/"), not "/home/" — pass the correct
+// root URLs so hreflang + the switcher point at the real homepages.
+const alternates = allLocaleAlternates("");
+---
+
+{home ? <PagePage page={home} locale={locale} alternates={alternates} /> : <HomePage locale={locale} />}

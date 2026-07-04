@@ -1,6 +1,11 @@
 {
-  "defaultLocale": "es",
+  "defaultLocale": "en",
   "locales": [
+    {
+      "code": "en",
+      "label": "English",
+      "ogLocale": "en_US"
+    },
     {
       "code": "es",
       "label": "Español",

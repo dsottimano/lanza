@@ -5,16 +5,20 @@ import type { CollectionEntry } from "astro:content";
 import Base from "../layouts/Base.astro";
 import PageArticle from "./PageArticle.astro";
 import { splitId, type Locale } from "../lib/i18n";
-import { entryAlternates } from "../lib/alternates";
+import { entryAlternates, type Alternate } from "../lib/alternates";
 import { resolveTemplate } from "../lib/templates";
 
 interface Props {
   page: CollectionEntry<"pages">;
   locale: Locale;
+  // Override the auto-derived alternates. The home page renders at "/" (not
+  // "/home/"), so its caller passes the correct root URLs (see HomeRoute).
+  alternates?: Alternate[];
 }
 
 const { page, locale } = Astro.props;
-const alternates = await entryAlternates("pages", splitId(page.id).slug, "");
+const alternates =
+  Astro.props.alternates ?? (await entryAlternates("pages", splitId(page.id).slug, ""));
 const template = resolveTemplate(page.data);
 ---
 
