@@ -14,6 +14,7 @@ export const DESIGN_DIR_PREFIXES = [
   "frontend/layouts/",
   "frontend/lib/",
   "frontend/styles/",
+  "frontend/presets/",
 ];
 
 // … plus these two individual files (the content model + Astro collection config).
