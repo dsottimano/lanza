@@ -164,8 +164,19 @@ independent of the split; do it in the broker whenever.
   Cloudflare Pages deploys `functions/` from the tenant *repo root*, not node_modules
   — so the tenant template needs functions/ at root (thin re-export, or `lanza build`
   copies them out). Resolve in P3 (identity touches functions anyway) or the template step.
-- **P3 — Identity (Thread #2).** `lanza.config.json`; `gh-proxy`/`admin` read it;
-  broker writes it; App-install redirect. Verify: dogfood edits its own repo via config.
+- **P3 — Identity (Thread #2). ✅ DONE (2026-07-04).** `lanza.config.json` = `{owner,
+  name}` at tenant root. **Decided (server-owned identity):** the prebuilt SPA is
+  tenant-agnostic — it sends repo-relative paths and the proxy prepends
+  `repos/<owner>/<name>/` from lanza.config.json via `upstreamPath()`. So a prebuilt
+  SPA literally cannot address another repo (a `repos/…`-prefixed path is now rejected).
+  `gh-proxy.ts` allowlist is repo-relative + tenant-agnostic; prod handler + dev
+  middleware read the config; SPA (`github.ts`, `export.ts`) + `config.ts` drop owner/name.
+  **Broker (P3d, separate repo):** `putFile()` stamps lanza.config.json + tenant-owner.ts
+  (ADMIN_LOGIN) into the fresh repo before branching staging. Verify: gh-proxy tests 9/9,
+  admin vue-tsc, astro check (0 err — also fixed a P1 tsc gap on `/data/*`), full build,
+  broker tsc. **Remaining self-serve seams (NOT identity):** (a) functions/ must deploy
+  from the tenant repo root — P4/template; (b) App-install-on-new-repo so the broker can
+  mint that repo's token (design §4 step 3, broker redesign — dogfood was hand-installed).
 - **P4 — Publish + thin template.** Publish `@lanza/site@x`; create the thin template
   repo (content only, depends on the package); dogfood cuts over to it. Verify: dogfood
   rebuilds from the published package.
