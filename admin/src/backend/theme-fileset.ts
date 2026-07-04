@@ -17,8 +17,14 @@ export const DESIGN_DIR_PREFIXES = [
   "frontend/presets/",
 ];
 
-// … plus these two individual files (the content model + Astro collection config).
-export const DESIGN_EXPLICIT_FILES = ["frontend/content.config.ts", "admin/src/schema.ts"];
+// … plus the content model. schema.json is the source of truth (the generator
+// derives content.config.ts from it at build); we ship both so a bundle carries
+// the model whether or not the target rebuilds.
+export const DESIGN_EXPLICIT_FILES = [
+  "frontend/data/schema.json",
+  "frontend/content.config.ts",
+  "admin/src/schema.ts",
+];
 
 // … plus the design's data defaults (top-level files in frontend/data/ only).
 // Selective on purpose: appearance/site + every seo.<locale>.json / menu.<locale>.json,

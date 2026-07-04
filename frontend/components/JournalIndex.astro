@@ -1,13 +1,13 @@
 ---
 import { getCollection } from "astro:content";
 import PostCard from "./PostCard.astro";
-import { UI, type Locale } from "../lib/listings";
+import type { Locale } from "../lib/locale";
 
 interface Props {
   locale?: Locale;
 }
 const { locale = "es" } = Astro.props;
-const t = UI[locale];
+const heading = { es: "Blog", en: "Blog" }[locale];
 
 const posts = (
   await getCollection("posts", ({ data }) =>
@@ -18,8 +18,8 @@ const posts = (
 
 <main class="layout-wide">
   <header class="journal-head">
-    <span class="lp-kicker">{t.journal}</span>
-    <h1>{t.journal}</h1>
+    <span class="u-kicker">{heading}</span>
+    <h1>{heading}</h1>
   </header>
   <div class="posts-grid">
     {posts.map((p) => <PostCard post={p} />)}
@@ -28,7 +28,7 @@ const posts = (
 
 <style>
   .journal-head { margin-bottom: 2rem; padding-bottom: 1.4rem; border-bottom: 1px solid var(--border-subtle); }
-  .journal-head .lp-kicker { display: block; margin-bottom: 0.5rem; }
+  .journal-head .u-kicker { display: block; margin-bottom: 0.5rem; }
   .journal-head h1 { margin: 0; }
   .posts-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(280px, 1fr)); gap: 1.4rem; }
   @media (max-width: 560px) { .posts-grid { grid-template-columns: 1fr; } }
