@@ -1,14 +1,8 @@
 ---
 import Base from "../layouts/Base.astro";
-import Home from "../components/Home.astro";
 import Manifesto from "../components/Manifesto.astro";
-import appearance from "../data/appearance.json";
-
-// The home reflects the active theme's flagship: Freehold ships the manifesto
-// (chrome-light landing); other themes keep the La Perle demo home.
-const freehold = (appearance.theme ?? "freehold") === "freehold";
 ---
 
-<Base seo={{}} template={freehold ? "landing" : undefined}>
-  {freehold ? <Manifesto locale="es" /> : <Home locale="es" />}
+<Base seo={{}} template="landing">
+  <Manifesto locale="es" />
 </Base>

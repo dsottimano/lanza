@@ -21,11 +21,8 @@ interface Pair {
 }
 
 const PAIRS: Pair[] = [
-  { es: "/p/", en: "/en/properties/", sub: true }, // listing detail — slug matches
   { es: "/posts/", en: "/en/journal/", sub: true, collapse: true }, // post detail → journal index
-  { es: "/propiedades", en: "/en/properties" }, // properties index
   { es: "/posts", en: "/en/journal" }, // journal index
-  { es: "/encuentra", en: "/en/find" },
   { es: "/", en: "/en/" },
 ];
 
