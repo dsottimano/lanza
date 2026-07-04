@@ -9,6 +9,7 @@ import { DEFAULT_LOCALE, LOCALES, localeUrl, type Locale } from "../lib/i18n";
 import { getMenu, getSeoDefaults, resolveDevices } from "../lib/site";
 import { isLanding } from "../lib/templates";
 import { resolveBrand } from "../lib/appearance";
+import { renderChrome } from "../lib/chrome";
 
 interface Props {
   seo?: PageSeo;
@@ -39,10 +40,31 @@ const year = new Date().getFullYear();
 // The brand links home in the active locale; the default locale sits at the root.
 const homeUrl = localeUrl(locale, "");
 
-// Nav from the editable per-locale Settings → Menu. The theme uses one flat
-// header list (its responsive CSS handles layout), so we render the desktop
-// menu; URLs are authored locale-correct in menu.es.json / menu.en.json.
-const nav = resolveDevices(getMenu(locale).header).desktop;
+// Chrome data → the header/footer HTML templates (templates/chrome/*.html). Menu
+// from the editable per-locale Settings → Menu (desktop list; responsive CSS
+// handles layout). The language switcher is data too: one item per enabled locale,
+// linked to this page's alternate (or that locale's home), the active one marked.
+const menu = getMenu(locale);
+const chromeData = {
+  homeUrl,
+  siteName,
+  year,
+  showNav: !landing, // landing pages drop the nav + switcher, keeping the brand
+  headerClass: landing ? "site-header landing" : "site-header",
+  footerClass: landing ? "site-footer landing" : "site-footer",
+  menuHeader: resolveDevices(menu.header).desktop,
+  menuFooter: resolveDevices(menu.footer).desktop,
+  showSwitcher: LOCALES.length > 1,
+  locales: LOCALES.map((l, i) => ({
+    code: l.toUpperCase(),
+    url: alternates.find((a) => a.locale === l)?.url ?? localeUrl(l, ""),
+    active: l === locale,
+    inactive: l !== locale, // engine has no {{else}} — pair active/inactive #ifs
+    sep: i > 0, // render a "·" separator before every locale after the first
+  })),
+};
+const headerHtml = renderChrome("header", chromeData);
+const footerHtml = renderChrome("footer", chromeData);
 ---
 
 <!doctype html>
@@ -70,54 +92,15 @@ const nav = resolveDevices(getMenu(locale).header).desktop;
     <Seo seo={seo} article={article} locale={locale} alternates={alternates} />
   </head>
   <body>
-    <header class:list={["site-header", landing && "landing"]}>
-      <div class="bar">
-        <a class="brand" href={homeUrl} aria-label={siteName}>
-          <svg class="wordmark" viewBox="-16 24 812 232" role="img" aria-label={siteName} xmlns="http://www.w3.org/2000/svg">
-            <g fill="currentColor">
-              <path d="M 14.04,240 H 48.62 V 47.86 H 14.04 Z"/>
-              <path d="m 212.29994,95.96 h -31.72 v 19.24 c -11.96,-15.86 -26.26,-22.62 -47.06,-22.62 -42.64,0 -73.32,31.98 -73.32,75.92 0,43.42 30.42,74.88 72.54,74.88 20.28,0 34.06,-6.24 47.84,-22.1 V 240 h 31.72 z m -75.14,28.34 c 24.7,0 42.38,18.46 42.38,44.72 0,10.4 -4.16,22.36 -10.4,29.64 -7.02,8.58 -18.2,13 -31.46,13 -25.22,0 -42.64,-17.16 -42.64,-42.38 0,-26.26 17.42,-44.98 42.12,-44.98 z"/>
-              <path d="m 228.03991,240 h 34.58 v -67.86 c 0,-19.24 1.3,-27.56 5.72,-34.58 5.46,-8.58 14.3,-13.26 25.48,-13.26 9.1,0 16.12,3.12 20.8,9.1 4.68,6.24 6.76,16.9 6.76,36.14 V 240 h 34.58 v -77.22 c 0,-25.74 -2.6,-38.22 -10.4,-49.4 -9.36,-13.52 -24.96,-20.8 -44.98,-20.8 -16.64,0 -27.82,4.68 -40.56,17.16 V 95.96 h -31.98 z"/>
-              <path d="m 364.93917,240 h 109.72 v -30.94 h -68.38 l 63.44,-82.16 V 95.96 h -97.5 v 30.94 h 56.16 l -63.44,82.16 z"/>
-              <path d="m 626.63886,95.96 h -31.72 v 19.24 c -11.96,-15.86 -26.26,-22.62 -47.06,-22.62 -42.64,0 -73.32,31.98 -73.32,75.92 0,43.42 30.42,74.88 72.54,74.88 20.28,0 34.06,-6.24 47.84,-22.1 V 240 h 31.72 z m -75.14,28.34 c 24.7,0 42.38,18.46 42.38,44.72 0,10.4 -4.16,22.36 -10.4,29.64 -7.02,8.58 -18.2,13 -31.46,13 -25.22,0 -42.64,-17.16 -42.64,-42.38 0,-26.26 17.42,-44.98 42.12,-44.98 z"/>
-            </g>
-            <g class="wordmark__arrow" transform="translate(636,100) scale(1.35)" fill="none" stroke="currentColor" stroke-width="19" stroke-linecap="round" stroke-linejoin="round">
-              <path d="M20 80 L80 20"/>
-              <path d="M80 48 L80 20 L52 20"/>
-            </g>
-          </svg>
-        </a>
-        {!landing && (
-          <nav class="site-nav">
-            {nav.map((item) => <a href={item.url}>{item.label}</a>)}
-            {LOCALES.length > 1 && (
-              <span class="nav-locale">
-                {LOCALES.map((l, i) => {
-                  const url = alternates.find((a) => a.locale === l)?.url ?? localeUrl(l, "");
-                  const code = l.toUpperCase();
-                  return (
-                    <>
-                      {i > 0 && <span>·</span>}
-                      {l === locale ? (
-                        <span class="is-active">{code}</span>
-                      ) : (
-                        <a href={url}>{code}</a>
-                      )}
-                    </>
-                  );
-                })}
-              </span>
-            )}
-          </nav>
-        )}
-      </div>
-    </header>
+    {/* Site chrome — rendered from the editable HTML templates in
+        templates/chrome/*.html (see lib/chrome.ts), injected around the page slot.
+        The markup is human-editable HTML; the menu + language switcher are
+        {{#each}} loops over the data computed above. */}
+    <Fragment set:html={headerHtml} />
 
     <slot />
 
-    <footer class:list={["site-footer", landing && "landing"]}>
-      <div class="bar">© {year} {siteName}</div>
-    </footer>
+    <Fragment set:html={footerHtml} />
 
     {/* Agent surface: window.lanza read API (see public/lanza.js). Static, deferred, cached site-wide. */}
     <script src="/lanza.js" defer is:inline></script>
