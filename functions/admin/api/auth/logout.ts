@@ -6,6 +6,7 @@ export const onRequest = async (context: { request: Request }): Promise<Response
     headers: {
       Location: new URL("/admin/api/auth/login", context.request.url).toString(),
       "Set-Cookie": "lanza_session=; Path=/admin; HttpOnly; Secure; SameSite=Lax; Max-Age=0",
+      "Cache-Control": "no-store",
     },
   });
 };
