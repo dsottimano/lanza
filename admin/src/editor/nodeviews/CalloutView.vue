@@ -24,9 +24,9 @@ function changeEmoji() {
   gap: 0.75rem;
   padding: 1rem 1.1rem;
   margin: 1.4em 0;
-  background: #f6f6f4;
+  background: var(--surface);
   border-radius: 8px;
-  border: 1px solid #ececec;
+  border: 1px solid var(--border);
 }
 .callout-emoji {
   flex: 0 0 auto;

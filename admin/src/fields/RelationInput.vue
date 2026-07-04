@@ -62,7 +62,7 @@ function toggle(slug: string) {
       class="inline-flex cursor-pointer items-center rounded-full border px-3 py-1 text-sm transition"
       :class="selected.includes(s)
         ? 'border-zinc-900 bg-zinc-900 text-white'
-        : 'border-white/60 bg-white/40 text-zinc-700 hover:border-white/90'"
+        : 'border-[var(--border)] bg-[var(--surface)] text-zinc-700 hover:border-[var(--ink-soft)]'"
     >
       <input type="checkbox" class="hidden" :checked="selected.includes(s)" @change="toggle(s)" />
       {{ s }}

@@ -140,7 +140,7 @@ const panelFields = computed<Field[]>(() =>
           @change="markDirty"
         >
           <div class="card p-4">
-            <h2 class="mb-3 border-b border-white/40 pb-3 text-sm font-semibold text-zinc-900">
+            <h2 class="mb-3 border-b border-[var(--border)] pb-3 text-sm font-semibold text-zinc-900">
               {{ collection.labelSingular }} details
             </h2>
             <div v-if="loading" class="space-y-4">
@@ -167,22 +167,13 @@ const panelFields = computed<Field[]>(() =>
 </template>
 
 <style scoped>
-/* Calm paper surface for the writing canvas — near-opaque so long-form editing
-   stays comfortable and high-contrast, only a whisper of the glass system. */
+/* Flat Paper surface for the writing canvas — an opaque sheet with a hairline
+   rule, matching the site's editorial ground (no glass). */
 .editor-paper {
-  border-radius: 22px;
-  background: rgba(255, 255, 255, 0.82);
-  border: 1px solid var(--glass-border-soft);
-  box-shadow: 0 18px 50px -20px rgba(30, 41, 80, 0.28),
-    inset 0 1px 0 rgba(255, 255, 255, 0.7);
+  border-radius: var(--radius);
+  background: var(--paper-card);
+  border: 1px solid var(--border);
   padding: 2.75rem 3rem 3.5rem;
-}
-@supports ((backdrop-filter: blur(1px)) or (-webkit-backdrop-filter: blur(1px))) {
-  .editor-paper {
-    background: rgba(255, 255, 255, 0.72);
-    backdrop-filter: blur(6px);
-    -webkit-backdrop-filter: blur(6px);
-  }
 }
 @media (max-width: 640px) {
   .editor-paper {

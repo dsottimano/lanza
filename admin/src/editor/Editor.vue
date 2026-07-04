@@ -210,10 +210,10 @@ function link() {
 
 .prose :deep(.tiptap) {
   outline: none;
-  font-family: Georgia, "Times New Roman", serif;
+  font-family: var(--font-body);
   font-size: 1.25rem;
   line-height: 1.75;
-  color: #2a2a2a;
+  color: var(--ink);
 }
 .prose :deep(.tiptap > * + *) {
   margin-top: 1.1em;
@@ -247,7 +247,7 @@ function link() {
 .prose :deep(.col) {
   min-width: 0;
   padding: 0.85rem 1rem;
-  border: 1px dashed #e2e2e2;
+  border: 1px dashed var(--border);
   border-radius: 8px;
 }
 .prose :deep(.col > * + *) {
@@ -271,15 +271,15 @@ function link() {
   margin-top: 1.5em;
 }
 .prose :deep(blockquote) {
-  border-left: 3px solid #1a1a1a;
+  border-left: 3px solid var(--ink);
   margin-left: 0;
   padding-left: 1.1rem;
   font-style: italic;
-  color: #555;
+  color: var(--ink-soft);
 }
 .prose :deep(hr) {
   border: none;
-  border-top: 1px solid #e2e2e2;
+  border-top: 1px solid var(--border);
   margin: 2em 0;
 }
 /* Lists + code — re-asserted because Tailwind's preflight strips list markers
@@ -303,13 +303,13 @@ function link() {
 .prose :deep(code) {
   font-family: ui-monospace, SFMono-Regular, Menlo, monospace;
   font-size: 0.88em;
-  background: #f4f4f5;
+  background: var(--surface);
   padding: 0.1em 0.35em;
   border-radius: 4px;
 }
 .prose :deep(pre) {
-  background: #18181b;
-  color: #e4e4e7;
+  background: var(--ink);
+  color: var(--paper);
   padding: 1rem 1.1rem;
   border-radius: 10px;
   overflow-x: auto;
@@ -322,14 +322,14 @@ function link() {
   font-size: inherit;
 }
 .prose :deep(a) {
-  color: #1a1a1a;
+  color: var(--accent);
   text-decoration: underline;
   text-underline-offset: 2px;
 }
 /* Highlight — soft amber wash that reads on the light paper; mirrors the
    .post-body mark token so editing matches the published result. */
 .prose :deep(mark) {
-  background: #fdeaa8;
+  background: rgba(228, 67, 27, 0.16);
   color: inherit;
   padding: 0.05em 0.15em;
   border-radius: 3px;
@@ -341,7 +341,7 @@ function link() {
   content: attr(data-placeholder);
   float: left;
   height: 0;
-  color: #c4c4c4;
+  color: var(--muted);
   pointer-events: none;
 }
 
@@ -352,14 +352,11 @@ function link() {
   bottom: 1rem;
   z-index: 40;
   padding: 0.45rem 0.65rem;
-  border: 1px solid var(--glass-border);
-  border-radius: 11px;
-  background: var(--glass-tint-strong);
-  backdrop-filter: blur(12px) saturate(180%);
-  -webkit-backdrop-filter: blur(12px) saturate(180%);
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  background: var(--paper-card);
   color: var(--ink-soft);
-  box-shadow: var(--glass-shadow-sm);
-  font-family: ui-monospace, monospace;
+  font-family: var(--font-mono);
   cursor: pointer;
 }
 .html-panel {

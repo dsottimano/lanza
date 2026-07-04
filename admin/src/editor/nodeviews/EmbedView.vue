@@ -54,26 +54,26 @@ function apply() {
   width: 100%;
   aspect-ratio: 16 / 9;
   border-radius: 6px;
-  background: #000;
+  background: var(--ink);
 }
 .embed-input {
   display: flex;
   gap: 0.5rem;
   align-items: center;
   padding: 1rem;
-  border: 1px dashed #d0d0d0;
+  border: 1px dashed var(--border);
   border-radius: 8px;
-  background: #fafafa;
+  background: var(--surface);
 }
 .embed-label {
-  color: #8a8a8a;
+  color: var(--muted);
   font-size: 0.9rem;
   white-space: nowrap;
 }
 .embed-input input {
   flex: 1;
   padding: 0.4rem 0.6rem;
-  border: 1px solid #ddd;
+  border: 1px solid var(--border);
   border-radius: 5px;
   font: inherit;
 }
@@ -81,12 +81,12 @@ function apply() {
   padding: 0.4rem 0.8rem;
   border: none;
   border-radius: 5px;
-  background: #1a1a1a;
+  background: var(--ink);
   color: #fff;
   cursor: pointer;
 }
 .embed-error {
-  color: #c0392b;
+  color: #c1121f;
   font-size: 0.8rem;
   white-space: nowrap;
 }

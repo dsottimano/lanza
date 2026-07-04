@@ -57,7 +57,7 @@ const open = ref(props.field.collapsed !== true);
 
 <template>
   <!-- object: a collapsible group of nested fields -->
-  <fieldset v-if="field.widget === 'object'" class="mb-4 rounded-xl border border-white/50 px-3.5">
+  <fieldset v-if="field.widget === 'object'" class="mb-4 rounded-xl border border-[var(--border)] px-3.5">
     <legend
       class="flex cursor-pointer items-center gap-1.5 py-2.5 text-xs font-bold tracking-wide text-zinc-700 uppercase select-none"
       @click="open = !open"

@@ -65,9 +65,9 @@ function onPick(e: Event) {
   gap: 0.7rem;
   width: 100%;
   padding: 2.2rem 1rem;
-  border: 1px dashed #d0d0d0;
+  border: 1px dashed var(--border);
   border-radius: 10px;
-  background: #fafafa;
+  background: var(--surface);
 }
 .figure-emoji {
   font-size: 1.5rem;
@@ -82,14 +82,14 @@ function onPick(e: Event) {
   display: inline-flex;
   align-items: center;
   padding: 0.4rem 0.9rem;
-  border: 1px solid #d4d4d8;
+  border: 1px solid var(--border);
   border-radius: 8px;
   background: #fff;
-  color: #3f3f46;
+  color: var(--ink-soft);
   cursor: pointer;
 }
 .figure-btn:hover {
-  border-color: #a1a1aa;
+  border-color: var(--muted);
 }
 .figure-btn.busy {
   opacity: 0.6;
@@ -99,7 +99,7 @@ function onPick(e: Event) {
   display: none;
 }
 .figure-error {
-  color: #c0392b;
+  color: #c1121f;
   font-size: 0.78rem;
 }
 .figure-alt {
@@ -107,7 +107,7 @@ function onPick(e: Event) {
   margin-top: 0.4em;
   border: none;
   background: none;
-  color: #a1a1aa;
+  color: var(--muted);
   cursor: pointer;
   font-size: 0.78rem;
   text-decoration: underline;
@@ -118,16 +118,16 @@ function onPick(e: Event) {
   white-space: nowrap;
 }
 .figure-alt:hover {
-  color: #71717a;
+  color: var(--ink);
 }
 .figure-caption {
   margin-top: 0.6em;
   font-size: 0.9rem;
-  color: #8a8a8a;
+  color: var(--muted);
   text-align: center;
 }
 .figure-caption:empty::before {
   content: "Type a caption…";
-  color: #bbb;
+  color: var(--muted);
 }
 </style>

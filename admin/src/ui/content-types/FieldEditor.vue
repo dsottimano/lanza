@@ -105,7 +105,7 @@ function removeOption(i: number) {
 </script>
 
 <template>
-  <div class="rounded-xl border border-white/50 bg-white/40 p-3.5">
+  <div class="rounded-xl border border-[var(--border)] bg-[var(--paper-card)] p-3.5">
     <!-- row header: name + reorder + remove -->
     <div class="flex items-center gap-2">
       <input
@@ -118,7 +118,7 @@ function removeOption(i: number) {
       />
       <div class="flex flex-shrink-0 items-center gap-1">
         <button
-          class="grid size-7 place-items-center rounded-md text-zinc-400 transition enabled:hover:bg-white/60 enabled:hover:text-zinc-800 disabled:opacity-30"
+          class="grid size-7 place-items-center rounded-md text-zinc-400 transition enabled:hover:bg-[var(--surface)] enabled:hover:text-zinc-800 disabled:opacity-30"
           title="Move up"
           :disabled="!canMoveUp"
           @click="emit('moveUp')"
@@ -126,7 +126,7 @@ function removeOption(i: number) {
           ↑
         </button>
         <button
-          class="grid size-7 place-items-center rounded-md text-zinc-400 transition enabled:hover:bg-white/60 enabled:hover:text-zinc-800 disabled:opacity-30"
+          class="grid size-7 place-items-center rounded-md text-zinc-400 transition enabled:hover:bg-[var(--surface)] enabled:hover:text-zinc-800 disabled:opacity-30"
           title="Move down"
           :disabled="!canMoveDown"
           @click="emit('moveDown')"
@@ -135,7 +135,7 @@ function removeOption(i: number) {
         </button>
         <button
           v-if="!isTitle"
-          class="grid size-7 place-items-center rounded-md text-zinc-400 transition hover:bg-white/60 hover:text-red-600"
+          class="grid size-7 place-items-center rounded-md text-zinc-400 transition hover:bg-[var(--surface)] hover:text-red-600"
           title="Remove field"
           @click="emit('remove')"
         >
@@ -209,7 +209,7 @@ function removeOption(i: number) {
         <div v-for="(_, i) in field.options || []" :key="i" class="flex items-center gap-2">
           <input v-model="field.options![i]" class="input" placeholder="value" @input="emit('change')" />
           <button
-            class="grid size-8 flex-shrink-0 place-items-center rounded-md text-zinc-400 transition hover:bg-white/60 hover:text-red-600"
+            class="grid size-8 flex-shrink-0 place-items-center rounded-md text-zinc-400 transition hover:bg-[var(--surface)] hover:text-red-600"
             title="Remove option"
             @click="removeOption(i)"
           >

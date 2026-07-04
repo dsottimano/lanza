@@ -30,7 +30,7 @@ import { errorState, clearError, isAuthError } from "../errors";
 
       <div class="mt-5 flex justify-end gap-2">
         <button
-          class="rounded-lg px-4 py-2 text-sm text-zinc-600 transition hover:bg-white/60"
+          class="rounded-lg px-4 py-2 text-sm text-zinc-600 transition hover:bg-[var(--surface)]"
           @click="clearError"
         >
           Dismiss

@@ -57,13 +57,13 @@ watch(() => props.collection.name, load, { immediate: true });
 
     <!-- Layout-stable skeleton: same rounded card shell as the list, so content
          appearing doesn't reflow the page. -->
-    <ul v-if="loading" class="card divide-y divide-white/40 overflow-hidden">
+    <ul v-if="loading" class="card divide-y divide-[var(--border)] overflow-hidden">
       <li v-for="n in 5" :key="n" class="flex items-center justify-between px-4 py-3.5">
         <span class="skeleton h-3.5 w-40" />
       </li>
     </ul>
 
-    <div v-else-if="failed" class="rounded-2xl border border-dashed border-white/50 bg-white/40 py-12 text-center">
+    <div v-else-if="failed" class="rounded-2xl border border-dashed border-[var(--border)] bg-[var(--paper-card)] py-12 text-center">
       <p class="text-sm text-zinc-600">Couldn't load {{ collection.label.toLowerCase() }}.</p>
       <button class="mt-3 text-sm font-medium text-zinc-900 underline-offset-2 hover:underline" @click="load">
         Try again
@@ -72,7 +72,7 @@ watch(() => props.collection.name, load, { immediate: true });
 
     <div
       v-else-if="!entries.length"
-      class="rounded-2xl border border-dashed border-white/50 bg-white/40 py-16 text-center"
+      class="rounded-2xl border border-dashed border-[var(--border)] bg-[var(--paper-card)] py-16 text-center"
     >
       <p class="text-sm text-zinc-600">No {{ collection.label.toLowerCase() }} yet.</p>
       <button
@@ -83,10 +83,10 @@ watch(() => props.collection.name, load, { immediate: true });
       </button>
     </div>
 
-    <ul v-else class="card divide-y divide-white/40 overflow-hidden">
+    <ul v-else class="card divide-y divide-[var(--border)] overflow-hidden">
       <li v-for="e in entries" :key="e.path">
         <button
-          class="group flex w-full items-center justify-between px-4 py-3.5 text-left transition hover:bg-white/50"
+          class="group flex w-full items-center justify-between px-4 py-3.5 text-left transition hover:bg-[var(--surface)]"
           @click="emit('open', e.path)"
         >
           <span class="text-sm text-zinc-800">{{ e.name.replace(/\.md$/, "") }}</span>

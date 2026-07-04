@@ -51,20 +51,20 @@ const tocActive = "nav-item--active";
   font-weight: 700;
   letter-spacing: -0.01em;
   margin-bottom: 1rem;
-  color: #18181b;
+  color: var(--ink);
 }
 .help-prose :deep(h2) {
   font-family: ui-serif, Georgia, serif;
   font-size: 1.3rem;
   font-weight: 700;
   margin: 2rem 0 0.6rem;
-  color: #18181b;
+  color: var(--ink);
 }
 .help-prose :deep(p),
 .help-prose :deep(li) {
   font-size: 0.95rem;
   line-height: 1.7;
-  color: #3f3f46;
+  color: var(--ink-soft);
 }
 .help-prose :deep(p) {
   margin: 0.75rem 0;
@@ -84,24 +84,24 @@ const tocActive = "nav-item--active";
   margin: 0.3rem 0;
 }
 .help-prose :deep(a) {
-  color: #2563eb;
+  color: var(--accent);
   text-decoration: underline;
   text-underline-offset: 2px;
 }
 .help-prose :deep(code) {
   font-family: ui-monospace, monospace;
   font-size: 0.85em;
-  background: #f4f4f5;
+  background: var(--surface);
   padding: 0.1rem 0.35rem;
   border-radius: 0.3rem;
 }
 .help-prose :deep(strong) {
   font-weight: 700;
-  color: #18181b;
+  color: var(--ink);
 }
 .help-prose :deep(hr) {
   margin: 1.5rem 0;
   border: none;
-  border-top: 1px solid #e4e4e7;
+  border-top: 1px solid var(--border);
 }
 </style>

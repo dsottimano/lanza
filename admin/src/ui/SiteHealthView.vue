@@ -130,7 +130,7 @@ onMounted(refreshAll);
               >
                 {{ open.gh ? "Hide" : "How to fix" }}
               </button>
-              <div v-if="open.gh && githubCard.state === 'error'" class="mt-2 rounded-lg bg-white/50 p-3 text-xs text-zinc-600">
+              <div v-if="open.gh && githubCard.state === 'error'" class="mt-2 rounded-lg bg-[var(--surface)] p-3 text-xs text-zinc-600">
                 <p v-if="githubCard.authIssue">
                   The server-side <code class="rounded bg-zinc-200 px-1">GITHUB_TOKEN</code> is missing or
                   expired. Check the Pages project's secrets (Settings → Variables &amp; Secrets) and set a
@@ -162,7 +162,7 @@ onMounted(refreshAll);
               >
                 {{ open.cf ? "Hide setup steps" : "Set it up" }}
               </button>
-              <div v-if="open.cf && cfApiCard.state === 'notConfigured'" class="mt-2 rounded-lg bg-white/50 p-3 text-xs text-zinc-600">
+              <div v-if="open.cf && cfApiCard.state === 'notConfigured'" class="mt-2 rounded-lg bg-[var(--surface)] p-3 text-xs text-zinc-600">
                 <p class="mb-2">
                   Connecting Cloudflare lets this page turn storage services on and off for you. To set it up:
                 </p>
@@ -198,7 +198,7 @@ onMounted(refreshAll);
               >
                 {{ open.cf ? "Hide detail" : "Detail" }}
               </button>
-              <div v-if="open.cf && cfApiCard.state !== 'notConfigured'" class="mt-2 rounded-lg bg-white/50 p-3 text-xs">
+              <div v-if="open.cf && cfApiCard.state !== 'notConfigured'" class="mt-2 rounded-lg bg-[var(--surface)] p-3 text-xs">
                 <p class="font-mono text-[11px] text-zinc-500">{{ cfApiCard.detail }}</p>
               </div>
             </div>
@@ -232,7 +232,7 @@ onMounted(refreshAll);
               >
                 {{ open.pages ? "Hide detail" : "Detail" }}
               </button>
-              <div v-if="open.pages && pagesCard.detail" class="mt-2 rounded-lg bg-white/50 p-3 text-xs">
+              <div v-if="open.pages && pagesCard.detail" class="mt-2 rounded-lg bg-[var(--surface)] p-3 text-xs">
                 <p class="font-mono text-[11px] text-zinc-500">{{ pagesCard.detail }}</p>
               </div>
             </div>
@@ -302,7 +302,7 @@ onMounted(refreshAll);
               >
                 {{ open['svc-' + kind] ? "Hide detail" : "Detail" }}
               </button>
-              <div v-if="open['svc-' + kind]" class="mt-2 space-y-2 rounded-lg bg-white/50 p-3 text-xs text-zinc-600">
+              <div v-if="open['svc-' + kind]" class="mt-2 space-y-2 rounded-lg bg-[var(--surface)] p-3 text-xs text-zinc-600">
                 <p v-if="services[kind].state === 'connected'">
                   Binding <code class="rounded bg-zinc-200 px-1">{{ services[kind].bindingName }}</code>
                   → <span class="font-medium">{{ services[kind].resourceName }}</span>

@@ -50,12 +50,10 @@ function groupHeader(i: number): string | null {
   max-height: 19rem;
   overflow-y: auto;
   padding: 0.35rem;
-  background: var(--glass-tint-strong);
-  backdrop-filter: blur(18px) saturate(180%);
-  -webkit-backdrop-filter: blur(18px) saturate(180%);
-  border: 1px solid var(--glass-border);
-  border-radius: 14px;
-  box-shadow: var(--glass-shadow), inset 0 1px 0 rgba(255, 255, 255, 0.7);
+  background: var(--paper-card);
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  box-shadow: 0 4px 14px -8px rgba(32, 29, 27, 0.35);
 }
 .slash-empty {
   padding: 0.6rem 0.7rem;
@@ -84,7 +82,7 @@ function groupHeader(i: number): string | null {
   text-align: left;
 }
 .slash-item.active {
-  background: rgba(23, 25, 32, 0.08);
+  background: rgba(32, 29, 27, 0.08);
 }
 .slash-icon {
   flex: 0 0 1.9rem;

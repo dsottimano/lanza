@@ -1,3 +1,44 @@
+# Lanza — session handoff (2026-07-04)
+
+## ☑ Admin Freehold reskin — SHIPPED (merged to main)
+The CMS (`admin/`) now wears the default theme's identity: Ink `#201d1b` / Paper
+`#f3f1ea` monochrome, one launch accent `#e4431b`, Jost + JetBrains Mono
+(self-hosted at `admin/public/fonts/`, no CDN), sharp 2px corners, flat hairline
+surfaces. The Apple liquid-glass system is fully gone — including a ~79-utility
+`bg-white/*` glass sweep across 20 views + the first-run onboarding wizard.
+`vue-tsc --noEmit` + `vite build` pass. Landed via branch
+`feat/freehold-reskin-and-onboarding-design`.
+- ☐ **Dave:** live visual QA — `cd admin && npm run dev`.
+- ☐ **Deferred:** true admin dark mode — the admin mixes CSS vars with hardcoded
+  `text-zinc-*`/`bg-white` across ~36 files, so a dark `@media` block would break
+  contrast; needs a separate `dark:`-variant / var-ification sweep.
+
+## ◐ Onboarding broker (Model B) — DESIGN DONE + APPROVED, NOT YET CODED
+Canonical spec: **`docs/onboarding-broker-design.md`**; operator steps:
+**`docs/onboarding-runbook.md`**. Managed onboarding, owners keep their own
+GitHub + Cloudflare accounts. Decisions (all verified against live GitHub/CF docs):
+- **Login:** one shared `lanza-cms` GitHub App → callback on the broker → an
+  **asymmetric RS256 handoff** to the tenant (GitHub Apps cap at 10 callbacks, so
+  per-tenant callbacks are impossible; tenants verify with a public key → can't
+  forge for each other).
+- **Sessions:** broker-signed, public-key verified → **zero per-tenant secrets**.
+- **`ADMIN_LOGIN`** = owner login committed into the repo (public, not a secret);
+  the tenant's own `ADMIN_LOGIN` check is the security gate → no origin allowlist.
+- **Hosting:** **guided dashboard "connect repo" on Pages**. The Deploy-to-Cloudflare
+  button is **DEFERRED** — it's Workers-only, so it would force a whole Pages→Workers
+  migration to save ~one click.
+- **`@lanza/site`** thin content-repo extraction is **in v1 scope** (Dave).
+
+**BLOCKED on Dave (see runbook):** register the `lanza-cms` GitHub App + generate the
+handoff keypair. Then Phase-1 code can be written/tested on a `*.pages.dev` preview.
+
+### Build order (spec is decision-complete; each phase verifies on a preview)
+☐ **P1** auth keystone (broker login + handoff + broker-signed session) ·
+☐ **P2** repo creation (OAuth `public_repo`) · ☐ **P3** guided hosting (wizard copy
++ docs) · ☐ **P4** `@lanza/site` extraction · ☐ **P5** wizard UI on lanzacms.com.
+
+---
+
 # Lanza — Default theme redesign
 
 Redesign the **default site theme** — the base look every un-branded Lanza site

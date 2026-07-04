@@ -92,7 +92,7 @@ async function apply() {
       <!-- Upload -->
       <label
         v-else-if="!theme"
-        class="flex cursor-pointer flex-col items-center justify-center gap-2 rounded-2xl border-2 border-dashed border-white/60 bg-white/40 px-6 py-12 text-center transition hover:border-white/90"
+        class="flex cursor-pointer flex-col items-center justify-center gap-2 rounded-2xl border-2 border-dashed border-[var(--border)] bg-[var(--surface)] px-6 py-12 text-center transition hover:border-[var(--ink-soft)]"
       >
         <span class="text-3xl" aria-hidden="true">🎨</span>
         <span class="text-sm font-medium text-zinc-700">Choose a theme bundle</span>
@@ -129,7 +129,7 @@ async function apply() {
         >
           {{ showFiles ? "Hide" : "Show" }} affected files ({{ theme.files.length }})
         </button>
-        <ul v-if="showFiles" class="mt-2 max-h-48 overflow-auto rounded-lg bg-white/50 p-3 font-mono text-xs text-zinc-600">
+        <ul v-if="showFiles" class="mt-2 max-h-48 overflow-auto rounded-lg bg-[var(--surface)] p-3 font-mono text-xs text-zinc-600">
           <li v-for="f in theme.files" :key="f.path" class="truncate py-0.5">{{ f.path }}</li>
         </ul>
 
