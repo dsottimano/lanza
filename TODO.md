@@ -1,3 +1,49 @@
+# Lanza — session 4 handoff (2026-07-04): HTML-template authoring is the NEW thrust
+
+**Read first: memory `lanza-html-template-authoring.md`** — the core product vision.
+
+**State of the repo right now:**
+- **Extraction P1–P4 is DONE and MERGED to `main` LOCALLY** (main is 12 ahead of
+  origin, **NOT pushed** — Dave pushes after his own test/deploy). Broker changes are
+  committed in the separate `lanza-broker/` repo (not pushed). Deploy caveats +
+  remaining publish/template steps: see the "session 3" block below + `docs/lanza-site-extraction-plan.md`.
+- **UNCOMMITTED on `main`** = a **superseded prototype** (do not push as-is): converted
+  the home into an **Astro-component preset** — `frontend/presets/manifesto.astro` +
+  `manifesto.slots.json`, `content/pages/es/home.md` (preset:manifesto + slot data),
+  and rewired `frontend/pages/index.astro` + `[...slug].astro` (filters slug "home").
+  It PROVED the content model + render pipeline work AND that `/` can be a CMS page —
+  but the `.astro` format is the developer surface, WRONG for "the human edits the HTML".
+
+**THE DIRECTION (decided this session):**
+- Product loop: user finds a web design → agent reproduces it as HTML/CSS → **agent
+  converts HTML/CSS → a Lanza template with `{{placeholder}}` fields + post types,
+  registered in the CMS** → human just fills the fields (and can hand-edit the HTML).
+- **Template format = HTML/CSS + `{{placeholders}}`** (NOT Astro components). Templates
+  live in the **tenant repo** (`templates/`), agent-authored + human-editable, survive
+  package updates.
+- **Engine DECIDED = a minimal custom, dependency-free engine** (`{{var}}`,
+  `{{#each}}`, `{{#if}}`; per Dave's stdlib-first rule). Syntax (Handlebars-ish):
+  `{{ headline }}`, `{{#each cards}}…{{ who }}…{{/each}}`, `{{#if x}}…{{/if}}`.
+
+**NEXT ACTIONS (rebuild the prototype in the right format):**
+1. Write the engine `frontend/lib/template-render.ts` — parse `{{var}}` / `{{#each}}` /
+   `{{#if}}` → AST → render(data). Escape `{{ }}` values; expose `@index`/`@number`
+   (1-based, zero-padded) inside `#each`. (Templates are author-trusted; values escaped.)
+2. Convert the home to the format: `templates/manifesto/template.html` (Manifesto's
+   HTML/CSS with `{{placeholders}}`) + `templates/manifesto/fields.json` (the field
+   schema, = the current `.slots.json` content). Data source = the slots already in
+   `content/pages/es/home.md`.
+3. `frontend/components/HtmlTemplate.astro` — glob `/templates/*/template.html` (`?raw`),
+   run the engine with the page data, `<Fragment set:html={…}>`. Wire `index.astro` to it.
+4. Delete the `.astro` dead-end (`frontend/presets/manifesto.astro` + `.slots.json`).
+   Verify `/` renders identically via the HTML engine.
+Then the bigger pieces: tenant `templates/` home wired into the build (config factory
+glob) + CMS reads them; CMS UI (template picker + fields editor reusing `FieldInput` +
+an HTML/CSS source editor — note the admin has NO preset/slots widget today, both fall
+to a text box in `admin/src/fields/FieldInput.vue`); the agent conversion skill.
+
+---
+
 # Lanza — `@lanza/site` extraction is the active workstream (2026-07-04, session 3)
 
 **DECIDED this session — the "rental" model + update control.** The photocopy problem
