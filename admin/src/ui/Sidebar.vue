@@ -14,6 +14,7 @@ const props = defineProps<{
   activeSettings: string | null;
   languagesOpen: boolean;
   themesOpen: boolean;
+  brandOpen: boolean;
   blocksOpen: boolean;
   healthOpen: boolean;
   contentTypesOpen: boolean;
@@ -27,6 +28,7 @@ const emit = defineEmits<{
   (e: "openSettings", file: FileEntry): void;
   (e: "languages"): void;
   (e: "themes"): void;
+  (e: "brand"): void;
   (e: "blocks"): void;
   (e: "health"): void;
   (e: "contentTypes"): void;
@@ -82,6 +84,7 @@ const settingsActive = computed(
     props.activeSettings !== null ||
     props.languagesOpen ||
     props.themesOpen ||
+    props.brandOpen ||
     props.blocksOpen ||
     props.healthOpen ||
     props.contentTypesOpen,
@@ -229,6 +232,12 @@ const itemActive = "nav-item--active";
               @click="emit('blocks')"
             >
               Blocks
+            </button>
+            <button
+              :class="[item, brandOpen ? itemActive : '']"
+              @click="emit('brand')"
+            >
+              Brand
             </button>
             <button
               :class="[item, themesOpen ? itemActive : '']"

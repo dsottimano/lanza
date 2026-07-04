@@ -41,6 +41,7 @@ const SiteHealthView = lazyPane(() => import("./ui/SiteHealthView.vue"));
 const HelpView = lazyPane(() => import("./ui/HelpView.vue"));
 const LanguagesView = lazyPane(() => import("./ui/LanguagesView.vue"));
 const ThemesView = lazyPane(() => import("./ui/ThemesView.vue"));
+const BrandView = lazyPane(() => import("./ui/BrandView.vue"));
 const ContentTypesView = lazyPane(() => import("./ui/ContentTypesView.vue"));
 const PublishView = lazyPane(() => import("./ui/PublishView.vue"));
 const OnboardingWizard = lazyPane(() => import("./ui/OnboardingWizard.vue"));
@@ -63,6 +64,7 @@ type Pane =
   | "help"
   | "languages"
   | "themes"
+  | "brand"
   | "blocks"
   | "contentTypes"
   | "publish";
@@ -156,6 +158,13 @@ function openThemes() {
   pane.value = "themes";
 }
 
+function openBrand() {
+  if (!confirmDiscard()) return;
+  settingsFile.value = null;
+  editingPath.value = null;
+  pane.value = "brand";
+}
+
 function openBlocks() {
   if (!confirmDiscard()) return;
   settingsFile.value = null;
@@ -234,6 +243,7 @@ function onOnboarded() {
       "
       :languages-open="pane === 'languages'"
       :themes-open="pane === 'themes'"
+      :brand-open="pane === 'brand'"
       :blocks-open="pane === 'blocks'"
       :health-open="pane === 'health'"
       :content-types-open="pane === 'contentTypes'"
@@ -245,6 +255,7 @@ function onOnboarded() {
       @open-settings="openSettings"
       @languages="openLanguages"
       @themes="openThemes"
+      @brand="openBrand"
       @blocks="openBlocks"
       @health="openHealth"
       @content-types="openContentTypes"
@@ -298,6 +309,7 @@ function onOnboarded() {
       <SiteHealthView v-else-if="pane === 'health'" :client="client" @back="backToList" />
       <HelpView v-else-if="pane === 'help'" @back="backToList" />
       <ThemesView v-else-if="pane === 'themes'" :client="client" @back="backToList" />
+      <BrandView v-else-if="pane === 'brand'" :client="client" @back="backToList" />
       <BlocksView v-else-if="pane === 'blocks'" :client="client" @back="backToList" />
       <LanguagesView
         v-else-if="pane === 'languages'"

@@ -43,8 +43,11 @@ the Astro front-end and the CMS:
   to build the right locale routes; the CMS reads it at boot for the language rail.
   Disabled locales are excluded from the build, so removing a language genuinely
   hides it (leftover content files are ignored, not published).
-- **`frontend/data/appearance.json`** — the **theme** and optional **logo**.
-  Written by the wizard and Settings → Appearance; `Base.astro` applies them.
+- **`frontend/data/appearance.json`** — the **theme**, optional **logo**, and the
+  **brand** block (palette / corners / motion / fonts) from Settings → Brand.
+  Written by the wizard and Settings → Brand; `Base.astro` turns the brand block
+  into inline custom-property overrides (see `frontend/lib/appearance.ts`) that
+  beat the active theme's tokens.
 
 Because these are normal repo files written through the proxy, a change is just a
 commit → a rebuild → live. The **first-run wizard** is simply the UI that writes

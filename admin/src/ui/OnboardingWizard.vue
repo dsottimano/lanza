@@ -1,8 +1,9 @@
 <script setup lang="ts">
-// First-run onboarding. Three steps — logo, starter theme, languages — then
-// writes everything to the repo through the proxy: the logo asset + appearance.json
-// (theme/logo) + site.json (locale set + `onboarded: true`). Once onboarded is
-// true the CMS skips this on future loads (see App.vue / backend/site.ts).
+// First-run onboarding. Two steps — logo, languages — then writes everything to
+// the repo through the proxy: the logo asset + appearance.json (logo) + site.json
+// (locale set + `onboarded: true`). Look/feel is set later in Settings → Brand,
+// not here. Once onboarded is true the CMS skips this on future loads (see
+// App.vue / backend/site.ts).
 import { ref, computed, onBeforeUnmount } from "vue";
 import { GitHubClient } from "../backend/github";
 import { uploadImage } from "../backend/media";
@@ -14,16 +15,6 @@ const props = defineProps<{ client: GitHubClient }>();
 const emit = defineEmits<{ (e: "done"): void }>();
 
 const APPEARANCE_PATH = "frontend/data/appearance.json";
-
-// Starter themes — must match the [data-theme] blocks in frontend/styles/site.css.
-// Swatches are representative (ink / paper / accent) for the picker.
-const THEMES = [
-  { id: "freehold", name: "Freehold", desc: "Own the open web — the flagship default", swatch: ["#123128", "#f2ede1", "#a9772a"] },
-  { id: "editorial", name: "Editorial", desc: "Clean serif — a classic blog", swatch: ["#18181b", "#fafafa", "#b91c1c"] },
-  { id: "magazine", name: "Magazine", desc: "Bold, dense, editorial", swatch: ["#0a0a0a", "#f5f5f4", "#d97706"] },
-  { id: "landing", name: "Landing", desc: "Marketing one-pager", swatch: ["#0f172a", "#ffffff", "#2563eb"] },
-  { id: "classic", name: "Classic", desc: "Traditional and understated", swatch: ["#1c1917", "#fafaf9", "#15803d"] },
-];
 
 const step = ref(1);
 const busy = ref(false);
@@ -43,10 +34,7 @@ onBeforeUnmount(() => {
   if (logoPreview.value) URL.revokeObjectURL(logoPreview.value);
 });
 
-// Step 2 — theme
-const theme = ref("freehold");
-
-// Step 3 — languages
+// Step 2 — languages
 const multilingual = ref(false);
 const single = ref("en");
 const chosen = ref<string[]>(["en"]);
@@ -63,17 +51,16 @@ async function finish() {
     let logoPath = "";
     if (logoFile.value) logoPath = await uploadImage(props.client, logoFile.value);
 
-    // 2. appearance.json — merge onto whatever's there (preserve unknown keys).
-    await putJsonSafe(
-      props.client,
-      APPEARANCE_PATH,
-      (cur) => {
-        const next: Record<string, unknown> = { ...cur, theme: theme.value };
-        if (logoPath) next.logo = logoPath;
-        return next;
-      },
-      "lanza: onboarding — appearance",
-    );
+    // 2. appearance.json — record the logo (if any); the look/feel is set later
+    // in Settings → Brand. Skip the write entirely when no logo was chosen.
+    if (logoPath) {
+      await putJsonSafe(
+        props.client,
+        APPEARANCE_PATH,
+        (cur) => ({ ...cur, logo: logoPath }),
+        "lanza: onboarding — logo",
+      );
+    }
 
     // 3. site.json — the chosen locale set + onboarded flag (preserve other keys).
     const codes = multilingual.value ? chosen.value : [single.value];
@@ -109,7 +96,7 @@ const card = "rounded-xl border bg-white/50 p-4 text-left transition";
         <p class="mt-1 text-sm text-zinc-600">A few quick choices to set up your site.</p>
         <div class="mt-4 flex justify-center gap-1.5">
           <span
-            v-for="n in 3"
+            v-for="n in 2"
             :key="n"
             :class="['h-1.5 w-8 rounded-full', n <= step ? 'bg-zinc-900' : 'bg-zinc-200']"
           />
@@ -135,32 +122,7 @@ const card = "rounded-xl border bg-white/50 p-4 text-left transition";
           </div>
         </div>
 
-        <!-- Step 2 — Theme -->
-        <div v-else-if="step === 2">
-          <h2 class="text-base font-semibold text-zinc-900">Pick a starter theme</h2>
-          <p class="mt-1 mb-5 text-sm text-zinc-500">You can change this any time in Settings → Appearance.</p>
-          <div class="grid grid-cols-2 gap-3">
-            <button
-              v-for="t in THEMES"
-              :key="t.id"
-              :class="[card, theme === t.id ? 'border-zinc-900 ring-4 ring-zinc-900/10' : 'border-white/50 hover:border-white/80']"
-              @click="theme = t.id"
-            >
-              <span class="mb-2 flex gap-1">
-                <span
-                  v-for="(c, i) in t.swatch"
-                  :key="i"
-                  class="size-5 rounded-full border border-black/5"
-                  :style="{ backgroundColor: c }"
-                />
-              </span>
-              <span class="block text-sm font-medium text-zinc-900">{{ t.name }}</span>
-              <span class="block text-xs text-zinc-500">{{ t.desc }}</span>
-            </button>
-          </div>
-        </div>
-
-        <!-- Step 3 — Languages -->
+        <!-- Step 2 — Languages -->
         <div v-else>
           <h2 class="text-base font-semibold text-zinc-900">Languages</h2>
           <p class="mt-1 mb-5 text-sm text-zinc-500">Is this site in one language or several?</p>
@@ -210,7 +172,7 @@ const card = "rounded-xl border bg-white/50 p-4 text-left transition";
           </button>
           <span v-else />
 
-          <button v-if="step < 3" class="btn btn-primary px-5" @click="step++">
+          <button v-if="step < 2" class="btn btn-primary px-5" @click="step++">
             {{ step === 1 && !logoFile ? "Skip" : "Continue" }}
           </button>
           <button
