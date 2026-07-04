@@ -90,26 +90,28 @@ export function previewFontHref(fonts: { heading: string; body: string }): strin
 // The base design's brand values — the Freehold look baked into site.css :root.
 // When a site has no `brand` block yet, the editor opens pre-filled with this,
 // so the first save is a visual no-op and every field starts somewhere sensible.
-// Mirrors the :root token block in frontend/styles/site.css (motion "off" =
-// the un-branded default render).
+// Mirrors the :root token block in frontend/styles/site.css: the wordmark
+// identity — Ink #201d1b on Paper #f3f1ea, Jost, sharp corners, one hot launch
+// accent (#e4431b). "reset to defaults" now lands on this base look.
 export const LANZA_DEFAULTS: BrandConfig = {
-  colors: { bg: "#f2ede1", surface: "#ebe4d3", ink: "#17241f", muted: "#5f6d63", accent: "#123128", border: "#ddd6c5" },
+  colors: { bg: "#f3f1ea", surface: "#eae7dd", ink: "#201d1b", muted: "#6b655e", accent: "#e4431b", border: "#ddd8cc" },
   radius: "2px",
-  motion: "off",
-  fonts: { heading: "fraunces", body: "space-grotesk" },
+  motion: "on",
+  fonts: { heading: "jost", body: "jost" },
 };
 
 export function defaultBrand(): BrandConfig {
   return structuredClone(LANZA_DEFAULTS);
 }
 
-// One-click palettes. The first IS the Lanza wordmark — Ink #201D1B on Paper
-// #F3F1EA, monochrome, geometric-sans, sharp corners (see /home/…/lanza-brand).
+// One-click palettes. The first IS the Lanza wordmark and now equals the base
+// (LANZA_DEFAULTS) — Ink #201d1b on Paper #f3f1ea, Jost, sharp corners, the hot
+// launch accent #e4431b (the ↗ arrow); see /home/…/lanza-brand.
 export const PRESETS: { name: string; brand: BrandConfig }[] = [
   {
     name: "Lanza brand",
     brand: {
-      colors: { bg: "#f3f1ea", surface: "#eae7dd", ink: "#201d1b", muted: "#6b655e", accent: "#201d1b", border: "#ddd8cc" },
+      colors: { bg: "#f3f1ea", surface: "#eae7dd", ink: "#201d1b", muted: "#6b655e", accent: "#e4431b", border: "#ddd8cc" },
       radius: "2px",
       motion: "on",
       fonts: { heading: "jost", body: "jost" },

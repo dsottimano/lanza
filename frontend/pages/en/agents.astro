@@ -1,0 +1,16 @@
+---
+import Base from "../../layouts/Base.astro";
+import Agents from "../../components/Agents.astro";
+---
+
+<Base
+  locale="en"
+  template="landing"
+  seo={{
+    title: "For agents",
+    description:
+      "The contract for AI agents: how to read a Lanza site (/llms.txt + window.lanza) and how to edit one (the Git repo + schema.ts). No database, no proprietary API.",
+  }}
+>
+  <Agents locale="en" />
+</Base>

@@ -1,0 +1,167 @@
+---
+// /agents — the contract for AI agents. Lanza treats agents as first-class
+// visitors AND first-class editors: this page states, in the dev/agent register,
+// how to read a Lanza site (the /llms.txt index + the window.lanza runtime) and
+// how to operate one on a human's behalf (the repo + schema.ts content model).
+// Points to the existing /llms.txt generator rather than duplicating it.
+// Bilingual. Static + cacheable. Rendered by pages/agents.astro + en mirror.
+import type { Locale } from "../lib/i18n";
+
+interface Props {
+  locale?: Locale;
+}
+const { locale = "es" } = Astro.props;
+const isEn = locale === "en";
+const base = isEn ? "/en" : "";
+
+const es = {
+  tag: "PARA AGENTES · CONTRATO",
+  headline: "Un sitio hecho para que lo maneje una IA.",
+  sub: "Lanza trata a los agentes como visitantes y como editores de primera clase. Si usted es un agente operando en nombre de un humano, esto es lo que puede leer y cómo puede editar.",
+  readEyebrow: "Leer el sitio",
+  read: [
+    ["/llms.txt", "El índice de descubrimiento: título, descripción y cada post y página con su URL. Como robots.txt, pero para LLMs.", "/llms.txt"],
+    ["window.lanza", "En el contexto JS de cualquier página, un objeto de solo lectura. Llame a lanza.help() para ver los métodos: page, toc(), content(), site.", null],
+    ["Datos estructurados", "Cada página lleva JSON-LD (Article/WebPage) y metadatos Open Graph. Hechos legibles por máquina, sin scraping frágil.", null],
+  ],
+  editEyebrow: "Editar el sitio",
+  editHead: "El contenido es un repositorio de Git que puede manejar.",
+  editBody: "No hay base de datos ni API propietaria. El contenido son archivos Markdown/HTML en un repositorio de GitHub. El modelo de contenido — qué colecciones existen, sus campos y dónde viven los archivos — está declarado en admin/src/schema.ts. Para hacer un cambio: lea el esquema, edite los archivos correctos, haga un commit. Cloudflare Pages reconstruye y publica.",
+  editSteps: [
+    ["read", "schema.ts", "Descubra las colecciones, los campos y las rutas de carpeta."],
+    ["write", ".md / .html", "Edite o cree entradas conforme al esquema. draft: true las oculta."],
+    ["commit", "git push", "Guarde el cambio. El build estático hace el resto."],
+  ],
+  linkHow: "Ver la cadena completa en Cómo funciona",
+  note: "Código abierto. El mismo modelo de contenido es suyo para conectar su propio agente.",
+};
+
+const en = {
+  tag: "FOR AGENTS · THE CONTRACT",
+  headline: "A site built to be driven by an AI.",
+  sub: "Lanza treats agents as first-class visitors and first-class editors. If you're an agent acting on a human's behalf, here's what you can read and how you can edit.",
+  readEyebrow: "Reading the site",
+  read: [
+    ["/llms.txt", "The discovery index: title, description, and every post and page with its URL. Like robots.txt, but for LLMs.", "/llms.txt"],
+    ["window.lanza", "In any page's JS context, a read-only object. Call lanza.help() for the methods: page, toc(), content(), site.", null],
+    ["Structured data", "Every page ships JSON-LD (Article/WebPage) and Open Graph metadata. Machine-readable facts, no brittle scraping.", null],
+  ],
+  editEyebrow: "Editing the site",
+  editHead: "The content is a Git repository you can drive.",
+  editBody: "There's no database and no proprietary API. Content is Markdown/HTML files in a GitHub repository. The content model — which collections exist, their fields, and where files live — is declared in admin/src/schema.ts. To make a change: read the schema, edit the right files, commit. Cloudflare Pages rebuilds and publishes.",
+  editSteps: [
+    ["read", "schema.ts", "Discover the collections, their fields, and folder paths."],
+    ["write", ".md / .html", "Edit or create entries that match the schema. draft: true hides them."],
+    ["commit", "git push", "Save the change. The static build does the rest."],
+  ],
+  linkHow: "See the full chain on How it works",
+  note: "Open source. The same content model is yours to point your own agent at.",
+};
+
+const t = isEn ? en : es;
+---
+
+<div class="ag">
+  <header class="ag-head">
+    <span class="ag-tag">{t.tag}</span>
+    <h1 class="ag-headline">{t.headline}</h1>
+    <p class="ag-sub">{t.sub}</p>
+  </header>
+
+  <!-- reading the site -->
+  <section class="ag-band ag-band--paper">
+    <div class="ag-wrap">
+      <span class="ag-eyebrow">{t.readEyebrow}</span>
+      <div class="ag-cards">
+        {t.read.map(([name, body, href]) => (
+          <div class="ag-card">
+            {href
+              ? <a class="ag-card__name ag-card__name--link" href={href as string}>{name}<span class="ag-arrow" aria-hidden="true">↗</span></a>
+              : <code class="ag-card__name">{name}</code>}
+            <p class="ag-card__body">{body}</p>
+          </div>
+        ))}
+      </div>
+    </div>
+  </section>
+
+  <!-- editing the site -->
+  <section class="ag-band ag-band--ink">
+    <div class="ag-wrap">
+      <span class="ag-eyebrow ag-eyebrow--onInk">{t.editEyebrow}</span>
+      <h2 class="ag-h2">{t.editHead}</h2>
+      <p class="ag-lede">{t.editBody}</p>
+      <ol class="ag-flow">
+        {t.editSteps.map(([verb, target, body]) => (
+          <li class="ag-flow__step">
+            <code class="ag-flow__verb">{verb}<span class="ag-flow__target">{target}</span></code>
+            <p class="ag-flow__body">{body}</p>
+          </li>
+        ))}
+      </ol>
+      <a class="ag-link" href={`${base}/how-it-works`}>{t.linkHow}<span class="ag-arrow" aria-hidden="true">↗</span></a>
+      <p class="ag-note">{t.note}</p>
+    </div>
+  </section>
+</div>
+
+<style>
+  .ag { color: var(--ink); font-family: var(--font-ui); }
+  .ag-wrap { max-width: var(--wide); margin: 0 auto; padding: 0 1.5rem; }
+  .ag-band { padding: clamp(3rem, 7vw, 5.5rem) 0; }
+  .ag-band--paper { background: var(--paper); }
+  .ag-band--ink { background: var(--ink-deep); color: #f3f1ea; }
+
+  .ag-head { max-width: var(--wide); margin: 0 auto; padding: clamp(3rem, 7vw, 5.5rem) 1.5rem clamp(1rem, 3vw, 2rem); }
+  .ag-tag {
+    display: inline-block;
+    font-family: var(--font-mono);
+    font-size: 0.7rem;
+    letter-spacing: 0.22em;
+    color: var(--accent);
+    padding-bottom: 0.9rem;
+    margin-bottom: 1.4rem;
+    border-bottom: 1px solid var(--rule);
+  }
+  .ag-headline {
+    font-family: var(--font-heading);
+    font-weight: 600;
+    font-size: clamp(2.4rem, 5.4vw, 4.2rem);
+    line-height: 1.02;
+    letter-spacing: -0.03em;
+    margin: 0 0 1.2rem;
+    max-width: 18ch;
+    text-wrap: balance;
+  }
+  .ag-sub { font-size: 1.16rem; line-height: 1.65; color: var(--text-secondary); max-width: 56ch; margin: 0; }
+
+  .ag-eyebrow { display: inline-block; font-family: var(--font-mono); font-size: 0.7rem; letter-spacing: 0.22em; text-transform: uppercase; color: var(--accent); margin-bottom: 1.4rem; }
+  .ag-eyebrow--onInk { color: var(--accent-bright); }
+  .ag-h2 { font-family: var(--font-heading); font-weight: 600; font-size: clamp(1.8rem, 4vw, 2.8rem); line-height: 1.06; letter-spacing: -0.02em; color: #fff; margin: 0 0 1.2rem; max-width: 22ch; }
+  .ag-lede { font-size: 1.1rem; line-height: 1.7; color: #b8b2a6; max-width: 66ch; margin: 0 0 2rem; }
+
+  /* read cards */
+  .ag-cards { display: grid; grid-template-columns: repeat(3, 1fr); gap: 1rem; }
+  .ag-card { border: 1px solid var(--rule); border-radius: var(--radius); background: var(--paper-card); padding: 1.5rem 1.5rem; }
+  .ag-card__name { display: inline-block; font-family: var(--font-mono); font-size: 0.9rem; color: var(--accent); background: color-mix(in srgb, var(--accent) 8%, transparent); padding: 0.25rem 0.55rem; border-radius: 2px; margin-bottom: 0.9rem; text-decoration: none; }
+  .ag-card__name--link:hover { background: color-mix(in srgb, var(--accent) 16%, transparent); }
+  .ag-card__body { font-size: 0.96rem; line-height: 1.6; color: var(--text-secondary); margin: 0; }
+
+  /* edit flow */
+  .ag-flow { list-style: none; margin: 0 0 2rem; padding: 0; display: grid; grid-template-columns: repeat(3, 1fr); gap: 1rem; counter-reset: none; }
+  .ag-flow__step { border-left: 3px solid var(--accent); padding: 0.2rem 0 0.2rem 1.1rem; }
+  .ag-flow__verb { display: block; font-family: var(--font-mono); font-size: 0.9rem; color: var(--accent-bright); margin-bottom: 0.6rem; }
+  .ag-flow__target { color: #f3f1ea; margin-left: 0.5rem; }
+  .ag-flow__body { font-size: 0.92rem; line-height: 1.55; color: #a8a199; margin: 0; }
+
+  .ag-link { display: inline-block; font-family: var(--font-mono); font-size: 0.76rem; letter-spacing: 0.1em; text-transform: uppercase; color: var(--accent-bright); text-decoration: none; }
+  .ag-note { font-family: var(--font-mono); font-size: 0.74rem; line-height: 1.6; color: #7c766e; margin: 1.6rem 0 0; }
+
+  .ag-arrow { display: inline-block; margin-left: 0.35em; transition: transform 160ms ease; }
+  .ag-card__name--link:hover .ag-arrow, .ag-link:hover .ag-arrow { transform: translate(2px, -2px); }
+  .ag a:focus-visible { outline: 2px solid var(--accent); outline-offset: 3px; }
+
+  @media (max-width: 780px) {
+    .ag-cards, .ag-flow { grid-template-columns: 1fr; }
+  }
+</style>

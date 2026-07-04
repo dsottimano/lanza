@@ -1,0 +1,16 @@
+---
+import Base from "../layouts/Base.astro";
+import HowItWorks from "../components/HowItWorks.astro";
+---
+
+<Base
+  locale="es"
+  template="landing"
+  seo={{
+    title: "Cómo funciona",
+    description:
+      "La vida de un cambio, de principio a fin: usted lo pide, un agente edita su repositorio, GitHub lo guarda y Cloudflare lo sirve. Sin base de datos, sin servidor, sin ataduras.",
+  }}
+>
+  <HowItWorks locale="es" />
+</Base>

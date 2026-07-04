@@ -1,0 +1,259 @@
+---
+// /start — the normie onboarding. Warm, hand-holding, honest: what you need,
+// the four real steps, what it costs (a domain is the only bill), and how long
+// it takes. No jargon. Ends on the real create-your-site action (lanzacms.com).
+// Bilingual. Pure CSS/type, static + cacheable. Rendered by pages/start.astro
+// + en mirror.
+import type { Locale } from "../lib/i18n";
+
+interface Props {
+  locale?: Locale;
+}
+const { locale = "es" } = Astro.props;
+const isEn = locale === "en";
+const base = isEn ? "/en" : "";
+const startUrl = "https://lanzacms.com/";
+
+const es = {
+  tag: "EMPEZAR · SIN CÓDIGO",
+  headline: "De cero a un sitio en vivo en unos 30 minutos.",
+  sub: "Sin programar, sin tarjeta de crédito para empezar. Si sabe describir lo que quiere, sabe usar Lanza. Esto es lo que hay que hacer.",
+  needEyebrow: "Lo que necesita",
+  needs: [
+    ["Una cuenta de GitHub", "Gratis. Guarda los archivos de su sitio — suyos, siempre."],
+    ["Unos 30 minutos", "Diez para registrarse, veinte para su primera página."],
+    ["~$12 al año (opcional)", "Solo si quiere su propio dominio. Puede empezar gratis y añadirlo después."],
+  ],
+  stepsEyebrow: "Los cuatro pasos",
+  steps: [
+    ["Entre con GitHub", "Lanza crea el repositorio de su sitio — su propia copia de los archivos. Un clic y ya es dueño."],
+    ["Elija su dirección", "Empiece gratis en un subdominio, o conecte su propio dominio (~$12/año) cuando esté listo."],
+    ["Diga qué quiere", "Escriba su primera página, o dígale al agente qué debe decir su sitio. En sus palabras, en su idioma."],
+    ["Publique", "Su sitio queda en vivo en la web abierta. Google lo encuentra en un día. Listo."],
+  ],
+  costEyebrow: "Lo que cuesta, en claro",
+  costHead: "El único gasto es su dominio.",
+  costRows: [
+    ["GitHub", "guarda su sitio", "$0"],
+    ["Cloudflare", "lo aloja y lo sirve", "$0"],
+    ["Dominio (opcional)", "su-nombre.com", "~$12/año"],
+    ["Total para empezar", "", "$0"],
+  ],
+  reassure: "Sin ataduras: si algún día se va, se lleva cada archivo. El sitio siempre fue suyo.",
+  ctaHead: "¿Listo?",
+  ctaSub: "Cree su sitio ahora — es gratis para empezar.",
+  cta: "Crear mi sitio",
+  learn: "Ver cómo funciona por dentro",
+};
+
+const en = {
+  tag: "GET STARTED · NO CODE",
+  headline: "Zero to a live site in about 30 minutes.",
+  sub: "No coding, no credit card to start. If you can describe what you want, you can use Lanza. Here's what it takes.",
+  needEyebrow: "What you need",
+  needs: [
+    ["A GitHub account", "Free. It holds your site's files — yours, always."],
+    ["About 30 minutes", "Ten to sign up, twenty for your first page."],
+    ["~$12 a year (optional)", "Only if you want your own domain. You can start free and add it later."],
+  ],
+  stepsEyebrow: "The four steps",
+  steps: [
+    ["Sign in with GitHub", "Lanza creates your site's repository — your own copy of the files. One click and you own it."],
+    ["Pick your address", "Start free on a subdomain, or connect your own domain (~$12/yr) whenever you're ready."],
+    ["Say what you want", "Write your first page, or tell the agent what your site should say. In your words, in your language."],
+    ["Publish", "Your site goes live on the open web. Google finds it within a day. That's it."],
+  ],
+  costEyebrow: "What it costs, in plain numbers",
+  costHead: "The only expense is your domain.",
+  costRows: [
+    ["GitHub", "holds your site", "$0"],
+    ["Cloudflare", "hosts and serves it", "$0"],
+    ["Domain (optional)", "your-name.com", "~$12/yr"],
+    ["Total to start", "", "$0"],
+  ],
+  reassure: "No lock-in: if you ever leave, you take every file. The site was always yours.",
+  ctaHead: "Ready?",
+  ctaSub: "Create your site now — it's free to start.",
+  cta: "Create my site",
+  learn: "See how it works under the hood",
+};
+
+const t = isEn ? en : es;
+---
+
+<div class="st">
+  <header class="st-head">
+    <span class="st-tag">{t.tag}</span>
+    <h1 class="st-headline">{t.headline}</h1>
+    <p class="st-sub">{t.sub}</p>
+  </header>
+
+  <!-- what you need -->
+  <section class="st-band st-band--paper">
+    <div class="st-wrap">
+      <span class="st-eyebrow">{t.needEyebrow}</span>
+      <div class="st-needs">
+        {t.needs.map(([h, b]) => (
+          <div class="st-need">
+            <h2 class="st-need__h">{h}</h2>
+            <p class="st-need__b">{b}</p>
+          </div>
+        ))}
+      </div>
+    </div>
+  </section>
+
+  <!-- the four steps -->
+  <section class="st-band st-band--surface">
+    <div class="st-wrap">
+      <span class="st-eyebrow">{t.stepsEyebrow}</span>
+      <ol class="st-steps">
+        {t.steps.map(([h, b], i) => (
+          <li class="st-step">
+            <span class="st-step__n">{i + 1}</span>
+            <div class="st-step__c">
+              <h2 class="st-step__h">{h}</h2>
+              <p class="st-step__b">{b}</p>
+            </div>
+          </li>
+        ))}
+      </ol>
+    </div>
+  </section>
+
+  <!-- costs, in plain numbers -->
+  <section class="st-band st-band--paper">
+    <div class="st-wrap st-wrap--narrow">
+      <span class="st-eyebrow">{t.costEyebrow}</span>
+      <h2 class="st-h2">{t.costHead}</h2>
+      <div class="st-cost">
+        {t.costRows.map(([a, b, c], i) => (
+          <div class:list={["st-cost__row", i === t.costRows.length - 1 && "st-cost__row--total"]}>
+            <span class="st-cost__a">{a}</span>
+            <span class="st-cost__b">{b}</span>
+            <span class="st-cost__c">{c}</span>
+          </div>
+        ))}
+      </div>
+      <p class="st-reassure">{t.reassure}</p>
+    </div>
+  </section>
+
+  <!-- cta -->
+  <section class="st-band st-band--ink st-cta">
+    <div class="st-wrap st-wrap--narrow">
+      <h2 class="st-cta__head">{t.ctaHead}</h2>
+      <p class="st-cta__sub">{t.ctaSub}</p>
+      <a class="st-btn" href={startUrl}>{t.cta}<span class="st-arrow" aria-hidden="true">↗</span></a>
+      <a class="st-learn" href={`${base}/how-it-works`}>{t.learn}</a>
+    </div>
+  </section>
+</div>
+
+<style>
+  .st { color: var(--ink); font-family: var(--font-ui); }
+  .st-wrap { max-width: var(--wide); margin: 0 auto; padding: 0 1.5rem; }
+  .st-wrap--narrow { max-width: 54rem; }
+  .st-band { padding: clamp(3rem, 7vw, 5.5rem) 0; }
+  .st-band--paper { background: var(--paper); }
+  .st-band--surface { background: var(--surface); }
+  .st-band--ink { background: var(--ink-deep); color: #f3f1ea; }
+
+  .st-head { max-width: var(--wide); margin: 0 auto; padding: clamp(3rem, 7vw, 5.5rem) 1.5rem clamp(1rem, 3vw, 2rem); }
+  .st-tag {
+    display: inline-block;
+    font-family: var(--font-mono);
+    font-size: 0.7rem;
+    letter-spacing: 0.22em;
+    color: var(--accent);
+    padding-bottom: 0.9rem;
+    margin-bottom: 1.4rem;
+    border-bottom: 1px solid var(--rule);
+  }
+  .st-headline {
+    font-family: var(--font-heading);
+    font-weight: 600;
+    font-size: clamp(2.4rem, 5.4vw, 4.2rem);
+    line-height: 1.02;
+    letter-spacing: -0.03em;
+    margin: 0 0 1.2rem;
+    max-width: 18ch;
+    text-wrap: balance;
+  }
+  .st-sub { font-size: 1.16rem; line-height: 1.65; color: var(--text-secondary); max-width: 54ch; margin: 0; }
+
+  .st-eyebrow { display: inline-block; font-family: var(--font-mono); font-size: 0.7rem; letter-spacing: 0.22em; text-transform: uppercase; color: var(--accent); margin-bottom: 1.4rem; }
+  .st-h2 { font-family: var(--font-heading); font-weight: 600; font-size: clamp(1.8rem, 4vw, 2.8rem); line-height: 1.06; letter-spacing: -0.02em; margin: 0 0 1.6rem; max-width: 20ch; }
+
+  /* needs */
+  .st-needs { display: grid; grid-template-columns: repeat(3, 1fr); gap: 1rem; }
+  .st-need { border-top: 2px solid var(--accent); padding-top: 1.1rem; }
+  .st-need__h { font-family: var(--font-heading); font-weight: 600; font-size: 1.3rem; line-height: 1.15; margin: 0 0 0.6rem; }
+  .st-need__b { font-size: 0.98rem; line-height: 1.6; color: var(--text-secondary); margin: 0; }
+
+  /* steps */
+  .st-steps { list-style: none; margin: 0; padding: 0; display: grid; gap: 1rem; }
+  .st-step { display: grid; grid-template-columns: auto 1fr; gap: 1.2rem; align-items: start; background: var(--paper-card); border: 1px solid var(--rule); border-radius: var(--radius); padding: 1.5rem 1.6rem; }
+  .st-step__n {
+    font-family: var(--font-heading);
+    font-weight: 600;
+    font-size: 1.5rem;
+    line-height: 1;
+    width: 2.6rem;
+    height: 2.6rem;
+    display: grid;
+    place-content: center;
+    color: var(--on-accent);
+    background: var(--accent);
+    border-radius: var(--radius);
+  }
+  .st-step__h { font-family: var(--font-heading); font-weight: 600; font-size: 1.35rem; line-height: 1.15; margin: 0.1rem 0 0.5rem; }
+  .st-step__b { font-size: 1.02rem; line-height: 1.6; color: var(--text-secondary); margin: 0; max-width: 60ch; }
+
+  /* cost ledger */
+  .st-cost { border: 1px solid var(--rule); border-radius: var(--radius); background: var(--paper-card); overflow: hidden; }
+  .st-cost__row { display: grid; grid-template-columns: 1fr 1fr auto; gap: 1rem; padding: 0.95rem 1.2rem; border-top: 1px solid var(--rule); align-items: baseline; }
+  .st-cost__row:first-child { border-top: 0; }
+  .st-cost__a { font-weight: 500; }
+  .st-cost__b { font-family: var(--font-mono); font-size: 0.82rem; color: var(--muted); }
+  .st-cost__c { font-family: var(--font-mono); font-size: 0.95rem; color: var(--ink); text-align: right; }
+  .st-cost__row--total { border-top: 2px solid var(--ink); background: color-mix(in srgb, var(--accent) 6%, transparent); }
+  .st-cost__row--total .st-cost__a { font-family: var(--font-heading); font-size: 1.05rem; }
+  .st-cost__row--total .st-cost__c { color: var(--accent); font-size: 1.15rem; }
+  .st-reassure { font-size: 1.02rem; line-height: 1.6; color: var(--text-secondary); margin: 1.6rem 0 0; }
+
+  /* cta */
+  .st-cta { text-align: center; }
+  .st-cta__head { font-family: var(--font-heading); font-weight: 600; font-size: clamp(2rem, 5vw, 3.2rem); line-height: 1; letter-spacing: -0.02em; color: #fff; margin: 0 0 0.8rem; }
+  .st-cta__sub { font-size: 1.12rem; color: #a8a199; margin: 0 auto 1.8rem; max-width: 40ch; }
+  .st-btn {
+    display: inline-flex;
+    align-items: center;
+    background: var(--accent);
+    color: var(--on-accent);
+    font-family: var(--font-mono);
+    font-size: 0.8rem;
+    letter-spacing: 0.14em;
+    text-transform: uppercase;
+    padding: 1.05rem 2rem;
+    border-radius: var(--radius);
+    text-decoration: none;
+    transition: transform 140ms ease, background 140ms ease;
+  }
+  .st-btn:hover { transform: translateY(-2px); background: var(--accent-bright); }
+  .st-arrow { display: inline-block; margin-left: 0.4em; transition: transform 160ms ease; }
+  .st-btn:hover .st-arrow { transform: translate(2px, -2px); }
+  .st-learn { display: block; margin-top: 1.4rem; font-family: var(--font-mono); font-size: 0.72rem; letter-spacing: 0.1em; text-transform: uppercase; color: #a8a199; text-decoration: underline; text-underline-offset: 3px; }
+  .st-learn:hover { color: var(--accent-bright); }
+
+  .st a:focus-visible, .st-btn:focus-visible { outline: 2px solid var(--accent); outline-offset: 3px; }
+
+  @media (max-width: 760px) {
+    .st-needs { grid-template-columns: 1fr; }
+  }
+  @media (max-width: 520px) {
+    .st-cost__row { grid-template-columns: 1fr auto; }
+    .st-cost__b { display: none; }
+    .st-step { padding: 1.2rem 1.2rem; }
+  }
+</style>

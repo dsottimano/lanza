@@ -1,0 +1,15 @@
+{
+  "name": "Lanza",
+  "short_name": "Lanza",
+  "description": "Content, launched.",
+  "start_url": "/",
+  "display": "standalone",
+  "background_color": "#F3F1EA",
+  "theme_color": "#F3F1EA",
+  "icons": [
+    { "src": "icon-192.png", "sizes": "192x192", "type": "image/png", "purpose": "any" },
+    { "src": "icon-512.png", "sizes": "512x512", "type": "image/png", "purpose": "any" },
+    { "src": "maskable-192.png", "sizes": "192x192", "type": "image/png", "purpose": "maskable" },
+    { "src": "maskable-512.png", "sizes": "512x512", "type": "image/png", "purpose": "maskable" }
+  ]
+}
