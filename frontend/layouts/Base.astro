@@ -9,6 +9,7 @@ import { DEFAULT_LOCALE, type Locale } from "../lib/i18n";
 import { getMenu, getSeoDefaults, resolveDevices } from "../lib/site";
 import { mirrorPath } from "../lib/locale";
 import { isLanding } from "../lib/templates";
+import { resolveBrand } from "../lib/appearance";
 
 interface Props {
   seo?: PageSeo;
@@ -30,8 +31,10 @@ const { seo = {}, article = null, locale = DEFAULT_LOCALE, template } = Astro.pr
 
 const landing = isLanding(template ?? "default");
 
-// Site-wide theme (Settings → Appearance). Drives the public CSS via data-theme.
-const theme = appearance.theme ?? "freehold";
+// Brand (Settings → Brand): inline custom-property overrides that beat the base
+// design tokens (site.css :root), a motion flag, and any custom-font stylesheet.
+// There is no theme switch — the base look lives in site.css; Brand owns it.
+const brand = resolveBrand(appearance);
 const siteName = getSeoDefaults(locale).siteName || "Site";
 const year = new Date().getFullYear();
 
@@ -47,18 +50,20 @@ const nav = resolveDevices(getMenu(locale).header).desktop;
 ---
 
 <!doctype html>
-<html lang={locale} data-theme={theme}>
+<html lang={locale} data-motion={brand.motion} style={brand.styleVars || undefined}>
   <head>
     <meta charset="utf-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1" />
     <link rel="preconnect" href="https://fonts.googleapis.com" />
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
-    {theme === "freehold" && (
-      <link
-        href="https://fonts.googleapis.com/css2?family=Fraunces:ital,opsz,wght@0,9..144,400..600;1,9..144,400&family=Space+Grotesk:wght@400;500;600&family=JetBrains+Mono:wght@400;500&display=swap"
-        rel="stylesheet"
-      />
-    )}
+    {/* Base design fonts: Fraunces + Space Grotesk (default heading/body) and
+        JetBrains Mono (nav/footer/manifesto machine-truth). Always loaded so an
+        un-branded site still looks right; Brand's own fonts load additively. */}
+    <link
+      href="https://fonts.googleapis.com/css2?family=Fraunces:ital,opsz,wght@0,9..144,400..600;1,9..144,400&family=Space+Grotesk:wght@400;500;600&family=JetBrains+Mono:wght@400;500&display=swap"
+      rel="stylesheet"
+    />
+    {brand.fontHref && <link href={brand.fontHref} rel="stylesheet" />}
     <Seo seo={seo} article={article} locale={locale} />
   </head>
   <body>
