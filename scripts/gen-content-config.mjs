@@ -26,8 +26,12 @@
 // `required: false` → `.optional()`.
 import { readFileSync, writeFileSync } from "node:fs";
 import { fileURLToPath } from "node:url";
+import { join } from "node:path";
 
-const schemaPath = fileURLToPath(new URL("../data/schema.json", import.meta.url));
+// Input is TENANT data (the content model) → read from the project root (cwd).
+// Output is CODE (Astro's srcDir content config) → write into this package's
+// frontend/. In the monorepo dogfood cwd === package, so both resolve as before.
+const schemaPath = join(process.cwd(), "data/schema.json");
 const outPath = fileURLToPath(new URL("../frontend/content.config.ts", import.meta.url));
 
 const schema = JSON.parse(readFileSync(schemaPath, "utf8"));

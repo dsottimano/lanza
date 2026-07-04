@@ -5,10 +5,13 @@
 // config, so every rule is validated: an embedded newline or space would
 // otherwise inject arbitrary redirect rules (e.g. one shadowing /admin/*).
 import { readFileSync, writeFileSync } from "node:fs";
-import { fileURLToPath } from "node:url";
+import { join } from "node:path";
 
-const dataPath = fileURLToPath(new URL("../data/redirects.json", import.meta.url));
-const outPath = fileURLToPath(new URL("../public/_redirects", import.meta.url));
+// Input is TENANT data (redirect rules) and output is the tenant's built public
+// dir → both resolve against the project root (cwd). In the monorepo dogfood
+// cwd === package root, so this is the same public/ as before.
+const dataPath = join(process.cwd(), "data/redirects.json");
+const outPath = join(process.cwd(), "public/_redirects");
 
 // The validation below is MIRRORED in admin/src/backend/redirect-rules.ts (the
 // CMS Redirects editor), so the editor flags exactly the rules this step skips.

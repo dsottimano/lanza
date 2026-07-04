@@ -5,7 +5,7 @@
   "scripts": {
     "dev": "node scripts/dev.mjs",
     "build:admin": "npm --prefix admin ci && npm --prefix admin run build",
-    "build": "npm run build:admin && node scripts/gen-redirects.mjs && node scripts/gen-content-config.mjs && astro build",
+    "build": "npm run build:admin && node bin/lanza.mjs build",
     "preview": "astro preview",
     "check": "astro check"
   },
