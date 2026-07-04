@@ -8,8 +8,8 @@
 // scoped to this one repo; nothing else is reachable through it. The CMS works on
 // the WORKING_BRANCH (drafts) and publishes by merging it into BRANCH (production
 // — the branch Astro builds from). Ref reads/writes are allowed for both.
-const OWNER = "dsottimano";
-const NAME = "lanza";
+export const OWNER = "dsottimano";
+export const NAME = "lanza";
 const BRANCH = "main"; // production / publish target (Astro builds from this)
 const WORKING_BRANCH = "staging"; // CMS drafts branch
 const BRANCHES = [BRANCH, WORKING_BRANCH];
