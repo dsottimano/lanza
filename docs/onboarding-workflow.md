@@ -26,7 +26,7 @@ Legend: ✅ proven/built · 🟡 built earlier, needs wizard wiring · 🔲 to b
 | 3 | **Connect Cloudflare** | CF OAuth → broker gets access + **refresh** token, stores `{access, refresh, expires_at}` | ✅ `functions/api/auth/cf/{login,callback}.ts` (callback → `lanza_cf` cookie) |
 | 4 | **Authorize GitHub↔CF** | deep-link `github.com/apps/cloudflare-workers-and-pages/installations/new` while CF session is warm → CF links the install to their account | ✅ wired (wizard opens the deep-link + polls `POST /api/onboard/deploy` as the detector) |
 | 5 | **Create + deploy site** | with CF token: `POST /pages/projects` (github source) → `POST …/deployments?branch=main` → live `*.pages.dev` | ✅ real endpoint `api/onboard/deploy.ts` (idempotent; the git-authorize detector) |
-| 6 | **Land in /admin** | broker-mediated GitHub login → RS256 handoff → tenant session → the CMS | 🟡 (Phase 1 auth — wizard links to `<url>/admin`; the handoff isn't wired yet) |
+| 6 | **Land in /admin** | broker-mediated GitHub login → RS256 handoff → tenant session → the CMS | ✅ built (tenant `admin/api/auth/{login,handoff}.ts` + middleware verify; broker `api/auth/callback.ts` mints the RS256 session) — pending live verify. **Gap:** onboarding doesn't yet install the `lanza-cms` App on the new repo, so a fresh owner can log in but can't *save* until it's added (design §4 step 3) |
 | 7 | **Edit + publish** | CMS saves → broker mints repo-scoped edit-token → GitHub Contents write; publish = staging→main merge | 🟡 built |
 | 8 | **Provision KV/D1/R2** (when a listing needs it) | CMS `cf/[[path]].ts` proxy → **through the broker** (Option B) using the CF token | 🔲 (decided, not built) |
 
