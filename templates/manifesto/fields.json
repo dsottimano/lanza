@@ -2,6 +2,7 @@
   "name": "manifesto",
   "label": "Manifesto (landing)",
   "description": "The flagship landing page — hero with a live ask→publish demo, a 5-step spine, three audience doors, cost tiles, and a closing call to action. Pair with the Landing template.",
+  "body": false,
   "fields": [
     { "name": "tag", "label": "Hero eyebrow", "widget": "string", "required": false },
     { "name": "headline", "label": "Hero headline", "widget": "string" },

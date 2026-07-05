@@ -23,7 +23,12 @@ const landing = isLanding(template);
   {
     page.data.preset ? (
       // A chosen template owns the whole page — skip the default title/body chrome.
-      <HtmlTemplate name={page.data.preset} data={page.data.slots ?? {}} />
+      // The sanitized body is exposed as a reserved `body` slot so a template that
+      // opts in (fields.json `"body": true`) can place it with {{{ body }}}.
+      <HtmlTemplate
+        name={page.data.preset}
+        data={{ ...(page.data.slots ?? {}), body }}
+      />
     ) : (
       <>
         {!landing && <h1>{page.data.title}</h1>}

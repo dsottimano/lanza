@@ -18,6 +18,11 @@ export interface TemplateInfo {
   label: string;
   description?: string;
   fields: Field[]; // the editable slots, in CMS Field shape
+  // Whether the template renders the page's rich body ({{ body }}). Default false:
+  // a template owns its whole layout via slots, so the writing canvas is dead
+  // real estate and the editor hides it. Set `"body": true` in fields.json only
+  // when the template embeds {{ body }} (see docs/authoring-templates.md).
+  body: boolean;
 }
 
 /** The repo path of a template's HTML file. */
@@ -41,6 +46,7 @@ export async function listTemplates(client: GitHubClient): Promise<TemplateInfo[
         label: (data.label as string) || d.name,
         description: data.description as string | undefined,
         fields: Array.isArray(data.fields) ? (data.fields as Field[]) : [],
+        body: data.body === true,
       });
     } catch {
       // No/invalid fields.json — not a usable template; skip it.

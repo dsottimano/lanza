@@ -28,10 +28,12 @@ templates/<name>/
   (it is not scoped), so **namespace every class** — the manifesto prefixes all of
   its with `.lz` / `.lz-*`. Editable spots are `{{placeholders}}` (see syntax below).
 - **`fields.json`** — declares the fields the CMS shows for this template:
-  `{ "name", "label", "description", "fields": [ … ] }`. Each entry in `fields`
-  mirrors the CMS `Field` shape (`admin/src/schema.ts`): `name`, `label`, `widget`,
-  optional `required` (default true — set `false` for optional), and for `list`/
-  `object` widgets a nested `fields: [ … ]`.
+  `{ "name", "label", "description", "body", "fields": [ … ] }`. Each entry in
+  `fields` mirrors the CMS `Field` shape (`admin/src/schema.ts`): `name`, `label`,
+  `widget`, optional `required` (default true — set `false` for optional), and for
+  `list`/`object` widgets a nested `fields: [ … ]`. The top-level **`body`** flag
+  (default `false`) declares whether the template uses the page's rich body — see
+  "The main body" below.
 
 Only `template.html` and the page's `slots` reach the render engine. `fields.json` is
 the authoring/CMS side — it tells the editor what to collect. Keep the field `name`s
@@ -46,6 +48,7 @@ empty — do **not** reach for Handlebars features that aren't here.
 | Syntax | Meaning |
 | --- | --- |
 | `{{ name }}` | Interpolate a value. The value is **HTML-escaped**. Whitespace inside the braces is ignored. |
+| `{{{ name }}}` | Interpolate a value **verbatim** (not escaped). Only for values that are already safe HTML — in practice just `{{{ body }}}` (the sanitized page body). Don't point it at user-entered slots. |
 | `{{ a.b.c }}` | Dotted path — resolves `a`, then walks into `.b.c`. Missing → empty string. |
 | `{{#each list}} … {{/each}}` | Repeat the body once per array item. Inside, the item's own fields resolve **by bare name**. Non-array or empty → renders nothing. |
 | `{{#if cond}} … {{/if}}` | Render the body only if `cond` is truthy. |
@@ -64,6 +67,26 @@ Trust model: the **template is author-trusted and emitted verbatim** — your ma
 `<style>`, everything passes through unchanged. Only the interpolated **values** (the
 page's slot data, which is user-entered) are HTML-escaped. The engine escapes values;
 it does not sanitize your template.
+
+## The main body
+
+Every template owns the **whole** page and normally builds it entirely from `slots` —
+so the page's rich body (the CMS writing canvas) is unused, and the CMS **hides the
+body editor** so it isn't dead real estate on a landing page. That is the default
+(`"body": false`, or omitted).
+
+If your design genuinely needs the long-form article body (e.g. a doc page whose hero
+is templated but whose content is prose the owner writes in the canvas):
+
+1. Set `"body": true` at the top level of `fields.json`.
+2. Place `{{{ body }}}` (triple-brace — the body is already-sanitized HTML) where the
+   article should render in `template.html`.
+
+With the flag on, the CMS shows the writing canvas again and the build injects the
+sanitized body into the reserved `body` slot. The flag is the single source of truth:
+the CMS reads it to decide whether to show the canvas, and the render side supplies
+`{{{ body }}}` regardless — so a mismatch just means an unused body, never a broken
+page.
 
 ### Not supported — will fail silently
 

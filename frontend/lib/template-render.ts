@@ -1,12 +1,14 @@
 // Minimal HTML TEMPLATE ENGINE — renders author-written HTML templates with page
-// data at Astro build time. A Handlebars-ish subset ({{var}}, {{a.b}}, {{#each}},
-// {{#if}}, plus loop vars @index/@number), zero dependencies (Dave's stdlib-first
-// rule), no partials/helpers/comments/else.
+// data at Astro build time. A Handlebars-ish subset ({{var}}, {{{raw}}}, {{a.b}},
+// {{#each}}, {{#if}}, plus loop vars @index/@number), zero dependencies (Dave's
+// stdlib-first rule), no partials/helpers/comments/else.
 //
 // Trust model: the TEMPLATE is author-trusted and emitted VERBATIM — a <style> or
 // any markup passes through unescaped. Only interpolated VALUES are untrusted, so
-// only they are HTML-escaped. (Values still land inside author-trusted markup;
-// this engine escapes the value, it does not sanitize the surrounding template.)
+// {{var}} HTML-escapes them. {{{raw}}} emits the value verbatim for values that are
+// ALREADY safe HTML — currently only the sanitized page body ({{{ body }}}); don't
+// point it at untrusted slot values. (Values still land inside author-trusted
+// markup; this engine escapes/emits the value, it doesn't sanitize the template.)
 
 type Scope = Record<string, unknown>;
 
@@ -17,7 +19,8 @@ interface Frame {
 
 type Node =
   | { t: "text"; v: string }
-  | { t: "var"; path: string }
+  | { t: "var"; path: string } // {{x}} — value HTML-escaped
+  | { t: "raw"; path: string } // {{{x}}} — value emitted verbatim (already-safe HTML, e.g. the page body)
   | { t: "each"; path: string; body: Node[] }
   | { t: "if"; path: string; body: Node[] };
 
@@ -34,7 +37,9 @@ function escapeHtml(s: string): string {
 // recursive descent driven by a cursor. Block tags ({{#each}}/{{#if}}) recurse
 // until their matching {{/each}}/{{/if}}.
 function tokenize(template: string): string[] {
-  return template.split(/(\{\{[^}]*\}\})/);
+  // Triple-brace ({{{raw}}}) must be tried before double so its braces aren't
+  // mis-split as an empty double-brace tag.
+  return template.split(/(\{\{\{[^}]*\}\}\}|\{\{[^}]*\}\})/);
 }
 
 function parse(tokens: string[], start: number, stop?: string): { nodes: Node[]; next: number } {
@@ -42,6 +47,12 @@ function parse(tokens: string[], start: number, stop?: string): { nodes: Node[];
   let i = start;
   while (i < tokens.length) {
     const tok = tokens[i];
+    const raw = /^\{\{\{\s*(.*?)\s*\}\}\}$/.exec(tok);
+    if (raw) {
+      nodes.push({ t: "raw", path: raw[1].trim() });
+      i++;
+      continue;
+    }
     const m = /^\{\{\s*(.*?)\s*\}\}$/.exec(tok);
     if (!m) {
       if (tok) nodes.push({ t: "text", v: tok });
@@ -115,6 +126,10 @@ function renderNodes(nodes: Node[], stack: Frame[]): string {
       out += node.v;
     } else if (node.t === "var") {
       out += stringify(resolve(node.path, stack));
+    } else if (node.t === "raw") {
+      // Verbatim — the value is already-safe HTML (e.g. the sanitized page body).
+      const v = resolve(node.path, stack);
+      if (v != null && typeof v !== "object") out += String(v);
     } else if (node.t === "if") {
       if (truthy(resolve(node.path, stack))) out += renderNodes(node.body, stack);
     } else {

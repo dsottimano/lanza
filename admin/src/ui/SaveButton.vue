@@ -5,7 +5,8 @@
 // failure, and listens for `saved` / `error` to update its own status line.
 import { computed, onBeforeUnmount, ref } from "vue";
 
-const props = defineProps<{ action: () => Promise<void>; disabled?: boolean }>();
+// `action` may resolve to anything (e.g. the saved path) — the button ignores it.
+const props = defineProps<{ action: () => Promise<unknown>; disabled?: boolean }>();
 const emit = defineEmits<{
   (e: "saved"): void;
   (e: "error", err: unknown): void;

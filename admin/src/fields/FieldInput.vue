@@ -53,6 +53,10 @@ if (
 const objModel = computed(() => model.value as Record<string, unknown>);
 
 const open = ref(props.field.collapsed !== true);
+
+// For the `list` outer container: the item count + a singular noun for the label.
+const itemCount = computed(() => (Array.isArray(model.value) ? model.value.length : 0));
+const singular = computed(() => (props.field.labelSingular ?? "item").toLowerCase());
 </script>
 
 <template>
@@ -80,10 +84,18 @@ const open = ref(props.field.collapsed !== true);
     </div>
   </fieldset>
 
-  <!-- list: handled by the dedicated array editor -->
+  <!-- list: a labelled OUTER container makes the array read as a repeating group
+       (a tinted, accent-edged box) with its item cards nested inside. -->
   <div v-else-if="field.widget === 'list'" class="mb-4">
-    <label class="mb-1.5 block text-xs font-semibold text-zinc-600">{{ field.label }}</label>
-    <ListInput :field="field" v-model="model" />
+    <div class="rounded-xl border border-[var(--border)] border-l-[3px] border-l-[var(--accent)] bg-[var(--surface)]/50 p-3">
+      <div class="mb-2.5 flex items-baseline justify-between gap-2">
+        <label class="text-xs font-bold tracking-wide text-zinc-600 uppercase">{{ field.label }}</label>
+        <span class="text-[0.7rem] whitespace-nowrap text-zinc-400">
+          {{ itemCount }} {{ itemCount === 1 ? singular : `${singular}s` }}
+        </span>
+      </div>
+      <ListInput :field="field" v-model="model" />
+    </div>
     <p v-if="field.hint" class="mt-1.5 text-xs text-zinc-500">{{ field.hint }}</p>
   </div>
 

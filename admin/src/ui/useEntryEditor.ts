@@ -28,6 +28,9 @@ export interface EntryEditorHooks {
   getBody: () => string;
   /** Optional `data` mutation just before save (e.g. posts' updatedDate). */
   beforeSave?: () => void;
+  /** The desired slug (filename) for this entry. Empty → derive from the title.
+   *  Changing it on an existing entry renames the file (see `save`). */
+  getSlug?: () => string;
 }
 
 export function useEntryEditor(props: EntryEditorProps, hooks: EntryEditorHooks) {
@@ -63,20 +66,51 @@ export function useEntryEditor(props: EntryEditorProps, hooks: EntryEditorHooks)
     }
   });
 
-  async function save() {
+  // Save, and return the entry's path (the caller uses it to keep the URL in sync
+  // after a rename). The slug decides the filename: on a NEW entry it seeds the
+  // path; on an EXISTING one, changing it renames the file — write the new path,
+  // then delete the old (two staging commits; no public rebuild until publish).
+  async function save(): Promise<string> {
     hooks.beforeSave?.();
-    if (!currentPath) {
-      const slug = slugify(String(data.title ?? ""));
-      currentPath = `${entryFolder(props.collection, props.locale)}/${slug}.md`;
+    // Always slugify: whatever the user typed becomes a filename + a URL, so it must
+    // be slug-safe (no spaces, no slashes escaping the collection folder). An empty
+    // slug falls back to the title. (slugify never returns "", so guard on the input.)
+    const typed = (hooks.getSlug?.() ?? "").trim();
+    const desiredSlug = typed ? slugify(typed) : slugify(String(data.title ?? ""));
+
+    let targetPath: string;
+    if (currentPath) {
+      // Keep the entry's own directory (home lives at the pages root, localized
+      // entries in their per-locale subfolder) — only swap the basename.
+      const dir = currentPath.slice(0, currentPath.lastIndexOf("/"));
+      const oldSlug = currentPath.slice(dir.length + 1).replace(/\.md$/, "");
+      targetPath = oldSlug === desiredSlug ? currentPath : `${dir}/${desiredSlug}.md`;
+    } else {
+      targetPath = `${entryFolder(props.collection, props.locale)}/${desiredSlug}.md`;
     }
+
+    const renaming = !!currentPath && targetPath !== currentPath;
+    const oldPath = currentPath;
+    const oldSha = sha;
+
+    // Renaming writes a NEW file (no sha), then removes the old one. Finalise the
+    // editor's own state on the NEW file BEFORE the delete: if the delete then fails
+    // (rare — a concurrent staging change), the new file is already the source of
+    // truth and the error surfaces for a manual cleanup of the orphan, rather than
+    // leaving the editor pointed at a file that no longer exists.
     sha = await props.client.saveEntry(
-      currentPath,
+      targetPath,
       { ...data },
       hooks.getBody(),
-      `${sha ? "lanza: update" : "lanza: create"} ${currentPath}`,
-      sha,
+      `${currentPath ? "lanza: update" : "lanza: create"} ${targetPath}`,
+      renaming ? undefined : sha,
     );
+    currentPath = targetPath;
     isDirty.value = false;
+    if (renaming && oldPath && oldSha) {
+      await props.client.deleteFile(oldPath, oldSha, `lanza: remove ${oldPath} (renamed)`);
+    }
+    return targetPath;
   }
 
   return { data, loading, save, dirty: isDirty, markDirty };

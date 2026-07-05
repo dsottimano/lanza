@@ -8,25 +8,30 @@
 // backend/templates.ts. This replaces the old plain-text-box fallthrough for the
 // `preset`/`slots` fields; EditorView filters them out of the generic field panel
 // and mounts this instead.
-import { computed, onMounted, ref, watch } from "vue";
+import { computed, ref, watch } from "vue";
 import FieldForm from "../fields/FieldForm.vue";
 import SaveButton from "./SaveButton.vue";
 import { inputCls } from "../fields/styles";
 import type { GitHubClient } from "../backend/github";
 import type { Locale } from "../backend/config";
-import { listTemplates, templateHtmlPath, type TemplateInfo } from "../backend/templates";
+import { templateHtmlPath, type TemplateInfo } from "../backend/templates";
 import { reportError, clearError } from "../errors";
 
+// The template list + its loading state are owned by EditorView (one load feeds the
+// picker here, the show/hide-body decision, and the live preview), so this pane is
+// presentational for the picker + slot fields + the raw-HTML "Advanced" editor.
 const props = defineProps<{
   client: GitHubClient;
   data: Record<string, unknown>; // the entry frontmatter (reactive) — we own preset + slots
   locale: Locale;
+  templates: TemplateInfo[];
+  loading: boolean;
 }>();
 
 const data = props.data;
 
-const templates = ref<TemplateInfo[]>([]);
-const loading = ref(true);
+const templates = computed(() => props.templates);
+const loading = computed(() => props.loading);
 
 const selected = computed(() => templates.value.find((t) => t.name === data.preset));
 const slotsData = computed(() => data.slots as Record<string, unknown>);
@@ -97,17 +102,6 @@ watch(
   },
   { immediate: true },
 );
-
-onMounted(async () => {
-  try {
-    templates.value = await listTemplates(props.client);
-    clearError();
-  } catch (e) {
-    reportError(e, "Couldn't load templates.");
-  } finally {
-    loading.value = false;
-  }
-});
 </script>
 
 <template>
