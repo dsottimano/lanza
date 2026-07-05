@@ -198,7 +198,9 @@ No Workers migration; no CF API token from the user; no secret typed (given §3.
 **VERIFIED end-to-end (2026-07-05).** Built + proven live on `lanza-broker.pages.dev`:
 `functions/api/auth/cf/{login,callback}.ts` (confidential client, `client_secret_post`,
 CSRF `state` cookie). Full loop works: authorize → consent → code → token exchange →
-`GET /accounts` returns the account (token drives the CF API). Concrete facts learned:
+`GET /accounts` **and `GET /accounts/{id}/pages/projects`** both return live data — the
+token reaches the user's **actual Pages projects** on their own account (the §5 premise,
+proven, not asserted). Concrete facts learned:
 - **Endpoints** (`dash.cloudflare.com`): `/oauth2/auth`, `/oauth2/token`, `/oauth2/userinfo`.
 - **Scopes must be sent explicitly** — omitting `scope` triggers a generic "unexpected
   error" at consent. Scope IDs are **dot notation = API-token permission IDs** (not the
