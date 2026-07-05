@@ -9,7 +9,7 @@ import { DEFAULT_LOCALE, LOCALES, localeUrl, type Locale } from "../lib/i18n";
 import { getMenu, getSeoDefaults, resolveDevices } from "../lib/site";
 import { isLanding } from "../lib/templates";
 import { resolveBrand } from "../lib/appearance";
-import { renderChrome } from "../lib/chrome";
+import { renderPart } from "../lib/parts";
 
 interface Props {
   seo?: PageSeo;
@@ -40,12 +40,12 @@ const year = new Date().getFullYear();
 // The brand links home in the active locale; the default locale sits at the root.
 const homeUrl = localeUrl(locale, "");
 
-// Chrome data → the header/footer HTML templates (templates/chrome/*.html). Menu
+// Parts data → the header/footer HTML templates (templates/parts/*.html). Menu
 // from the editable per-locale Settings → Menu (desktop list; responsive CSS
 // handles layout). The language switcher is data too: one item per enabled locale,
 // linked to this page's alternate (or that locale's home), the active one marked.
 const menu = getMenu(locale);
-const chromeData = {
+const partData = {
   homeUrl,
   siteName,
   year,
@@ -63,8 +63,8 @@ const chromeData = {
     sep: i > 0, // render a "·" separator before every locale after the first
   })),
 };
-const headerHtml = renderChrome("header", chromeData);
-const footerHtml = renderChrome("footer", chromeData);
+const headerHtml = renderPart("header", partData);
+const footerHtml = renderPart("footer", partData);
 ---
 
 <!doctype html>
@@ -92,8 +92,8 @@ const footerHtml = renderChrome("footer", chromeData);
     <Seo seo={seo} article={article} locale={locale} alternates={alternates} />
   </head>
   <body>
-    {/* Site chrome — rendered from the editable HTML templates in
-        templates/chrome/*.html (see lib/chrome.ts), injected around the page slot.
+    {/* Site parts — header/footer rendered from the editable HTML templates in
+        templates/parts/*.html (see lib/parts.ts), injected around the page slot.
         The markup is human-editable HTML; the menu + language switcher are
         {{#each}} loops over the data computed above. */}
     <Fragment set:html={headerHtml} />

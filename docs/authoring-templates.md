@@ -109,6 +109,34 @@ cards}}` / `{{#each tiles}}` for the audience doors and cost tiles — each a `l
 widget with sub-`fields` in `fields.json`, filled by the `slots:` array in
 `content/pages/es/home.md`.
 
+## Site parts: header & footer
+
+The site chrome — header, nav, footer, language switcher — is templated too, under
+`templates/parts/`, with the same engine. These are **template parts** (the
+WordPress term): reusable HTML shared by every page, rendered by `Base.astro` around
+the page body (`frontend/lib/parts.ts`).
+
+```
+templates/parts/
+  header.html   # brand + nav menu + language switcher
+  footer.html   # copyright + footer menu
+```
+
+Unlike a page template, a part has **no `fields.json`** — its data isn't free-form
+slots, it's computed system data that `Base.astro` passes in:
+
+| Placeholder | Is |
+| --- | --- |
+| `{{ siteName }}` · `{{ year }}` · `{{ homeUrl }}` | site identity |
+| `{{#each menuHeader}}` / `{{#each menuFooter}}` | the menu (Settings → Menu); items expose `{{ label }}` + `{{ url }}` |
+| `{{#each locales}}` | the language switcher; each item has `{{ code }}`, `{{ url }}`, `{{ active }}`, `{{ inactive }}`, `{{ sep }}` |
+| `{{#if showNav}}` | false on `landing` pages (drops the nav) |
+
+Edit `header.html` / `footer.html` to restructure the chrome; the **menu links** stay
+editable in the CMS (Settings → Menu). To move the language switcher (say, to the
+footer), move its `{{#each locales}}` block between the two files — that's what "the
+switcher is a menu location" means here.
+
 ## Richer templates: fields & post types
 
 If a template needs data the content model doesn't have yet — new frontmatter fields,

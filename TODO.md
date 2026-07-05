@@ -1,3 +1,52 @@
+# Lanza — session 5 (2026-07-04): template authoring SHIPPED + English-default DRY i18n
+
+**Read first: memories `lanza-html-template-authoring.md` (product vision) +
+`dave-dry-no-magic-strings.md` (engineering bar).**
+
+**State now — COMMITTED on `main` (19 ahead of origin/main, UNPUSHED — Dave's call)
+and PUSHED to `origin/staging` (`bcb6098`):**
+- **Template authoring pieces 1–3 shipped** (engine, CMS Template surface, agent doc) —
+  see the session-4 block below.
+- **English-default, DRY, config-driven i18n shipped this session.** `data/site.json`
+  flip (`defaultLocale en`, `locales [en, es]`) now restructures ALL routing + hreflang +
+  the language switcher — no per-locale files, no magic strings:
+  - `lib/fixed-pages.ts` — ONE registry (slug + per-locale `PageSeo`) for the marketing/
+    blog pages, rendered by `components/FixedPage.astro`, generated for every locale by the
+    existing `[...slug]`/`[locale]/[...slug]` route pair (fixed slugs win over CMS pages).
+    **Extensible descriptor**: `seo` is `PageSeo` (canonical/ogImage/noindex already
+    covered); canonical/redirects/JSON-LD/metadata get added as fields **as testing
+    surfaces them** (Dave). This is the single per-page cross-cutting-concern object.
+  - Retired the hardcoded "es-default + /en/ mirror" layer: `lib/locale.ts` (mirrorPath),
+    all `pages/en/*`, duplicated root marketing routes, orphaned `Manifesto.astro` (now CMS
+    content in `content/pages/{en,es}/home.md`). `Base.astro` switcher iterates `LOCALES`
+    off per-page alternates; `homeUrl = localeUrl(locale,"")`.
+  - **3 bugs caught + fixed by the migration:** (1) `/es/home/` duplicate; (2) **hreflang
+    was silently empty site-wide** — `Base` never forwarded `alternates` to `Seo`; (3)
+    `templateClass()` emitted `tpl-*` but site.css only has `.layout-*` → CMS home rendered
+    at ~40% width (fixed: map landing→layout-landing, full-width→layout-wide).
+- Verified each phase: `astro check` 0 errors, build 12 pages; en at root, es at `/es/`,
+  switcher + hreflang correct both directions.
+- **Site chrome now templated too — "parts".** The header/footer moved out of hardcoded
+  `Base.astro` markup into `templates/parts/{header,footer}.html` (WordPress "template
+  parts"), rendered by `frontend/lib/parts.ts` via the same engine, injected around the
+  page `<slot>`. The menu is `{{#each menuHeader/menuFooter}}` (data still from Settings →
+  Menu) and the language switcher is an in-template `{{#each locales}}` loop — so switching
+  is a placeable, editable element (move the block between header/footer). No `fields.json`
+  for parts (their data is computed system data). Doc: `docs/authoring-templates.md`
+  "Site parts". OPEN: no CMS editor for parts yet (menu still edits via Settings → Menu).
+
+**Staging push (`bcb6098`) unblocks the CMS:** the local admin (new code) reading
+`origin/staging` now sees `content/pages/{en,es}/home.md` + `templates/manifesto/` +
+`data/schema.json` (preset/slots fields). **Dave to verify live:** admin Pages lists Home
+(en+es); the Template picker + slot fields + Advanced-HTML editor work; front-end home is
+full-width; `/es/` + switcher work.
+
+**Still open:** push `main` to `origin/main` when Dave's ready (deploy); future
+fixed-page descriptor fields (canonical / redirects / JSON-LD / metadata) driven by
+testing; the TODO is uncommitted — commit alongside the next chunk.
+
+---
+
 # Lanza — session 4 handoff (2026-07-04): HTML-template authoring is the NEW thrust
 
 **Read first: memory `lanza-html-template-authoring.md`** — the core product vision.
