@@ -15,13 +15,11 @@
         </g>
       </svg>
     </a>
-    {{#if showNav}}
     <nav class="site-nav">
       {{#each menuHeader}}<a href="{{ url }}">{{ label }}</a>{{/each}}
       {{#if showSwitcher}}
       <span class="nav-locale">{{#each locales}}{{#if sep}}<span>·</span>{{/if}}{{#if active}}<span class="is-active">{{ code }}</span>{{/if}}{{#if inactive}}<a href="{{ url }}">{{ code }}</a>{{/if}}{{/each}}</span>
       {{/if}}
     </nav>
-    {{/if}}
   </div>
 </header>
