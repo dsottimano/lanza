@@ -185,11 +185,13 @@ OAuth clients, GA "OAuth for all" 2026-06.)
   provisioning (KV/D1/R2), build config, deploys, status polling. No user-created API
   token, no secret typed.
 
-Token lifecycle (**VERIFIED 2026-07-05, corrected**): the access token is a **~16h
-bearer** and this client type issues **NO refresh token** — Cloudflare's self-service
-OAuth clients don't offer `offline_access`/`openid` (only resource scopes). So "silent
-refresh" is off the table; on expiry the user re-runs the OAuth consent (Dave's accepted
-call). The broker stores the token meanwhile. **Open sub-point:** where the runtime
+Token lifecycle (**VERIFIED 2026-07-05**): the access token is a **~16h bearer** AND a
+**refresh token IS available** — the recipe is enable **both** the `authorization_code`
+and `refresh_token` grant types on the client AND request the **`offline_access`** scope
+(grant alone or scope alone → no refresh token; both → one comes back). So the broker
+**consents once, then refreshes silently** in the background; the user does not re-auth
+every 16h. The broker stores `{access, refresh, expires_at}` and refreshes on demand.
+**Open sub-point:** where the runtime
 `functions/admin/api/cf/[[path]].ts` proxy sources the token — broker-injected into the
 tenant Pages project vs. proxied through the broker — resolve when wiring Phase 3.
 
@@ -206,8 +208,9 @@ proven, not asserted). Concrete facts learned:
   error" at consent. Scope IDs are **dot notation = API-token permission IDs** (not the
   `resource:access` colon strings wrangler uses); fetch via `GET /client/v4/oauth/scopes`.
 - **Least-privilege set for the proxy:** `account-settings.read`, `user-details.read`,
-  `workers-kv-storage.write`, `d1.write`, `workers-r2.write`, `page.read`. The client
-  must be configured with (at least) these.
+  `workers-kv-storage.write`, `d1.write`, `workers-r2.write`, `page.read`, plus
+  **`offline_access`** (refresh token). The client must be configured with (at least)
+  these scopes AND both grant types (`authorization_code` + `refresh_token`).
 - **Redirect URI must exactly match** a registered one; `lanza-broker.pages.dev/...`
   works today (lanzacms.com still serves the dogfood site, not the broker Functions).
 
@@ -291,7 +294,7 @@ identity** now shared by the CMS so onboarding and the editor read as one produc
 | 2026-07-04 | **Deploy button deferred** | Workers-only → whole-app migration to save ~one click |
 | 2026-07-04 | Publishing stays **staging → main** merge | unchanged |
 | 2026-07-05 | Hosting = **user manually creates Pages project + authorizes the CF GitHub app; all other CF ops via a Lanza CF OAuth client** (Dave) | OAuth-for-all shipped 2026-06; the git-authorize is the only step no CF credential can self-grant — not worth automating |
-| 2026-07-05 | CF OAuth token **stored broker-side; reauth via OAuth consent on expiry** (Dave) | client type issues NO refresh token (~16h bearer, no offline_access) — verified, so re-auth is the only path; Dave accepted |
+| 2026-07-05 | CF OAuth = **consent once, broker refreshes silently** | refresh token IS available — recipe: `authorization_code`+`refresh_token` grants on the client + `offline_access` scope (both needed); ~16h access token, refresh in background |
 | 2026-07-05 | CF OAuth **verified end-to-end** on `lanza-broker.pages.dev` (`/api/auth/cf/{login,callback}`) | token exchange + `GET /accounts` work; scopes must be sent explicitly as dot-notation IDs (§5) |
 
 ## 10. Build order
