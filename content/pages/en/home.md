@@ -8,7 +8,7 @@ slots:
   headline: "Launch a site you actually own."
   sub: "Lanza (Spanish for throw) gives you a real address on the open web: a folder of files that belongs to you, hosted free on GitHub and Cloudflare, and changed just by asking an AI agent. No platform, no lock-in, no developer."
   cta1: "Start your site"
-  cta1Url: "/start"
+  cta1Url: "https://connect.lanzacms.com/"
   cta2: "How it works"
   cta2Url: "/how-it-works"
   demoYouWho: "you"
@@ -38,7 +38,7 @@ slots:
   doorsHeadline: "Built for whoever's holding the keyboard."
   cards:
     - who: "You just want a site"
-      body: "No code, no jargon. You describe it, it appears. See what it costs and how to start."
+      body: "No code, no jargon. Type your site's name and watch it come alive, then a few clicks make it real. See what it costs and how to start."
       cta: "Get started"
       href: "/start"
     - who: "You're a developer"
@@ -62,5 +62,5 @@ slots:
   closeHeadline: "Throw your first page."
   closeSub: "A corner of the open web, owned outright, is one sentence away."
   closeCta: "Start your site"
-  closeCtaUrl: "/start"
+  closeCtaUrl: "https://connect.lanzacms.com/"
 ---

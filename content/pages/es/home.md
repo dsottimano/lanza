@@ -8,7 +8,7 @@ slots:
   headline: "Lance un sitio que de verdad es suyo."
   sub: "Lanza (del español lanzar) le da una dirección real en la web abierta: una carpeta de archivos que le pertenece, alojada gratis en GitHub y Cloudflare, y modificable con solo pedírselo a un agente de IA. Sin plataforma, sin ataduras, sin programador."
   cta1: "Empezar"
-  cta1Url: "/start"
+  cta1Url: "https://connect.lanzacms.com/"
   cta2: "Cómo funciona"
   cta2Url: "/how-it-works"
   demoYouWho: "usted"
@@ -38,7 +38,7 @@ slots:
   doorsHeadline: "Hecho para quien tenga el teclado."
   cards:
     - who: "Solo quiere un sitio"
-      body: "Sin código ni tecnicismos. Usted lo describe, aparece. Vea lo que cuesta y cómo empezar."
+      body: "Sin código ni tecnicismos. Escriba el nombre de su sitio y véalo cobrar vida, luego unos clics lo hacen real. Vea lo que cuesta y cómo empezar."
       cta: "Empezar"
       href: "/start"
     - who: "Es desarrollador"
@@ -62,5 +62,5 @@ slots:
   closeHeadline: "Lance su primera página."
   closeSub: "Un rincón de la web abierta, en propiedad plena, está a una frase de distancia."
   closeCta: "Empezar"
-  closeCtaUrl: "/start"
+  closeCtaUrl: "https://connect.lanzacms.com/"
 ---

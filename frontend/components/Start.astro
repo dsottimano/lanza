@@ -1,7 +1,8 @@
 ---
 // /start — the normie onboarding. Warm, hand-holding, honest: what you need,
-// the four real steps, what it costs (a domain is the only bill), and how long
-// it takes. No jargon. Ends on the real create-your-site action (lanzacms.com).
+// the four real steps of the connect.lanzacms.com wizard, the health-screen
+// payoff, what it costs (a domain is the only bill), and how long it takes.
+// No jargon. Ends on the real create-your-site action (connect.lanzacms.com).
 // Bilingual. Pure CSS/type, static + cacheable. Rendered by pages/start.astro
 // + en mirror.
 import type { Locale } from "../lib/i18n";
@@ -12,25 +13,34 @@ interface Props {
 const { locale = "es" } = Astro.props;
 const isEn = locale === "en";
 const base = isEn ? "/en" : "";
-const startUrl = "https://lanzacms.com/";
+const startUrl = "https://connect.lanzacms.com/";
 
 const es = {
   tag: "EMPEZAR · SIN CÓDIGO",
   headline: "De cero a un sitio en vivo en unos 30 minutos.",
-  sub: "Sin programar, sin tarjeta de crédito para empezar. Si sabe describir lo que quiere, sabe usar Lanza. Esto es lo que hay que hacer.",
+  sub: "Sin programar, sin tarjeta de crédito para empezar. Escriba el nombre de su sitio y véalo cobrar vida en pantalla antes de crear ninguna cuenta. Desde ahí, unos clics — sin tecnicismos, sin configurar nada — y queda en vivo en la web abierta, enteramente suyo.",
   needEyebrow: "Lo que necesita",
   needs: [
-    ["Una cuenta de GitHub", "Gratis. Guarda los archivos de su sitio — suyos, siempre."],
-    ["Unos 30 minutos", "Diez para registrarse, veinte para su primera página."],
+    ["Cuentas de GitHub y Cloudflare", "Gratis las dos. Una guarda los archivos de su sitio, la otra lo sirve — todo suyo, siempre."],
+    ["Unos 30 minutos", "Diez para conectar sus cuentas, veinte para su primera página."],
     ["~$12 al año (opcional)", "Solo si quiere su propio dominio. Puede empezar gratis y añadirlo después."],
   ],
   stepsEyebrow: "Los cuatro pasos",
   steps: [
-    ["Entre con GitHub", "Lanza crea el repositorio de su sitio — su propia copia de los archivos. Un clic y ya es dueño."],
-    ["Elija su dirección", "Empiece gratis en un subdominio, o conecte su propio dominio (~$12/año) cuando esté listo."],
-    ["Diga qué quiere", "Escriba su primera página, o dígale al agente qué debe decir su sitio. En sus palabras, en su idioma."],
-    ["Publique", "Su sitio queda en vivo en la web abierta. Google lo encuentra en un día. Listo."],
+    ["Escriba el nombre de su sitio", "Aparece una vista previa en vivo al instante, antes de crear ninguna cuenta."],
+    ["Conecte GitHub", "Un clic de acceso. Creamos un repositorio que es suyo, a partir de una plantilla lista para usar."],
+    ["Conecte Cloudflare", "Un clic más. Así consigue alojamiento gratis, para siempre."],
+    ["Autorice la conexión", "El único clic manual: apruebe GitHub ↔ Cloudflare en una pantalla de Cloudflare. De ahí en más, es automático — publicamos su sitio sin que usted escriba una sola línea de configuración."],
   ],
+  healthEyebrow: "Y entonces, la pantalla de salud",
+  healthHead: "Todo en verde — y ya está adentro.",
+  healthChecks: [
+    "Repositorio de GitHub creado",
+    "Cuenta de Cloudflare conectada",
+    "Conexión Git ↔ Cloudflare activa",
+    "Sitio publicado en vivo",
+  ],
+  healthSub: "En cuanto las cuatro luces se ponen verdes, Lanza lo lleva directo a su panel de administración — listo para escribir la primera página.",
   costEyebrow: "Lo que cuesta, en claro",
   costHead: "El único gasto es su dominio.",
   costRows: [
@@ -49,20 +59,29 @@ const es = {
 const en = {
   tag: "GET STARTED · NO CODE",
   headline: "Zero to a live site in about 30 minutes.",
-  sub: "No coding, no credit card to start. If you can describe what you want, you can use Lanza. Here's what it takes.",
+  sub: "No coding, no credit card to start. Type your site's name and you'll see it come alive on screen before you've created a single account. From there, a few clicks — no jargon, no config — and it's live on the open web, yours outright.",
   needEyebrow: "What you need",
   needs: [
-    ["A GitHub account", "Free. It holds your site's files — yours, always."],
-    ["About 30 minutes", "Ten to sign up, twenty for your first page."],
+    ["A GitHub + Cloudflare account", "Both free. One holds your site's files, the other serves them — all yours, always."],
+    ["About 30 minutes", "Ten to connect your accounts, twenty for your first page."],
     ["~$12 a year (optional)", "Only if you want your own domain. You can start free and add it later."],
   ],
   stepsEyebrow: "The four steps",
   steps: [
-    ["Sign in with GitHub", "Lanza creates your site's repository — your own copy of the files. One click and you own it."],
-    ["Pick your address", "Start free on a subdomain, or connect your own domain (~$12/yr) whenever you're ready."],
-    ["Say what you want", "Write your first page, or tell the agent what your site should say. In your words, in your language."],
-    ["Publish", "Your site goes live on the open web. Google finds it within a day. That's it."],
+    ["Type your site's name", "An instant live preview appears — before you've created a single account."],
+    ["Connect GitHub", "One sign-in click. We create a repository you own, from a ready-made template."],
+    ["Connect Cloudflare", "One more click. That's your free hosting, for good."],
+    ["Authorize the connection", "The one manual click: approve GitHub ↔ Cloudflare on a Cloudflare screen. From there it's automatic — we publish your site without you typing a single line of config."],
   ],
+  healthEyebrow: "Then, the health screen",
+  healthHead: "Every light turns green — and you're already in.",
+  healthChecks: [
+    "GitHub repository created",
+    "Cloudflare account connected",
+    "Git ↔ Cloudflare connection live",
+    "Site published and live",
+  ],
+  healthSub: "The moment all four lights turn green, Lanza drops you straight into your CMS — ready to write your first page.",
   costEyebrow: "What it costs, in plain numbers",
   costHead: "The only expense is your domain.",
   costRows: [
@@ -121,8 +140,25 @@ const t = isEn ? en : es;
     </div>
   </section>
 
-  <!-- costs, in plain numbers -->
+  <!-- the health-screen payoff -->
   <section class="st-band st-band--paper">
+    <div class="st-wrap st-wrap--narrow">
+      <span class="st-eyebrow">{t.healthEyebrow}</span>
+      <h2 class="st-h2">{t.healthHead}</h2>
+      <ul class="st-health">
+        {t.healthChecks.map((c) => (
+          <li class="st-health__row">
+            <span class="st-health__dot" aria-hidden="true">✓</span>
+            <span>{c}</span>
+          </li>
+        ))}
+      </ul>
+      <p class="st-reassure">{t.healthSub}</p>
+    </div>
+  </section>
+
+  <!-- costs, in plain numbers -->
+  <section class="st-band st-band--surface">
     <div class="st-wrap st-wrap--narrow">
       <span class="st-eyebrow">{t.costEyebrow}</span>
       <h2 class="st-h2">{t.costHead}</h2>
@@ -209,6 +245,23 @@ const t = isEn ? en : es;
   }
   .st-step__h { font-family: var(--font-heading); font-weight: 600; font-size: 1.35rem; line-height: 1.15; margin: 0.1rem 0 0.5rem; }
   .st-step__b { font-size: 1.02rem; line-height: 1.6; color: var(--text-secondary); margin: 0; max-width: 60ch; }
+
+  /* health screen */
+  .st-health { list-style: none; margin: 0 0 1.6rem; padding: 0; display: grid; gap: 0.8rem; }
+  .st-health__row { display: flex; align-items: center; gap: 0.9rem; font-size: 1.05rem; }
+  .st-health__dot {
+    display: inline-grid;
+    place-content: center;
+    width: 1.7rem;
+    height: 1.7rem;
+    flex: none;
+    border-radius: 50%;
+    background: var(--accent);
+    color: var(--on-accent);
+    font-family: var(--font-mono);
+    font-size: 0.85rem;
+    font-weight: 600;
+  }
 
   /* cost ledger */
   .st-cost { border: 1px solid var(--rule); border-radius: var(--radius); background: var(--paper-card); overflow: hidden; }
