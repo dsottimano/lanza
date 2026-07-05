@@ -4,7 +4,7 @@
 // compiles data/redirects.json into Cloudflare's native _redirects
 // file). They live in separate build roots — this is Vite/TS, that is Node ESM —
 // so the logic is duplicated on purpose, the same way frontend/lib/site.ts and
-// admin/src/ui/MenuView.vue mirror each other. If you change a rule here, change
+// admin/src/backend/menu.ts mirror each other. If you change a rule here, change
 // it there too, and vice versa. The core predicates below are byte-for-byte
 // equivalent to that file so the editor never marks a rule valid that the build
 // would drop (or vice versa). `ruleError() === null` iff gen-redirects `isValid()`.

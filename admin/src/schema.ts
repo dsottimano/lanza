@@ -87,7 +87,8 @@ export interface FileEntry {
   // the active locale is spliced in before `.json` (menu.json → menu.es.json).
   localized?: boolean;
   // When set, App.vue opens a purpose-built pane instead of the generic
-  // FieldForm (e.g. "menu" → MenuView.vue). `fields` is then unused.
+  // FieldForm (e.g. "redirects" → RedirectsView.vue). `fields` is then unused.
+  // ("menu" is now folded into HeaderFooterView, looked up by name, not by view.)
   view?: "menu" | "redirects";
   fields: Field[];
 }

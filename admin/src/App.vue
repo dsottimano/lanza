@@ -32,15 +32,15 @@ const lazyPane = (loader: () => Promise<unknown>) =>
 const EditorView = lazyPane(() => import("./ui/EditorView.vue"));
 const RecordEditor = lazyPane(() => import("./ui/RecordEditor.vue"));
 const SettingsView = lazyPane(() => import("./ui/SettingsView.vue"));
-const MenuView = lazyPane(() => import("./ui/MenuView.vue"));
 const BlocksView = lazyPane(() => import("./ui/BlocksView.vue"));
 const RedirectsView = lazyPane(() => import("./ui/RedirectsView.vue"));
 const SiteHealthView = lazyPane(() => import("./ui/SiteHealthView.vue"));
 const HelpView = lazyPane(() => import("./ui/HelpView.vue"));
 const LanguagesView = lazyPane(() => import("./ui/LanguagesView.vue"));
-const ThemesView = lazyPane(() => import("./ui/ThemesView.vue"));
-const BrandView = lazyPane(() => import("./ui/BrandView.vue"));
-const PartsView = lazyPane(() => import("./ui/PartsView.vue"));
+// Header & footer (menu + preview + markup) and Brand & themes (brand + themes)
+// are each one nav item now — the shells host the underlying editors together.
+const HeaderFooterView = lazyPane(() => import("./ui/HeaderFooterView.vue"));
+const BrandThemesView = lazyPane(() => import("./ui/BrandThemesView.vue"));
 const ContentTypesView = lazyPane(() => import("./ui/ContentTypesView.vue"));
 const PublishView = lazyPane(() => import("./ui/PublishView.vue"));
 const OnboardingWizard = lazyPane(() => import("./ui/OnboardingWizard.vue"));
@@ -65,14 +65,12 @@ type Pane =
   | "editRich"
   | "editRecord"
   | "settings"
-  | "menu"
   | "redirects"
   | "health"
   | "help"
   | "languages"
-  | "themes"
-  | "brand"
-  | "parts"
+  | "headerFooter"
+  | "brandThemes"
   | "blocks"
   | "contentTypes"
   | "publish";
@@ -110,9 +108,8 @@ router.beforeEach(() => confirmDiscard());
 // ── route → on-screen state ────────────────────────────────────────────────
 // Settings panels that are their own pane (vs. the file-backed menu/redirects/seo).
 const SPECIAL_PANELS: Record<string, Pane> = {
-  parts: "parts",
-  brand: "brand",
-  themes: "themes",
+  "header-footer": "headerFooter",
+  "brand-themes": "brandThemes",
   blocks: "blocks",
   contentTypes: "contentTypes",
   health: "health",
@@ -133,6 +130,8 @@ const collection = computed<FolderCollection>(() => routeCollection.value ?? def
 const settingsFile = computed<FileEntry | null>(() =>
   route.name === "settings" ? settingsFileByName(route.params.panel as string) : null,
 );
+// The Header & footer shell owns the menu file (its metadata drives the path).
+const menuFile = computed<FileEntry | null>(() => settingsFileByName("menu"));
 
 const pane = computed<Pane>(() => {
   switch (route.name) {
@@ -211,14 +210,13 @@ function onOnboarded() {
     <Sidebar
       :active-collection="collection.name"
       :active-settings="
-        pane === 'settings' || pane === 'menu' || pane === 'redirects'
+        pane === 'settings' || pane === 'redirects'
           ? (settingsFile?.name ?? null)
           : null
       "
       :languages-open="pane === 'languages'"
-      :themes-open="pane === 'themes'"
-      :brand-open="pane === 'brand'"
-      :parts-open="pane === 'parts'"
+      :header-footer-open="pane === 'headerFooter'"
+      :brand-themes-open="pane === 'brandThemes'"
       :blocks-open="pane === 'blocks'"
       :health-open="pane === 'health'"
       :content-types-open="pane === 'contentTypes'"
@@ -229,9 +227,8 @@ function onOnboarded() {
       @select-locale="setLocale"
       @open-settings="openSettings"
       @languages="openPanel('languages')"
-      @themes="openPanel('themes')"
-      @brand="openPanel('brand')"
-      @parts="openPanel('parts')"
+      @header-footer="openPanel('header-footer')"
+      @brand-themes="openPanel('brand-themes')"
       @blocks="openPanel('blocks')"
       @health="openPanel('health')"
       @content-types="openPanel('contentTypes')"
@@ -269,12 +266,17 @@ function onOnboarded() {
         :locale="locale"
         @back="backToList"
       />
-      <MenuView
-        v-else-if="pane === 'menu' && settingsFile"
-        :key="`menu#${locale}`"
+      <HeaderFooterView
+        v-else-if="pane === 'headerFooter' && menuFile"
+        :key="`header-footer#${locale}`"
         :client="client"
-        :file="settingsFile"
+        :menu-file="menuFile"
         :locale="locale"
+        @back="backToList"
+      />
+      <BrandThemesView
+        v-else-if="pane === 'brandThemes'"
+        :client="client"
         @back="backToList"
       />
       <RedirectsView
@@ -284,9 +286,6 @@ function onOnboarded() {
       />
       <SiteHealthView v-else-if="pane === 'health'" :client="client" @back="backToList" />
       <HelpView v-else-if="pane === 'help'" @back="backToList" />
-      <ThemesView v-else-if="pane === 'themes'" :client="client" @back="backToList" />
-      <BrandView v-else-if="pane === 'brand'" :client="client" @back="backToList" />
-      <PartsView v-else-if="pane === 'parts'" :client="client" @back="backToList" />
       <BlocksView v-else-if="pane === 'blocks'" :client="client" @back="backToList" />
       <LanguagesView
         v-else-if="pane === 'languages'"

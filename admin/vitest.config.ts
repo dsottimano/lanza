@@ -6,6 +6,9 @@ import vue from "@vitejs/plugin-vue";
 // Function code), none of which the tests need, so tests get their own config.
 export default defineConfig({
   plugins: [vue()],
+  // Allow ?raw imports of the repo-root tenant files (e.g. templates/parts/*.html)
+  // the tests round-trip; they live above admin/, outside Vite's default fs root.
+  server: { fs: { allow: [".."] } },
   test: {
     environment: "happy-dom",
     include: ["src/**/*.test.ts"],

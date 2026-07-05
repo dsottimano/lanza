@@ -209,7 +209,7 @@ onMounted(() => {
   void loadDeploy();
 });
 
-// ── shared class strings (match MenuView) ───────────────────────────────────
+// ── shared class strings (match MenuEditor) ─────────────────────────────────
 const cellInput = "input min-w-0 font-mono text-[13px]";
 const iconBtn =
   "grid size-7 flex-shrink-0 place-items-center rounded-md text-zinc-500 transition hover:bg-[var(--surface)] hover:text-zinc-800 disabled:cursor-default disabled:opacity-30 disabled:hover:bg-transparent";

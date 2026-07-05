@@ -13,9 +13,8 @@ const props = defineProps<{
   activeCollection: string;
   activeSettings: string | null;
   languagesOpen: boolean;
-  themesOpen: boolean;
-  brandOpen: boolean;
-  partsOpen: boolean;
+  headerFooterOpen: boolean;
+  brandThemesOpen: boolean;
   blocksOpen: boolean;
   healthOpen: boolean;
   contentTypesOpen: boolean;
@@ -28,9 +27,8 @@ const emit = defineEmits<{
   (e: "selectLocale", locale: Locale): void;
   (e: "openSettings", file: FileEntry): void;
   (e: "languages"): void;
-  (e: "themes"): void;
-  (e: "brand"): void;
-  (e: "parts"): void;
+  (e: "headerFooter"): void;
+  (e: "brandThemes"): void;
   (e: "blocks"): void;
   (e: "health"): void;
   (e: "contentTypes"): void;
@@ -45,6 +43,10 @@ const content = folders.filter((c) => c.body === "rich");
 const taxonomies = folders.filter((c) => c.body === "none");
 const settings = COLLECTIONS.find((c) => c.kind === "files");
 const settingsFiles = settings && settings.kind === "files" ? settings.files : [];
+// The appearance + menu files are folded into the merged Appearance / Header &
+// footer panes, so they're not listed on their own; the rest keep their own item.
+const seoFile = settingsFiles.find((f) => f.name === "seo_defaults");
+const redirectsFile = settingsFiles.find((f) => f.name === "redirects");
 
 // ── Collapsible group state ──────────────────────────────────────────────
 type GroupId = "content" | "taxonomies" | "settings";
@@ -85,9 +87,8 @@ const settingsActive = computed(
   () =>
     props.activeSettings !== null ||
     props.languagesOpen ||
-    props.themesOpen ||
-    props.brandOpen ||
-    props.partsOpen ||
+    props.headerFooterOpen ||
+    props.brandThemesOpen ||
     props.blocksOpen ||
     props.healthOpen ||
     props.contentTypesOpen,
@@ -220,36 +221,36 @@ const itemActive = "nav-item--active";
               Languages
             </button>
             <button
-              v-for="f in settingsFiles"
-              :key="f.name"
-              :class="[item, activeSettings === f.name ? itemActive : '']"
-              @click="emit('openSettings', f)"
+              v-if="seoFile"
+              :class="[item, activeSettings === seoFile.name ? itemActive : '']"
+              @click="emit('openSettings', seoFile)"
             >
-              {{ f.label }}
+              {{ seoFile.label }}
+            </button>
+            <button
+              :class="[item, headerFooterOpen ? itemActive : '']"
+              @click="emit('headerFooter')"
+            >
+              Header &amp; footer
+            </button>
+            <button
+              :class="[item, brandThemesOpen ? itemActive : '']"
+              @click="emit('brandThemes')"
+            >
+              Brand &amp; themes
+            </button>
+            <button
+              v-if="redirectsFile"
+              :class="[item, activeSettings === redirectsFile.name ? itemActive : '']"
+              @click="emit('openSettings', redirectsFile)"
+            >
+              {{ redirectsFile.label }}
             </button>
             <button
               :class="[item, blocksOpen ? itemActive : '']"
               @click="emit('blocks')"
             >
               Blocks
-            </button>
-            <button
-              :class="[item, brandOpen ? itemActive : '']"
-              @click="emit('brand')"
-            >
-              Brand
-            </button>
-            <button
-              :class="[item, partsOpen ? itemActive : '']"
-              @click="emit('parts')"
-            >
-              Header &amp; footer
-            </button>
-            <button
-              :class="[item, themesOpen ? itemActive : '']"
-              @click="emit('themes')"
-            >
-              Themes
             </button>
             <button
               :class="[item, healthOpen ? itemActive : '']"

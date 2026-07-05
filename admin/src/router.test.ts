@@ -34,7 +34,7 @@ describe("localeSwapRoute — language switch goes to the equivalent page", () =
   });
 
   it("stays put on locale-independent screens (settings/publish/help)", () => {
-    const r = route("settings", { panel: "parts" }, "/settings/parts");
-    expect(localeSwapRoute(r, "es")).toBe("/settings/parts");
+    const r = route("settings", { panel: "header-footer" }, "/settings/header-footer");
+    expect(localeSwapRoute(r, "es")).toBe("/settings/header-footer");
   });
 });
