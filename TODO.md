@@ -1,3 +1,52 @@
+# Lanza — session 6 (2026-07-04): template-first editor + live preview + editable slugs
+
+**State now — COMMITTED + PUSHED to `origin/main` (`857a7ac`).** vue-tsc clean ·
+admin build clean · `astro check` 0 errors · vitest 12/12.
+
+**☑ Shipped this session (the content-experience reorg Dave asked for):**
+- **Templated pages no longer waste space on a body editor.** A page whose `preset`
+  template doesn't render the body hides the writing canvas. Templates declare it:
+  `"body": true|false` in `fields.json` (default false). The engine gained
+  `{{{ raw }}}` and `PageArticle.astro` passes the sanitized body as a reserved
+  `body` slot, so `{{{ body }}}` works when a template opts in. Doc updated
+  (`docs/authoring-templates.md`, "The main body").
+- **New templated-page layout:** full-width **title + editable URL** → 2-col
+  **template fields | live preview** → 1-col **vital info (SEO/metadata)** below.
+- **Live preview (`admin/src/ui/PreviewPane.vue`)** — imports (not mirrors)
+  `frontend/lib/template-render.ts`, renders the template with the reactive `slots`
+  in a scriptless sandboxed iframe with the site's design tokens. Debounced
+  body-only innerHTML swaps (keep scroll); template/CSS change = full rebuild.
+  Preview stretches to the template-fields height. **Read-only (Phase 1)** — Dave
+  chose to defer in-place editing (DOM↔slot source-mapping) to a later phase.
+- **Honest publish state:** "Published" toggle → **Draft ⟷ Ready**; **"N to publish"**
+  pill (staging-vs-production compare, `admin/src/ui/staging.ts`), refreshed on save.
+- **Editable slug/URL for ALL content types** (`SlugField.vue` + shared
+  `useEntryEditor.save`): editing the slug renames the file (write new, delete old),
+  always slugified, then navigates to the new slug. `home` is locked (site root).
+  Wired in EditorView (posts/pages) + RecordEditor (categories/tags/authors).
+- **Arrays read as arrays** — `list` fields get a labelled, accent-edged outer
+  container + item count (`FieldInput.vue`).
+- Adversarial code review run on the diff; fixes applied (slug sanitisation,
+  rename state-on-failure, RecordEditor pending refresh, preview first-paint edit).
+
+**☐ Open threads (deferred, low-risk — flagged in review):**
+- **Taxonomy-rename referential integrity** — renaming a category/tag/author slug
+  does NOT rewrite posts that reference it via relations. Real footgun; needs a
+  reference sweep on rename (or a guard/warning). **Highest of the three.**
+- **Slug-collision UX** — renaming onto an existing slug fails safe with a raw
+  GitHub 422; wants a pre-flight check + "slug already in use" message.
+- **Preview brand accuracy** — preview uses `site.css` defaults, not the live Brand
+  overrides from `appearance.json` (Base.astro injects those at build). Layout is
+  exact; brand-customised colours can differ. Inject the appearance token block.
+- **Phase 2 — in-place visual editing** — click a rendered region → edit → write
+  back to its `{{slot}}`. Needs a DOM→template source-map layer (annotate
+  text-position interpolations with `data-lz-path`; skip attribute/style/`{{{raw}}}`
+  positions). Explicitly deferred by Dave this session.
+- **Dave live QA** — new template-first layout, live preview repaint, slug rename +
+  URL nav, Draft⟷Ready + pending pill.
+
+---
+
 # Lanza — session 5 (2026-07-04): template authoring SHIPPED + English-default DRY i18n
 
 **Read first: memories `lanza-html-template-authoring.md` (product vision) +
