@@ -7,7 +7,7 @@
 // The nonce cookie is SameSite=None so it survives the broker's cross-site POST
 // back to the handoff endpoint (a Lax cookie would be dropped on a cross-site POST).
 import { cookie } from "../../../_lib/session";
-import { BROKER_ORIGIN } from "../../../_lib/tenant-config";
+import { BROKER_ORIGIN, GITHUB_CLIENT_ID } from "../../../_lib/tenant-config";
 
 interface Env {
   GITHUB_CLIENT_ID?: string;
@@ -19,12 +19,9 @@ export const onRequest = async (context: {
   env: Env;
 }): Promise<Response> => {
   const { request, env } = context;
-  if (!env.GITHUB_CLIENT_ID) {
-    return new Response("OAuth is not configured: GITHUB_CLIENT_ID is missing.", {
-      status: 500,
-    });
-  }
-
+  // client_id + broker origin come from the committed tenant-config (public, self-config),
+  // with same-named env vars overriding for the dogfood/preview sites.
+  const clientId = env.GITHUB_CLIENT_ID || GITHUB_CLIENT_ID;
   const broker = env.BROKER_ORIGIN || BROKER_ORIGIN;
   const origin = new URL(request.url).origin;
   const nonce = crypto.randomUUID();
@@ -33,7 +30,7 @@ export const onRequest = async (context: {
   const state = btoa(JSON.stringify({ origin, nonce })).replace(/\+/g, "-").replace(/\//g, "_");
 
   const authorize = new URL("https://github.com/login/oauth/authorize");
-  authorize.searchParams.set("client_id", env.GITHUB_CLIENT_ID);
+  authorize.searchParams.set("client_id", clientId);
   authorize.searchParams.set("redirect_uri", new URL("/api/auth/callback", broker).toString());
   authorize.searchParams.set("state", state);
 
