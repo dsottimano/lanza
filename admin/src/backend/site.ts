@@ -21,6 +21,10 @@ export interface SiteConfigData {
   locales: LocaleDef[];
   // Set true by the onboarding wizard once first-run setup is complete.
   onboarded?: boolean;
+  // The site's public origin (e.g. https://lanzacms.com), used as Astro's `site`
+  // for canonical/OG/hreflang. Derived from the connected Cloudflare Pages project
+  // (Site Health → Set site URL); if unset, the build falls back to CF_PAGES_URL.
+  url?: string;
 }
 
 // Pre-onboarding default: a single English locale. Used when site.json is absent
@@ -35,12 +39,14 @@ export const site = reactive<{
   defaultLocale: string;
   locales: LocaleDef[];
   onboarded: boolean;
+  url: string | null; // public origin for canonical/OG; null until derived
   sha: string | null; // blob sha of site.json, for in-place updates
   loaded: boolean;
 }>({
   defaultLocale: FALLBACK.defaultLocale,
   locales: FALLBACK.locales,
   onboarded: false,
+  url: null,
   sha: null,
   loaded: false,
 });
@@ -52,6 +58,7 @@ function applySite(data: Record<string, unknown>, sha: string | null): void {
   site.defaultLocale = (data.defaultLocale as string) || locales[0].code;
   site.locales = locales;
   site.onboarded = data.onboarded === true;
+  site.url = typeof data.url === "string" && data.url ? data.url : null;
   site.sha = sha;
 }
 

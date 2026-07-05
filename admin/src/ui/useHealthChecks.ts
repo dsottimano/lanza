@@ -14,6 +14,7 @@ import {
   type PagesProject,
   type PagesDeploymentConfig,
 } from "../backend/cloudflare";
+import { site, putJsonSafe, SITE_CONFIG_PATH } from "../backend/site";
 
 // ── Card view-models ──────────────────────────────────────────────────────
 
@@ -47,6 +48,18 @@ export interface PagesCard {
   deployStatus: "live" | "building" | "failed" | "unknown" | null;
   deployWhen: string | null; // relative time, e.g. "3 minutes ago"
   deployUrl: string | null;
+}
+
+/**
+ * Site address card. The site's public origin drives Astro's `site` (canonical /
+ * OG / hreflang). We derive a suggestion from the connected Pages project's domains
+ * and let the user commit it to data/site.json — so the URL tracks the real host
+ * instead of a hardcoded placeholder. `current` mirrors the live `site.url`.
+ */
+export interface SiteUrlCard {
+  suggestion: string | null; // best guess from the Pages project (custom domain first)
+  busy: boolean; // a "Set" write is in flight
+  detail: string; // error detail, if a write failed
 }
 
 export type ServiceKind = "kv" | "d1" | "r2";
@@ -193,6 +206,12 @@ export function useHealthChecks(github: GitHubClient) {
     r2: freshService("r2"),
   });
 
+  const siteUrlCard = reactive<SiteUrlCard>({
+    suggestion: null,
+    busy: false,
+    detail: "",
+  });
+
   // Proxy reachability — set as a side effect of the checks (no extra requests).
   // null = not yet determined this run.
   const proxies = reactive<{ gh: boolean | null; cf: boolean | null }>({
@@ -317,6 +336,7 @@ export function useHealthChecks(github: GitHubClient) {
   function cascadeNotConfigured(): void {
     pagesCard.state = "notConfigured";
     pagesCard.summary = "Set up the Cloudflare connection first.";
+    siteUrlCard.suggestion = null;
     for (const k of SERVICE_KINDS) {
       services[k].state = "notConfigured";
       services[k].resourceName = null;
@@ -329,6 +349,7 @@ export function useHealthChecks(github: GitHubClient) {
     pagesCard.state = "error";
     pagesCard.summary = "Couldn't read the Cloudflare project.";
     pagesCard.detail = detail;
+    siteUrlCard.suggestion = null;
     for (const k of SERVICE_KINDS) {
       services[k].state = "error";
       services[k].detail = detail;
@@ -348,12 +369,14 @@ export function useHealthChecks(github: GitHubClient) {
       pagesCard.deployStatus = null;
       pagesCard.deployWhen = null;
       pagesCard.deployUrl = null;
+      siteUrlCard.suggestion = null;
       return;
     }
 
     const project = projectRes.value as ProjectWithBranch;
     pagesCard.state = "ok";
     pagesCard.projectName = project.name;
+    siteUrlCard.suggestion = pickSiteUrl(project);
     pagesCard.productionBranch = project.production_branch ?? null;
     pagesCard.summary = `Project "${project.name}" is set up.`;
     pagesCard.detail = "";
@@ -436,6 +459,34 @@ export function useHealthChecks(github: GitHubClient) {
   }
 
   // ── Actions ──
+
+  /**
+   * Commit a public site URL to data/site.json (merge-preserving other keys), so
+   * the next build uses it as Astro's `site`. Updates the live `site.url` so the
+   * UI reflects it immediately. `url` is validated/normalized to an origin first.
+   */
+  async function setSiteUrl(url: string): Promise<void> {
+    const origin = normalizeOrigin(url);
+    if (!origin) {
+      siteUrlCard.detail = "That doesn't look like a valid https:// address.";
+      return;
+    }
+    siteUrlCard.busy = true;
+    siteUrlCard.detail = "";
+    try {
+      await putJsonSafe(
+        github,
+        SITE_CONFIG_PATH,
+        (cur) => ({ ...cur, url: origin }),
+        `lanza: set site URL to ${origin}`,
+      );
+      site.url = origin;
+    } catch (e) {
+      siteUrlCard.detail = describe(e);
+    } finally {
+      siteUrlCard.busy = false;
+    }
+  }
 
   /** Off → create the resource named after the project, then bind it. */
   async function enable(kind: ServiceKind): Promise<void> {
@@ -547,13 +598,39 @@ export function useHealthChecks(github: GitHubClient) {
     githubCard,
     cfApiCard,
     pagesCard,
+    siteUrlCard,
     services,
     proxies,
     refreshing,
     refreshAll,
     enable,
     connect,
+    setSiteUrl,
   };
+}
+
+// The site's public origin from its Pages project: prefer an attached custom
+// domain, else the project's `<name>.pages.dev` subdomain. Returns an https origin
+// or null. Cloudflare's `domains` array holds both custom domains and the pages.dev.
+export function pickSiteUrl(project: PagesProject): string | null {
+  const domains = Array.isArray(project.domains) ? project.domains : [];
+  const custom = domains.find((d) => typeof d === "string" && !d.endsWith(".pages.dev"));
+  const host = custom ?? project.subdomain ?? domains[0] ?? null;
+  return host ? normalizeOrigin(host) : null;
+}
+
+// A user/host string → a normalized https origin, or null if unusable. A bare host
+// (no scheme) is assumed https; anything non-http(s) or unparseable is rejected.
+function normalizeOrigin(value: string): string | null {
+  const raw = (value ?? "").trim();
+  if (!raw) return null;
+  try {
+    const u = new URL(/^https?:\/\//.test(raw) ? raw : `https://${raw}`);
+    if (u.protocol !== "http:" && u.protocol !== "https:") return null;
+    return u.origin;
+  } catch {
+    return null;
+  }
 }
 
 // ── Kind-specific normalization (kept as free functions, no `this`) ─────────

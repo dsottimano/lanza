@@ -19,6 +19,20 @@ import { join } from "node:path";
 // This file sits at the package root; the render code is in ./frontend.
 const PKG_ROOT = fileURLToPath(new URL(".", import.meta.url));
 
+// A tenant's `site.json.url` → a valid absolute origin for Astro's `site`, or null
+// if unset/garbage (so the caller falls through to CF_PAGES_URL). Astro throws on an
+// invalid `site`, so a bad committed value must never reach it.
+function resolveSiteUrl(url) {
+  if (typeof url !== "string" || !url.trim()) return null;
+  try {
+    const u = new URL(url.trim());
+    if (u.protocol !== "http:" && u.protocol !== "https:") return null;
+    return u.origin; // normalized, no trailing slash/path
+  } catch {
+    return null;
+  }
+}
+
 export function lanzaConfig() {
   // Locale set is tenant data — the single source of truth is <tenant>/data/site.json
   // (also read by frontend/lib/i18n.ts). Read it from the project root (cwd) so
@@ -29,7 +43,12 @@ export function lanzaConfig() {
   const locales = site.locales.map((l) => l.code);
 
   return defineConfig({
-    site: "https://example.com",
+    // Public origin for canonical/OG/hreflang. Precedence: the tenant's committed
+    // `url` (derived from their Cloudflare Pages project via the CMS, so it tracks
+    // the real production domain) → `CF_PAGES_URL` (auto-set on every Pages build,
+    // so a fresh site still gets a real deploy URL instead of a placeholder) →
+    // localhost for a bare local build. No more hardcoded example.com.
+    site: resolveSiteUrl(site.url) || process.env.CF_PAGES_URL || "http://localhost:4321",
     // The render code lives in the package (not the tenant's ./src) — an absolute
     // path so it resolves the same whether this package is the repo itself
     // (monorepo dogfood) or installed under the tenant's node_modules.

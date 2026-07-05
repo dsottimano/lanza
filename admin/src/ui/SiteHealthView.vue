@@ -5,8 +5,9 @@
 // editors get a plain-English status + one-click "Enable"/"Connect"; the
 // technical detail lives behind each card's expander. All data + provisioning
 // logic is in useHealthChecks; this file only renders it.
-import { onMounted, reactive } from "vue";
+import { onMounted, reactive, ref } from "vue";
 import { GitHubClient } from "../backend/github";
+import { site } from "../backend/site";
 import {
   useHealthChecks,
   SERVICE_META,
@@ -21,13 +22,24 @@ const {
   githubCard,
   cfApiCard,
   pagesCard,
+  siteUrlCard,
   services,
   proxies,
   refreshing,
   refreshAll,
   enable,
   connect,
+  setSiteUrl,
 } = useHealthChecks(props.client);
+
+// Manual site-URL entry (used when there's no connected project to derive from).
+const manualUrl = ref("");
+async function applyManualUrl() {
+  const v = manualUrl.value.trim();
+  if (!v) return;
+  await setSiteUrl(v);
+  if (!siteUrlCard.detail) manualUrl.value = "";
+}
 
 // Which cards have their detail expanded.
 const open = reactive<Record<string, boolean>>({});
@@ -235,6 +247,49 @@ onMounted(refreshAll);
               <div v-if="open.pages && pagesCard.detail" class="mt-2 rounded-lg bg-[var(--surface)] p-3 text-xs">
                 <p class="font-mono text-[11px] text-zinc-500">{{ pagesCard.detail }}</p>
               </div>
+            </div>
+          </div>
+        </section>
+
+        <!-- Site address (Astro `site` → canonical / OG / hreflang) -->
+        <section class="card p-5">
+          <div class="flex items-start gap-3">
+            <span class="mt-1.5 h-2.5 w-2.5 shrink-0 rounded-full" :class="site.url ? dotClass.ok : dotClass.muted" />
+            <div class="min-w-0 flex-1">
+              <h3 class="font-semibold text-zinc-900">Site address</h3>
+              <p class="mt-0.5 text-sm text-zinc-600">
+                The public URL used for canonical links, social previews and search.
+              </p>
+              <p class="mt-2 break-all text-sm">
+                <span v-if="site.url" class="font-medium text-zinc-800">{{ site.url }}</span>
+                <span v-else class="text-zinc-500">Not set — the build falls back to the deployment URL.</span>
+              </p>
+
+              <!-- Derive from the connected Pages project -->
+              <button
+                v-if="siteUrlCard.suggestion && siteUrlCard.suggestion !== site.url"
+                class="btn btn-ghost mt-2"
+                :disabled="siteUrlCard.busy"
+                @click="setSiteUrl(siteUrlCard.suggestion)"
+              >
+                Use {{ siteUrlCard.suggestion }}
+              </button>
+
+              <!-- Or set it manually -->
+              <div class="mt-3 flex gap-2">
+                <input
+                  v-model="manualUrl"
+                  class="input min-w-0 flex-1"
+                  placeholder="https://yoursite.com"
+                  @keyup.enter="applyManualUrl"
+                />
+                <button
+                  class="btn btn-primary"
+                  :disabled="siteUrlCard.busy || !manualUrl.trim()"
+                  @click="applyManualUrl"
+                >Set</button>
+              </div>
+              <p v-if="siteUrlCard.detail" class="mt-2 text-xs text-red-600">{{ siteUrlCard.detail }}</p>
             </div>
           </div>
         </section>

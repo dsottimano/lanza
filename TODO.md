@@ -1,3 +1,66 @@
+# Lanza — session 7 (2026-07-05): header/footer visual builder + Cloudflare wiring
+
+**☑ Shipped to main (`29e10f5`):** Settings condensed 11→8; header/footer **visual
+builder** (parts parsed into reorderable section cards — menu→friendly editor,
+brand/switcher→cards, other markup→editable HTML blocks — + live preview; lossless
+parse/serialize proven byte-for-byte); Brand+Themes merged; dead Appearance form dropped.
+
+## ◐ Cloudflare connection (redirects + site URL) — CODE DONE, UNCOMMITTED, needs Dave's secrets
+
+**Scope Dave chose:** (1) our own instance first (lanzacms.com / dsottimano/lanza),
+(2) "preview domains" == **fix the site-URL config** (kill hardcoded example.com,
+derive the real URL from the connected Pages project), (3) redirects: **build-time
+`_redirects` is fine** — just wire the CF connection so publish-status shows.
+
+**⚠ Working tree is UNCOMMITTED** (Dave asked to hold before committing). Changed:
+`astro-config.mjs`, `admin/src/backend/site.ts`, `admin/src/ui/useHealthChecks.ts`
+(+`.test.ts`), `admin/src/ui/SiteHealthView.vue`, `TODO.md`. To resume: review the
+diff, then commit + push to main (or `git stash` if switching tasks).
+
+**☑ Built + verified (vue-tsc clean · 30 admin tests · astro check 0 errors · real
+build confirms canonicals use the deploy URL, no example.com anywhere in dist):**
+- `astro-config.mjs` resolves `site:` = `data/site.json.url` (real domain) →
+  `process.env.CF_PAGES_URL` (auto on every Pages build) → `http://localhost:4321`.
+  Helper `resolveSiteUrl()` validates so a bad committed value can't crash Astro.
+- `data/site.json` gained an optional `url` field (`admin/src/backend/site.ts`:
+  `SiteConfigData.url`, `site.url` reactive, `applySite`).
+- **Site Health → "Site address" card** (`useHealthChecks.ts` + `SiteHealthView.vue`):
+  derives a suggestion from the connected Pages project (`pickSiteUrl` — prefers a
+  custom domain over `<project>.pages.dev`), one-click "Use <domain>" writes it to
+  site.json via `putJsonSafe`, plus a manual input. `setSiteUrl` normalizes to an
+  origin. `pickSiteUrl` is exported + unit-tested.
+- Redirects pipeline confirmed working end-to-end (no code change): CMS →
+  `data/redirects.json` → `scripts/gen-redirects.mjs` → `public/_redirects` → Pages,
+  on each deploy. Redirects view already polls deploy-status when CF is connected.
+
+**☐ THE GATING MANUAL STEP (only Dave can do) — set 3 secrets, then everything CF
+lights up (Site Health green, the "Use <domain>" button, redirect publish-status):**
+1. Create a **scoped API token** (CF dashboard → My Profile → API Tokens → Custom):
+   Account perms **Workers KV: Edit · D1: Edit · R2: Edit · Cloudflare Pages: Edit**.
+2. **Prod:** Pages project → Settings → Environment variables (Production):
+   `CLOUDFLARE_API_TOKEN`, `CLOUDFLARE_ACCOUNT_ID`, `PAGES_PROJECT` (project name).
+3. **Dev:** `cp admin/.sample.env admin/.env`, fill the same three.
+   (Or, without CF: just type the domain into the new "Site address" field to set
+   `site.json.url` manually — didn't hardcode lanzacms.com because the docs also call
+   it the *broker's* Pages project, so the real content-site host is ambiguous.)
+
+**Hard limit (verified vs CF docs, `onboarding-broker-design.md:171`):** creating +
+git-connecting the Pages project itself CANNOT be API-automated (needs dashboard
+OAuth) — stays a guided manual step for tenants. Everything downstream is now wired.
+
+**Next (deferred):** roll this into tenant onboarding (the wizard is GitHub-only
+today); custom-domain management via CF API (design doc deferred to post-v1);
+optional instant redirects via CF Bulk Redirects (needs a zone/custom domain).
+
+**☐ Backlog / ideas:**
+- **Variables page in Settings** (Dave, 2026-07-05) — a place to define site-wide
+  custom variables/values usable as `{{ placeholders }}` in templates + the
+  header/footer builder (his intended fix for wanting dynamic values like a
+  computed year/date instead of raw `<script>`, which the template engine emits
+  verbatim and the preview sandbox blocks). Feeds `partData` / template-render.
+
+---
+
 # Lanza — session 6 (2026-07-04): template-first editor + live preview + editable slugs
 
 **State now — COMMITTED + PUSHED to `origin/main` (`857a7ac`).** vue-tsc clean ·
