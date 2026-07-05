@@ -33,7 +33,25 @@ and PUSHED to `origin/staging` (`bcb6098`):**
   Menu) and the language switcher is an in-template `{{#each locales}}` loop — so switching
   is a placeable, editable element (move the block between header/footer). No `fields.json`
   for parts (their data is computed system data). Doc: `docs/authoring-templates.md`
-  "Site parts". OPEN: no CMS editor for parts yet (menu still edits via Settings → Menu).
+  "Site parts".
+- **CMS: Parts editor** — Settings → "Header & footer" (`admin/src/ui/PartsView.vue` +
+  `backend/parts.ts`) edits `templates/parts/{header,footer}.html` via loadText/saveText.
+- **CMS: real routes + locale-equivalent language switch (vue-router) + tests.** The admin
+  was a routerless SPA; `setLocale` dumped you to the list. Added `vue-router` (hash) —
+  `admin/src/router.ts`; App.vue derives panes from the route, nav = `router.push`, dirty
+  guard = one global `beforeEach`. Language switch swaps the `:locale` segment →
+  translation (same slug). CollectionList rows/"new" are real `<router-link>`s. Tests:
+  `admin/src/router.test.ts` + `ui/CollectionList.test.ts` (vitest + @vue/test-utils +
+  happy-dom, 7/7); `npm test`. vue-tsc + admin build clean. **Dave does live SPA QA** (see
+  [[dave-workflow-preferences]] — he's the live-QA teammate; hand him a click-through list,
+  don't caveat about not driving the browser).
+- **Fix: header nav (menu + switcher) now shows on landing pages** — was gated by
+  `{{#if showNav}}`; the whole marketing site is `landing`, so it only appeared on /posts.
+  Gate dropped in `templates/parts/header.html`.
+- **All the above committed on `main` (now ~28 ahead of origin/main, UNPUSHED) and pushed to
+  `origin/staging` (latest `1130c6d`).** origin/staging accrues CMS edits (Dave saved
+  en/home.md, menu) — each staging sync is `git merge main` (keeps those). Deploy wiring
+  sanity-checked safe (functions/ at root, self-contained; build = `npm run build` → dist).
 
 **Staging push (`bcb6098`) unblocks the CMS:** the local admin (new code) reading
 `origin/staging` now sees `content/pages/{en,es}/home.md` + `templates/manifesto/` +
