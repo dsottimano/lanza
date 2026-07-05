@@ -1,5 +1,6 @@
 <script setup lang="ts">
-import { defineAsyncComponent, h, ref, shallowRef } from "vue";
+import { computed, defineAsyncComponent, h, ref, shallowRef } from "vue";
+import { useRoute, useRouter } from "vue-router";
 // Eager: the shell that's always on screen at boot.
 import Sidebar from "./ui/Sidebar.vue";
 import CollectionList from "./ui/CollectionList.vue";
@@ -17,9 +18,6 @@ const lazyPane = (loader: () => Promise<unknown>) =>
     loader: loader as never,
     loadingComponent: PaneFallback,
     delay: 0,
-    // A failed chunk fetch must never dead-end in a blank pane. Retry once
-    // (transient blip), then surface it — the usual cause in dev is a stale
-    // Vite optimizer under a tab that outlived a dev-server restart.
     onError(error, retry, fail, attempts) {
       if (attempts <= 1) return retry();
       reportError(
@@ -52,7 +50,15 @@ import { site, loadSiteConfig } from "./backend/site";
 import { loadSchema } from "./backend/schema";
 import { reportError } from "./errors";
 import { confirmDiscard } from "./ui/dirty";
-import { getCollection, folderCollections, type FolderCollection, type FileEntry } from "./schema";
+import {
+  getCollection,
+  folderCollections,
+  entryFolder,
+  COLLECTIONS,
+  type FolderCollection,
+  type FileEntry,
+} from "./schema";
+import { listRoute, localeSwapRoute } from "./router";
 
 type Pane =
   | "list"
@@ -71,162 +77,121 @@ type Pane =
   | "contentTypes"
   | "publish";
 
+const route = useRoute();
+const router = useRouter();
+
 // The token lives server-side (the /admin/api/gh proxy). Past Cloudflare Access
-// the CMS just boots — no sign-in screen, no localStorage PAT. The client carries
-// no token; the proxy injects it.
+// the CMS just boots — no sign-in screen, no localStorage PAT.
 const client = shallowRef(new GitHubClient());
-// Load the data-driven site config (locales) from the repo before rendering, so
-// the language rail and default locale reflect data/site.json.
 const ready = ref(false);
-// Make sure the working branch (staging) exists before the first read — a fresh
-// repo has only `main`, and reads against a missing branch 404 and masquerade as
-// an un-onboarded repo. Then load the data-driven config + content model from it.
+const defaultCollection = () =>
+  (getCollection("posts") ?? folderCollections()[0]) as FolderCollection;
+
+// Ensure the working branch (staging) exists, then load the data-driven config +
+// content model. Only after the model is loaded can routes resolve collections.
 client.value
   .ensureWorkingBranch()
   .then(() => Promise.all([loadSiteConfig(client.value), loadSchema(client.value)]))
   .then(() => {
-    locale.value = site.defaultLocale;
-    // Re-resolve the default collection against the loaded model — the seeded
-    // "posts" may have been renamed/removed via the content-type editor.
-    collection.value = (getCollection("posts") ?? folderCollections()[0]) as FolderCollection;
+    // Booted at "/" → land on the default collection's list in the default locale.
+    if (route.name === "home") {
+      router.replace(listRoute(defaultCollection().name, site.defaultLocale));
+    }
   })
   .catch((e) => reportError(e))
   .finally(() => {
     ready.value = true;
   });
 
-const pane = ref<Pane>("list");
-// Active editing language. Scopes localized collections (posts/pages/taxonomies)
-// to their per-locale subfolder; shared collections (authors) ignore it.
-const locale = ref<Locale>("en");
-const collection = shallowRef<FolderCollection>(getCollection("posts") as FolderCollection);
-const editingPath = ref<string | null>(null);
-const settingsFile = shallowRef<FileEntry | null>(null);
+// Every navigation guards on unsaved changes — one global guard replaces the
+// per-action confirmDiscard() calls the manual nav functions used to make.
+router.beforeEach(() => confirmDiscard());
 
-// Every pane transition guards on unsaved changes: if the active editor is dirty,
-// confirmDiscard() prompts and bails out when the user cancels.
-
-function selectCollection(name: string) {
-  if (!confirmDiscard()) return;
-  collection.value = getCollection(name) as FolderCollection;
-  settingsFile.value = null;
-  editingPath.value = null;
-  pane.value = "list";
+// ── route → on-screen state ────────────────────────────────────────────────
+// Settings panels that are their own pane (vs. the file-backed menu/redirects/seo).
+const SPECIAL_PANELS: Record<string, Pane> = {
+  parts: "parts",
+  brand: "brand",
+  themes: "themes",
+  blocks: "blocks",
+  contentTypes: "contentTypes",
+  health: "health",
+  languages: "languages",
+};
+function settingsFileByName(name: string): FileEntry | null {
+  const fc = COLLECTIONS.find((c) => c.kind === "files");
+  return fc && fc.kind === "files" ? (fc.files.find((f) => f.name === name) ?? null) : null;
 }
 
-// Switching language drops back to the list so you never edit one locale's entry
-// while the rail says another. The list re-fetches via its locale-keyed remount.
-function setLocale(l: Locale) {
-  if (!confirmDiscard()) return;
-  locale.value = l;
-  settingsFile.value = null;
-  editingPath.value = null;
-  pane.value = "list";
-}
+const locale = computed<Locale>(() => (route.params.locale as string) || site.defaultLocale);
+const routeCollection = computed<FolderCollection | undefined>(
+  () => getCollection(route.params.collection as string) as FolderCollection | undefined,
+);
+// Always a real collection (falls back to the default) so the Sidebar/list never
+// see `undefined`; non-collection routes just don't render the list.
+const collection = computed<FolderCollection>(() => routeCollection.value ?? defaultCollection());
+const settingsFile = computed<FileEntry | null>(() =>
+  route.name === "settings" ? settingsFileByName(route.params.panel as string) : null,
+);
 
-function openSettings(file: FileEntry) {
-  if (!confirmDiscard()) return;
-  settingsFile.value = file;
-  // A file entry can route to a purpose-built pane (Menu, Redirects) instead of
-  // the generic form.
-  pane.value = file.view ?? "settings";
-}
-
-function openHealth() {
-  if (!confirmDiscard()) return;
-  settingsFile.value = null;
-  editingPath.value = null;
-  pane.value = "health";
-}
-
-function openHelp() {
-  if (!confirmDiscard()) return;
-  settingsFile.value = null;
-  editingPath.value = null;
-  pane.value = "help";
-}
-
-function openLanguages() {
-  if (!confirmDiscard()) return;
-  settingsFile.value = null;
-  editingPath.value = null;
-  pane.value = "languages";
-}
-
-function openThemes() {
-  if (!confirmDiscard()) return;
-  settingsFile.value = null;
-  editingPath.value = null;
-  pane.value = "themes";
-}
-
-function openBrand() {
-  if (!confirmDiscard()) return;
-  settingsFile.value = null;
-  editingPath.value = null;
-  pane.value = "brand";
-}
-
-function openParts() {
-  if (!confirmDiscard()) return;
-  settingsFile.value = null;
-  editingPath.value = null;
-  pane.value = "parts";
-}
-
-function openBlocks() {
-  if (!confirmDiscard()) return;
-  settingsFile.value = null;
-  editingPath.value = null;
-  pane.value = "blocks";
-}
-
-function openContentTypes() {
-  if (!confirmDiscard()) return;
-  settingsFile.value = null;
-  editingPath.value = null;
-  pane.value = "contentTypes";
-}
-
-function openPublish() {
-  if (!confirmDiscard()) return;
-  settingsFile.value = null;
-  editingPath.value = null;
-  pane.value = "publish";
-}
-
-// Languages saved: the config store is already refreshed. If the active editing
-// locale was just removed, fall back to the default. Return to the list.
-function onLanguagesSaved() {
-  if (!site.locales.some((l) => l.code === locale.value)) {
-    locale.value = site.defaultLocale;
+const pane = computed<Pane>(() => {
+  switch (route.name) {
+    case "entry":
+      return collection.value.body === "rich" ? "editRich" : "editRecord";
+    case "settings": {
+      const panel = route.params.panel as string;
+      return SPECIAL_PANELS[panel] ?? (settingsFileByName(panel)?.view ?? "settings");
+    }
+    case "publish":
+      return "publish";
+    case "help":
+      return "help";
+    default:
+      return "list";
   }
-  pane.value = "list";
-}
+});
 
-function openEntry(path: string) {
-  editingPath.value = path;
-  pane.value = collection.value.body === "rich" ? "editRich" : "editRecord";
-}
+const editingPath = computed<string | null>(() => {
+  if (route.name !== "entry") return null;
+  const slug = route.params.slug as string;
+  return slug === "new" ? null : `${entryFolder(collection.value, locale.value)}/${slug}.md`;
+});
 
-function newEntry() {
-  editingPath.value = null;
-  pane.value = collection.value.body === "rich" ? "editRich" : "editRecord";
+// ── navigation (push the URL; the beforeEach guard handles unsaved changes) ──
+function selectCollection(name: string) {
+  router.push(listRoute(name, locale.value));
 }
-
-// Shared "return to the list" handler for the editors' ← Back and the settings/
-// help/themes/languages panes. Guards on unsaved changes like the rail nav does.
-// The list remounts (its :key changes) and reloads on its own, so nothing to
-// refresh here.
+function setLocale(l: Locale) {
+  // Same screen, other language: swaps the :locale segment, so an open entry lands
+  // on its translation (same slug) rather than dropping you to the list.
+  router.push(localeSwapRoute(route, l));
+}
+function openSettings(file: FileEntry) {
+  router.push(`/settings/${file.name}`);
+}
+function openPanel(panel: string) {
+  router.push(`/settings/${panel}`);
+}
+function openPublish() {
+  router.push("/publish");
+}
+function openHelp() {
+  router.push("/help");
+}
 function backToList() {
-  if (!confirmDiscard()) return;
-  pane.value = "list";
+  router.push(listRoute(collection.value.name, locale.value));
 }
 
-// Onboarding just finished: config was reloaded, so adopt the new default locale
-// and fall through to the CMS (site.onboarded is now true).
+// Languages saved: if the active editing locale was just removed, fall back to the
+// default. Return to the list either way.
+function onLanguagesSaved() {
+  const l = site.locales.some((x) => x.code === locale.value) ? locale.value : site.defaultLocale;
+  router.push(listRoute(collection.value.name, l));
+}
+
+// Onboarding finished: config reloaded — land on the default collection list.
 function onOnboarded() {
-  locale.value = site.defaultLocale;
+  router.push(listRoute(defaultCollection().name, site.defaultLocale));
 }
 </script>
 
@@ -263,13 +228,13 @@ function onOnboarded() {
       @select="selectCollection"
       @select-locale="setLocale"
       @open-settings="openSettings"
-      @languages="openLanguages"
-      @themes="openThemes"
-      @brand="openBrand"
-      @parts="openParts"
-      @blocks="openBlocks"
-      @health="openHealth"
-      @content-types="openContentTypes"
+      @languages="openPanel('languages')"
+      @themes="openPanel('themes')"
+      @brand="openPanel('brand')"
+      @parts="openPanel('parts')"
+      @blocks="openPanel('blocks')"
+      @health="openPanel('health')"
+      @content-types="openPanel('contentTypes')"
       @publish="openPublish"
       @help="openHelp"
     />
@@ -345,8 +310,6 @@ function onOnboarded() {
         :client="client"
         :collection="collection"
         :locale="locale"
-        @open="openEntry"
-        @new="newEntry"
       />
       </Transition>
     </main>

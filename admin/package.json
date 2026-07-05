@@ -6,6 +6,7 @@
     "dev": "vite",
     "build": "vue-tsc --noEmit && vite build",
     "typecheck": "vue-tsc --noEmit",
+    "test": "vitest run",
     "preview": "vite preview"
   },
   "dependencies": {
@@ -22,15 +23,19 @@
     "@tiptap/vue-3": "3.27.1",
     "js-yaml": "5.2.0",
     "marked": "18.0.5",
-    "vue": "3.5.39"
+    "vue": "3.5.39",
+    "vue-router": "4.6.4"
   },
   "devDependencies": {
     "@tailwindcss/vite": "4.3.1",
     "@types/js-yaml": "4.0.9",
     "@vitejs/plugin-vue": "6.0.7",
+    "@vue/test-utils": "2.4.11",
+    "happy-dom": "20.10.6",
     "tailwindcss": "4.3.1",
     "typescript": "6.0.3",
     "vite": "8.1.0",
+    "vitest": "4.1.9",
     "vue-tsc": "3.3.5"
   }
 }

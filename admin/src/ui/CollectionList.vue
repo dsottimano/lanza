@@ -6,16 +6,17 @@ import { GitHubClient, type RepoFile } from "../backend/github";
 import { entryFolder, type FolderCollection } from "../schema";
 import type { Locale } from "../backend/config";
 import { reportError } from "../errors";
+import { entryRoute } from "../router";
 
 const props = defineProps<{
   client: GitHubClient;
   collection: FolderCollection;
   locale: Locale;
 }>();
-const emit = defineEmits<{
-  (e: "open", path: string): void;
-  (e: "new"): void;
-}>();
+
+// Rows + "new" are real links (router-links) to real entry URLs, so a page has a
+// deep-linkable address and the language switch can swap to its translation.
+const slugOf = (file: RepoFile) => file.name.replace(/\.md$/, "");
 
 const entries = ref<RepoFile[]>([]);
 const loading = ref(true);
@@ -49,10 +50,10 @@ watch(() => props.collection.name, load, { immediate: true });
           {{ entries.length }} {{ entries.length === 1 ? "entry" : "entries" }}
         </p>
       </div>
-      <button class="btn btn-primary" @click="emit('new')">
+      <router-link class="btn btn-primary" :to="entryRoute(collection.name, locale, 'new')">
         <span class="text-base leading-none">+</span>
         New {{ collection.labelSingular.toLowerCase() }}
-      </button>
+      </router-link>
     </div>
 
     <!-- Layout-stable skeleton: same rounded card shell as the list, so content
@@ -75,23 +76,23 @@ watch(() => props.collection.name, load, { immediate: true });
       class="rounded-2xl border border-dashed border-[var(--border)] bg-[var(--paper-card)] py-16 text-center"
     >
       <p class="text-sm text-zinc-600">No {{ collection.label.toLowerCase() }} yet.</p>
-      <button
-        class="mt-3 text-sm font-medium text-zinc-900 underline-offset-2 hover:underline"
-        @click="emit('new')"
+      <router-link
+        class="mt-3 inline-block text-sm font-medium text-zinc-900 underline-offset-2 hover:underline"
+        :to="entryRoute(collection.name, locale, 'new')"
       >
         Create the first one →
-      </button>
+      </router-link>
     </div>
 
     <ul v-else class="card divide-y divide-[var(--border)] overflow-hidden">
       <li v-for="e in entries" :key="e.path">
-        <button
+        <router-link
           class="group flex w-full items-center justify-between px-4 py-3.5 text-left transition hover:bg-[var(--surface)]"
-          @click="emit('open', e.path)"
+          :to="entryRoute(collection.name, locale, slugOf(e))"
         >
-          <span class="text-sm text-zinc-800">{{ e.name.replace(/\.md$/, "") }}</span>
+          <span class="text-sm text-zinc-800">{{ slugOf(e) }}</span>
           <span class="text-zinc-500 transition group-hover:translate-x-0.5 group-hover:text-zinc-600">→</span>
-        </button>
+        </router-link>
       </li>
     </ul>
   </div>
