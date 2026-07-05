@@ -1,9 +1,12 @@
 # Lanza Onboarding — The Explicit Workflow
 
-Status: **2026-07-05.** The end-to-end *mechanics* are proven (a live site was deployed
-headless from OAuth). What's left is the **wizard UI** that orchestrates them. This doc is
-the explicit "life of an onboarding" — the *how it all fits*. The *why/decisions* live in
-`onboarding-broker-design.md`; the GitHub-side details in there + `onboarding-runbook.md`.
+Status: **2026-07-05.** The end-to-end *mechanics* are proven AND the **wizard UI is now
+built** (broker `index.html` + `api/onboard/{status,deploy}` + cookie-redirect callbacks,
+deployed to connect.lanzacms.com). What's left is a **live end-to-end verification** through
+a real browser, **Dave's go-live prereqs** (§ below), and **Phase-1 auth wiring** (the
+broker-mediated `/admin` login handoff — step 6). This doc is the explicit "life of an
+onboarding" — the *how it all fits*. The *why/decisions* live in `onboarding-broker-design.md`;
+the GitHub-side details in there + `onboarding-runbook.md`.
 
 **Model B:** the user owns their GitHub + Cloudflare accounts; the broker
 (`connect.lanzacms.com`, repo `lanza-broker`) automates everything between the two
@@ -18,12 +21,12 @@ Legend: ✅ proven/built · 🟡 built earlier, needs wizard wiring · 🔲 to b
 
 | # | Step | How | State |
 |---|---|---|---|
-| 1 | Land on wizard | `connect.lanzacms.com` — name → instant preview → "Get started" | 🔲 (Phase 5) |
-| 2 | **Connect GitHub** | OAuth (`public_repo`, one-time) → broker `POST /repos/{template}/generate` → new tenant repo; commit `lanza.config.json` (owner/name/adminLogin); ensure `staging` branch | 🟡 `functions/api/onboard/setup.ts` + `_lib/gh-app.ts` |
-| 3 | **Connect Cloudflare** | CF OAuth → broker gets access + **refresh** token, stores `{access, refresh, expires_at}` | ✅ `functions/api/auth/cf/{login,callback}.ts` |
-| 4 | **Authorize GitHub↔CF** | deep-link `github.com/apps/cloudflare-workers-and-pages/installations/new` while CF session is warm → CF links the install to their account | 🔲 (one click; the only unavoidable dashboard-side act) |
-| 5 | **Create + deploy site** | with CF token: `POST /pages/projects` (github source) → `POST …/deployments?branch=main` → live `*.pages.dev` | ✅ proven end-to-end |
-| 6 | **Land in /admin** | broker-mediated GitHub login → RS256 handoff → tenant session → the CMS | 🟡 (Phase 1 auth) |
+| 1 | Land on wizard | `connect.lanzacms.com` — name → instant preview → "Get started" | ✅ built (`lanza-broker/index.html`; pending live verify) |
+| 2 | **Connect GitHub** | OAuth (`public_repo`, one-time) → broker `POST /repos/{template}/generate` → new tenant repo; commit `lanza.config.json` (owner/name/adminLogin); ensure `staging` branch | ✅ wired into wizard (`oauth/callback.ts` → cookie → `/?step=cloudflare`) |
+| 3 | **Connect Cloudflare** | CF OAuth → broker gets access + **refresh** token, stores `{access, refresh, expires_at}` | ✅ `functions/api/auth/cf/{login,callback}.ts` (callback → `lanza_cf` cookie) |
+| 4 | **Authorize GitHub↔CF** | deep-link `github.com/apps/cloudflare-workers-and-pages/installations/new` while CF session is warm → CF links the install to their account | ✅ wired (wizard opens the deep-link + polls `POST /api/onboard/deploy` as the detector) |
+| 5 | **Create + deploy site** | with CF token: `POST /pages/projects` (github source) → `POST …/deployments?branch=main` → live `*.pages.dev` | ✅ real endpoint `api/onboard/deploy.ts` (idempotent; the git-authorize detector) |
+| 6 | **Land in /admin** | broker-mediated GitHub login → RS256 handoff → tenant session → the CMS | 🟡 (Phase 1 auth — wizard links to `<url>/admin`; the handoff isn't wired yet) |
 | 7 | **Edit + publish** | CMS saves → broker mints repo-scoped edit-token → GitHub Contents write; publish = staging→main merge | 🟡 built |
 | 8 | **Provision KV/D1/R2** (when a listing needs it) | CMS `cf/[[path]].ts` proxy → **through the broker** (Option B) using the CF token | 🔲 (decided, not built) |
 
