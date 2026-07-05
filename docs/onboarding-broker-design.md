@@ -168,20 +168,46 @@ absorbed it, is deferred — §5.1).
 
 ---
 
-## 5. Phase 3 — Hosting: guided connect on Pages
+## 5. Phase 3 — Hosting: manual Pages+Git connect, everything else via CF OAuth
 
-**VERIFIED:** there is **no third-party API/OAuth path** to wire a Pages project to a
-GitHub repo on the *user's own* Cloudflare account. The API's `source:{type:github}`
-only works once a git installation exists, and that installation is created **only**
-in the Cloudflare dashboard ("Install & Authorize"); without it the API returns
-8000010/8000011. So the one dashboard step is **unavoidable** — we make it guided:
+**DECIDED (2026-07-05):** the user does exactly **two** things by hand; a **Lanza
+Cloudflare OAuth client** does all the rest headless. (Supersedes the earlier
+"no OAuth path, fully guided-dashboard" verdict — Cloudflare shipped third-party
+OAuth clients, GA "OAuth for all" 2026-06.)
 
-1. Wizard: "Create your free Cloudflare account" (sign-up moment #2) → deep-link to
-   Pages → "Connect to Git" → pick the repo the broker just made.
-2. Build settings are pre-documented (framework preset, output dir, `NODE_VERSION`).
-3. First deploy runs; wizard polls the `*.pages.dev` URL, then hands off to `/admin`.
+- **User-done (accepted, not worth automating):** create the free Cloudflare account +
+  Pages project and authorize the **"Cloudflare Workers and Pages"** GitHub app on
+  their account. This is the one step no CF credential can self-grant —
+  `source:{type:github}` returns 8000010/8000011 until that GitHub-side app authorize
+  exists (**VERIFIED**). It's CF↔GitHub consent, outside anything our OAuth can reach.
+- **OAuth-done (headless):** the user authorizes Lanza's CF OAuth client **once**; the
+  broker then drives every other CF operation with the granted token — resource
+  provisioning (KV/D1/R2), build config, deploys, status polling. No user-created API
+  token, no secret typed.
 
-No Workers migration, no CF API token from the user, no secret typed (given §3.4-B).
+Token lifecycle (**VERIFIED 2026-07-05, corrected**): the access token is a **~16h
+bearer** and this client type issues **NO refresh token** — Cloudflare's self-service
+OAuth clients don't offer `offline_access`/`openid` (only resource scopes). So "silent
+refresh" is off the table; on expiry the user re-runs the OAuth consent (Dave's accepted
+call). The broker stores the token meanwhile. **Open sub-point:** where the runtime
+`functions/admin/api/cf/[[path]].ts` proxy sources the token — broker-injected into the
+tenant Pages project vs. proxied through the broker — resolve when wiring Phase 3.
+
+No Workers migration; no CF API token from the user; no secret typed (given §3.4-B).
+
+**VERIFIED end-to-end (2026-07-05).** Built + proven live on `lanza-broker.pages.dev`:
+`functions/api/auth/cf/{login,callback}.ts` (confidential client, `client_secret_post`,
+CSRF `state` cookie). Full loop works: authorize → consent → code → token exchange →
+`GET /accounts` returns the account (token drives the CF API). Concrete facts learned:
+- **Endpoints** (`dash.cloudflare.com`): `/oauth2/auth`, `/oauth2/token`, `/oauth2/userinfo`.
+- **Scopes must be sent explicitly** — omitting `scope` triggers a generic "unexpected
+  error" at consent. Scope IDs are **dot notation = API-token permission IDs** (not the
+  `resource:access` colon strings wrangler uses); fetch via `GET /client/v4/oauth/scopes`.
+- **Least-privilege set for the proxy:** `account-settings.read`, `user-details.read`,
+  `workers-kv-storage.write`, `d1.write`, `workers-r2.write`, `page.read`. The client
+  must be configured with (at least) these.
+- **Redirect URI must exactly match** a registered one; `lanza-broker.pages.dev/...`
+  works today (lanzacms.com still serves the dogfood site, not the broker Functions).
 
 ### 5.1 Why the Deploy-to-Cloudflare button is deferred
 
@@ -233,11 +259,18 @@ identity** now shared by the CMS so onboarding and the editor read as one produc
    Record App ID, client_id, client_secret.
 2. **Generate the handoff keypair** (I'll give exact `openssl` commands): private →
    broker secret `HANDOFF_PRIVATE_KEY`; public → template repo.
-3. **Broker secrets** (Pages): `GH_APP_ID`, `GH_APP_PRIVATE_KEY`, `GH_APP_CLIENT_ID`,
-   `GH_APP_CLIENT_SECRET`, `HANDOFF_PRIVATE_KEY`, `TEMPLATE_OWNER`/`TEMPLATE_REPO`.
-   *(No CF OAuth creds — hosting is user-connected, guided.)*
-4. **Thin template repo** (Lanza-owned, public) — content-only (Phase 4 shapes it).
-5. **Broker Pages project + lanzacms.com domain.**
+3. **Register the Lanza CF OAuth client** (Manage Account → OAuth clients) — **DONE +
+   verified 2026-07-05.** Config that works: Response Type **Code**, grant
+   **Authorization Code**, token auth **Client Secret POST**, scopes = the six IDs in
+   §5, redirect URIs include `https://lanza-broker.pages.dev/api/auth/cf/callback` (add
+   the lanzacms.com one once that domain fronts the broker). Domain-verification TXT
+   required. client_id + client_secret recorded.
+4. **Broker secrets** (Pages): `GH_APP_ID`, `GH_APP_PRIVATE_KEY`, `GH_APP_CLIENT_ID`,
+   `GH_APP_CLIENT_SECRET`, `HANDOFF_PRIVATE_KEY`, `TEMPLATE_OWNER`/`TEMPLATE_REPO`,
+   plus **`CLOUDFLARE_OAUTH_CLIENT_ID`/`CLOUDFLARE_OAUTH_CLIENT_SECRET`** (§5) — matches
+   the existing `CLOUDFLARE_API_TOKEN` naming.
+5. **Thin template repo** (Lanza-owned, public) — content-only (Phase 4 shapes it).
+6. **Broker Pages project + lanzacms.com domain.**
 
 ## 9. Decision log
 
@@ -255,6 +288,9 @@ identity** now shared by the CMS so onboarding and the editor read as one produc
 | 2026-07-04 | Hosting = **guided dashboard connect on Pages** | no API path wires git-integration; the one authorize is unavoidable |
 | 2026-07-04 | **Deploy button deferred** | Workers-only → whole-app migration to save ~one click |
 | 2026-07-04 | Publishing stays **staging → main** merge | unchanged |
+| 2026-07-05 | Hosting = **user manually creates Pages project + authorizes the CF GitHub app; all other CF ops via a Lanza CF OAuth client** (Dave) | OAuth-for-all shipped 2026-06; the git-authorize is the only step no CF credential can self-grant — not worth automating |
+| 2026-07-05 | CF OAuth token **stored broker-side; reauth via OAuth consent on expiry** (Dave) | client type issues NO refresh token (~16h bearer, no offline_access) — verified, so re-auth is the only path; Dave accepted |
+| 2026-07-05 | CF OAuth **verified end-to-end** on `lanza-broker.pages.dev` (`/api/auth/cf/{login,callback}`) | token exchange + `GET /accounts` work; scopes must be sent explicitly as dot-notation IDs (§5) |
 
 ## 10. Build order
 
