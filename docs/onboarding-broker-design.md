@@ -199,20 +199,30 @@ No Workers migration; no CF API token from the user; no secret typed (given §3.
 
 **VERIFIED end-to-end (2026-07-05).** Built + proven live on `lanza-broker.pages.dev`:
 `functions/api/auth/cf/{login,callback}.ts` (confidential client, `client_secret_post`,
-CSRF `state` cookie). Full loop works: authorize → consent → code → token exchange →
-`GET /accounts` **and `GET /accounts/{id}/pages/projects`** both return live data — the
-token reaches the user's **actual Pages projects** on their own account (the §5 premise,
-proven, not asserted). Concrete facts learned:
+CSRF `state` cookie). The **entire headless chain works**: authorize → consent → code →
+token exchange → `GET /accounts` + `GET /pages/projects` (read) → **`POST /pages/projects`
+with a github source (create + connect repo) → `POST …/deployments` (trigger build) →
+a real `index.html` deployed and served live at `*.pages.dev`** — zero dashboard steps
+after the one-time git authorize. Concrete facts learned:
 - **Endpoints** (`dash.cloudflare.com`): `/oauth2/auth`, `/oauth2/token`, `/oauth2/userinfo`.
 - **Scopes must be sent explicitly** — omitting `scope` triggers a generic "unexpected
   error" at consent. Scope IDs are **dot notation = API-token permission IDs** (not the
   `resource:access` colon strings wrangler uses); fetch via `GET /client/v4/oauth/scopes`.
-- **Least-privilege set for the proxy:** `account-settings.read`, `user-details.read`,
-  `workers-kv-storage.write`, `d1.write`, `workers-r2.write`, `page.read`, plus
-  **`offline_access`** (refresh token). The client must be configured with (at least)
-  these scopes AND both grant types (`authorization_code` + `refresh_token`).
-- **Redirect URI must exactly match** a registered one; `lanza-broker.pages.dev/...`
-  works today (lanzacms.com still serves the dogfood site, not the broker Functions).
+- **Scope set:** `account-settings.read`, `user-details.read`, `workers-kv-storage.write`,
+  `d1.write`, `workers-r2.write`, `page.read` **+ `page.write`** (create/deploy Pages — read
+  alone → 10000 auth error on POST) **+ `offline_access`** (refresh token). The client must
+  be configured with these scopes AND both grant types (`authorization_code` + `refresh_token`).
+- **Two deploy gotchas:** (a) `page.write` is required to create a project, not just read;
+  (b) creating a git-sourced project **does not auto-deploy** — the UI shows "no deployment"
+  until a push or an explicit **`POST …/deployments`** (branch=main), which we now call so no
+  dummy commit is needed.
+- **The one manual step** (git authorize) is handled by deep-linking the user to
+  **`github.com/apps/cloudflare-workers-and-pages/installations/new`** right after the CF
+  OAuth (warm CF session) — same install Cloudflare's own "Connect to Git" funnels to; the
+  account link rides the CF session cookie. No API to confirm it (feature request open), so
+  the `POST /pages/projects` attempt is the detector (succeeds once linked; 8000010 until).
+- **Redirect URI must exactly match** a registered one; broker now on `connect.lanzacms.com`
+  (custom domain) — `lanza-broker.pages.dev` kept during transition.
 
 ### 5.1 Why the Deploy-to-Cloudflare button is deferred
 
@@ -296,6 +306,7 @@ identity** now shared by the CMS so onboarding and the editor read as one produc
 | 2026-07-05 | Hosting = **user manually creates Pages project + authorizes the CF GitHub app; all other CF ops via a Lanza CF OAuth client** (Dave) | OAuth-for-all shipped 2026-06; the git-authorize is the only step no CF credential can self-grant — not worth automating |
 | 2026-07-05 | CF OAuth = **consent once, broker refreshes silently** | refresh token IS available — recipe: `authorization_code`+`refresh_token` grants on the client + `offline_access` scope (both needed); ~16h access token, refresh in background |
 | 2026-07-05 | CF OAuth **verified end-to-end** on `lanza-broker.pages.dev` (`/api/auth/cf/{login,callback}`) | token exchange + `GET /accounts` work; scopes must be sent explicitly as dot-notation IDs (§5) |
+| 2026-07-05 | **Full headless deploy chain proven** — token creates git-sourced Pages project + triggers deployment → live site | needs `page.write`; git-create doesn't auto-deploy so `POST …/deployments` after; the one manual git-authorize = deep-link `github.com/apps/cloudflare-workers-and-pages/installations/new` (Dave) |
 
 ## 10. Build order
 
