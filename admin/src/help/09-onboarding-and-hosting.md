@@ -38,7 +38,7 @@ No passwords, no credential storage, no card. The one shared "Lanza CMS" GitHub 
 (slug `lanza-cms`) provides the login for every site; the per-site `ADMIN_LOGIN`
 keeps each door private.
 
-## Creating the site's repo — two credentials  · **Planned**
+## Creating the site's repo — two credentials  · **Live**
 
 Creating a repo in someone's account needs repo-creation power, and there are two
 ways to get it. We deliberately avoid the scary one:
@@ -80,26 +80,69 @@ Owners never see a version number. Sites track a **`@lanza/site@stable`** tag:
 That's auto-update with a safety valve we hold — a bad release can't hit everyone,
 and no site drifts onto ancient code.
 
-## The onboarding wizard (target flow)  · **Planned**
+## The onboarding wizard  · **Live**
 
-1. Land on lanzacms.com → "Create your site" → name + business type.
-2. Instant preview of a demo site (hook before asking for anything).
-3. **Connect GitHub** — sign in; OAuth creates the content repo *(sign-up moment 1)*.
-4. **Connect Cloudflare** — CF OAuth wires a Pages project to the repo
-   *(sign-up moment 2)*.
-5. Pick an address — a free subdomain now, a custom domain later.
-6. Done → land in `/admin`, editing.
+Go to **connect.lanzacms.com** and the whole setup above happens as one guided
+walkthrough:
+
+1. **Name your site** — type your business name, see an instant preview of a demo
+   site before you've committed to anything.
+2. **Connect GitHub** — sign in and authorize once; the wizard creates your content
+   repo for you behind the scenes *(sign-up moment 1)*.
+3. **Connect Cloudflare** — sign in and authorize once *(sign-up moment 2)*.
+4. **One manual click** — Cloudflare has to be told it's allowed to build from your
+   new GitHub repo. Neither service lets an app do this step on your behalf, so it's
+   the one dashboard click that survives automation; the wizard deep-links you
+   straight to it.
+5. **Sit back** — the wizard creates the Cloudflare Pages project, connects it to
+   your repo, and triggers the first deploy. Nothing left to click.
+6. **The health screen** — a checklist confirms every piece is wired up (see below),
+   then a button drops you straight into your CMS.
+
+Every site launches today on a free `*.pages.dev` address; picking your own domain
+is still a manual Cloudflare step (**Planned**: wizard-guided custom domains).
+
+## The health screen
+
+Two places show the same "is everything actually connected?" checklist:
+
+- **At the end of the wizard**  · **Live** — once the wizard has created and
+  deployed your site, a confirmation screen lights up each piece as it's verified:
+  GitHub repo, Cloudflare hosting, Git integration, live deployment. When
+  everything's green, a button takes you straight into `/admin`.
+- **Settings → Site Health, inside the CMS**  · **Live** — the same idea, built to
+  last. Anytime later it re-checks your GitHub connection, your Cloudflare token,
+  your Pages project and its latest deploy status, and any KV/D1/R2 storage you've
+  turned on — so if something breaks down the line (an expired token, a failed
+  deploy) you see exactly what and why, instead of a blank screen.
+
+The wizard's screen is the one-time "you did it" moment; Site Health is the same
+checklist, always there.
+
+## For developers — skip the wizard  · **Live**
+
+Lanza is a self-sufficient CMS on its own — **connect.lanzacms.com** is a
+convenience layer over it, never a requirement. A developer who'd rather not create
+an account with us at all can self-host directly:
+
+1. Clone the public template repo.
+2. Set `ADMIN_LOGIN` to your own GitHub login — and, if you'd rather run your own
+   login flow instead of the broker-mediated one, your own GitHub OAuth app.
+3. Set your own `CLOUDFLARE_API_TOKEN`. The admin's Cloudflare proxy is dual-mode:
+   if a site has its own token, it's used directly and the broker is never
+   contacted.
+4. `npm run build`, then deploy to Cloudflare Pages yourself.
+
+No wizard, no OAuth consent to us, no broker involved at any point — this path is
+an invariant the design was built around, not an afterthought.
 
 ## The broker
 
 The wizard/marketing/onboarding logic lives in a **separate** app — the *broker* —
 not in a customer's repo (it holds server-side credentials and must never be cloned
 into a tenant). It's the `lanza-broker` repo, deployed as its own Pages project, and
-is the home of **lanzacms.com**. Customer sites live on their own Cloudflare Pages.
-
-> Note: an early broker build used the GitHub App's `/generate` (the
-> Administration-scoped path). That's being reworked to the OAuth-creation +
-> thin-content-repo model described above.
+is the home of **connect.lanzacms.com**. Customer sites live on their own Cloudflare
+Pages.
 
 ## Draft vs live (unchanged)
 
