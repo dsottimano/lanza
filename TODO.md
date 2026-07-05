@@ -36,20 +36,29 @@ pushed `f8838d1`) + supporting doc/marketing work on `main` (pushed `f6f87a4`).
 
 ## ☐ NEXT SESSION — to actually go live (priority order)
 
-1. **☐ Dave's go-live prereqs (GATING — only Dave can do):**
-   - Add `https://connect.lanzacms.com/api/auth/cf/callback` to the **CF OAuth client's**
-     redirect URIs (keep the `lanza-broker.pages.dev` one during transition).
-   - Point the **`lanza-cms` GitHub App** user-auth callback at
-     `https://connect.lanzacms.com/api/auth/callback`.
-   - Confirm the **broker Pages project fronts connect.lanzacms.com** with all secrets set
-     (`CLOUDFLARE_OAUTH_CLIENT_ID/SECRET`, `GH_APP_*`, `HANDOFF_PRIVATE_KEY`,
-     `TEMPLATE_OWNER/REPO`, the onboarding `OAUTH_CLIENT_ID/SECRET`). See design §8.
+1. **☑ Dave's go-live prereqs — ALL VERIFIED LIVE 2026-07-05:**
+   - ☑ CF OAuth client has `https://connect.lanzacms.com/api/auth/cf/callback` — CF issues a
+     login_challenge (not a redirect_uri rejection) for the broker's authorize.
+   - ☑ `lanza-cms` GitHub App Callback URL list includes
+     `https://connect.lanzacms.com/api/auth/callback` (Dave confirmed in the App settings).
+   - ☑ Broker fronts connect.lanzacms.com: current wizard (`f8838d1`) served byte-equal,
+     `cf/login`→302 authorize (CF id/secret set), `onboard/status`→200, `auth/callback` alive.
+   - ☐ **NEW (from item 2 build):** set the `lanza-cms` App **Setup URL** to
+     `https://connect.lanzacms.com/api/onboard/setup` (github.com/settings/apps/lanza-cms →
+     Post installation). It's the *only* hook GitHub gives to return the user to the wizard
+     after they install the App — memory says it's still the old `lanzacms.com/...` domain.
 
-2. **☐ Install the `lanza-cms` App on the new repo during onboarding** (design §4 step 3).
-   Today `lanza-broker/functions/api/onboard/oauth/callback.ts` creates the repo + staging +
-   owner but does NOT install the App — so a fresh owner can **log in but can't save** (the
-   edit-token endpoint needs an installation on that repo). Add an App-install redirect/step
-   after repo creation. **Highest-value gap for a real new tenant.**
+2. **◐ Install the `lanza-cms` App on the new repo during onboarding — BUILT 2026-07-05,
+   pending deploy + live verify** (design §4 step 3). The onboard OAuth callback now creates
+   the repo, then 302s to a pre-selected install screen
+   (`github.com/apps/lanza-cms/installations/new/permissions?suggested_target_id=<user>&repository_ids[]=<repo>`);
+   GitHub returns to `/api/onboard/setup`, which verifies the App now covers the repo
+   (retry ×3 for read-replica lag) and resumes the wizard at Cloudflare. Files: broker
+   `_lib/oauth.ts` (getUser +id), `_lib/gh-app.ts` (generate +id),
+   `api/onboard/oauth/callback.ts` (install redirect), `api/onboard/setup.ts` (rewritten
+   Setup-URL landing), `index.html` (install_incomplete/not_configured copy). `tsc` clean.
+   **Not committed/pushed yet.** Needs the Setup-URL prereq above + a live install round-trip
+   to confirm (can't be exercised headlessly — that's item 3).
 
 3. **☐ Live end-to-end verification** — no real OAuth round-trip has been run yet. Drive the
    whole chain in a browser once (1)+(2) are in: land on wizard → create repo → connect CF →
