@@ -8,7 +8,9 @@
       "mobile": null
     },
     "footer": {
-      "desktop": [],
+      "desktop": [
+        { "label": "Términos y Privacidad", "url": "/es/legal" }
+      ],
       "tablet": null,
       "mobile": null
     }

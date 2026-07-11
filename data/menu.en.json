@@ -8,7 +8,9 @@
       "mobile": null
     },
     "footer": {
-      "desktop": [],
+      "desktop": [
+        { "label": "Terms & Privacy", "url": "/legal" }
+      ],
       "tablet": null,
       "mobile": null
     }
