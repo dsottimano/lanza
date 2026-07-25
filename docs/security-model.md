@@ -77,16 +77,60 @@ that, a session minted for *any* origin mints `Contents:write` on *every* repo i
 login owns — because ownership (`owner === login`) was the only test.
 
 `audienceAllowedForRepo()` (`lanza-broker/functions/_lib/tenant-origin.ts`) binds
-the audience to the repo by recomputing the tenant's origin from the repo name.
-No new state: the Pages project name is derived from the repo, so the expected
-origin is derivable. Custom domains can't be derived — see §3.
+the audience to the repo by recomputing the tenant's origin. No new state — see
+§2 for how the name is derived. Custom domains can't be derived; see §4.
 
 > This is why design §3.3's "no origin allowlist is needed" argument does not
 > hold. It assumed tenants were the only consumer of a broker-signed token.
 
 ---
 
-## 2. What the MCP server may touch
+## 2. How a tenant's Pages project is named
+
+`lanza-broker/functions/_lib/tenant-origin.ts` — read this before changing
+anything about project naming, because two unrelated requirements meet in it.
+
+**The name is not the repo name, and the user does not choose it.**
+
+```
+projectNameCandidates(owner, repo)[0] = `${slug(repo)}-${sha256(owner/repo)[0..12]}`
+
+  datadefine/test    →  test-0304ea543eaf.pages.dev
+  someone/test       →  test-f3d658bc73b5.pages.dev   (same repo name, no collision)
+  acme/"My Bakery!"  →  my-bakery-ccb492ff422f.pages.dev
+```
+
+Two constraints force this shape:
+
+1. **`*.pages.dev` is a global namespace** — unique across *every* Cloudflare
+   account, not just the user's. Naming a project after its repo meant ordinary
+   names (`test`, `blog`, `bakery`) collided with strangers on the first attempt.
+   Worse, the collision was invisible: `projectExists` only checks *our* account,
+   so a stranger's name read as "already exists → success", deployed nothing, and
+   the wizard then invited the user to log in at a third party's `/admin`.
+2. **The origin must be recomputable** (I4). `/api/token` has to derive a repo's
+   site origin to check a session's `aud` against it. A random name would break
+   that and force a persistent repo→origin store — reopening exactly the
+   statelessness question §3 of the broker design just closed.
+
+A 48-bit suffix bound to `owner/repo` satisfies both: collisions aren't a
+practical concern, nobody can squat another tenant's name, and every name stays
+derivable from public inputs.
+
+**The fallback ladder.** `projectNameCandidates` returns `[base, base-2, base-3,
+base-4]`. Only Cloudflare can say whether a name is genuinely free, so the create
+path must be able to try again; in practice the first candidate always wins.
+`allowedOriginsForRepo` accepts *every* candidate, which keeps the audience check
+correct no matter which one the create landed on — the set is small, fixed, and
+derived from that one repo, so it grants nothing to any other tenant.
+
+**Constraints to respect if you touch this:** Cloudflare Pages names are
+lowercase alphanumerics and hyphens, 58 chars max, start and end alphanumeric.
+The base slug is capped at 42 so `base + "-" + 12 hex + "-4"` stays inside 58.
+`deploy.ts` and `token.ts` must always agree — they import the same function, and
+they must keep doing so.
+
+## 3. What the MCP server may touch
 
 The MCP tools run on behalf of an **agent**, which may be acting on
 prompt-injected input. They are confined twice:
@@ -110,7 +154,7 @@ upsert. Two titles that slugify alike would otherwise destroy an entry silently.
 
 ---
 
-## 3. Deployment requirements this model imposes
+## 4. Deployment requirements this model imposes
 
 | Setting | Where | Why | Consequence if unset |
 |---|---|---|---|
@@ -119,13 +163,17 @@ upsert. Two titles that slugify alike would otherwise destroy an entry silently.
 | `ADMIN_LOGIN` (optional) | tenant | Overrides `lanza.config.json`'s `adminLogin`; comma-list for extra editors | Falls back to the committed config — fine for a normal tenant |
 
 **lanzacms.com specifically** (the Lanza instance we run our own site on): its
-repo is `dsottimano/lanza`, so the derived origin is `https://lanza.pages.dev`,
-which is not the domain it actually serves from. The broker must carry
-`ALLOWED_TENANT_ORIGINS=https://lanzacms.com` or saves from that site break.
+repo is `dsottimano/lanza`, so the derived origin is
+`https://lanza-76cae1b6cc54.pages.dev` — not the domain it actually serves from.
+The broker must carry `ALLOWED_TENANT_ORIGINS=https://lanzacms.com` or saves from
+that site break.
+
+Any tenant on a custom domain needs the same entry. That is the one thing §2's
+derivation cannot cover, because a custom domain is not a function of the repo.
 
 ---
 
-## 4. Known-accepted risks
+## 5. Known-accepted risks
 
 Real, reviewed, not currently fixed. Listed so they are decisions rather than
 oversights.
@@ -158,7 +206,7 @@ oversights.
 
 ---
 
-## 5. Reviewing changes to this surface
+## 6. Reviewing changes to this surface
 
 - Adding a route under `/admin/`? It inherits the middleware — confirm it should.
 - Adding a GitHub call? Use an existing client. A third one means a third place

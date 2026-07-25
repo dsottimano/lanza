@@ -36,10 +36,10 @@ authorize)**, which polls forever.
    installation is stale. Uninstall **Cloudflare Workers and Pages** from GitHub
    (Settings → Applications), then reconnect via **CF dashboard → Workers & Pages → Create
    → Pages → Connect to Git**, which recreates the link. Then retry.
-3. **☐ Rename the repo before retrying.** The project name is derived from the repo, and
-   `*.pages.dev` names are **globally unique across all Cloudflare accounts** — `test`
-   is certainly taken. (`e44976a`'s parent now reports this clearly instead of reporting
-   success and sending the user to a stranger's site.)
+3. **☑ Project-name collisions — fixed, no rename needed.** The name is no longer the
+   repo name: it is `<repo-slug>-<sha256(owner/repo)[0..12]>` with a fallback ladder, so
+   `datadefine/test` → `test-0304ea543eaf.pages.dev`. Deterministic, so `/api/token` can
+   still recompute the origin with no store. See `docs/security-model.md` §2.
 4. **☐ Then finish the chain:** deploy → health screen → log into `/admin` → save an edit →
    publish. **Note:** `/admin` on the new site gates on that repo's `adminLogin`, so log in
    as the account that owns it.
@@ -75,7 +75,7 @@ is stale), the Cloudflare account picker, and `8000011` diagnostics.
 
 **Config Dave set this session:** `ALLOWED_TENANT_ORIGINS=https://lanzacms.com` on the
 broker (required — lanzacms.com's repo is `lanza`, so the derived origin is
-`lanza.pages.dev` and won't match), plus `HANDOFF_PUBLIC_KEY` / `OAUTH_CLIENT_ID` /
+`lanza-76cae1b6cc54.pages.dev` and won't match), plus `HANDOFF_PUBLIC_KEY` / `OAUTH_CLIENT_ID` /
 `OAUTH_CLIENT_SECRET` verified present.
 
 ---
@@ -112,7 +112,7 @@ The tenant advertises `connect.lanzacms.com` as its authorization server, so dis
 
 ## ☐ Known-open security items (reviewed, deliberately not fixed)
 
-Full detail + rationale in `docs/security-model.md` §4. Listed here so they stay decisions.
+Full detail + rationale in `docs/security-model.md` §5. Listed here so they stay decisions.
 
 - ☐ **Sessions can't be revoked.** Stateless 7-day RS256 bearer, no `jti`. Logout clears the
   cookie only; removing a login from `ADMIN_LOGIN` doesn't invalidate live sessions. Only

@@ -128,9 +128,10 @@ repo the victim owns — full repo takeover, and via the Pages build, code execu
 
 **Fix:** `/api/token` now binds the audience to the repo —
 `audienceAllowedForRepo()` in `functions/_lib/tenant-origin.ts` recomputes the
-tenant's expected origin from the repo name (the Pages project name is derived
-from it, so this needs no new state) and requires `aud` to match, plus any custom
-domains listed in `ALLOWED_TENANT_ORIGINS`. The broker stays stateless.
+tenant's expected origin from `owner`+`repo` (the Pages project name is derived
+from them — see `security-model.md` §2 — so this needs no new state) and requires
+`aud` to match, plus any custom domains listed in `ALLOWED_TENANT_ORIGINS`. The
+broker stays stateless.
 
 The general rule, now in `security-model.md` §1 (I4): **an audience claim is
 worthless unless every consumer checks it.** Adding a third consumer of these
@@ -336,7 +337,7 @@ identity** now shared by the CMS so onboarding and the editor read as one produc
    | `GH_APP_SLUG` | `/api/onboard/oauth/callback` (install link) | defaults to `lanza-cms` |
    | `TEMPLATE_OWNER`, `TEMPLATE_REPO` | repo creation | onboarding fails |
    | `CLOUDFLARE_OAUTH_CLIENT_ID`, `CLOUDFLARE_OAUTH_CLIENT_SECRET` (§5) | CF connect + deploy | step 3 fails |
-   | **`ALLOWED_TENANT_ORIGINS`** | **`/api/token` audience binding (§3.3)** | **custom-domain tenants can't save.** Set `https://lanzacms.com` — that site's repo is `lanza`, so the derived origin is `lanza.pages.dev`, which won't match its real domain. |
+   | **`ALLOWED_TENANT_ORIGINS`** | **`/api/token` audience binding (§3.3)** | **custom-domain tenants can't save.** Set `https://lanzacms.com` — that site's repo is `lanza`, so the derived origin is `lanza-76cae1b6cc54.pages.dev` (see `security-model.md` §2), which won't match its real domain. |
 
    Note §8.1 registers the **GitHub App**; `OAUTH_CLIENT_ID`/`SECRET` come from a
    **separate classic OAuth App** — repo creation deliberately runs on its
@@ -354,6 +355,8 @@ identity** now shared by the CMS so onboarding and the editor read as one produc
 | 2026-07-04 | **No** origin allowlist / broker-signed tenant credential | the tenant's own `ADMIN_LOGIN` check is the real gate (§3.3) |
 | 2026-07-25 | **Reversed in part**: `/api/token` binds `aud` to the repo | the 2026-07-04 rationale assumed tenants were the only consumer of a broker-signed token; `/api/token` is a second one, and checked ownership only (§3.3) |
 | 2026-07-25 | `/admin` middleware checks `adminLogin`, not just a valid signature | a signature only proves the broker authenticated *someone* — see `security-model.md` I1 |
+| 2026-07-25 | Pages project name = `<repo-slug>-<sha256(owner/repo)[0..12]>`, **not** the repo name | `*.pages.dev` is global across all Cloudflare accounts, so ordinary repo names collided with strangers on the first try — and the collision read as success. Kept *derivable* (rather than random) so `/api/token` can still recompute a tenant's origin with no store. See `security-model.md` §2 |
+| 2026-07-25 | Cloudflare account is **chosen**, not `accounts[0]` | anyone in >1 account had their site created in whichever listed first; the POST and polling GET also resolved it independently, stranding the wizard. Stored in the `lanza_cf` cookie |
 | 2026-07-04 | `ADMIN_LOGIN` = **owner login committed into the repo** at creation | it's public, not a secret — no store/injection needed |
 | 2026-07-04 | Session signing = **B — broker-signed, public-key verified** | removes the last per-tenant secret + needs no provisioned KV on Pages (§3.4) |
 | 2026-07-04 | **Dogfood our own site first** as tenant #0 / canary | feel the onboarding + new-auth pain before a real customer does |
