@@ -30,3 +30,7 @@ lanza-broker/
 
 # npm pack artifacts
 *.tgz
+
+# local dev secrets & wrangler cache
+.dev.vars
+.wrangler/
