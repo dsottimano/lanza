@@ -85,6 +85,22 @@ the audience to the repo by recomputing the tenant's origin. No new state — se
 > This is why design §3.3's "no origin allowlist is needed" argument does not
 > hold. It assumed tenants were the only consumer of a broker-signed token.
 
+**The multi-site MCP token is the one deliberate exception, and it does not weaken
+this.** `connect.lanzacms.com/api/mcp` issues a token whose `aud` is the *router*, so
+audience alone can no longer name one site. The bound moves to an explicit **`sites`
+claim** the user sets at consent, and the router checks it on every call before minting
+anything. Two properties keep I4 intact:
+
+- The router mints its own **per-site** downstream tokens (`aud = <tenant>/api/mcp`,
+  5 min). `/api/token` still sees only single-site audiences — `audienceAllowedForRepo`
+  was not relaxed, and must not be.
+- The exception is not transitive. A router-audience token is refused by every tenant,
+  and a tenant-audience token is refused by the router. Neither substitutes for the other.
+
+A `sites` claim is a *grant*, not a hint: absent or empty means **nothing**, never
+everything (`lanza-broker/functions/api/mcp.ts`). The consent POST is intersected with
+the server's own list, so the browser can only narrow it; refresh carries it unchanged.
+
 ---
 
 ## 2. How a tenant's Pages project is named
@@ -221,3 +237,10 @@ oversights.
 - Changing `isAllowed`, `assertSafePath`, or the audience binding? The adversarial
   cases live in `functions/_lib/gh-proxy.test.mjs` and `mcp-core.test.mjs`. They
   assert refusal **and** that nothing was written — keep both halves.
+- Touching the multi-site MCP grant (the `sites` claim, the consent screen, the
+  router)? Its adversarial cases live in `lanza-broker/functions/api/
+  mcp-multisite.test.mjs` — a tampered consent POST, a broadening refresh, a replayed
+  single-site token, an ungranted `site`. Each asserts refusal **and** that no request
+  reached a tenant; keep both halves. If you find yourself relaxing
+  `audienceAllowedForRepo` to make something work, stop — that is the check the router
+  exists to avoid touching.

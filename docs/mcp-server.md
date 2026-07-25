@@ -6,23 +6,23 @@ edit its content — create/update/delete pages and posts, then publish. It ship
 domain automatically**, the same way `functions/admin/api/gh` gives every tenant a GitHub
 proxy.
 
-- **Endpoint:** `POST https://<your-site>/api/mcp`
+There are **two endpoints**, and which one you hand the agent decides how far the
+resulting token reaches:
+
+| | Endpoint | Reaches | Use when |
+|---|---|---|---|
+| **Multi-site** | `POST https://connect.lanzacms.com/api/mcp` | the sites you tick at consent | you own more than one site — one entry, one login |
+| **Single-site** | `POST https://<your-site>/api/mcp` | exactly that one site | you want the tightest possible grant, or you self-host with no broker |
+
 - **Transport:** MCP Streamable HTTP, **stateless** — each POST is a self-contained
   JSON-RPC exchange. No Durable Object, no session store. `GET` (server→client SSE) is
   unsupported.
-- **Auth:** OAuth 2.1. Zero-friction — the user pastes the site URL into the
-  connector, approves once in the browser via GitHub, done. No API keys, no PATs.
+- **Auth:** OAuth 2.1. Zero-friction — the user pastes the URL into the connector,
+  approves once in the browser via GitHub, done. No API keys, no PATs.
 - **Protocol revision:** the server advertises `2025-06-18`
   (`mcp-core.ts:SUPPORTED_PROTOCOL`), which is why JSON-RPC batching is still
   accepted. Don't cite `2025-11-25` here without changing the code — that revision
   removed batching.
-
-> **⚠️ Not deployable yet.** The authorization-server half listed below lives only
-> in a *second, stale* broker checkout (`lanza/lanza-broker`, gitignored) and is
-> not in the canonical `lanza-broker` repo. Until it is rebased and committed
-> there, `/.well-known/oauth-authorization-server` 404s on `connect.lanzacms.com`
-> and **every MCP connection dies at discovery step 2.** The prereqs below are
-> also still outstanding.
 
 ## Architecture
 
@@ -55,6 +55,57 @@ Two roles, reusing what already exists:
    public key** (`HANDOFF_PUBLIC_KEY`, same as the CMS session), checks the audience is
    this site and `login == site owner`, then mints a repo-scoped GitHub token via the
    broker's `/api/token` to do the writes. **The agent never sees a GitHub token; no PAT.**
+
+## Multi-site: one connection for every site you own
+
+One MCP entry and one OAuth round-trip *per site* does not survive a user with five
+sites. `connect.lanzacms.com/api/mcp` is the answer — and it is a **router, not a second
+MCP server**.
+
+It holds **no tool definitions and no content logic.** Every real call is forwarded to
+that site's own `/api/mcp`, which stays the single implementation (`mcp-core.ts`). Three
+consequences, and they are the whole reason for the shape:
+
+1. **No duplication, so no drift.** `tools/list` is fetched from a live granted site, not
+   hardcoded — a tool added to a tenant shows up here on its own.
+2. **Authorization stays where it already works.** The tenant still checks
+   `login == adminLogin`. The router never becomes the thing that decides who owns a site.
+3. **Blast radius stays bounded.** See below.
+
+### The grant, and why the consent screen exists
+
+GitHub's own consent proves **identity**, not **scope**. So for the multi-site resource
+the broker inserts one more screen (`_lib/consent-page.ts`): a checkbox list of the Lanza
+sites that login administers. The choice becomes a **`sites` claim** on the access token.
+
+The list is computed server-side (`gh-app.ts:listUserSites` — the `lanza-cms` App's
+installation repos, filtered to those whose `lanza.config.json` names *this* login as
+`adminLogin`). The POST is intersected with that list, so a tampered form can only
+**narrow** the grant, never widen it. A refresh carries the same list unchanged.
+
+### Blast radius
+
+| Credential | Reaches | Lifetime |
+|---|---|---|
+| Access token the client stores | only the ticked sites | 1h, refreshable |
+| Token minted per forwarded call | **one** site (audience-bound) | 5 min |
+| GitHub token | never leaves the tenant — repo-scoped, Contents:write | ~1h |
+
+Nothing downstream ever holds a multi-site credential. `/api/token`'s
+`audienceAllowedForRepo` rule is **deliberately untouched**: the router mints its own
+per-site tokens rather than asking that endpoint to accept a multi-site audience — so the
+check that currently contains blast radius keeps containing it.
+
+### Tool surface
+
+`list_sites` is the broker's own (answered from the claim; no tenant is contacted).
+Every other tool is the tenant's, with a **required `site`** injected — `"owner/repo"`,
+enumerated in the schema so agents can't guess. A `site` outside the grant is refused
+*before any token is minted for it*.
+
+Files: `lanza-broker/functions/api/mcp.ts` (router),
+`functions/api/oauth/consent.ts` (site picker POST), `functions/_lib/consent-page.ts`
+(the screen), `functions/.well-known/oauth-protected-resource.ts` (the broker's own PRM).
 
 ## The content model (same as the CMS)
 
@@ -109,18 +160,27 @@ unavailable.
 
 ## Connecting an agent
 
-- **Claude** (Settings → Connectors → Add custom connector): paste
-  `https://<your-site>/api/mcp`. It discovers OAuth automatically and opens the GitHub
-  approval.
+Use `https://connect.lanzacms.com/api/mcp` for all your sites, or
+`https://<your-site>/api/mcp` for exactly one. Everything else is identical — the same
+discovery, the same GitHub login. The multi-site URL adds the site-picker screen.
+
+- **Claude** (Settings → Connectors → Add custom connector): paste the URL. It discovers
+  OAuth automatically and opens the GitHub approval.
 - **ChatGPT** (Settings → Connectors, developer mode for a custom URL): same URL; OAuth
   is the only supported auth and is handled automatically.
 - **Codex** (`~/.codex/config.toml`):
   ```toml
-  [mcp_servers.my-site]
-  url = "https://<your-site>/api/mcp"
+  [mcp_servers.lanza]
+  url = "https://connect.lanzacms.com/api/mcp"
   # auth = "oauth" is the default
   ```
-  then `codex mcp login my-site` (browser OAuth; no key pasted).
+  then `codex mcp login lanza` (browser OAuth; no key pasted).
+
+**Sign in as the right GitHub account.** Authorization follows the login in the consent
+popup, not your Claude/ChatGPT account. GitHub silently reuses whatever session is live,
+so re-authenticating does *not* switch accounts — sign out of GitHub first. On the
+multi-site endpoint a wrong account shows up honestly (an empty picker naming the login);
+on a single-site endpoint it is a bare 403.
 
 ## Tests
 
@@ -128,16 +188,26 @@ unavailable.
 # Tenant (this repo): protocol + content flow (fake GitHub, no token)
 npm test
 
-# Broker (lanza-broker): OAuth utils + full authorization-code/PKCE/refresh flow
+# Broker (lanza-broker): OAuth utils, the authorization-code/PKCE/refresh flow, and
+# the multi-site consent → sites-claim → router chain (incl. the adversarial cases:
+# a tampered consent POST, a replayed single-site token, an ungranted site).
 node --experimental-strip-types --loader ./functions/_lib/ts-resolve.mjs \
-  --test functions/_lib/oauth-util.test.mjs functions/api/oauth/oauth-flow.test.mjs
+  --test functions/_lib/oauth-util.test.mjs functions/api/oauth/oauth-flow.test.mjs \
+         functions/api/mcp-multisite.test.mjs
 ```
 
 ## Security notes
 
 - **Audience binding (RFC 8707):** access tokens carry `aud = your MCP URL`; a token
   minted for another Lanza site is rejected. The `resource` in the protected-resource
-  metadata must match the connect URL exactly.
+  metadata must match the connect URL exactly. This holds in **both** directions on the
+  multi-site endpoint: a tenant-audience token is refused there (it would otherwise be
+  read as a multi-site grant), and the broker's own audience is refused by every tenant.
+- **A multi-site token is bounded by its `sites` claim, not by its audience.** The
+  audience only says "this is the router"; the claim says how far it reaches. So the
+  router must check `sites.includes(site)` on every call — that check *is* the boundary,
+  and it runs before any per-site token is minted. A token with no `sites` grants
+  nothing (403) rather than defaulting to everything.
 - **Owner-only:** the resource server requires the token's `login` to equal the site's
   `adminLogin`, and the broker's `/api/token` independently re-checks `owner == login`
   before minting a write token — so a token is only ever usable to write the user's own

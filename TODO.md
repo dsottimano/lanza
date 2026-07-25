@@ -69,6 +69,8 @@ edit/publish was driven without copy-paste. Launch:
    have to fix it.
 4. **◐ MCP** — server side is done and verified in production. One step left: restart
    Claude Code, `/mcp` → `dmg` → Authenticate, then run the three tools. See below.
+5. **◐ Multi-site MCP — built, not yet deployed or live-verified.** See its section
+   below. Needs a broker deploy, then a real connect against two `datadefine` sites.
 
 ---
 
@@ -151,6 +153,55 @@ Run the AS tests (the broker has no `package.json`, so no `npm test`):
 
 **Gotchas:** `WWW-Authenticate` must be on the 401 (Claude ignores it on 200) ✓. PRM
 `resource` must byte-match the connect URL ✓. CIMD is primary, DCR the KV-backed fallback.
+
+---
+
+## ◐ Multi-site MCP — one connection for every site you own
+
+**Why:** one MCP entry + one OAuth per site doesn't survive a user with five sites.
+`connect.lanzacms.com/api/mcp` is one entry for all of them.
+
+**Shape — it's a router, not a second MCP server.** It holds zero tool definitions and
+zero content logic; every real call is forwarded to that site's own `/api/mcp`, which
+stays the single implementation. So `mcp-core.ts` never gets duplicated, the tenant's
+`login == adminLogin` check still runs unchanged, and `/api/token`'s
+`audienceAllowedForRepo` was **not** relaxed — the router mints its own per-site,
+5-minute, audience-bound tokens instead.
+
+**Blast radius is the point.** A GitHub login proves identity, not scope, so consent
+gained a site-picker screen; the ticked list becomes a `sites` claim on the token. The
+POST is intersected with the server's own list (tamper can only narrow), refresh carries
+it unchanged, and absent/empty means *nothing*, never everything. Nothing downstream ever
+holds a multi-site credential.
+
+Written, typecheck clean, **20/20 broker tests** (10 new, incl. the adversarial four:
+tampered consent POST, broadening refresh, replayed single-site token, ungranted `site` —
+each asserts refusal *and* that no request reached a tenant). Tenant repo untouched:
+36/36 still green, and the single-site flow is byte-identical.
+
+New/changed in `lanza-broker`: `functions/api/mcp.ts` (router),
+`functions/api/oauth/consent.ts`, `functions/_lib/consent-page.ts`,
+`functions/.well-known/oauth-protected-resource.ts`, plus `sites` threaded through
+`oauth-store.ts` / `oauth/token.ts` / `oauth/github-callback.ts` and an `expectedAud`
+argument on `handoff.verifySession`. Design + rationale: `docs/mcp-server.md`
+§Multi-site; the I4 exception is written up in `docs/security-model.md` §1.
+
+- ☐ **Deploy the broker.** Nothing is live until then — and remember a Pages
+  binding/route change does nothing until the *next* deployment (that's what produced
+  the `1101` last session).
+- ☐ **Live-verify:** connect `https://connect.lanzacms.com/api/mcp` as `datadefine`,
+  confirm the picker lists their sites (and *not* `dsottimano`'s), tick one, then
+  `list_sites` → `create_content` → `publish`. Then re-connect ticking two and confirm a
+  call to the unticked one is refused.
+- ☐ **`GH_APP_ID` / `GH_APP_PRIVATE_KEY` must be set on the broker Pages project** —
+  `listUserSites` needs the App JWT. They already are for `/api/token`; confirm the
+  binding covers the same environment.
+- ☐ **Custom domains aren't routable yet.** `siteOrigin()` derives the `*.pages.dev`
+  origin (always resolves, per `tenant-origin.ts`). A site reached only by a custom
+  domain still works — the derived origin serves the same Pages project — but if that
+  ever stops being true, this is the line to fix.
+- ☐ **`MAX_SITES = 25`.** Beyond that the picker truncates and says so. Fine for now;
+  revisit if anyone has more.
 
 ---
 
@@ -238,6 +289,10 @@ Full detail + rationale in `docs/security-model.md` §5. Listed so they stay dec
   login can't own the requested `resource` (fail at consent, where the user can act, rather
   than at the tenant). Note the broker can't know `adminLogin` without asking the tenant —
   the cheap version is the better error message.
+  **Largely solved on the multi-site endpoint**, which fails at consent by construction:
+  wrong account → the picker is empty and names the login it signed in as. The gap is now
+  only the single-site endpoint. `listUserSites` also disproves the "broker can't know
+  `adminLogin`" note above — it reads each repo's `lanza.config.json`.
 - ☐ **Wizard: GitHub-account gate before step 1** — non-technical users may not have a
   GitHub account, and "Connect GitHub" with none is a dead end. Ask first → No opens
   `github.com/signup` in a new tab; Yes proceeds. Frame GitHub as "the free account that
