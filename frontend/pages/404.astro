@@ -1,13 +1,32 @@
 ---
 import Base from "../layouts/Base.astro";
+import { DEFAULT_LOCALE } from "../lib/i18n";
+
+// Astro serves ONE 404 for the whole site, so it can't be a per-locale route —
+// it follows the site's default locale instead. This copy was hardcoded Spanish
+// (a leftover from the site this codebase started as), which shipped a Spanish
+// 404 to every English tenant once the code became a shared package.
+const COPY: Record<string, { h1: string; body: string; cta: string }> = {
+  en: {
+    h1: "Page not found",
+    body: "The page you are looking for does not exist or has moved.",
+    cta: "Back to home",
+  },
+  es: {
+    h1: "Página no encontrada",
+    body: "La página que busca no existe o fue movida.",
+    cta: "Volver al inicio",
+  },
+};
+const t = COPY[DEFAULT_LOCALE] ?? COPY.en;
 ---
 
 <Base seo={{ title: "404", noindex: true }}>
   <main class="notfound">
     <span class="u-kicker">Error 404</span>
-    <h1>Página no encontrada</h1>
-    <p>La página que busca no existe o fue movida.</p>
-    <a class="u-btn" href="/">Volver al inicio</a>
+    <h1>{t.h1}</h1>
+    <p>{t.body}</p>
+    <a class="u-btn" href="/">{t.cta}</a>
   </main>
 </Base>
 

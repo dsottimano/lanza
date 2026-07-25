@@ -12,6 +12,14 @@
 // meant to live here, as data.
 import type { Locale } from "./i18n";
 import type { PageSeo } from "./seo";
+import site from "/data/site.json";
+
+// how-it-works / start / agents are LANZA'S OWN marketing pages. This module ships
+// inside the lanza-site package, so without a gate every tenant's site would serve
+// (and get indexed for) lanzacms.com's copy at their own domain. Only the product
+// site sets `productSite: true` in data/site.json. The blog index is not in here:
+// every tenant needs it.
+const PRODUCT_ONLY = new Set(["how-it-works", "start", "agents"]);
 
 export interface FixedPage {
   slug: string;
@@ -21,7 +29,7 @@ export interface FixedPage {
   seo: Record<Locale, PageSeo>;
 }
 
-export const FIXED_PAGES: FixedPage[] = [
+const ALL_FIXED_PAGES: FixedPage[] = [
   {
     slug: "how-it-works",
     template: "landing",
@@ -79,6 +87,19 @@ export const FIXED_PAGES: FixedPage[] = [
     },
   },
 ];
+
+// The blog index IS every tenant's, but its copy above is Lanza's own, and it
+// would otherwise become their meta description. Tenants get neutral wording.
+const GENERIC_POSTS_SEO: Record<Locale, PageSeo> = {
+  en: { title: "Blog", description: "All posts." },
+  es: { title: "Blog", description: "Todas las entradas." },
+};
+
+export const FIXED_PAGES: FixedPage[] = (site as { productSite?: boolean }).productSite
+  ? ALL_FIXED_PAGES
+  : ALL_FIXED_PAGES.filter((p) => !PRODUCT_ONLY.has(p.slug)).map((p) =>
+      p.slug === "posts" ? { ...p, seo: GENERIC_POSTS_SEO } : p,
+    );
 
 /** The set of slugs owned by fixed pages — CMS routes exclude these to avoid clashes. */
 export const FIXED_SLUGS = new Set(FIXED_PAGES.map((p) => p.slug));
