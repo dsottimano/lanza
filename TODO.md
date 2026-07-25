@@ -62,8 +62,21 @@ cannot fix it — worth a support ticket.
 - **Start over.** The wizard's state is all HttpOnly cookies, so a reload resumed a dead
   run forever and nobody could create a *second* site. `POST /api/onboard/reset` +
   a topbar control.
-- **Step 3 → Cloudflare deep link** (above). **Not re-testable on an account that already
-  has a connection record** — a rerun sails past the step.
+- **Step 3 → Cloudflare deep link** (above). **Confirmed on a clean account**: with the
+  Cloudflare App uninstalled and no connection record, `datadefine/bbbb` →
+  `bbbb-2db67eab8649.pages.dev` ran through without dashboard detours. Note it is not
+  re-testable on an account that already has a record — a rerun sails past the step.
+- **Entry point asks instead of resuming.** A bare `connect.lanzacms.com` used to resume
+  whatever the cookies held, so "Start your site" on lanzacms.com landed on a *previous*
+  tenant's completion screen. Now: Continue / Start a new site / the Lanza sites on the
+  account, each flagged when the git connection is missing (`GET /api/onboard/sites`).
+- **Wizard shell was cached 4h.** A zone-level Browser Cache TTL on `lanzacms.com` overrode
+  origin headers, so returning users ran stale wizard code — this hid two shipped fixes
+  during testing. Dave set the zone to respect existing headers; `_headers` now marks the
+  shell `no-cache` and fonts immutable. **Anyone testing must hard-reload once**: responses
+  cached under the old 4h TTL stay fresh in the browser regardless.
+- **`pages/projects` rejects pagination.** `?page=`/`?per_page=` → 400 code 8000024, unlike
+  `/accounts` which needs them. Cost an empty sites list until found.
 - **Identity strip.** The wizard now names the GitHub login/repo and the Cloudflare user +
   account, so nobody discovers the wrong account after the site exists.
 - **Health screen verifies git.** It ticked "Git integration" unconditionally;
