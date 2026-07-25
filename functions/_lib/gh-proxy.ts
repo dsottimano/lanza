@@ -8,7 +8,7 @@
 // identity (owner/name) is NOT here. It lives in the tenant's committed
 // lanza.config.json, read by the callers (the prod Pages Function + the dev
 // middleware), which prepend `repos/<owner>/<name>/` via upstreamPath() below. So
-// this module is fully tenant-agnostic and ships unchanged in @lanza/site.
+// this module is fully tenant-agnostic and ships unchanged in lanza-site.
 //
 // The CMS works on the WORKING_BRANCH (drafts) and publishes by merging it into
 // BRANCH (production — the branch Astro builds from). Ref reads/writes allow both.

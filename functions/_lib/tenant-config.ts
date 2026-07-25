@@ -5,7 +5,7 @@
 //
 // Per-tenant identity (owner/name/adminLogin) is NOT here — it lives in the repo-root
 // lanza.config.json, which the onboarding broker writes per tenant at repo creation.
-// Keeping it out of functions/ lets the whole dir ship as pure @lanza/site code.
+// Keeping it out of functions/ lets the whole dir ship as pure lanza-site code.
 export const BROKER_ORIGIN = "https://connect.lanzacms.com";
 
 // The shared lanza-cms GitHub App's OAuth client_id — PUBLIC (it appears in every

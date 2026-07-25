@@ -1,7 +1,7 @@
 // Lanza CMS — MCP server (Cloudflare Pages Function, route: /api/mcp).
 //
 // Lets an external agent (ChatGPT / Claude / Codex) connect to a LIVE Lanza site and
-// edit its content. Ships inside @lanza/site, so every tenant that installs the CMS gets
+// edit its content. Ships inside lanza-site, so every tenant that installs the CMS gets
 // an MCP endpoint on their own domain automatically — the same way functions/admin/api/gh
 // gives every tenant a GitHub proxy. Protocol + tools live in functions/_lib/mcp-core.ts;
 // this file is transport + auth + the GitHub-token acquisition.

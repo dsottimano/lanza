@@ -1,5 +1,5 @@
 #!/usr/bin/env node
-// @lanza/site build tool. A tenant repo's package.json runs `lanza build` /
+// lanza-site build tool. A tenant repo's package.json runs `lanza build` /
 // `lanza dev`; this drives the code (shipped in this package) against the
 // tenant's content + data (the current working directory).
 //
@@ -57,7 +57,7 @@ if (mode === "build") {
   }
 
   // External tenants deploy Pages Functions from their REPO ROOT, but the function
-  // code ships in @lanza/site. Copy functions/ into the tenant root so Pages
+  // code ships in lanza-site. Copy functions/ into the tenant root so Pages
   // compiles it. functions/ is pure package code (per-tenant identity lives in the
   // repo-root lanza.config.json, not here), so overwriting on every build is safe.
   // Skip in the monorepo dogfood (package === cwd → functions are already at root).

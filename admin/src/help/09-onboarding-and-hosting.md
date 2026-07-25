@@ -64,14 +64,14 @@ So the tenant repo holds **only content**:
 
 - `content/…`, `schema.json`, and a `package.json`.
 - The CMS + Astro site + this admin app ship as a **versioned package**,
-  `@lanza/site`, that the site's Cloudflare build pulls in at deploy time.
+  `lanza-site`, that the site's Cloudflare build pulls in at deploy time.
 
 Fix core **once**, publish a new version, and every site gets it on its next build.
 No copies to chase, no merge conflicts.
 
 ## How updates roll out  · **Planned**
 
-Owners never see a version number. Sites track a **`@lanza/site@stable`** tag:
+Owners never see a version number. Sites track a **`lanza-site@stable`** tag:
 
 1. A new release lands on **our own dogfood site first** (the canary).
 2. Once it's proven, we advance the `stable` tag.

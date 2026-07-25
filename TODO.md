@@ -312,8 +312,8 @@ Full detail + rationale in `docs/security-model.md` §5. Listed so they stay dec
 - ☐ **MCP self-host story** — without a broker there's no OAuth AS; document or provide
   an authless/bearer mode. The single-site endpoint is the half that can work this way
   (`GITHUB_TOKEN` fallback); the multi-site router is broker-only by definition.
-- ☐ **`@lanza/site` extraction P4/P5** — deferred post-v1 (v1 ships a fat template repo,
-  design §11.4). P4: thin content-only tenant repo + publish `@lanza/site`. P5: stable
+- ☐ **`lanza-site` extraction P4/P5** — deferred post-v1 (v1 ships a fat template repo,
+  design §11.4). P4: thin content-only tenant repo + publish `lanza-site`. P5: stable
   pointer + safe-revert + "update available" banner. Recover from
   `docs/lanza-site-extraction-plan.md` + git history.
 - ☐ **Variables page in Settings** — site-wide `{{ placeholders }}` for templates and the

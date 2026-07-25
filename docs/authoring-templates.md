@@ -12,7 +12,7 @@ The user finds (or asks you to build) a design → you reproduce it as plain HTM
 you convert that HTML into a **template** (`template.html` with `{{placeholders}}` +
 `fields.json` describing the editable fields) → the user just fills those fields in
 the CMS and publishes. Templates live in the **tenant repo** at `templates/<name>/`,
-not in the `@lanza/site` package: they are agent-authored, hand-editable, and survive
+not in the `lanza-site` package: they are agent-authored, hand-editable, and survive
 package updates (the package never overwrites the tenant's `templates/`).
 
 ## Anatomy of a template

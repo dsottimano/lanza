@@ -28,7 +28,7 @@ asymmetric handoff. The Deploy-to-Cloudflare button is **deferred** (§5.1).
 | Component | Role | Holds | Never holds |
 |---|---|---|---|
 | **Broker** (`lanza-broker`, own Pages project = lanzacms.com) | marketing, wizard, the shared login callback | GitHub App private key + client secret, **handoff PRIVATE key** | per-tenant state (aim: stateless) |
-| **Tenant site** (customer's own Pages, from template) | Astro site + Lanza admin (via `@lanza/site`) + content | broker's **handoff PUBLIC key**, its owner login (public), its session state (§3.4) | any signing secret shared across tenants |
+| **Tenant site** (customer's own Pages, from template) | Astro site + Lanza admin (via `lanza-site`) + content | broker's **handoff PUBLIC key**, its owner login (public), its session state (§3.4) | any signing secret shared across tenants |
 | **`lanza-cms` GitHub App** (one, Lanza-owned) | identity login for every tenant + Contents-only repo edits | — | broad/Administration repo access |
 | **Template repo** (Lanza-owned, **public**) | thin content starter | — | — |
 
@@ -283,15 +283,15 @@ comes nearly free then, and its free KV would make §3.4-A viable.
 
 ---
 
-## 6. Phase 4 — Thin repo + `@lanza/site`
+## 6. Phase 4 — Thin repo + `lanza-site`
 
 **VERIFIED:** a Pages build (`npm install && build`) pulling a versioned package works.
-Pin **Node 22** (`NODE_VERSION`/`.nvmrc`; build image v3) to match `@lanza/site`; keep
-`@lanza/site` **public** (a private pkg needs `.npmrc` + `NPM_TOKEN` per project).
+Pin **Node 22** (`NODE_VERSION`/`.nvmrc`; build image v3) to match `lanza-site`; keep
+`lanza-site` **public** (a private pkg needs `.npmrc` + `NPM_TOKEN` per project).
 
 Tenant repo holds **content only** (`content/`, `schema.json`, `package.json`); the CMS
-+ Astro + admin ship as versioned `@lanza/site`, pulled at build. Auto-update via a
-`@lanza/site@stable` tag: land on the dogfood canary first, advance `stable`, fan-out
++ Astro + admin ship as versioned `lanza-site`, pulled at build. Auto-update via a
+`lanza-site@stable` tag: land on the dogfood canary first, advance `stable`, fan-out
 redeploy. Fix core once → every site gets it next build.
 
 ---
@@ -360,7 +360,7 @@ identity** now shared by the CMS so onboarding and the editor read as one produc
 | 2026-07-04 | `ADMIN_LOGIN` = **owner login committed into the repo** at creation | it's public, not a secret — no store/injection needed |
 | 2026-07-04 | Session signing = **B — broker-signed, public-key verified** | removes the last per-tenant secret + needs no provisioned KV on Pages (§3.4) |
 | 2026-07-04 | **Dogfood our own site first** as tenant #0 / canary | feel the onboarding + new-auth pain before a real customer does |
-| 2026-07-04 | `@lanza/site` extraction **IN v1 scope** (Dave, reversed the earlier defer) | thin content repo is the point — do the code/content split as part of v1, not later |
+| 2026-07-04 | `lanza-site` extraction **IN v1 scope** (Dave, reversed the earlier defer) | thin content repo is the point — do the code/content split as part of v1, not later |
 | 2026-07-04 | Repo creation = **OAuth `public_repo` once + App Contents-only** | avoids App Administration/all-repos + the `/generate` install gotcha |
 | 2026-07-04 | Hosting = **guided dashboard connect on Pages** | no API path wires git-integration; the one authorize is unavoidable |
 | 2026-07-04 | **Deploy button deferred** | Workers-only → whole-app migration to save ~one click |
@@ -382,7 +382,7 @@ repo/package) → Phase 5 (wizard UI). Each verifies on a `*.pages.dev` preview.
 2. **Dogfood** — ✅ migrate our own site to the shared-app flow **first**, as tenant #0
    / canary. (Dave rec-confirmed.)
 3. **Custom domains** — ⏸ deferred; v1 ships `*.pages.dev`. Revisit post-v1.
-4. **`@lanza/site` extraction** — ✅ **deferred**; v1 ships a fat template, extract the
+4. **`lanza-site` extraction** — ✅ **deferred**; v1 ships a fat template, extract the
    package as a follow-up once the flow is proven end-to-end.
 
 Remaining before Phase-1 code: Dave's prereqs in §8 (register the `lanza-cms` GitHub

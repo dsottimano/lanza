@@ -1,6 +1,6 @@
 // Reads the tenant's HTML templates from the repo so the CMS can offer a template
 // picker + a fields editor. Templates live at the TENANT REPO ROOT `templates/<name>/`
-// (agent-authored, hand-editable HTML/CSS that survives @lanza/site updates — see
+// (agent-authored, hand-editable HTML/CSS that survives lanza-site updates — see
 // docs/authoring-templates.md), NOT in the package. The frontend renders them at
 // build via frontend/components/HtmlTemplate.astro + frontend/lib/template-render.ts;
 // here we surface each one's editable-field schema (fields.json) to the editor.

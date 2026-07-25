@@ -2,7 +2,7 @@
 
 Lets an external agent (ChatGPT / Claude / Codex) connect to a **live** Lanza site and
 edit its content — create/update/delete pages and posts, then publish. It ships inside
-`@lanza/site`, so **every tenant that installs the CMS gets an MCP endpoint on their own
+`lanza-site`, so **every tenant that installs the CMS gets an MCP endpoint on their own
 domain automatically**, the same way `functions/admin/api/gh` gives every tenant a GitHub
 proxy.
 
@@ -153,7 +153,7 @@ go live. New entries are written `draft: false` (visible once published); pass
 
 ### Tenant
 
-Nothing per-site. `HANDOFF_PUBLIC_KEY` and `BROKER_ORIGIN` are baked into `@lanza/site`
+Nothing per-site. `HANDOFF_PUBLIC_KEY` and `BROKER_ORIGIN` are baked into `lanza-site`
 (`functions/_lib/tenant-config.ts`); repo identity comes from `lanza.config.json`. A
 `GITHUB_TOKEN` secret is an optional self-host fallback for when the broker is
 unavailable.

@@ -1,7 +1,7 @@
-// @lanza/site — the Astro config factory a tenant repo consumes.
+// lanza-site — the Astro config factory a tenant repo consumes.
 //
 // The tenant's astro.config.mjs is a two-liner:
-//   import { lanzaConfig } from "@lanza/site/astro";
+//   import { lanzaConfig } from "lanza-site/astro";
 //   export default lanzaConfig();
 // (In this monorepo, before the package is published, astro.config.mjs imports
 // this file directly — it plays the tenant's role.)

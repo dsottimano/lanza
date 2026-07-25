@@ -3,7 +3,7 @@
 // WORKING_BRANCH (staging) for reads/writes, and `merges` (staging→main) to publish.
 // Repo identity (owner/name) is passed in from lanza.config.json — deliberately NOT
 // hard-coded here, the same discipline as gh-proxy.ts, so this ships tenant-agnostic
-// in @lanza/site. Consumed by the MCP server (functions/api/mcp.ts).
+// in lanza-site. Consumed by the MCP server (functions/api/mcp.ts).
 import { parseFrontmatter, serializeFrontmatter } from "./frontmatter";
 import { BRANCH, WORKING_BRANCH } from "./gh-proxy";
 
