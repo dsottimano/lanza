@@ -2,7 +2,7 @@
 // Run: node --experimental-strip-types functions/_lib/gh-proxy.test.mjs
 import { test } from "node:test";
 import assert from "node:assert/strict";
-import { isAllowed, crossOriginBlocked, upstreamPath } from "./gh-proxy.ts";
+import { isAllowed, crossOriginBlocked, upstreamPath, upstreamTargetAllowed } from "./gh-proxy.ts";
 
 // The allowlist now validates REPO-RELATIVE paths — the SPA never sends owner/name;
 // the proxy prepends repos/<owner>/<name>/ via upstreamPath. So paths here have no
@@ -76,4 +76,53 @@ test("crossOriginBlocked unchanged", () => {
   assert.ok(crossOriginBlocked("POST", "https://evil.com", "cms.example.com"));
   assert.ok(!crossOriginBlocked("POST", "https://cms.example.com", "cms.example.com"));
   assert.ok(!crossOriginBlocked("POST", null, "cms.example.com")); // no Origin → allowed
+});
+
+// ---------------------------------------------------------------------------
+// Encoded + backslash traversal. A string check and the WHATWG URL parser
+// disagree about what a path separator is; each case below RESOLVED OUTSIDE the
+// repo before the fold-then-check fix. Regression cases — do not relax.
+// ---------------------------------------------------------------------------
+
+const BS = String.fromCharCode(92);
+const resolved = (p) => new URL(`https://api.github.com/${upstreamPath(p, "o", "n")}`).href;
+
+test("traversal: backslash is a path separator to fetch(), so it must be rejected", () => {
+  const escape = `contents/${(".." + BS).repeat(4)}user/repos`;
+  // Proof the payload really does escape once parsed:
+  assert.equal(resolved(escape), "https://api.github.com/user/repos");
+  assert.ok(!isAllowed("GET", escape));
+  assert.ok(!isAllowed("PUT", `contents/${(".." + BS).repeat(4)}repos/attacker/evil/contents/pwn.md`));
+});
+
+test("traversal: %2e%2e is a dot segment per RFC 3986", () => {
+  const escape = "contents/%2e%2e/%2e%2e/%2e%2e/%2e%2e/user/repos";
+  assert.equal(resolved(escape), "https://api.github.com/user/repos");
+  assert.ok(!isAllowed("GET", escape));
+  // The branch pin is only meaningful if this is blocked: it deletes the branch
+  // Astro builds from.
+  assert.ok(!isAllowed("DELETE", "contents/%2e%2e/%2e%2e/%2e%2e/%2e%2e/repos/o/n/git/refs/heads/main"));
+});
+
+test("traversal: double-encoded and mixed forms", () => {
+  assert.ok(!isAllowed("GET", "contents/%252e%252e/%252e%252e/user"));
+  assert.ok(!isAllowed("GET", `contents/..%2f..%2fuser`));
+  assert.ok(!isAllowed("GET", `contents/..${BS}../user`));
+});
+
+test("legitimate percent-encoding still passes (accented filenames)", () => {
+  assert.ok(isAllowed("PUT", "contents/content/pages/en/caf%C3%A9.md"));
+  assert.ok(isAllowed("GET", "contents/content/pages/en/about.md?ref=staging"));
+});
+
+test("upstreamTargetAllowed: the resolved URL is the last word", () => {
+  assert.ok(upstreamTargetAllowed("https://api.github.com/repos/o/n/contents/x.md", "o", "n"));
+  assert.ok(upstreamTargetAllowed("https://api.github.com/user", "o", "n"));
+  // escaped out of the repo namespace
+  assert.ok(!upstreamTargetAllowed("https://api.github.com/user/repos", "o", "n"));
+  assert.ok(!upstreamTargetAllowed("https://api.github.com/repos/o/n-evil/contents/x", "o", "n"));
+  assert.ok(!upstreamTargetAllowed("https://api.github.com/repos/other/repo/contents/x", "o", "n"));
+  // never leave api.github.com
+  assert.ok(!upstreamTargetAllowed("https://evil.com/repos/o/n/contents/x", "o", "n"));
+  assert.ok(!upstreamTargetAllowed("not a url", "o", "n"));
 });

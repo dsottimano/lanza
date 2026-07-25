@@ -75,6 +75,23 @@ export async function verifySession(
   return typeof login === "string" ? login : null;
 }
 
+// The /admin authorization boundary: a valid session proves WHO you are, this
+// decides whether that person owns this site. Every gate that admits a session
+// must call it — a signature-only check admits any GitHub user on earth, since
+// the broker signs a token for whoever authenticates. Case-insensitive and
+// comma-list ready so extra editors can be added without a redeploy.
+// `allowList` comes from env.ADMIN_LOGIN || lanza.config.json's adminLogin; the
+// caller passes it so this module stays pure package code (no tenant imports).
+export function isAllowedLogin(login: string | null | undefined, allowList: string): boolean {
+  if (typeof login !== "string" || !login) return false;
+  return allowList
+    .toLowerCase()
+    .split(",")
+    .map((s) => s.trim())
+    .filter(Boolean)
+    .includes(login.toLowerCase());
+}
+
 // Scoped to /admin so the cookie is never sent on public (cached) routes.
 // HttpOnly (no JS access) + Secure (HTTPS only). SameSite defaults to Lax; the
 // login nonce cookie overrides to "None" so it accompanies the broker's cross-site

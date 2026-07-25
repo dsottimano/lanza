@@ -12,8 +12,8 @@
 //
 // The CMS works on the WORKING_BRANCH (drafts) and publishes by merging it into
 // BRANCH (production — the branch Astro builds from). Ref reads/writes allow both.
-const BRANCH = "main"; // production / publish target (Astro builds from this)
-const WORKING_BRANCH = "staging"; // CMS drafts branch
+export const BRANCH = "main"; // production / publish target (Astro builds from this)
+export const WORKING_BRANCH = "staging"; // CMS drafts branch
 const BRANCHES = [BRANCH, WORKING_BRANCH];
 
 // Request headers worth forwarding upstream. Everything else (cookies, CF
@@ -46,11 +46,35 @@ export const STRIP_RESPONSE_HEADERS = [
 // is forwarded. Only the endpoints GitHubClient (admin/src/backend/github.ts)
 // actually calls are permitted; anything else is rejected. `path` may carry a
 // leading slash and/or a query string — both are normalized away here.
+// Fold every encoding that fetch()'s URL parser will collapse LATER into the form
+// we check NOW. Two traps, both confirmed to bypass a naive `..` regex:
+//   - WHATWG treats `\` as a path separator, so `..\..\x` traverses.
+//   - `%2e%2e` IS a dot segment per RFC 3986 and is normalized on parse.
+// Decoding is looped because `%252e` decodes to `%2e` decodes to `.`.
+function foldPath(path: string): string {
+  let p = path.replace(/[?#].*$/, "").replace(/^\/+/, "").replace(/\\/g, "/");
+  for (let i = 0; i < 3; i++) {
+    let next: string;
+    try {
+      next = decodeURIComponent(p);
+    } catch {
+      return p; // malformed escape — leave as-is; the dot check still runs
+    }
+    if (next === p) break;
+    p = next.replace(/\\/g, "/");
+  }
+  return p;
+}
+
 export function isAllowed(method: string, path: string): boolean {
   const m = method.toUpperCase();
   const p = path.replace(/[?#].*$/, "").replace(/^\/+/, "");
   // Reject dot segments outright: fetch() normalizes `..` when it parses the
   // upstream URL, so `contents/../../../orgs/x` would escape a prefix check.
+  // Checked against the FOLDED path so encoded and backslash forms are caught;
+  // the allowlist below still matches the raw path, so an encoded prefix like
+  // `%63ontents/` fails closed rather than being silently accepted.
+  if (/(^|\/)\.\.?(\/|$)/.test(foldPath(path))) return false;
   if (/(^|\/)\.\.?(\/|$)/.test(p)) return false;
 
   switch (m) {
@@ -92,6 +116,25 @@ export function upstreamPath(subPath: string, owner: string, name: string): stri
   const p = subPath.replace(/^\/+/, "");
   if (p.replace(/[?#].*$/, "") === "user") return p;
   return `repos/${owner}/${name}/${p}`;
+}
+
+// Defence in depth: isAllowed() inspects a string, but what actually gets fetched
+// is a parsed URL, and only the parser has the final say on normalization. So
+// re-check the RESOLVED target: whatever encoding trick reached this point, the
+// request must still land inside this tenant's repo (or on /user). Callers pass
+// the URL they are about to fetch; a false here means drop it, don't "fix" it.
+export function upstreamTargetAllowed(target: string, owner: string, name: string): boolean {
+  let pathname: string;
+  try {
+    const u = new URL(target);
+    if (u.origin !== "https://api.github.com") return false;
+    pathname = u.pathname;
+  } catch {
+    return false;
+  }
+  if (pathname === "/user") return true;
+  const prefix = `/repos/${owner}/${name}/`;
+  return pathname.startsWith(prefix) && !pathname.slice(prefix.length).startsWith("/");
 }
 
 // Cheap CSRF guard for state-changing methods: if the browser sent an Origin, its

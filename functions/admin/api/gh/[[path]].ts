@@ -17,6 +17,7 @@ import {
   crossOriginBlocked,
   isAllowed,
   upstreamPath,
+  upstreamTargetAllowed,
 } from "../../../_lib/gh-proxy";
 // Per-tenant repo identity — the broker writes this at repo creation; the proxy is
 // the single place that turns repo-relative CMS paths into repos/<owner>/<name>/…
@@ -37,23 +38,32 @@ const GITHUB_API = "https://api.github.com";
 // on each CMS call. A cache miss just re-fetches; correctness never depends on it.
 const tokenCache = new Map<string, { token: string; exp: number }>();
 
-async function brokerToken(broker: string, session: string): Promise<string | null> {
+// "denied" = the broker positively refused this session (it is not the owner).
+// null = the broker could not answer. The two must never be conflated: falling
+// back to the standing PAT on a refusal would hand a rejected caller full access.
+type TokenResult = { token: string } | "denied" | null;
+
+async function brokerToken(broker: string, session: string): Promise<TokenResult> {
   const key = `${repo.owner}/${repo.name}`;
   const cached = tokenCache.get(key);
-  if (cached && cached.exp > Date.now() + 60_000) return cached.token;
+  if (cached && cached.exp > Date.now() + 60_000) return { token: cached.token };
   const res = await fetch(`${broker}/api/token`, {
     method: "POST",
     headers: { "X-Lanza-Session": session, "Content-Type": "application/json" },
     body: JSON.stringify({ owner: repo.owner, repo: repo.name }),
   });
+  if (res.status === 401 || res.status === 403) return "denied";
   if (!res.ok) return null;
   const data = (await res.json()) as { token?: string; expiresAt?: string };
   if (!data.token) return null;
+  const exp = data.expiresAt ? Date.parse(data.expiresAt) : NaN;
   tokenCache.set(key, {
     token: data.token,
-    exp: data.expiresAt ? Date.parse(data.expiresAt) : Date.now() + 3_000_000,
+    // A NaN expiry would make every future `exp > now` false and silently disable
+    // the cache — fall back to a fixed ~50min TTL instead.
+    exp: Number.isFinite(exp) ? exp : Date.now() + 3_000_000,
   });
-  return data.token;
+  return { token: data.token };
 }
 
 export const onRequest = async (context: {
@@ -96,9 +106,14 @@ export const onRequest = async (context: {
 
   // Token: broker-minted (multi-tenant) first, else the legacy GITHUB_TOKEN PAT.
   const broker = env.BROKER_ORIGIN || CONFIG_BROKER;
-  let token: string | null = null;
-  if (session && broker) token = await brokerToken(broker, session);
-  if (!token) token = env.GITHUB_TOKEN ?? null;
+  const result = session && broker ? await brokerToken(broker, session) : null;
+  // A refusal is final. Only an UNAVAILABLE broker may fall through to the PAT,
+  // otherwise a caller the broker just rejected would be handed the standing
+  // token instead — turning a denial into an escalation.
+  if (result === "denied") {
+    return json(403, { message: "Your session is not authorized to edit this repository." });
+  }
+  const token = result ? result.token : (env.GITHUB_TOKEN ?? null);
   if (!token) {
     return json(500, {
       message: "GitHub proxy: no token — the broker was unavailable and no GITHUB_TOKEN is set.",
@@ -106,6 +121,10 @@ export const onRequest = async (context: {
   }
 
   const target = `${GITHUB_API}/${upstreamPath(subPath, repo.owner, repo.name)}${url.search}`;
+  // Last line of defence — the parsed URL, not the string, is what gets fetched.
+  if (!upstreamTargetAllowed(target, repo.owner, repo.name)) {
+    return json(403, { message: "Blocked by proxy: request resolves outside this repository." });
+  }
 
   const headers = new Headers();
   for (const name of FORWARD_REQUEST_HEADERS) {

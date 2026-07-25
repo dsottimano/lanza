@@ -7,11 +7,21 @@
 // so the login round-trip (login → broker → handoff) can complete while
 // unauthenticated. The session cookie is a broker-signed RS256 token, verified
 // here with the baked-in public key + bound to this site's origin (design §3.4-B).
-import { SESSION_COOKIE, verifySession, importPublicKey, readCookie } from "../_lib/session";
+import {
+  SESSION_COOKIE,
+  verifySession,
+  importPublicKey,
+  readCookie,
+  isAllowedLogin,
+} from "../_lib/session";
 import { HANDOFF_PUBLIC_KEY as CONFIG_PUBLIC_KEY } from "../_lib/tenant-config";
+// Per-tenant identity — adminLogin is the /admin gate (same source the handoff
+// endpoint checks). The broker writes this file at repo creation.
+import repo from "../../lanza.config.json";
 
 interface Env {
   HANDOFF_PUBLIC_KEY?: string;
+  ADMIN_LOGIN?: string;
 }
 
 export const onRequest = async (context: {
@@ -35,7 +45,11 @@ export const onRequest = async (context: {
       url.origin,
     );
   }
-  if (login) return next();
+  // A valid signature only proves the broker authenticated SOMEONE — it mints a
+  // token for any GitHub user who logs in. Ownership is a separate check, and it
+  // belongs here: /admin/api/cf/* trusts this middleware entirely and attaches an
+  // account-scoped Cloudflare token.
+  if (isAllowedLogin(login, env.ADMIN_LOGIN || repo.adminLogin)) return next();
 
   // Unauthenticated. XHR/API calls get a JSON 401 (the SPA can surface a
   // "sign in" prompt); top-level navigations are redirected into the login flow.

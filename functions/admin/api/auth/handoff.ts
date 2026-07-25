@@ -17,6 +17,7 @@ import {
   readCookie,
   importPublicKey,
   verifyRS256,
+  isAllowedLogin,
 } from "../../../_lib/session";
 import { HANDOFF_PUBLIC_KEY as CONFIG_PUBLIC_KEY } from "../../../_lib/tenant-config";
 // Per-tenant identity (owner/name/adminLogin) — the broker writes this at repo
@@ -65,14 +66,9 @@ export const onRequest = async (context: {
     return new Response("Handoff token expired.", { status: 401 });
   }
 
-  // The security boundary: only the site owner's login(s) may enter. Case-insensitive
-  // and comma-list ready so extra editors can be added without a redeploy.
-  const allowed = (env.ADMIN_LOGIN || repo.adminLogin)
-    .toLowerCase()
-    .split(",")
-    .map((s) => s.trim())
-    .filter(Boolean);
-  if (typeof login !== "string" || !allowed.includes(login.toLowerCase())) {
+  // The security boundary: only the site owner's login(s) may enter. Shared with
+  // the /admin middleware so both gates apply the identical rule.
+  if (!isAllowedLogin(login as string | null, env.ADMIN_LOGIN || repo.adminLogin)) {
     return new Response("This GitHub account is not authorized for this site.", {
       status: 403,
     });
