@@ -4,8 +4,10 @@ The auth/authz rules the tenant site and the broker both depend on, and why each
 exists. Written after the 2026-07-25 review, which found four ways to bypass the
 `/admin` gate — every rule below is here because something got through.
 
-Companion docs: `onboarding-broker-design.md` (the flow), `mcp-server.md` (the
-agent surface). **This file is authoritative where they disagree.**
+Companion docs: `keys-and-secrets.md` (every credential and who holds it),
+`onboarding-workflow.md` (life of an onboarding), `onboarding-broker-design.md`
+(why/decisions), `mcp-server.md` (the agent surface). **This file is authoritative
+where they disagree.**
 
 ---
 
@@ -196,10 +198,11 @@ oversights.
   enforced. Switching the session cookie to `SameSite=None` would make this live.
 - **Cloudflare OAuth tokens live in a browser cookie.** `lanza_cf` holds the CF
   access + refresh tokens as unauthenticated base64 JSON (`HttpOnly; Secure`,
-  `Path=/`). Contradicts `onboarding-workflow.md`'s "token never exposed to the
-  browser" invariant. Scopes also still include `workers-kv-storage.write`,
-  `d1.write`, `workers-r2.write` and `user-details.read`, which no broker code
-  path uses.
+  `Path=/`). The fix is Option B — a per-tenant server-side token store — designed
+  and unbuilt. Scopes also still include `workers-kv-storage.write`, `d1.write`
+  and `workers-r2.write`, which no broker code path uses. (`user-details.read` is
+  no longer in that list: `describeIdentity()` calls `GET /user` so the wizard can
+  show which Cloudflare account a site is about to be built in.)
 - **`/api/auth/cf/login` honours an unauthenticated `?scope=` override.**
 - **No `Origin` validation on the MCP transport.** The spec asks for it against
   DNS rebinding; impact is low because auth is Bearer, not cookie.

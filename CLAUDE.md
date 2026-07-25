@@ -43,6 +43,8 @@ markdown on load and re-saves HTML.
    (`functions/_lib/gh-proxy.ts`, shared by both) **and** re-validates the
    resolved URL. **Read `docs/security-model.md` before touching any of this** —
    it is authoritative, and every rule in it exists because something got past.
+   `docs/keys-and-secrets.md` is the credential inventory (who holds what, blast
+   radius, rotation); `docs/onboarding-workflow.md` is life-of-an-onboarding.
 
 5. **Bot secrets via wrangler, never in the repo.** `BOT_TOKEN`, `BOT_INFO`,
    `WEBHOOK_SECRET`, `GITHUB_TOKEN` are `wrangler secret put`. The bot fails

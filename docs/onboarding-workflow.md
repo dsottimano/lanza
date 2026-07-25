@@ -1,119 +1,269 @@
-# Lanza Onboarding — The Explicit Workflow
+# Life of an onboarding
 
-Status: **2026-07-05.** The end-to-end *mechanics* are proven AND the **wizard UI is now
-built** (broker `index.html` + `api/onboard/{status,deploy}` + cookie-redirect callbacks,
-deployed to connect.lanzacms.com). What's left is a **live end-to-end verification** through
-a real browser, **Dave's go-live prereqs** (§ below), and **Phase-1 auth wiring** (the
-broker-mediated `/admin` login handoff — step 6). This doc is the explicit "life of an
-onboarding" — the *how it all fits*. The *why/decisions* live in `onboarding-broker-design.md`;
-the GitHub-side details in there + `onboarding-runbook.md`.
+How a stranger goes from nothing to a live site they own, in detail. **Status:
+2026-07-25 — proven end to end.** `datadefine/bbbb` → `bbbb-2db67eab8649.pages.dev`,
+driven as a third-party tenant (not as the Lanza owner), including `/admin` login, an
+edit, a publish, and Cloudflare rebuilding from the merge.
 
-**Model B:** the user owns their GitHub + Cloudflare accounts; the broker
-(`connect.lanzacms.com`, repo `lanza-broker`) automates everything between the two
-unavoidable sign-ups. Two manual acts survive by design: creating those two accounts, and
-one GitHub↔Cloudflare authorize click (step 4). Everything else is headless.
+Companions: `keys-and-secrets.md` (credentials), `security-model.md` (**authoritative
+on authz**), `onboarding-broker-design.md` (why/decisions).
 
----
-
-## The full journey (new non-technical user)
-
-Legend: ✅ proven/built · 🟡 built earlier, needs wizard wiring · 🔲 to build
-
-| # | Step | How | State |
-|---|---|---|---|
-| 1 | Land on wizard | `connect.lanzacms.com` — name → instant preview → "Get started" | ✅ built (`lanza-broker/index.html`; pending live verify) |
-| 2 | **Connect GitHub** | OAuth (`public_repo`, one-time) → broker `POST /repos/{template}/generate` → new tenant repo (+ `staging` + committed owner) → **302 to a pre-selected `lanza-cms` App install** (design §4 step 3) → GitHub returns to the Setup URL, which resumes the wizard | ✅ built (`oauth/callback.ts` → install redirect; `setup.ts` verifies the App covers the repo → `/?step=cloudflare`); pending live verify |
-| 3 | **Connect Cloudflare** | CF OAuth → broker gets access + **refresh** token, stores `{access, refresh, expires_at}` | ✅ `functions/api/auth/cf/{login,callback}.ts` (callback → `lanza_cf` cookie) |
-| 4 | **Authorize GitHub↔CF** | deep-link `github.com/apps/cloudflare-workers-and-pages/installations/new` while CF session is warm → CF links the install to their account | ✅ wired (wizard opens the deep-link + polls `POST /api/onboard/deploy` as the detector) |
-| 5 | **Create + deploy site** | with CF token: `POST /pages/projects` (github source) → `POST …/deployments?branch=main` → live `*.pages.dev` | ✅ real endpoint `api/onboard/deploy.ts` (idempotent; the git-authorize detector) |
-| 6 | **Land in /admin** | broker-mediated GitHub login → RS256 handoff → tenant session → the CMS | ✅ built (tenant `admin/api/auth/{login,handoff}.ts` + middleware verify; broker `api/auth/callback.ts` mints the RS256 session) — pending live verify. **App-install gap CLOSED 2026-07-05** — step 2 now installs `lanza-cms` on the new repo, so a fresh owner can save (needs the App Setup URL pointed at `connect.lanzacms.com` + a live install round-trip to confirm) |
-| 7 | **Edit + publish** | CMS saves → broker mints repo-scoped edit-token → GitHub Contents write; publish = staging→main merge | 🟡 built |
-| 8 | **Provision KV/D1/R2** (when a listing needs it) | CMS `cf/[[path]].ts` proxy → **through the broker** (Option B) using the CF token | 🔲 (decided, not built) |
+> The previous version of this file was written before the first live run and was
+> wrong in one load-bearing way: it sent users to GitHub's App-install URL at step 3.
+> That is precisely what produces `8000011`. See §3.
 
 ---
 
-## The Cloudflare OAuth recipe (hard-won — don't re-derive)
+## 0. The model
 
-- **Endpoints** (`dash.cloudflare.com`): `/oauth2/auth`, `/oauth2/token`, `/oauth2/userinfo`.
-  Discovery: `dash.cloudflare.com/.well-known/openid-configuration`.
-- **Client config:** Response Type `Code`, Token Auth `Client Secret POST`, **both** grant
-  types `authorization_code` **and** `refresh_token`, redirect URI exact-match. Client ID
-  `4b126e72…`; secrets `CLOUDFLARE_OAUTH_CLIENT_ID` / `CLOUDFLARE_OAUTH_CLIENT_SECRET` in the
-  broker Pages env.
-- **Scopes are sent explicitly** in the authorize request (omitting `scope` → generic
-  "unexpected error"). They are **dot-notation IDs = API-token permission IDs** (NOT
-  wrangler's `resource:access` colon strings). Full list: `GET /client/v4/oauth/scopes`.
-  Current set (trimmed 2026-07-10 to the minimum the broker deploy uses):
-  `offline_access account-settings.read page.read page.write`. Dropped
-  `user-details.read workers-kv-storage.write d1.write workers-r2.write` — the OAuth
-  token never used them (KV/D1/R2 provisioning runs on the separate `CLOUDFLARE_API_TOKEN`).
-- **Refresh token** requires the `refresh_token` grant on the client **AND** `offline_access`
-  in scope — *both*, neither alone. Access token ~16h; broker refreshes silently.
-- **Deploy gotchas:** `page.write` (not just `page.read`) to create a project — read alone
-  → `10000` auth error. Creating a git-sourced project **does not auto-deploy**; follow with
-  `POST /accounts/{id}/pages/projects/{name}/deployments` (`branch=main`) — no dummy commit.
-- **Git-link detection:** no API to confirm the step-4 authorize exists (CF feature request
-  open). The `POST /pages/projects` attempt IS the detector: succeeds once linked,
-  `8000010/8000011` until. Retry.
+The user owns their GitHub account and their Cloudflare account. The broker
+(`connect.lanzacms.com`, repo `lanza-broker`) automates everything between them and
+holds every secret; the tenant holds none.
 
----
+**Three manual acts survive by design**, and only three:
 
-## Invariants (do not violate)
+1. create a GitHub account
+2. create a Cloudflare account
+3. let Cloudflare connect itself to GitHub (§3 — one click, on Cloudflare's own page)
 
-1. **Never inhibit self-hosting developers.** CF access is dual-mode: if the tenant has its
-   own `CLOUDFLARE_API_TOKEN`, the proxy uses it directly (no broker); else it proxies
-   through the broker (managed). Same for auth (own GitHub OAuth + `ADMIN_LOGIN` vs.
-   broker-mediated). The broker is an *optional layer over a self-sufficient CMS*.
-2. **Broker holds secrets + tokens; tenants verify-only** (asymmetric RS256 handoff).
-3. **Stay free-tier, all-Cloudflare; cache public routes** (repo CLAUDE.md rules).
-4. **Token never exposed to the browser** — CF calls are server-side (proxy / broker).
+Everything else is headless. The wizard's entire state is HttpOnly cookies on the
+broker origin — no KV, no database.
+
+| cookie | set by | carries |
+|---|---|---|
+| `lanza_gh` | `onboard/oauth/callback.ts` | `{owner, repo, login}` |
+| `lanza_cf` | `auth/cf/callback.ts` | `{access, refresh, expires_at, account_id}` |
+| `lanza_cf_state` | `auth/cf/login.ts` | CSRF nonce, 600s |
+
+`POST /api/onboard/reset` expires all three. The page cannot — they are HttpOnly.
 
 ---
 
-## Code map
+## 1. Name → repo (steps 1–2)
 
-- **CF OAuth:** `lanza-broker/functions/api/auth/cf/{login,callback}.ts` — login builds the
-  authorize redirect (+ `?scope=` / `?deploytest=owner/repo` debug overrides); callback
-  exchanges the code and (currently) runs smoke tests incl. the deploy probe.
-- **GitHub App / repo creation:** `lanza-broker/functions/_lib/gh-app.ts`,
-  `functions/api/onboard/setup.ts`.
-- **Broker-mediated login + handoff:** `lanza-broker/functions/api/auth/*` (GitHub side),
-  tenant `functions/admin/api/auth/{login,handoff}.ts`, `functions/_lib/session.ts`.
-- **Runtime CF proxy (tenant):** `functions/admin/api/cf/[[path]].ts` + `_lib/cf-proxy.ts`
-  (allowlist). Today static-token; Option B adds the broker path.
-- **Broker origin constant:** `functions/_lib/tenant-config.ts` → `BROKER_ORIGIN` (flip to
-  `connect.lanzacms.com`).
+The visitor types a site name and clicks through to GitHub OAuth
+(`OAUTH_CLIENT_ID`, scope `public_repo`).
+
+In the callback (`onboard/oauth/callback.ts`), before the user sees another screen:
+
+1. sanitise the name → `[a-z0-9._-]`, collapse the rest to `-`, cap 90 chars,
+   fall back to `<login>-site`
+2. `POST /repos/{TEMPLATE_OWNER}/{TEMPLATE_REPO}/generate` → the tenant's repo
+3. `setTenantConfig()` → write `lanza.config.json` = `{owner, name, adminLogin}`
+4. `ensureStaging()` → cut `staging` from the default branch
+5. discard the user token — it is never stored
+6. redirect to the `lanza-cms` App install, pre-filled:
+   `…/installations/new/permissions?suggested_target_id=<user id>&repository_ids[]=<repo id>`
+
+That pre-fill is why GitHub shows the new repo already selected and badged
+*suggested*: **the repo exists before the install screen renders.**
+
+> **Two races live here, both real.**
+>
+> `/generate` returns when GitHub *registers* the repo, not when it has committed the
+> template. Writing `lanza.config.json` too early creates it on a near-empty repo and
+> GitHub's own "Initial commit" then lands **on top**, reverting it — the tenant boots
+> with the template's `dsottimano/lanza` identity, locked out of its own `/admin`.
+> Observed on `star-real-estate` and `blah-blah`. `setTenantConfig` now polls for the
+> placeholder (8 × 1s) and updates **by SHA**, never blind-creates. `ensureStaging`
+> has always had its own wait for the branch ref.
+>
+> A user who clicks **Reject** on the install screen leaves an orphan repo, because
+> creation precedes consent. Unresolved.
+
+GitHub returns to the App's Setup URL → `/api/onboard/setup`, which confirms the
+install covers *that* repo and resumes the wizard at Cloudflare.
 
 ---
 
-## NEXT SESSION: build the onboarding wizard (Phase 5)
+## 2. Connect Cloudflare
 
-The mechanics are proven; assemble them into the guided UI on `connect.lanzacms.com`.
+Standard OAuth against `dash.cloudflare.com/oauth2/{auth,token}` (see
+`keys-and-secrets.md` §5 for scopes and the refresh-token requirement).
 
-**Goal:** the step 1→6 flow above as a real wizard — name → instant preview → Connect GitHub
-→ Connect Cloudflare → Authorize GitHub↔CF (deep-link) → we create+deploy → land in `/admin`.
-Skinned in the flat Freehold identity the CMS uses so onboarding + editor read as one product.
+**The account is chosen, never guessed.** Cloudflare's consent screen has the user tick
+which accounts to grant, which *scopes the token* — so `GET /accounts` returns only
+those. `resolveAccount()` then:
 
-**Sequencing notes for the wizard:**
-- After **step 3 (Connect Cloudflare)** the CF session is warm — that's the moment to
-  deep-link **step 4** (`github.com/apps/cloudflare-workers-and-pages/installations/new`).
-- After step 4, **poll by attempting `POST /pages/projects`** (the only integration detector)
-  — retry past `8000010` until it succeeds, then trigger the deployment and poll the
-  `*.pages.dev` until it serves, then hand off to `/admin`.
-- The `callback.ts` smoke-test scaffolding (create-project + trigger-deploy) is throwaway
-  proof code — lift the *real* create+deploy into a proper broker endpoint the wizard calls,
-  using the **stored** token (not inline in the OAuth callback).
+- uses a stored `account_id` if the token still grants it
+- picks implicitly when there is exactly **one** (so most users see no picker)
+- otherwise asks
 
-**Also pending (can precede or follow the wizard):**
-- **Option B** — broker CF-proxy endpoint + tenant `cf-proxy.ts` local-token-or-broker
-  switch (invariant #1). This is what actually wires the CF token into the running CMS.
-- Flip `BROKER_ORIGIN` → `connect.lanzacms.com`.
-- Decide the broker's token store (KV? DO?) for `{access, refresh, expires_at}` per tenant.
+The choice is persisted in `lanza_cf` and survives token refresh. It used to be
+`accounts[0]`, resolved *independently* by the deploy POST and the polling GET — so
+anyone in more than one account could get their site built in an employer's, and a
+listing-order change stranded the wizard on an account the project was never in.
 
-**Cleanup owed from this session:**
-- Delete test GitHub repo `dsottimano/lanza-deploytest-11556` and the two
-  `lanza-deploytest-*` Pages projects.
-- **Burn the API token** pasted in the session, and the CF OAuth flow's exploratory
-  `?deploytest` scaffolding once the real endpoint exists.
+---
 
-See `onboarding-broker-design.md` §5 (verified block) + §9 (decision log) for full detail.
+## 3. The one manual step — Cloudflare connects itself to GitHub
+
+**This is the step everything else depended on, and the one we got wrong.**
+
+Cloudflare keeps an **account-level git connection record**, entirely separate from the
+GitHub App installation:
+
+```
+GET https://api.cloudflare.com/client/v4/accounts/<id>/pages/connections
+```
+
+- `result: []` → creating a git-sourced Pages project returns **8000011**
+  (*"internal issue with your Cloudflare Pages Git installation"*)
+- one record present → the **identical** create call succeeds immediately
+
+Proven both directions on `datadefine/aaaaaa`, same account, same repo, same code.
+
+**Only Cloudflare can write that record.** Its connect button sends the user to
+
+```
+github.com/apps/cloudflare-workers-and-pages/installations/new/permissions
+  ?state=<cf token>&target_id=<github user id>
+```
+
+and that **`state`** is what binds the resulting installation back to the Cloudflare
+account. Sending the user to GitHub's bare install URL — what this doc used to
+prescribe — carries no state, so GitHub's post-install redirect lands on
+`dash.cloudflare.com/pages/installations/github` with **no account context** and
+Cloudflare writes nothing. The App looks installed on GitHub, Cloudflare disagrees, and
+every project create fails.
+
+So the wizard opens Cloudflare's own page, account-scoped:
+
+```
+https://dash.cloudflare.com/<accountId>/pages/new/provider/github
+```
+
+Account-scoped deliberately: the accountless variant binds to whichever account the
+dashboard session happens to resolve to.
+
+### The trap we cannot fix
+
+If the Cloudflare Workers and Pages App is **already installed** on that GitHub
+account, Cloudflare's own connect flow deep-links to
+`github.com/settings/installations/<id>` and still writes no record — an infinite
+loop with no error. Reproduced entirely inside Cloudflare's UI with our code absent, so
+it is their bug.
+
+The only escape is to **uninstall** the App on GitHub and let Cloudflare install it
+fresh. The wizard surfaces this as a hint after ~6 polls. It is worth a support ticket.
+
+### Detection
+
+The old claim that "no API can confirm this step" is false — `pages/connections` is
+exactly that API, and it works with the tenant's OAuth token, not just a dashboard
+session. The wizard still *advances* on the create attempt succeeding, but the health
+screen and the site list check the record directly (§6).
+
+---
+
+## 4. Create and deploy
+
+`POST /api/onboard/deploy` walks a deterministic candidate ladder from
+`projectNameCandidates(owner, repo)` and for each name:
+
+1. `projectExists` in *our* account → adopt it (idempotent re-poll)
+2. else create with a `github` source, `production_branch: main`,
+   `npm run build` → `dist`, `NODE_VERSION=22`
+3. `8000010/8000011` → return `awaiting_git_authorize` **with Cloudflare's verbatim
+   error, the accountId, the project name and the source repo** — this state used to
+   discard all of that and spin forever with no clue
+4. "already exists" but **not** in our account → a stranger holds the global name; try
+   the next candidate
+
+**The project name is derived, not the repo name** —
+`<repo-slug>-<sha256(owner/repo)[0..12]>`. `*.pages.dev` is one global namespace across
+every Cloudflare account, so `test`, `blog`, `bakery` collided with strangers on the
+first attempt *and the collision read as success* — deploying nothing and pointing the
+user at a third party's `/admin`. Derived rather than random because `/api/token` must
+recompute a tenant's origin to check a session's `aud`. Full rationale:
+`security-model.md` §2.
+
+A git-sourced create **does not auto-deploy**; `ensureDeployment` triggers
+`POST …/deployments` with `branch=main`. The wizard then polls
+`GET /api/onboard/deploy?project=<name>` until `stage: deploy, status: success`.
+
+---
+
+## 5. Land in `/admin`, edit, publish
+
+1. `/admin` → broker-mediated GitHub login → RS256 session (`keys-and-secrets.md` §2)
+2. `handoff.ts` checks signature, `aud`, `nonce`, `exp`, **and** `adminLogin` — the
+   ownership check is separate from identity and both are required
+3. saves go to `staging` via `/admin/api/gh`, which mints a repo-scoped
+   Contents:write token per request
+4. **Publish** merges `staging` → `main`; Cloudflare rebuilds from the push
+
+`draft: true` is the publish gate — an unticked post merges but stays hidden.
+
+---
+
+## 6. Returning, and knowing your site is healthy
+
+A bare `connect.lanzacms.com` used to resume whatever the cookies held, so a finished
+run showed its completion screen forever and creating a *second* site was effectively
+impossible. It now offers **Continue / Start a new site**, plus the Lanza sites already
+on the connected account (`GET /api/onboard/sites`, filtered by our
+`-<12 hex>` naming convention).
+
+OAuth callbacks always return with an explicit `?step=`, so asking here never
+interrupts a flow in progress.
+
+**Each site row reports whether the git connection exists**, because this failure is
+otherwise invisible:
+
+> A Pages project created while Cloudflare held no connection record still *displays* a
+> linked repo, builds once, and then never rebuilds. Every later edit publishes into a
+> void. Nothing in the CMS, in GitHub, or on the Cloudflare project page says so.
+> `star-real-estate` was exactly this, and the wizard congratulated us on it.
+
+---
+
+## 7. Invariants
+
+1. **Never inhibit self-hosting.** Dual-mode throughout: own `CLOUDFLARE_API_TOKEN` and
+   `GITHUB_TOKEN` and `ADMIN_LOGIN`, or the broker. The broker is an optional layer
+   over a self-sufficient CMS.
+2. **Broker holds secrets; tenants verify only.**
+3. **Stay free-tier and all-Cloudflare; cache public routes** (CLAUDE.md rules 1–2).
+   The wizard shell itself is `no-cache` — it is an app, not a document, and a
+   zone-level 4h Browser Cache TTL once hid two shipped fixes mid-test.
+
+---
+
+## 8. Code map
+
+| Concern | Files |
+|---|---|
+| Wizard UI + state machine | `lanza-broker/index.html` |
+| GitHub OAuth → repo | `functions/api/onboard/oauth/{start,callback}.ts`, `_lib/gh-app.ts` |
+| App install resume | `functions/api/onboard/setup.ts` |
+| Cloudflare OAuth | `functions/api/auth/cf/{login,callback}.ts` |
+| Account choice / identity / connection check | `functions/_lib/cf-accounts.ts` |
+| Create + deploy + poll | `functions/api/onboard/deploy.ts` |
+| Existing sites + health | `functions/api/onboard/sites.ts` |
+| Abandon a run | `functions/api/onboard/reset.ts` |
+| Project naming / audience | `functions/_lib/tenant-origin.ts` |
+| Edit tokens | `functions/api/token.ts` |
+| Tenant login | tenant `functions/admin/api/auth/{login,handoff}.ts`, `_lib/session.ts` |
+
+---
+
+## 9. Cloudflare API notes (hard-won — don't re-derive)
+
+- `/accounts` **requires** `page`/`per_page`; `/accounts/<id>/pages/projects`
+  **rejects** them — `?per_page=50&page=1` returns 400 code `8000024`. An empty sites
+  list came from exactly this.
+- `page.write` is needed to create a project; `page.read` alone → `10000`.
+- Git-sourced create does not auto-deploy.
+- Scopes must be sent explicitly, in dot notation.
+- `offline_access` **and** the `refresh_token` grant are both required for a refresh
+  token; either alone yields none.
+
+## 10. Still open
+
+- **Option B** — move Cloudflare tokens out of the browser cookie into a per-tenant
+  server-side store. Until then every onboarded tenant's Site Health panel 503s, since
+  the broker sets only `NODE_VERSION` on new projects.
+- **Orphan repo** when a user rejects the App install.
+- **The already-installed trap** (§3) — Cloudflare's to fix.
+- Unused Cloudflare scopes still requested; trim the code before the client.

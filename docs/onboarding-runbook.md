@@ -1,8 +1,11 @@
 # Onboarding broker — operator runbook (the parts only Dave can do)
 
-The one-time setup that unblocks Phase 1–3 going live (see
-`docs/onboarding-broker-design.md` §8). Do these once; hand me the recorded values
-(or set them as secrets yourself) and I can wire the code end-to-end.
+The one-time setup behind a working broker. **Already done for
+`connect.lanzacms.com`** — this is here for rebuilding it, rotating a credential, or
+standing up a second broker.
+
+For what each credential authorizes and what breaks if it leaks, see
+`keys-and-secrets.md` — that file is the inventory; this one is the procedure.
 
 > ⚠ GitHub/Cloudflare UI labels drift — if a field name here doesn't match exactly,
 > match by intent and tell me.
@@ -14,10 +17,12 @@ GitHub → **Settings → Developer settings → GitHub Apps → New GitHub App*
 - **Name:** `Lanza CMS` (slug becomes `lanza-cms`).
 - **Homepage URL:** `https://lanzacms.com`
 - **Callback URL (the "Sign in with GitHub" web flow):**
-  `https://lanzacms.com/api/auth/callback`  ← this is the single shared callback the
-  whole design hinges on.
-- **Setup URL (optional, for the install→repo flow later):**
-  `https://lanzacms.com/api/onboard/setup`  · leave "Redirect on update" unchecked.
+  `https://connect.lanzacms.com/api/auth/callback`  ← the single shared callback the
+  whole design hinges on. It points at the **broker**, not a tenant: the App can only
+  register a handful of callbacks, so it cannot point at each customer's domain.
+- **Setup URL (where GitHub returns after an install):**
+  `https://connect.lanzacms.com/api/onboard/setup`  · leave "Redirect on update"
+  unchecked.
 - **Webhook:** uncheck **Active** (not needed yet).
 - **Permissions → Repository → Contents: Read and write.** (Nothing else — this is the
   standing access a tenant grants: one repo, content only.)
@@ -72,50 +77,64 @@ Set via **Pages → Settings → Variables & Secrets** (as *Secret*), or
 - The committed **owner login** slot (`lanza.owner`) is written by the broker at repo
   creation, not by you.
 
-## 5. Hand-off to me
+## 5. The second OAuth client (onboarding)
 
-Give me: **App ID, Client ID, Client secret** (or confirm they're set as broker
-secrets), and the **public key** file. Then I wire `login.ts` → broker, the broker
-`callback.ts` + `handoff.ts`, and the tenant `handoff.ts`/middleware, and we test the
-round-trip on a `*.pages.dev` preview.
+Repo creation cannot use the App's login client, because login is deliberately
+scopeless. Register a separate OAuth client with `public_repo` and set
+`OAUTH_CLIENT_ID` / `OAUTH_CLIENT_SECRET`. Reasoning: `keys-and-secrets.md` §3.
+
+## 6. Cloudflare OAuth client
+
+Response Type **Code**, Token Auth **Client Secret POST**, **both** grant types
+`authorization_code` *and* `refresh_token` (a refresh token needs the grant *and*
+`offline_access` in scope — neither alone works), redirect URI exact-match
+`https://connect.lanzacms.com/api/auth/cf/callback`. Set
+`CLOUDFLARE_OAUTH_CLIENT_ID` / `_SECRET`.
+
+## 7. Verify it works
+
+- `GET https://connect.lanzacms.com/api/onboard/status` → 200 JSON
+- Run the wizard against a throwaway GitHub account whose Cloudflare account has **no**
+  git connection record — that is the only state in which step 3 is actually exercised
+  (`onboarding-workflow.md` §3). Check with
+  `/accounts/<id>/pages/connections` → must be `result: []` before you start.
 
 ---
 
-# The one manual step — guided Cloudflare connect (Phase 3)
+# The one manual step — Cloudflare connects itself to GitHub
 
-This is the **only** click the user does by hand (design §5 — no API can do it). The
-wizard's job is to make it feel like following a recipe, not configuring a server. The
-broker already created their repo; this wires Cloudflare to it.
+> **Rewritten 2026-07-25 after the first live run.** This section used to describe the
+> user creating the Pages project by hand and typing build settings. None of that
+> happens any more — the broker creates the project and triggers the deploy. What
+> survives is a single click, and it is *not* the one this doc originally described.
+> Full detail: `onboarding-workflow.md` §3.
 
-**What the wizard shows (one screen, pre-filled values to copy):**
+The user's only manual act here is letting **Cloudflare** connect itself to GitHub.
+The wizard opens Cloudflare's own account-scoped page:
 
-1. **"Create your free Cloudflare account"** → button deep-links to
-   `https://dash.cloudflare.com/sign-up`. (Sign-up moment #2 — their turf, we can't
-   skip it. Tell them: free, no card.)
-2. **"Connect your site"** → deep-link straight to
-   **Workers & Pages → Create → Pages → Connect to Git**. On first use Cloudflare shows
-   **"Install & Authorize"** — this is the unavoidable git authorization; the copy
-   should say *"click Install & Authorize, pick only the `<their-repo>` repo."*
-3. **"Pick the repo"** — the one the broker just made (name shown on screen).
-4. **Build settings — copy these exactly** (the screen lists them as copy chips):
+```
+https://dash.cloudflare.com/<accountId>/pages/new/provider/github
+```
 
-   | Field | Value |
-   |---|---|
-   | Framework preset | **Astro** |
-   | Build command | **`npm run build`** |
-   | Build output directory | **`dist`** |
-   | Environment variable | **`NODE_VERSION`** = **`22`** |
+They click **GitHub → Connect GitHub → Install & Authorize** (choosing just their
+repo), and can close the tab. The wizard is polling and takes over.
 
-   > ⚠ Confirm these against the template repo's `package.json` before shipping the copy
-   > — the `build` script must be the one that also builds the admin (`build:admin`),
-   > and `dist` is Astro's default output. Node 22 is pinned to match `@lanza/site`
-   > (design §6).
+**Why it must be Cloudflare's page, not GitHub's.** Cloudflare stores an account-level
+git *connection record* and only writes it when Cloudflare itself starts the install —
+its URL carries a `state` that binds the installation back to the account. Sending the
+user to `github.com/apps/cloudflare-workers-and-pages/installations/new` skips that, no
+record is written, and every project create then fails with `8000011`. Confirmed both
+directions against `/accounts/<id>/pages/connections`.
 
-5. **"Save and Deploy"** → first build runs. The wizard **polls the `*.pages.dev` URL**
-   in the background; when it answers 200, it auto-advances → **"Your site is live"** →
-   button into `/admin`.
+**The trap.** If that App is *already* installed on their GitHub account, Cloudflare's
+own flow dead-ends at `github.com/settings/installations/<id>` and writes nothing —
+their bug, reproduced with our code out of the picture. They must uninstall
+**Cloudflare Workers and Pages** and let Cloudflare reinstall it. The wizard hints at
+this after ~6 polls.
 
-**Why nothing else is typed:** no secrets, no `ADMIN_LOGIN`, no session key — all
-handled by the broker-signed design (§3.4-B). The four build-setting values above are
-the entire manual surface. Everything before (repo) and after (auth, sessions) is
-automated.
+**Build settings are no longer typed by anyone** — `deploy.ts` sets
+`production_branch: main`, `npm run build`, `dist`, `NODE_VERSION=22` at create time,
+and triggers the first deployment (a git-sourced create does not auto-deploy).
+
+**Nothing else is entered by the user**: no secrets, no `ADMIN_LOGIN`, no session key.
+The project name is derived, not chosen (`security-model.md` §2).
