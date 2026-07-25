@@ -72,8 +72,15 @@ async function getCollections(client: ContentClient): Promise<CollectionDef[]> {
   const pending = (async () => {
     const raw = await client.readRaw("data/schema.json");
     if (!raw) throw new GitHubError(404, "This site has no data/schema.json — it may not be a Lanza site.");
-    const schema = JSON.parse(raw) as { collections?: CollectionDef[] };
-    return schema.collections ?? [];
+    // schema.json is a bare array of collections — the shape the CMS writes
+    // (admin/src/backend/schema.ts) and Astro's generator reads. Not an object.
+    const schema = JSON.parse(raw) as unknown;
+    if (!Array.isArray(schema)) {
+      throw new GitHubError(500, "data/schema.json is not a collection array — this site's content model is malformed.");
+    }
+    // `kind: "files"` collections (Settings) are singleton JSON files, not entry
+    // folders. They have no `folder`, and the MCP server does not edit them.
+    return (schema as CollectionDef[]).filter((c) => typeof c.folder === "string" && c.folder !== "");
   })();
   // Don't cache a rejection — a transient GitHub error would poison the request.
   pending.catch(() => collectionsCache.delete(client));

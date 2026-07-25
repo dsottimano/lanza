@@ -12,12 +12,17 @@ const REPO = { owner: "o", name: "n" };
 const b64 = (s) => Buffer.from(s, "utf8").toString("base64");
 
 const SITE = JSON.stringify({ defaultLocale: "en", locales: [{ code: "en" }, { code: "es" }] });
-const SCHEMA = JSON.stringify({
-  collections: [
-    { name: "pages", folder: "content/pages", localized: true, body: "rich" },
-    { name: "authors", folder: "content/authors", localized: false, body: "none" },
-  ],
-});
+// A BARE ARRAY — the shape the CMS actually commits (admin/src/backend/schema.ts
+// saveJson's a Collection[]). This fixture used to wrap it in {collections: […]},
+// a shape no writer produces, and the implementation was written to match the
+// fixture: every content tool was dead against a real site while the suite was
+// green. The trailing `kind: "files"` entry is Settings — folderless, and it must
+// not reach the path-confinement check.
+const SCHEMA = JSON.stringify([
+  { kind: "folder", name: "pages", folder: "content/pages", localized: true, body: "rich" },
+  { kind: "folder", name: "authors", folder: "content/authors", localized: false, body: "none" },
+  { kind: "files", name: "settings", files: [{ name: "menu", file: "data/menu.json" }] },
+]);
 
 // A fresh fake GitHub per test: a Map of repo-path → file text, plus staging state.
 function fakeGitHub(seed = {}) {
@@ -111,6 +116,19 @@ test("get_site reads locales from data/site.json", async () => {
   fakeGitHub({ "data/site.json": SITE });
   const r = await handleMessage({ jsonrpc: "2.0", id: 4, method: "tools/call", params: { name: "get_site" } }, client());
   assert.deepEqual(toolData(r), { defaultLocale: "en", locales: ["en", "es"] });
+});
+
+test("list_collections returns the folder collections, not the files ones", async () => {
+  fakeGitHub({ "data/schema.json": SCHEMA });
+  const r = await handleMessage({ jsonrpc: "2.0", id: 11, method: "tools/call", params: { name: "list_collections" } }, client());
+  const data = toolData(r);
+  // The bug this pins: a shape mismatch made this return [] on every real site,
+  // which also 404'd resolveCollection and 403'd every entry path.
+  assert.deepEqual(
+    data.map((c) => c.name),
+    ["pages", "authors"],
+  );
+  assert.deepEqual(data[0], { name: "pages", folder: "content/pages", localized: true, body: "rich" });
 });
 
 test("create_content stages a new page with draft:false + derived slug", async () => {
