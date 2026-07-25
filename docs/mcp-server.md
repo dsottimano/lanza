@@ -82,13 +82,18 @@ go live. New entries are written `draft: false` (visible once published); pass
 
 ### Broker prereqs (once, `lanza-broker`)
 
-1. **Create a KV namespace** and bind it as `OAUTH_KV` (auth codes, refresh tokens,
-   DCR clients):
+1. **Create a KV namespace** and bind it as `LANZA_OAUTH_KV` (auth codes, refresh tokens,
+   DCR clients). This is broker-only infrastructure on the broker's own Cloudflare
+   account — tenants never get one:
    ```sh
-   wrangler kv namespace create OAUTH_KV
-   # then add the binding (name OAUTH_KV) to the broker Pages project — dashboard,
-   # or a [[kv_namespaces]] entry if the broker adopts wrangler config.
+   wrangler kv namespace create lanza-oauth
+   # then add the binding (variable name LANZA_OAUTH_KV) to the broker Pages project —
+   # dashboard, or a [[kv_namespaces]] entry if the broker adopts wrangler config.
    ```
+   The namespace name and the binding name are independent: the namespace is what you
+   see in the account's KV list, the binding is what the code reads as
+   `env.LANZA_OAUTH_KV`. Bind it per-environment (Production, and Preview if you test
+   there) — Pages only picks up a new binding on the next deployment.
 2. **Register the OAuth callback** `https://connect.lanzacms.com/api/oauth/github-callback`
    as a callback URL on the `lanza-cms` GitHub App (alongside the existing
    `/api/auth/callback`).

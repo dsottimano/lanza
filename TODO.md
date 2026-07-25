@@ -60,8 +60,8 @@ edit/publish was driven without copy-paste. Launch:
    dead-ends at `github.com/settings/installations/<id>` and never writes the connection
    record. Reproduced with our code out of the picture. We can only hint at it; they
    have to fix it.
-4. **◐ MCP** — the repo split is done and pushed. Now blocked on *you*: bind `OAUTH_KV`
-   and register the callback (step 2 below), then live-verify.
+4. **◐ MCP** — the repo split is done and pushed. Now blocked on *you*: bind
+   `LANZA_OAUTH_KV` and register the callback (step 2 below), then live-verify.
 
 ---
 
@@ -81,9 +81,13 @@ tenant origin and matches. Discovery lines up too: the tenant PRM advertises
 which the broker now serves with `issuer` computed as the request origin — a byte match.
 
 1. **☑ Rebase/copy the AS onto the canonical checkout.** Done.
-2. **☐ Dave prereqs — this is what's blocking:** create + bind KV namespace **`OAUTH_KV`**
-   on the broker Pages project (the AS 500s without it); register callback
+2. **☐ Dave prereqs — this is what's blocking:** create a KV namespace on the broker's own
+   Cloudflare account and bind it to the broker Pages project as **`LANZA_OAUTH_KV`** (the
+   AS 500s without it); register callback
    **`https://connect.lanzacms.com/api/oauth/github-callback`** on the `lanza-cms` App.
+   The namespace must live in the same account as the Pages project — a Pages binding
+   can't reach across accounts. Bindings are per-environment and only take effect on the
+   next deployment. Steps: `docs/mcp-server.md` §Setup.
 3. **☐ Live-verify** with a Claude custom connector against `https://lanzacms.com/api/mcp`:
    401 → discover → GitHub approve → `tools/list` → `create_content` → `publish`. Then
    ChatGPT (developer mode) and Codex.
