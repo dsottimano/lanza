@@ -40,6 +40,20 @@ export interface VersionState {
   offline: boolean;
 }
 
+// The release that introduced this screen. Older versions have no update UI at
+// all, so moving to one removes the only way back: the owner would have to edit
+// package.json on GitHub by hand. Observed for real — a test site reverted to
+// 0.1.1 and lost the button it needed to return.
+//
+// This is not a one-off fixed by time. Any revert that crosses a release which
+// added UI loses that UI, so the guard is permanent even as the number ages.
+export const SELF_UPDATE_SINCE = "0.1.3";
+
+/** True if switching to `version` would leave the owner with no way back here. */
+export function strandsOwner(version: string): boolean {
+  return compareVersions(version, SELF_UPDATE_SINCE) < 0;
+}
+
 /** Compare two dotted numeric versions. -1 / 0 / 1, like a sort comparator. */
 export function compareVersions(a: string, b: string): number {
   // Prerelease suffixes (1.2.3-beta.1) sort BEFORE their release, per semver.

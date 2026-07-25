@@ -3,6 +3,8 @@ import {
   compareVersions,
   updateAvailable,
   securityUpdateRequired,
+  strandsOwner,
+  SELF_UPDATE_SINCE,
   type VersionState,
 } from "./version";
 
@@ -64,6 +66,19 @@ describe("updateAvailable", () => {
 
   it("offers nothing for a repo with no dependency to bump", () => {
     expect(updateAvailable(state(null, "0.1.2"))).toBe(false);
+  });
+});
+
+describe("strandsOwner", () => {
+  it("flags versions older than the one that added this screen", () => {
+    // The real case: a test site went to 0.1.1 and lost the button to come back.
+    expect(strandsOwner("0.1.1")).toBe(true);
+    expect(strandsOwner("0.1.2")).toBe(true);
+  });
+
+  it("does not flag the introducing version or anything newer", () => {
+    expect(strandsOwner(SELF_UPDATE_SINCE)).toBe(false);
+    expect(strandsOwner("9.9.9")).toBe(false);
   });
 });
 

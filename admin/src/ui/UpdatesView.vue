@@ -16,6 +16,7 @@ import {
   updateAvailable,
   securityUpdateRequired,
   compareVersions,
+  strandsOwner,
   type VersionState,
 } from "../backend/version";
 import { reportError, clearError } from "../errors";
@@ -53,6 +54,18 @@ async function refresh() {
 
 async function apply(version: string) {
   if (busy.value) return;
+  // Going back far enough removes this screen, and with it the way to come back.
+  // Say so plainly before doing it, not after.
+  if (
+    strandsOwner(version) &&
+    !confirm(
+      `Version ${version} doesn't include this Software screen.\n\n` +
+        `If you switch to it, coming back means editing package.json in your ` +
+        `GitHub repository by hand. Continue?`,
+    )
+  ) {
+    return;
+  }
   busy.value = version;
   doneMsg.value = null;
   clearError();
