@@ -6,8 +6,12 @@
 
 Status legend: ☑ done · ◐ in progress · ☐ todo
 
-**Everything is committed and pushed.** `lanza` → `b4d4b58`, `lanza-broker` → `e44976a`.
+**Everything is committed and pushed.** `lanza` → `c2b9fd6`, `lanza-broker` → `43eb314`.
 Typecheck clean both repos; `npm test` 36/36 in `lanza`.
+
+Broker typecheck note: there is no TypeScript installed in `lanza-broker` (no `package.json`).
+`npx tsc` there tries to install and fails — use the sibling's binary:
+`cd lanza-broker && /home/dsottimano/source/websites/lanza/node_modules/.bin/tsc --noEmit -p tsconfig.json`
 
 ---
 
@@ -24,25 +28,37 @@ authorize)**, which polls forever.
 | Repo created | `datadefine/test` ☑ |
 | `lanza-cms` App installed on it | ☑ |
 | Cloudflare Workers and Pages App installed | ☑ (installation `148982753`) |
-| CF account used | `a1e22bc0c133063c7bd02358c1f2e7df` (auto-picked, unverified) |
+| CF account used | `a1e22bc0c133063c7bd02358c1f2e7df` (auto-picked — **never confirmed correct**) |
 | `POST /api/onboard/deploy` returns | `8000011: There is an internal issue with your Cloudflare Pages Git installation.` |
+
+Two of the three suspects have since been fixed in code (account is now chosen, name is
+now derived). **`8000011` is untouched and is the live blocker.** It is a Cloudflare-side
+complaint: GitHub's records are fine (repo exists, both Apps installed).
+
+**How to reproduce the error in one line** — on `connect.lanzacms.com`, console:
+
+```js
+await (await fetch("/api/onboard/deploy", {method:"POST"})).json()
+```
+
+It now returns `detail` (Cloudflare's verbatim error), `accountId`, `project` and `source`.
 
 **Next actions, in order:**
 
-1. **☐ Confirm the CF account.** The picker shipped this session (`e44976a`) — rerun the
-   wizard and choose explicitly. If the error changes, the auto-picked account was the bug.
-   Compare against the ID in your `dash.cloudflare.com/<id>/…` URL.
-2. **☐ If still 8000011 on the right account** — Cloudflare's record of the GitHub
+1. **☐ Rerun the wizard and pick the Cloudflare account explicitly.** The picker shipped
+   this session. If the error changes, the auto-picked account was the cause. Cross-check
+   against the ID in your `dash.cloudflare.com/<id>/…` URL — `a1e22bc0c133063c7bd02358c1f2e7df`
+   was never verified as the right one.
+2. **☐ If still 8000011 on the confirmed account** — Cloudflare's record of the GitHub
    installation is stale. Uninstall **Cloudflare Workers and Pages** from GitHub
-   (Settings → Applications), then reconnect via **CF dashboard → Workers & Pages → Create
-   → Pages → Connect to Git**, which recreates the link. Then retry.
-3. **☑ Project-name collisions — fixed, no rename needed.** The name is no longer the
-   repo name: it is `<repo-slug>-<sha256(owner/repo)[0..12]>` with a fallback ladder, so
-   `datadefine/test` → `test-0304ea543eaf.pages.dev`. Deterministic, so `/api/token` can
-   still recompute the origin with no store. See `docs/security-model.md` §2.
+   (Settings → Applications → installation `148982753`), then reconnect via **CF dashboard
+   → Workers & Pages → Create → Pages → Connect to Git → GitHub**, which recreates the
+   link. Then retry. (Installing the GitHub App alone does *not* create the CF-side link.)
+3. **☐ If it still fails** — that is genuinely Cloudflare's bug; their own message says to
+   contact support. Escalate rather than keep changing our code.
 4. **☐ Then finish the chain:** deploy → health screen → log into `/admin` → save an edit →
-   publish. **Note:** `/admin` on the new site gates on that repo's `adminLogin`, so log in
-   as the account that owns it.
+   publish. **Note:** `/admin` gates on that repo's `adminLogin`, so log in as the account
+   that owns it — `datadefine`, not `dsottimano`.
 
 ---
 
@@ -70,8 +86,40 @@ exist because something got past.
   by `assertSafePath` + `assertEntryPath` + locale validation. `create_content` no longer
   silently overwrites.
 
+### Onboarding fixes (from driving the live run)
+
+- **Cloudflare account is now chosen, not guessed** (`_lib/cf-accounts.ts`,
+  `api/onboard/accounts.ts`). It was `accounts[0]` — whichever Cloudflare listed first —
+  so anyone in more than one account (agency staff, contractors, anyone added to a
+  client's account) got their site built in the wrong place. It was also resolved
+  *independently* by the deploy POST and the polling GET with nothing persisted between
+  them, so a listing-order change stranded the wizard on an account the project was never
+  created in. The choice now lives in the `lanza_cf` cookie, survives token refresh, is
+  re-validated on use, and paginates the account list. A single-account user never sees
+  the picker.
+- **Pages project name is derived, not the repo name** (`_lib/tenant-origin.ts`).
+  `*.pages.dev` is one global namespace across **every** Cloudflare account, so `test`,
+  `blog`, `bakery` collided with strangers on the first try — and the collision read as
+  *success*, deploying nothing and pointing the user at a third party's `/admin`.
+
+  ```
+  <repo-slug>-<sha256(owner/repo)[0..12]>
+  datadefine/test  ->  test-0304ea543eaf.pages.dev
+  someone/test     ->  test-f3d658bc73b5.pages.dev
+  ```
+
+  **Derived rather than random on purpose:** `/api/token` must recompute a tenant's origin
+  to check a session's `aud` (I4). A random name would break that and force a persistent
+  repo→origin store. Fallback ladder `[base, base-2, base-3, base-4]` because only
+  Cloudflare knows what is truly free; `allowedOriginsForRepo` accepts every candidate so
+  the audience check stays correct whichever one wins. Verified: deterministic, no
+  cross-owner collision, worst case 57 chars (limit 58). **Full rationale:
+  `docs/security-model.md` §2 — read it before touching project naming.**
+- **`awaiting_git_authorize` now reports why.** It discarded Cloudflare's error body, so a
+  forever-spinning wizard gave no clue which account/repo/project was being rejected.
+
 **Also shipped:** the MCP server itself (committed — the previous handoff's "NOT committed"
-is stale), the Cloudflare account picker, and `8000011` diagnostics.
+is stale).
 
 **Config Dave set this session:** `ALLOWED_TENANT_ORIGINS=https://lanzacms.com` on the
 broker (required — lanzacms.com's repo is `lanza`, so the derived origin is
