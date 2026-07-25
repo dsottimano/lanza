@@ -1,4 +1,4 @@
-# Lanza — handoff (session 9, 2026-07-25)
+# Lanza — handoff (session 10, 2026-07-25)
 
 **Read first:** `docs/security-model.md` (authoritative on auth/authz — new this session)
 · `docs/onboarding-workflow.md` (life-of-an-onboarding + the Cloudflare OAuth recipe)
@@ -6,7 +6,7 @@
 
 Status legend: ☑ done · ◐ in progress · ☐ todo
 
-**Everything is committed and pushed.** `lanza` → `c2b9fd6`, `lanza-broker` → `43eb314`.
+**Everything is committed and pushed.** `lanza-broker` → `44aea09`+ (5 fixes this session).
 Typecheck clean both repos; `npm test` 36/36 in `lanza`.
 
 Broker typecheck note: there is no TypeScript installed in `lanza-broker` (no `package.json`).
@@ -15,50 +15,69 @@ Broker typecheck note: there is no TypeScript installed in `lanza-broker` (no `p
 
 ---
 
-## ◐ BLOCKED RIGHT NOW — first live onboarding run
+## ☑ UNBLOCKED — first full onboarding ran end to end
 
-Driving the wizard end-to-end for the first time. Stuck at **step 3 (GitHub ↔ Cloudflare
-authorize)**, which polls forever.
+`datadefine/aaaaaa` → `aaaaaa-79d94dc420e1.pages.dev`: repo generated, deployed, `/admin`
+login as `datadefine`, post written, saved to `staging`, published to `main`, Cloudflare
+rebuilt, post live. **The whole chain works.** Driven as a third-party tenant (GitHub
+`datadefine` + Cloudflare `data@definemg.com`), which is the point — not as `dsottimano`.
 
-**Exact state when it stalled:**
+### 8000011, root-caused and proven both directions
 
-| | |
-|---|---|
-| GitHub login used | `datadefine` (not `dsottimano`) |
-| Repo created | `datadefine/test` ☑ |
-| `lanza-cms` App installed on it | ☑ |
-| Cloudflare Workers and Pages App installed | ☑ (installation `148982753`) |
-| CF account used | `a1e22bc0c133063c7bd02358c1f2e7df` (auto-picked — **never confirmed correct**) |
-| `POST /api/onboard/deploy` returns | `8000011: There is an internal issue with your Cloudflare Pages Git installation.` |
+Cloudflare keeps an account-level **git connection record**, separate from the GitHub App
+installation:
 
-Two of the three suspects have since been fixed in code (account is now chosen, name is
-now derived). **`8000011` is untouched and is the live blocker.** It is a Cloudflare-side
-complaint: GitHub's records are fine (repo exists, both Apps installed).
-
-**How to reproduce the error in one line** — on `connect.lanzacms.com`, console:
-
-```js
-await (await fetch("/api/onboard/deploy", {method:"POST"})).json()
+```
+GET https://api.cloudflare.com/client/v4/accounts/<id>/pages/connections
 ```
 
-It now returns `detail` (Cloudflare's verbatim error), `accountId`, `project` and `source`.
+- `result: []` → creating a git-sourced Pages project returns **8000011**
+- one record present → the *identical* create returns `deploying` immediately
 
-**Next actions, in order:**
+The record is only written when **Cloudflare initiates** the install. Its connect button
+sends the user to
+`github.com/apps/cloudflare-workers-and-pages/installations/new/permissions?state=…&target_id=…`,
+and that **`state`** is what binds the installation back to the account. Our wizard sent
+users to GitHub's bare install URL, which carries no state — so the record was never
+written and *every* tenant would have hit 8000011. Fixed: step 3 now opens
+`dash.cloudflare.com/<accountId>/pages/new/provider/github`.
 
-1. **☐ Rerun the wizard and pick the Cloudflare account explicitly.** The picker shipped
-   this session. If the error changes, the auto-picked account was the cause. Cross-check
-   against the ID in your `dash.cloudflare.com/<id>/…` URL — `a1e22bc0c133063c7bd02358c1f2e7df`
-   was never verified as the right one.
-2. **☐ If still 8000011 on the confirmed account** — Cloudflare's record of the GitHub
-   installation is stale. Uninstall **Cloudflare Workers and Pages** from GitHub
-   (Settings → Applications → installation `148982753`), then reconnect via **CF dashboard
-   → Workers & Pages → Create → Pages → Connect to Git → GitHub**, which recreates the
-   link. Then retry. (Installing the GitHub App alone does *not* create the CF-side link.)
-3. **☐ If it still fails** — that is genuinely Cloudflare's bug; their own message says to
-   contact support. Escalate rather than keep changing our code.
-4. **☐ Then finish the chain:** deploy → health screen → log into `/admin` → save an edit →
-   publish. **Note:** `/admin` gates on that repo's `adminLogin`, so log in as the account
-   that owns it — `datadefine`, not `dsottimano`.
+**The remaining trap — Cloudflare's bug, not ours.** If the App is *already* installed on
+GitHub, Cloudflare's own connect flow dead-ends at `github.com/settings/installations/<id>`
+and still writes nothing. Reproduced inside Cloudflare's own UI with our code out of the
+picture. The only escape is to uninstall **Cloudflare Workers and Pages** on GitHub and let
+Cloudflare install it fresh. The wizard now surfaces this as a hint after ~6 polls, but it
+cannot fix it — worth a support ticket.
+
+---
+
+## ☑ Shipped in session 10 (broker `44aea09`+)
+
+- **Tenant identity race.** `/generate` returns before GitHub commits the template, so
+  `setTenantConfig` wrote `lanza.config.json` to a near-empty repo and GitHub's "Initial
+  commit" landed *on top*, reverting it. Every tenant booted with the template's
+  `dsottimano/lanza` identity: locked out of its own `/admin`, CMS pointed at the template
+  repo. Now waits for the placeholder and updates by SHA. Verified — on `aaaaaa` the
+  identity commit is the child, and `/admin` admitted `datadefine` first try.
+- **Start over.** The wizard's state is all HttpOnly cookies, so a reload resumed a dead
+  run forever and nobody could create a *second* site. `POST /api/onboard/reset` +
+  a topbar control.
+- **Step 3 → Cloudflare deep link** (above). **Not re-testable on an account that already
+  has a connection record** — a rerun sails past the step.
+- **Identity strip.** The wizard now names the GitHub login/repo and the Cloudflare user +
+  account, so nobody discovers the wrong account after the site exists.
+- **Health screen verifies git.** It ticked "Git integration" unconditionally;
+  `star-real-estate` proved a project created without a connection still *displays* a
+  linked repo, builds once, then never rebuilds. Now checks `pages/connections` at `live`
+  and says edits won't rebuild when empty (three-state: `null` stays silent).
+
+### Debugging setup worth reusing
+
+Brave with CDP on `:9222` + a dependency-free client at
+`scratchpad/cdp.py` (`targets` / `eval` / `goto` / `shot`, `CDP_TARGET=<url substring>`).
+That is how the dashboard API was queried as the logged-in user and how the CMS
+edit/publish was driven. Launch: `brave-browser-stable --remote-debugging-port=9222
+--user-data-dir=<scratch> <url>` (a fresh dir; an already-running Brave swallows the flag).
 
 ---
 
@@ -199,7 +218,11 @@ wizard, which rides cookies. Until then every onboarded tenant's Site Health pan
 ## ☐ Cleanup owed
 
 - ☐ Delete test repo `dsottimano/lanza-deploytest-11556` + the two `lanza-deploytest-*` Pages
-  projects. Add `datadefine/test` + its project to this list if abandoned.
+  projects.
+- ☐ Delete the session-9/10 tenant wreckage under `datadefine`: repos `test`,
+  `star-real-estate`, `blah-blah` (all three carry the WRONG identity in `main` — they
+  predate the race fix) and `aaaaaa`, plus their Pages projects. `star-real-estate`'s
+  project is the zombie: linked repo, no connection behind it.
 - ☐ **Burn/rotate secrets pasted or screenshotted in earlier sessions:** the exploratory CF
   API token, the broker `OAUTH_CLIENT_SECRET` / App client secret, and the old tenant
   `GITHUB_TOKEN` (now unused on prod). Broker private keys are already Secret type.
