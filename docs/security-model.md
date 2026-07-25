@@ -118,9 +118,10 @@ upsert. Two titles that slugify alike would otherwise destroy an entry silently.
 | `HANDOFF_PUBLIC_KEY` | broker | `/api/token` verifies tenant sessions with it | First save fails with a 500 that points at the tenant, not the broker |
 | `ADMIN_LOGIN` (optional) | tenant | Overrides `lanza.config.json`'s `adminLogin`; comma-list for extra editors | Falls back to the committed config — fine for a normal tenant |
 
-**lanzacms.com specifically:** its repo is `dsottimano/lanza`, so the derived
-origin is `https://lanza.pages.dev`. The broker must carry
-`ALLOWED_TENANT_ORIGINS=https://lanzacms.com` or saves from the live site break.
+**lanzacms.com specifically** (the Lanza instance we run our own site on): its
+repo is `dsottimano/lanza`, so the derived origin is `https://lanza.pages.dev`,
+which is not the domain it actually serves from. The broker must carry
+`ALLOWED_TENANT_ORIGINS=https://lanzacms.com` or saves from that site break.
 
 ---
 

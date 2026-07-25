@@ -336,7 +336,7 @@ identity** now shared by the CMS so onboarding and the editor read as one produc
    | `GH_APP_SLUG` | `/api/onboard/oauth/callback` (install link) | defaults to `lanza-cms` |
    | `TEMPLATE_OWNER`, `TEMPLATE_REPO` | repo creation | onboarding fails |
    | `CLOUDFLARE_OAUTH_CLIENT_ID`, `CLOUDFLARE_OAUTH_CLIENT_SECRET` (§5) | CF connect + deploy | step 3 fails |
-   | **`ALLOWED_TENANT_ORIGINS`** | **`/api/token` audience binding (§3.3)** | **custom-domain tenants can't save.** Set `https://lanzacms.com` for the dogfood — its repo is `lanza`, so the derived origin is `lanza.pages.dev`, which won't match. |
+   | **`ALLOWED_TENANT_ORIGINS`** | **`/api/token` audience binding (§3.3)** | **custom-domain tenants can't save.** Set `https://lanzacms.com` — that site's repo is `lanza`, so the derived origin is `lanza.pages.dev`, which won't match its real domain. |
 
    Note §8.1 registers the **GitHub App**; `OAUTH_CLIENT_ID`/`SECRET` come from a
    **separate classic OAuth App** — repo creation deliberately runs on its
