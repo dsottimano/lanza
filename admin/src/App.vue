@@ -35,6 +35,7 @@ const SettingsView = lazyPane(() => import("./ui/SettingsView.vue"));
 const BlocksView = lazyPane(() => import("./ui/BlocksView.vue"));
 const RedirectsView = lazyPane(() => import("./ui/RedirectsView.vue"));
 const SiteHealthView = lazyPane(() => import("./ui/SiteHealthView.vue"));
+const UpdatesView = lazyPane(() => import("./ui/UpdatesView.vue"));
 const HelpView = lazyPane(() => import("./ui/HelpView.vue"));
 const LanguagesView = lazyPane(() => import("./ui/LanguagesView.vue"));
 // Header & footer (menu + preview + markup) and Brand & themes (brand + themes)
@@ -48,6 +49,7 @@ import { GitHubClient } from "./backend/github";
 import type { Locale } from "./backend/config";
 import { site, loadSiteConfig } from "./backend/site";
 import { loadSchema } from "./backend/schema";
+import { refreshVersionState } from "./backend/version";
 import { reportError } from "./errors";
 import { confirmDiscard } from "./ui/dirty";
 import {
@@ -67,6 +69,7 @@ type Pane =
   | "settings"
   | "redirects"
   | "health"
+  | "updates"
   | "help"
   | "languages"
   | "headerFooter"
@@ -99,6 +102,9 @@ client.value
   .catch((e) => reportError(e))
   .finally(() => {
     ready.value = true;
+    // Advisory chrome for the sidebar's version line — deliberately NOT awaited,
+    // so a slow or unreachable npm registry can never delay the CMS booting.
+    void refreshVersionState(client.value);
   });
 
 // Every navigation guards on unsaved changes — one global guard replaces the
@@ -113,6 +119,7 @@ const SPECIAL_PANELS: Record<string, Pane> = {
   blocks: "blocks",
   contentTypes: "contentTypes",
   health: "health",
+  updates: "updates",
   languages: "languages",
 };
 function settingsFileByName(name: string): FileEntry | null {
@@ -219,6 +226,7 @@ function onOnboarded() {
       :brand-themes-open="pane === 'brandThemes'"
       :blocks-open="pane === 'blocks'"
       :health-open="pane === 'health'"
+      :updates-open="pane === 'updates'"
       :content-types-open="pane === 'contentTypes'"
       :publish-open="pane === 'publish'"
       :locale="locale"
@@ -231,6 +239,7 @@ function onOnboarded() {
       @brand-themes="openPanel('brand-themes')"
       @blocks="openPanel('blocks')"
       @health="openPanel('health')"
+      @updates="openPanel('updates')"
       @content-types="openPanel('contentTypes')"
       @publish="openPublish"
       @help="openHelp"
@@ -285,6 +294,7 @@ function onOnboarded() {
         @back="backToList"
       />
       <SiteHealthView v-else-if="pane === 'health'" :client="client" @back="backToList" />
+      <UpdatesView v-else-if="pane === 'updates'" :client="client" @back="backToList" />
       <HelpView v-else-if="pane === 'help'" @back="backToList" />
       <BlocksView v-else-if="pane === 'blocks'" :client="client" @back="backToList" />
       <LanguagesView

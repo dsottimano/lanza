@@ -8,6 +8,18 @@ import { computed, reactive, watch } from "vue";
 import { COLLECTIONS, type FolderCollection, type FileEntry } from "../schema";
 import type { Locale } from "../backend/config";
 import { site } from "../backend/site";
+import { versionState, updateAvailable, securityUpdateRequired } from "../backend/version";
+
+// The running version sits in the footer permanently: "what am I on" should never
+// require hunting for a panel. It turns into a prompt only when there's something
+// to do about it.
+const runningVersion = computed(
+  () => versionState.value?.staged ?? versionState.value?.live ?? null,
+);
+const hasUpdate = computed(() => (versionState.value ? updateAvailable(versionState.value) : false));
+const insecure = computed(() =>
+  versionState.value ? securityUpdateRequired(versionState.value) : false,
+);
 
 const props = defineProps<{
   activeCollection: string;
@@ -17,6 +29,7 @@ const props = defineProps<{
   brandThemesOpen: boolean;
   blocksOpen: boolean;
   healthOpen: boolean;
+  updatesOpen: boolean;
   contentTypesOpen: boolean;
   publishOpen: boolean;
   locale: Locale;
@@ -31,6 +44,7 @@ const emit = defineEmits<{
   (e: "brandThemes"): void;
   (e: "blocks"): void;
   (e: "health"): void;
+  (e: "updates"): void;
   (e: "contentTypes"): void;
   (e: "publish"): void;
   (e: "help"): void;
@@ -258,6 +272,12 @@ const itemActive = "nav-item--active";
             >
               Site health
             </button>
+            <button
+              :class="[item, updatesOpen ? itemActive : '']"
+              @click="emit('updates')"
+            >
+              Software
+            </button>
           </div>
         </div>
       </div>
@@ -277,6 +297,26 @@ const itemActive = "nav-item--active";
         @click="emit('help')"
       >
         <span aria-hidden="true">📖</span> Guide
+      </button>
+
+      <button
+        v-if="runningVersion"
+        class="mt-1 flex items-center gap-1.5 px-2 py-1 text-left text-xs text-zinc-500 transition hover:text-zinc-900"
+        @click="emit('updates')"
+      >
+        <span class="font-mono">v{{ runningVersion }}</span>
+        <span
+          v-if="insecure"
+          class="rounded-full bg-red-100 px-1.5 py-0.5 text-[10px] font-medium text-red-800"
+        >
+          Security update
+        </span>
+        <span
+          v-else-if="hasUpdate"
+          class="rounded-full bg-amber-100 px-1.5 py-0.5 text-[10px] font-medium text-amber-800"
+        >
+          Update available
+        </span>
       </button>
     </div>
   </nav>

@@ -69,16 +69,19 @@ So the tenant repo holds **only content**:
 Fix core **once**, publish a new version, and every site gets it on its next build.
 No copies to chase, no merge conflicts.
 
-## How updates roll out  · **Planned**
+## How updates roll out  · **Live**
 
-Owners never see a version number. Sites track a **`lanza-site@stable`** tag:
+Your site pins **one exact version** in its `package.json`, and nothing changes
+underneath you. **Settings → Software** shows the version you're running and
+offers a newer one when it exists; updating writes that one line and rebuilds.
 
-1. A new release lands on **our own dogfood site first** (the canary).
-2. Once it's proven, we advance the `stable` tag.
-3. A fan-out redeploy rebuilds every site onto it.
+Because every published version stays available forever, an update can always be
+undone — go back to the previous number and rebuild.
 
-That's auto-update with a safety valve we hold — a bad release can't hit everyone,
-and no site drifts onto ancient code.
+**The one exception is security.** If a release fixes something serious, versions
+below it are marked unsafe, your site shows a security warning instead of a normal
+update offer, and we may update you without waiting. That is the only case where
+your site moves without you clicking.
 
 ## The onboarding wizard  · **Live**
 
