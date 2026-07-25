@@ -35,6 +35,17 @@ if (mode !== "build" && mode !== "dev") {
   process.exit(2);
 }
 
+// Without an astro.config that calls lanzaConfig(), Astro never learns srcDir is
+// this package: it finds no src/pages, builds ZERO pages, and exits 0. That
+// "success" would deploy an empty site over a live one, so fail loudly instead.
+if (!["mjs", "js", "ts", "mts"].some((e) => existsSync(join(process.cwd(), `astro.config.${e}`)))) {
+  console.error(
+    "lanza: no astro.config.* in this directory.\n" +
+      'Create one containing:\n\n  import { lanzaConfig } from "lanza-site/astro";\n  export default lanzaConfig();\n',
+  );
+  process.exit(1);
+}
+
 // Codegen (content model → Zod config; redirect rules → _redirects).
 run(process.execPath, [join(PKG_ROOT, "scripts/gen-content-config.mjs")]);
 run(process.execPath, [join(PKG_ROOT, "scripts/gen-redirects.mjs")]);

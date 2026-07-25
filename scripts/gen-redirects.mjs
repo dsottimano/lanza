@@ -4,8 +4,8 @@
 // The JSON is CMS/git-edited untrusted input compiled straight into a routing
 // config, so every rule is validated: an embedded newline or space would
 // otherwise inject arbitrary redirect rules (e.g. one shadowing /admin/*).
-import { readFileSync, writeFileSync } from "node:fs";
-import { join } from "node:path";
+import { mkdirSync, readFileSync, writeFileSync } from "node:fs";
+import { dirname, join } from "node:path";
 
 // Input is TENANT data (redirect rules) and output is the tenant's built public
 // dir → both resolve against the project root (cwd). In the monorepo dogfood
@@ -63,5 +63,8 @@ for (const r of redirects) {
   lines.push(`${r.from} ${r.to} ${r.status ?? 301}`);
 }
 
+// A thin tenant that has never uploaded media has no public/ at all — the
+// monorepo always does, which is why this only shows up on a real install.
+mkdirSync(dirname(outPath), { recursive: true });
 writeFileSync(outPath, lines.length ? lines.join("\n") + "\n" : "");
 console.log(`gen-redirects: wrote ${lines.length} rule(s) to public/_redirects`);
