@@ -1,4 +1,4 @@
-# Lanza — handoff (session 10, 2026-07-25)
+# Lanza — handoff (session 11, 2026-07-25)
 
 **Read first:** `docs/security-model.md` (authoritative on auth/authz) ·
 `docs/keys-and-secrets.md` (every credential, who holds it, blast radius) ·
@@ -60,33 +60,36 @@ edit/publish was driven without copy-paste. Launch:
    dead-ends at `github.com/settings/installations/<id>` and never writes the connection
    record. Reproduced with our code out of the picture. We can only hint at it; they
    have to fix it.
-4. **☐ MCP** — blocked on a repo split, not on code. See below.
+4. **◐ MCP** — the repo split is done and pushed. Now blocked on *you*: bind `OAUTH_KV`
+   and register the callback (step 2 below), then live-verify.
 
 ---
 
-## ☐ MCP — blocked on a repo split, not on code
+## ◐ MCP — code is in; blocked on two Cloudflare/GitHub settings
 
-The MCP server ships in `@lanza/site` and is committed. **It cannot work in production**
-because the OAuth *authorization server* half exists only in a stale second checkout.
+The repo split is **done** (`lanza-broker` `8cbaa78`, pushed). The AS turned out to be
+untracked files, not commits, so it was a copy-forward rather than a rebase — nothing in
+canonical conflicted. One real drift was caught and fixed on the way: canonical's
+`_lib/oauth` exports `getUser` → `{login, id}`, not the `getUserLogin` the AS was written
+against, so it would never have compiled. Typecheck clean, AS tests 10/10.
 
-- `/home/dsottimano/source/websites/lanza-broker` — canonical, has all the onboarding
-  work, **no `api/oauth/*`**.
-- `/home/dsottimano/source/websites/lanza/lanza-broker` — gitignored, many commits
-  behind, **holds the only copy of the AS** plus an uncommitted CF scope trim.
+Verified while carrying it over — the token contract holds end to end: the access token is
+a broker-signed RS256 JWT, and `/api/token`'s `audienceAllowedForRepo` does
+`new URL(aud).origin`, so the MCP audience (`https://site.com/api/mcp`) reduces to the
+tenant origin and matches. Discovery lines up too: the tenant PRM advertises
+`connect.lanzacms.com` (bare origin), so clients fetch `/.well-known/oauth-authorization-server`,
+which the broker now serves with `issuer` computed as the request origin — a byte match.
 
-The tenant advertises `connect.lanzacms.com` as its authorization server, so discovery
-404s and every MCP connection dies at step 2.
-
-1. **☐ Rebase the AS work onto the canonical checkout and commit from there.** Never
-   commit from the nested copy. Files: `functions/.well-known/oauth-authorization-server.ts`,
-   `functions/api/oauth/{authorize,github-callback,token,register}.ts`,
-   `functions/_lib/oauth-{util,store}.ts` + tests.
-2. **☐ Dave prereqs:** create + bind KV namespace **`OAUTH_KV`** on the broker Pages
-   project (the AS 500s without it); register callback
+1. **☑ Rebase/copy the AS onto the canonical checkout.** Done.
+2. **☐ Dave prereqs — this is what's blocking:** create + bind KV namespace **`OAUTH_KV`**
+   on the broker Pages project (the AS 500s without it); register callback
    **`https://connect.lanzacms.com/api/oauth/github-callback`** on the `lanza-cms` App.
 3. **☐ Live-verify** with a Claude custom connector against `https://lanzacms.com/api/mcp`:
    401 → discover → GitHub approve → `tools/list` → `create_content` → `publish`. Then
    ChatGPT (developer mode) and Codex.
+
+Run the AS tests (the broker has no `package.json`, so no `npm test`):
+`cd lanza-broker && node --experimental-strip-types --loader ./functions/_lib/ts-resolve.mjs --test functions/api/oauth/oauth-flow.test.mjs functions/_lib/oauth-util.test.mjs`
 
 **Gotchas:** `WWW-Authenticate` must be on the 401 (Claude ignores it on 200) ✓. PRM
 `resource` must byte-match the connect URL ✓. CIMD is primary, DCR the KV-backed fallback.
@@ -120,8 +123,13 @@ Full detail + rationale in `docs/security-model.md` §5. Listed so they stay dec
 - ☐ **CF OAuth scopes: three still unused.** `cf/login.ts` requests
   `workers-kv-storage.write`, `d1.write`, `workers-r2.write`, which no code path calls.
   **Trim the code, not the CF client** — trimming the client first breaks the connect
-  step with a generic error. (`user-details.read` *is* now used, by `describeIdentity`.)
-  Also `cf/login.ts` honours an unauthenticated `?scope=` override.
+  step with a generic error. Also `cf/login.ts` honours an unauthenticated `?scope=`
+  override.
+  **Do not reuse the trim sitting uncommitted in the nested checkout** — it also drops
+  `user-details.read`, which was correct when it was written and is now wrong:
+  `describeIdentity` (`_lib/cf-accounts.ts:67`) fetches `/client/v4/user` for the email in
+  the wizard's identity strip. It's best-effort, so the scope loss would show up as a
+  silently missing email, not an error. Re-derive the trim from the canonical tree.
 - ☐ **Proxy relays upstream headers verbatim** — inherits GitHub's `Cache-Control` and
   `ACAO: *` rather than enforcing CLAUDE.md Rule 2. Latent: live if the session cookie
   ever moves to `SameSite=None`.
@@ -142,6 +150,10 @@ Full detail + rationale in `docs/security-model.md` §5. Listed so they stay dec
   linked repo, no connection behind it.
 - ☐ Delete `dsottimano/lanza-deploytest-11556` + the two `lanza-deploytest-*` Pages
   projects.
+- ☐ **Delete the nested `lanza/lanza-broker` checkout.** It no longer holds anything
+  unique now that the AS is on canonical — only the stale scope trim noted above, which
+  should be re-derived rather than reused. Keeping it around is how the AS got stranded
+  in the first place.
 - ☐ **Rotate secrets pasted or screenshotted in earlier sessions:** the exploratory CF
   API token, the broker `OAUTH_CLIENT_SECRET` / App client secret, and the old tenant
   `GITHUB_TOKEN` (now unused on prod). Broker private keys are already Secret type.
