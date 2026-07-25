@@ -8,7 +8,14 @@
 Status legend: ☑ done · ◐ in progress · ☐ todo
 
 **Everything is committed and pushed.** Typecheck clean in both repos; `npm test` 36/36
-in `lanza`. Nothing is blocked on code you can't see.
+in `lanza`, AS tests 10/10 in `lanza-broker`. Nothing is blocked on code you can't see.
+
+Session 11 shipped, all deployed: the MCP OAuth AS onto the canonical broker (`8cbaa78`),
+the `LANZA_OAUTH_KV` rename (`a6ee422`), and two wizard fixes found by watching a real
+onboarding (`05aebaf`, `762df16`) — the "Open Cloudflare" button no longer goes live
+before the account id exists (it reads "Checking your Cloudflare account…" until then),
+an inline error no longer follows the user into the next step, and the wordmark links to
+lanzacms.com.
 
 Broker typecheck note: `lanza-broker` has no `package.json`, so `npx tsc` there tries to
 install and fails. Use the sibling's binary:
@@ -60,8 +67,8 @@ edit/publish was driven without copy-paste. Launch:
    dead-ends at `github.com/settings/installations/<id>` and never writes the connection
    record. Reproduced with our code out of the picture. We can only hint at it; they
    have to fix it.
-4. **◐ MCP** — the repo split is done and pushed. Now blocked on *you*: bind
-   `LANZA_OAUTH_KV` and register the callback (step 2 below), then live-verify.
+4. **◐ MCP** — server side is done and verified in production. One step left: restart
+   Claude Code, `/mcp` → `dmg` → Authenticate, then run the three tools. See below.
 
 ---
 
@@ -81,16 +88,63 @@ tenant origin and matches. Discovery lines up too: the tenant PRM advertises
 which the broker now serves with `issuer` computed as the request origin — a byte match.
 
 1. **☑ Rebase/copy the AS onto the canonical checkout.** Done.
-2. **☐ Dave prereqs — this is what's blocking:** create a KV namespace on the broker's own
-   Cloudflare account and bind it to the broker Pages project as **`LANZA_OAUTH_KV`** (the
-   AS 500s without it); register callback
-   **`https://connect.lanzacms.com/api/oauth/github-callback`** on the `lanza-cms` App.
-   The namespace must live in the same account as the Pages project — a Pages binding
-   can't reach across accounts. Bindings are per-environment and only take effect on the
-   next deployment. Steps: `docs/mcp-server.md` §Setup.
-3. **☐ Live-verify** with a Claude custom connector against `https://lanzacms.com/api/mcp`:
-   401 → discover → GitHub approve → `tools/list` → `create_content` → `publish`. Then
-   ChatGPT (developer mode) and Codex.
+2. **☑ Prereqs done.** KV namespace bound to the broker Pages project as
+   **`LANZA_OAUTH_KV`** (renamed from `OAUTH_KV`, commit `a6ee422`); the
+   `/api/oauth/github-callback` callback is registered on the `lanza-cms` App — proven
+   by a real login completing, not just by inspection. Notes that cost time: a Pages KV
+   binding can only reach a namespace in the *same account*, bindings are
+   per-environment, and **a new binding does nothing until the next deployment** — the
+   first `/register` returned Cloudflare error `1101` (Worker threw) purely because the
+   running deployment predated the binding. `docs/mcp-server.md` §Setup.
+3. **◐ Live-verify.** Everything server-side passes in production (table below). What is
+   left is only the client leg: **restart Claude Code** (it holds the MCP config from
+   startup, so the `dmg` add is not live yet), then `/mcp` → `dmg` → Authenticate →
+   `tools/list` → `create_content` → `publish`. Then ChatGPT (developer mode) and Codex.
+
+### Verified in production 2026-07-25
+
+| Check | Result |
+|---|---|
+| `/.well-known/oauth-authorization-server` | 200, `issuer` byte-matches the PRM |
+| Tenant PRM | 200, points at `connect.lanzacms.com` |
+| `/api/oauth/register` (KV write) | 201, `dcr_…` |
+| `/api/oauth/authorize` (KV read + write) | 302 to GitHub with the right callback |
+| Tenant `/api/mcp` unauthenticated | 401 + `WWW-Authenticate` **on the 401** |
+| **Gate 2 vs a stranger's valid token** | **403 `"Forbidden: not the site owner."`** |
+
+That last row is the one worth keeping: a correctly-signed token for GitHub login
+`datadefine` was refused by `dsottimano`'s site. CLAUDE.md's "a signature alone
+authorizes nobody" is now demonstrated against production, not just asserted.
+
+### Which account, and against which site
+
+This wasted real time, so: **Dave operates as `datadefine`** (see the tenant-testing
+persona). `lanzacms.com` has `adminLogin: "dsottimano"`, so a datadefine token can never
+drive it — that 403 is correct behaviour, not a bug. The MCP test target must be a
+**datadefine-owned site**.
+
+- Test tenant: **`datadefine/define-media-group`** →
+  `https://define-media-group-3e8206c30d74.pages.dev` (live; PRM + 401 correct;
+  `adminLogin: "datadefine"`, so no identity race).
+- Registered locally as MCP server **`dmg`** (the old `lanza` entry pointing at
+  `lanzacms.com` was removed — it could only ever 403).
+- The Claude *account* is irrelevant to authorization; only the **GitHub login in the
+  consent popup** matters. A free Claude plan can't add claude.ai custom connectors, but
+  Claude Code itself works as an MCP client and needs no such plan.
+- GitHub silently reuses whatever session is live, so re-authenticating does **not**
+  change the account. Sign out of GitHub first if you need a different login.
+
+Useful while debugging — decode the token Claude Code actually stored (claims only):
+```sh
+python3 -c "
+import json,base64,os
+d=json.load(open(os.path.expanduser('~/.claude/.credentials.json')))
+for k,v in d.get('mcpOAuth',{}).items():
+    b=v['accessToken'].split('.')[1]; b+='='*(-len(b)%4)
+    print(v['serverUrl'], json.loads(base64.urlsafe_b64decode(b)))"
+```
+A tenant's `*.pages.dev` name is derivable, no lookup needed —
+`slug(repo)-<first 12 hex of sha256("owner/repo")>` (`_lib/tenant-origin.ts`).
 
 Run the AS tests (the broker has no `package.json`, so no `npm test`):
 `cd lanza-broker && node --experimental-strip-types --loader ./functions/_lib/ts-resolve.mjs --test functions/api/oauth/oauth-flow.test.mjs functions/_lib/oauth-util.test.mjs`
@@ -151,7 +205,10 @@ Full detail + rationale in `docs/security-model.md` §5. Listed so they stay dec
 - ☐ **Test wreckage under `datadefine`:** repos `test`, `star-real-estate`, `blah-blah`
   (all three carry the WRONG identity in `main` — they predate the race fix), `aaaaaa`
   and `bbbb`, plus their Pages projects. `star-real-estate`'s project is the zombie:
-  linked repo, no connection behind it.
+  linked repo, no connection behind it. As of 2026-07-25 `gh api users/datadefine/repos`
+  lists only `bulk-labeling`, and neither `aaaaaa` nor `bbbb`'s derived `.pages.dev`
+  resolves — so most of this may already be gone. Confirm before hunting.
+  **Keep `define-media-group`** — it's the live MCP test tenant.
 - ☐ Delete `dsottimano/lanza-deploytest-11556` + the two `lanza-deploytest-*` Pages
   projects.
 - ☐ **Delete the nested `lanza/lanza-broker` checkout.** It no longer holds anything
@@ -171,6 +228,16 @@ Full detail + rationale in `docs/security-model.md` §5. Listed so they stay dec
 
 ## ☐ Backlog / deferred (genuinely open, not blocking)
 
+- ☐ **MCP: the wrong-GitHub-account failure is invisible.** Hit for real on 2026-07-25.
+  The tenant returns a precise `403 "Forbidden: not the site owner."`, but the MCP client
+  shows only *"Got new credentials, but lanza rejected them on reconnect"* and loops —
+  never naming the account used or hinting the account is the problem. Anyone with two
+  GitHub logins hits this, and GitHub silently reuses the live session so re-authenticating
+  changes nothing. Options: pass GitHub's `login`/`prompt` hint from `/api/oauth/authorize`,
+  surface the offending login in the 403 body, or have the AS refuse to mint a token whose
+  login can't own the requested `resource` (fail at consent, where the user can act, rather
+  than at the tenant). Note the broker can't know `adminLogin` without asking the tenant —
+  the cheap version is the better error message.
 - ☐ **Wizard: GitHub-account gate before step 1** — non-technical users may not have a
   GitHub account, and "Connect GitHub" with none is a dead end. Ask first → No opens
   `github.com/signup` in a new tab; Yes proceeds. Frame GitHub as "the free account that
