@@ -43,8 +43,10 @@ Legend: ✅ proven/built · 🟡 built earlier, needs wizard wiring · 🔲 to b
 - **Scopes are sent explicitly** in the authorize request (omitting `scope` → generic
   "unexpected error"). They are **dot-notation IDs = API-token permission IDs** (NOT
   wrangler's `resource:access` colon strings). Full list: `GET /client/v4/oauth/scopes`.
-  Current set: `offline_access account-settings.read user-details.read
-  workers-kv-storage.write d1.write workers-r2.write page.read page.write`.
+  Current set (trimmed 2026-07-10 to the minimum the broker deploy uses):
+  `offline_access account-settings.read page.read page.write`. Dropped
+  `user-details.read workers-kv-storage.write d1.write workers-r2.write` — the OAuth
+  token never used them (KV/D1/R2 provisioning runs on the separate `CLOUDFLARE_API_TOKEN`).
 - **Refresh token** requires the `refresh_token` grant on the client **AND** `offline_access`
   in scope — *both*, neither alone. Access token ~16h; broker refreshes silently.
 - **Deploy gotchas:** `page.write` (not just `page.read`) to create a project — read alone

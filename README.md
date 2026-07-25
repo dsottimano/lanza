@@ -39,10 +39,12 @@ build, so a bare `npm run dev` won't serve `/admin` until you've built it
 - Deploy, then visit `https://<your-site>/admin/`. Access is gated by "Sign in
   with GitHub" — you're redirected to GitHub, and once your login matches the
   `ADMIN_LOGIN` allowlist the CMS opens straight in.
-- No sign-in screen and no browser token: the GitHub token lives server-side and
-  is injected by the `/admin/api/gh` proxy (a Cloudflare Pages Function). Set it
-  as the `GITHUB_TOKEN` Pages secret (fine-grained PAT, **Contents: read &
-  write** on this repo). For local dev, put it in `admin/.env` (see
+- No browser token: GitHub credentials live server-side and are injected by the
+  `/admin/api/gh` proxy (a Cloudflare Pages Function). On an onboarded site the
+  proxy mints a short-lived, repo-scoped token from the broker per request, so
+  there is nothing to configure. **Self-hosting without a broker?** Set the
+  `GITHUB_TOKEN` Pages secret (fine-grained PAT, **Contents: read & write** on
+  this repo) as a fallback. For local dev, put it in `admin/.env` (see
   `admin/.sample.env`).
 - The Site Health / provisioning diagnostics reach the Cloudflare API the same
   way, through the `/admin/api/cf` proxy. Set three Pages secrets:
@@ -69,23 +71,30 @@ See `admin/PROGRESS.md` for the build history and architecture notes.
 The CMS never holds a GitHub token; every write reaches GitHub through the
 `/admin/api/gh` proxy. Three layers keep that proxy safe:
 
-1. **Narrow token.** `GITHUB_TOKEN` is a fine-grained PAT scoped to **Contents:
-   read & write on this one repo** — nothing else. Never broaden it (no other
-   repos, no extra permissions) and never reuse it elsewhere; it is the only
-   secret guarding the whole content store.
-2. **GitHub-OAuth auth gate.** All of `/admin/*` (the SPA and the proxies) sits
-   behind a "Sign in with GitHub" gate (`functions/admin/_middleware.ts`). An
-   unauthenticated request is redirected into the OAuth flow; the callback
-   (`functions/admin/api/auth/callback.ts`) exchanges the code for a *scopeless*
-   user token, reads the GitHub login, and lets in only logins on the
-   `ADMIN_LOGIN` allowlist — then mints a signed, HttpOnly session cookie
-   (`SESSION_SECRET`). No GitHub token is ever stored in the session. Config:
-   `GITHUB_CLIENT_ID`, `GITHUB_CLIENT_SECRET`, `SESSION_SECRET`, `ADMIN_LOGIN`
-   (Pages secrets). The OAuth app's callback URL is `<site>/admin/api/auth/callback`.
-3. **Endpoint allowlist.** The proxy enforces a method+path allowlist
-   (`functions/_lib/gh-proxy.ts`, shared by the prod Pages Function and the dev
-   Vite middleware) *before* attaching the token: only the exact GitHub endpoints
-   the CMS calls, on this repo/branch, are forwarded — everything else is 403.
+1. **Short-lived, repo-scoped token.** The proxy asks the **broker** to mint a
+   GitHub App installation token (Contents:write, ~1h, this repo only) per
+   request — a Lanza site holds no standing GitHub secret. `GITHUB_TOKEN`, a
+   fine-grained PAT scoped to Contents:read&write **on this one repo**, remains
+   only as a self-hosting fallback for when there is no broker. If you set it,
+   never broaden it and never reuse it elsewhere.
+2. **Two-part auth gate.** All of `/admin/*` (the SPA and both proxies) sits
+   behind `functions/admin/_middleware.ts`. Login is GitHub OAuth *via the
+   broker*: the tenant redirects to it, the broker exchanges the code and
+   RS256-signs a session, and `functions/admin/api/auth/handoff.ts` sets it as an
+   HttpOnly cookie. The tenant holds **only the public key** — no signing secret,
+   no `SESSION_SECRET`, no `GITHUB_CLIENT_SECRET`.
+
+   The gate makes two distinct checks, and both matter: the signature proves
+   *who* you are, and `ADMIN_LOGIN` (or `lanza.config.json`'s `adminLogin`)
+   decides whether that person owns *this* site. The broker signs a token for
+   anyone who authenticates, so a signature alone is not authorization — see
+   `docs/security-model.md` I1.
+3. **Endpoint allowlist, checked twice.** The proxy enforces a method+path
+   allowlist (`functions/_lib/gh-proxy.ts`, shared by the prod Pages Function and
+   the dev Vite middleware) *before* attaching the token, and then re-checks the
+   **resolved** URL before fetching it — a string check and a URL parser disagree
+   about `\` and `%2e%2e`. Only the exact GitHub endpoints the CMS calls, on this
+   repo/branch, are forwarded; everything else is 403.
 
 **CSRF** is mitigated by a same-origin check on state-changing methods (a write
 whose `Origin` host differs from the request host is rejected) layered on the auth gate.

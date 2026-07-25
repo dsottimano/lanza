@@ -83,24 +83,58 @@ site (signing key == verifying key). Asymmetric gives tenants verify-only power.
         → establish session (§3.4) → 302 /admin/
 ```
 
+> **Steps 4–6 above describe the ORIGINAL design, not the shipped code.** §3.4-B
+> (decided later) made the handoff token *become* the 7-day session, which
+> dropped `exp ≤ 120s` and `jti`, and delivery is an auto-submitting POST form,
+> not a redirect (so the bearer never lands in a URL). The shipped shape is:
+>
+> - claims `{ login, aud, nonce, iat, exp: +7d }` — **no `jti`**
+> - broker renders a POST form → tenant `/admin/api/auth/handoff` (**POST only**;
+>   a GET gets 405)
+> - tenant asserts sig, `aud == own origin`, `nonce ==` cookie, `exp` fresh,
+>   `login ∈ ADMIN_LOGIN` — there is no `jti` replay check
+>
+> See `security-model.md` §4 for the consequences (sessions can't be revoked).
+
 ### 3.2 Security properties
 
 - **No cross-tenant forgery** — tenants hold only the public key. ✓ (the requirement)
 - **client_secret stays on the broker.** ✓
 - **`aud` binding** — a token minted for tenant A is rejected by tenant B. ✓
+  *and*, since 2026-07-25, by the broker's own `/api/token` (§3.3).
 - **CSRF** — the `nonce` cookie must match the `nonce` echoed through `state`. ✓
-- **Replay-bounded** — `exp ≤ 120s` + one-shot `jti`/`nonce`. ✓
-- **`ADMIN_LOGIN` is the real boundary** (§3.3). ✓
+- **Replay-bounded** — ❌ **NOT IMPLEMENTED.** Superseded by §3.4-B: `exp` is 7
+  days and there is no `jti`. Only the `nonce` is one-shot, and only on the
+  tenant side. Treat a handoff token as a 7-day bearer.
+- **`ADMIN_LOGIN` is the real boundary** (§3.3). ✓ — but it is *a* boundary, not
+  the only one; see the correction in §3.3.
 
-### 3.3 Why the broker needs no origin allowlist (and no per-tenant state)
+### 3.3 Origin handling — the original argument, and why it was wrong
 
-The broker redirects a freshly-minted token to the `origin` it read from `state` —
-which an attacker *could* forge. That's fine: the receiving tenant's **own
-`ADMIN_LOGIN` check rejects any login that isn't its owner**. A token phished onto the
-wrong origin is only usable on a site where that GitHub user is *already* the admin —
-i.e. their own. So the per-tenant `ADMIN_LOGIN` is the security gate, **not** an origin
-allowlist. This is why we need no broker-signed "tenant credential" and no server-side
-tenant registry — the broker stays stateless.
+**Original reasoning (kept for the record):** the broker redirects a freshly-minted
+token to the `origin` it read from `state`, which an attacker *could* forge. That
+was judged fine because the receiving tenant's own `ADMIN_LOGIN` check rejects any
+login that isn't its owner — so a token phished onto the wrong origin is only
+usable where that user is already admin. Hence no origin allowlist, no tenant
+registry, stateless broker.
+
+**Correction (2026-07-25 review).** The argument holds only while **tenants are the
+only consumer** of a broker-signed token. They are not — the broker's own
+`/api/token` is a second consumer, and it authorized on `owner == login` alone.
+So a token minted for `aud: https://evil.com` (the attacker builds the authorize
+URL themselves; a victim who has already authorized the App is redirected with no
+consent screen) could be POSTed to `/api/token` to mint `Contents:write` on **any**
+repo the victim owns — full repo takeover, and via the Pages build, code execution.
+
+**Fix:** `/api/token` now binds the audience to the repo —
+`audienceAllowedForRepo()` in `functions/_lib/tenant-origin.ts` recomputes the
+tenant's expected origin from the repo name (the Pages project name is derived
+from it, so this needs no new state) and requires `aud` to match, plus any custom
+domains listed in `ALLOWED_TENANT_ORIGINS`. The broker stays stateless.
+
+The general rule, now in `security-model.md` §1 (I4): **an audience claim is
+worthless unless every consumer checks it.** Adding a third consumer of these
+tokens means adding the check there too.
 
 ### 3.4 Self-configuring tenant — `ADMIN_LOGIN` solved, session handling OPEN
 
@@ -208,10 +242,13 @@ after the one-time git authorize. Concrete facts learned:
 - **Scopes must be sent explicitly** — omitting `scope` triggers a generic "unexpected
   error" at consent. Scope IDs are **dot notation = API-token permission IDs** (not the
   `resource:access` colon strings wrangler uses); fetch via `GET /client/v4/oauth/scopes`.
-- **Scope set:** `account-settings.read`, `user-details.read`, `workers-kv-storage.write`,
-  `d1.write`, `workers-r2.write`, `page.read` **+ `page.write`** (create/deploy Pages — read
-  alone → 10000 auth error on POST) **+ `offline_access`** (refresh token). The client must
-  be configured with these scopes AND both grant types (`authorization_code` + `refresh_token`).
+- **Scope set (trimmed 2026-07-10 for public-app publishing):** `account-settings.read`
+  (resolve account id), `page.read` **+ `page.write`** (create/deploy Pages — read alone →
+  10000 auth error on POST) **+ `offline_access`** (refresh token). The client must be
+  configured with these scopes AND both grant types (`authorization_code` + `refresh_token`).
+  Dropped `user-details.read`, `workers-kv-storage.write`, `d1.write`, `workers-r2.write`:
+  the OAuth token never called KV/D1/R2 or `/user` — that provisioning runs on the separate
+  hand-made `CLOUDFLARE_API_TOKEN` (cf-proxy). Re-add only if the proxy moves onto this token.
 - **Two deploy gotchas:** (a) `page.write` is required to create a project, not just read;
   (b) creating a git-sourced project **does not auto-deploy** — the UI shows "no deployment"
   until a push or an explicit **`POST …/deployments`** (branch=main), which we now call so no
@@ -269,21 +306,41 @@ identity** now shared by the CMS so onboarding and the editor read as one produc
 ## 8. Prerequisites (only Dave can provision; gate Phases 1–3 going live)
 
 1. **Register the `lanza-cms` GitHub App** — *Contents: read/write* on installed repos,
-   account identity read, **user authorization (web) enabled**; callback
-   `https://lanzacms.com/api/auth/callback`; a Setup URL; generate a private key.
-   Record App ID, client_id, client_secret.
+   account identity read, **user authorization (web) enabled**; a Setup URL;
+   generate a private key. Record App ID, client_id, client_secret.
+   **Callbacks live on the BROKER, not the tenant** — the code sends
+   `https://connect.lanzacms.com/api/auth/callback` (`functions/_lib/tenant-config.ts`).
+   Two must be registered:
+   - `https://connect.lanzacms.com/api/auth/callback` — CMS login
+   - `https://connect.lanzacms.com/api/oauth/github-callback` — MCP authorization server
+   (An earlier draft of this doc said `https://lanzacms.com/api/auth/callback`. That
+   is wrong; registering it would break `/admin` login for every tenant.)
 2. **Generate the handoff keypair** (I'll give exact `openssl` commands): private →
    broker secret `HANDOFF_PRIVATE_KEY`; public → template repo.
 3. **Register the Lanza CF OAuth client** (Manage Account → OAuth clients) — **DONE +
    verified 2026-07-05.** Config that works: Response Type **Code**, grant
-   **Authorization Code**, token auth **Client Secret POST**, scopes = the six IDs in
+   **Authorization Code**, token auth **Client Secret POST**, scopes = the four IDs in
    §5, redirect URIs include `https://lanza-broker.pages.dev/api/auth/cf/callback` (add
    the lanzacms.com one once that domain fronts the broker). Domain-verification TXT
    required. client_id + client_secret recorded.
-4. **Broker secrets** (Pages): `GH_APP_ID`, `GH_APP_PRIVATE_KEY`, `GH_APP_CLIENT_ID`,
-   `GH_APP_CLIENT_SECRET`, `HANDOFF_PRIVATE_KEY`, `TEMPLATE_OWNER`/`TEMPLATE_REPO`,
-   plus **`CLOUDFLARE_OAUTH_CLIENT_ID`/`CLOUDFLARE_OAUTH_CLIENT_SECRET`** (§5) — matches
-   the existing `CLOUDFLARE_API_TOKEN` naming.
+4. **Broker secrets** (Pages) — the code reads all of these; a missing one fails at
+   runtime, usually with an error that points somewhere else:
+
+   | Var | Used by | Missing → |
+   |---|---|---|
+   | `GH_APP_ID`, `GH_APP_PRIVATE_KEY` | `/api/token`, `/api/onboard/setup` | 500 "Broker not configured" |
+   | `GH_APP_CLIENT_ID`, `GH_APP_CLIENT_SECRET` | `/api/auth/callback` (CMS login) | login fails at code exchange |
+   | `HANDOFF_PRIVATE_KEY` | signs the handoff | login fails |
+   | **`HANDOFF_PUBLIC_KEY`** | **`/api/token` verifies tenant sessions** | **every tenant's first save 500s** |
+   | **`OAUTH_CLIENT_ID`, `OAUTH_CLIENT_SECRET`** | **`/api/onboard/oauth/*`** — the *classic OAuth App* (`public_repo`, for `/generate`), **not** the GitHub App | **onboarding step 2 500s; onboarding cannot start** |
+   | `GH_APP_SLUG` | `/api/onboard/oauth/callback` (install link) | defaults to `lanza-cms` |
+   | `TEMPLATE_OWNER`, `TEMPLATE_REPO` | repo creation | onboarding fails |
+   | `CLOUDFLARE_OAUTH_CLIENT_ID`, `CLOUDFLARE_OAUTH_CLIENT_SECRET` (§5) | CF connect + deploy | step 3 fails |
+   | **`ALLOWED_TENANT_ORIGINS`** | **`/api/token` audience binding (§3.3)** | **custom-domain tenants can't save.** Set `https://lanzacms.com` for the dogfood — its repo is `lanza`, so the derived origin is `lanza.pages.dev`, which won't match. |
+
+   Note §8.1 registers the **GitHub App**; `OAUTH_CLIENT_ID`/`SECRET` come from a
+   **separate classic OAuth App** — repo creation deliberately runs on its
+   `public_repo` grant so the App needs no Administration permission (§4).
 5. **Thin template repo** (Lanza-owned, public) — content-only (Phase 4 shapes it).
 6. **Broker Pages project + lanzacms.com domain.**
 
@@ -295,6 +352,8 @@ identity** now shared by the CMS so onboarding and the editor read as one produc
 | 2026-07-04 | Login = **broker-mediated shared-app** flow | GitHub Apps cap at 10 callbacks → can't do per-tenant |
 | 2026-07-04 | Handoff = **asymmetric RS256**, tenants verify-only | shared HMAC → one tenant could forge sessions for all |
 | 2026-07-04 | **No** origin allowlist / broker-signed tenant credential | the tenant's own `ADMIN_LOGIN` check is the real gate (§3.3) |
+| 2026-07-25 | **Reversed in part**: `/api/token` binds `aud` to the repo | the 2026-07-04 rationale assumed tenants were the only consumer of a broker-signed token; `/api/token` is a second one, and checked ownership only (§3.3) |
+| 2026-07-25 | `/admin` middleware checks `adminLogin`, not just a valid signature | a signature only proves the broker authenticated *someone* — see `security-model.md` I1 |
 | 2026-07-04 | `ADMIN_LOGIN` = **owner login committed into the repo** at creation | it's public, not a secret — no store/injection needed |
 | 2026-07-04 | Session signing = **B — broker-signed, public-key verified** | removes the last per-tenant secret + needs no provisioned KV on Pages (§3.4) |
 | 2026-07-04 | **Dogfood our own site first** as tenant #0 / canary | feel the onboarding + new-auth pain before a real customer does |
