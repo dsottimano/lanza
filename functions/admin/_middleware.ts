@@ -14,7 +14,10 @@ import {
   readCookie,
   isAllowedLogin,
 } from "../_lib/session";
-import { HANDOFF_PUBLIC_KEY as CONFIG_PUBLIC_KEY } from "../_lib/tenant-config";
+import {
+  HANDOFF_PUBLIC_KEY as CONFIG_PUBLIC_KEY,
+  productionOriginIfPreview,
+} from "../_lib/tenant-config";
 // Per-tenant identity — adminLogin is the /admin gate (same source the handoff
 // endpoint checks). The broker writes this file at repo creation.
 import repo from "../../lanza.config.json";
@@ -31,6 +34,25 @@ export const onRequest = async (context: {
 }): Promise<Response> => {
   const { request, env, next } = context;
   const url = new URL(request.url);
+
+  // FIRST, before any auth work: there is no CMS on a preview build. The session is
+  // bound to the production origin, so every path from here 403s or bounces to a
+  // GitHub login that can't help. Send the whole of /admin/* to the live site,
+  // carrying the path and query across. The SPA's `#/...` route is lost, because a
+  // fragment is never sent to a server — the CMS opens at its default screen.
+  //
+  // This runs ahead of the /admin/api/auth/ exemption deliberately — starting a login
+  // round-trip on a preview host is precisely the dead end being removed.
+  const productionOrigin = productionOriginIfPreview(url.hostname);
+  if (productionOrigin) {
+    return new Response(null, {
+      status: 302,
+      headers: {
+        Location: `${productionOrigin}${url.pathname}${url.search}`,
+        "Cache-Control": "no-store",
+      },
+    });
+  }
 
   // The login/handoff/logout endpoints must be reachable without a session.
   if (url.pathname.startsWith("/admin/api/auth/")) return next();

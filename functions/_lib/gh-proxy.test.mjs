@@ -126,3 +126,36 @@ test("upstreamTargetAllowed: the resolved URL is the last word", () => {
   assert.ok(!upstreamTargetAllowed("https://evil.com/repos/o/n/contents/x", "o", "n"));
   assert.ok(!upstreamTargetAllowed("not a url", "o", "n"));
 });
+
+// ── Preview-origin redirect ────────────────────────────────────────────────
+// /admin on a Cloudflare Pages preview build can never authenticate: the session's
+// aud claim is bound to the production origin. Rather than explain that, the
+// middleware redirects to the live CMS — which already edits the same staging
+// branch. These pin the derivation the redirect depends on.
+import { productionOriginIfPreview } from "./tenant-config.ts";
+
+test("productionOriginIfPreview redirects preview hosts to production", () => {
+  assert.equal(
+    productionOriginIfPreview("staging.mcp-test-736f7e918662.pages.dev"),
+    "https://mcp-test-736f7e918662.pages.dev",
+  );
+  // Per-deployment hash URLs are previews too.
+  assert.equal(
+    productionOriginIfPreview("4eb5de2d.mcp-test-736f7e918662.pages.dev"),
+    "https://mcp-test-736f7e918662.pages.dev",
+  );
+});
+
+test("productionOriginIfPreview never redirects a site to itself", () => {
+  // Production must not look like a preview, or /admin would 302-loop forever.
+  assert.equal(productionOriginIfPreview("mcp-test-736f7e918662.pages.dev"), null);
+  // Custom domains: a preview can't be told from an apex, and a wrong guess would
+  // send a healthy live site somewhere it can't come back from.
+  assert.equal(productionOriginIfPreview("example.com"), null);
+  assert.equal(productionOriginIfPreview("www.example.com"), null);
+  assert.equal(productionOriginIfPreview("staging.example.com"), null);
+  // A host merely ending in the string isn't Cloudflare's.
+  assert.equal(productionOriginIfPreview("evil-pages.dev"), null);
+  assert.equal(productionOriginIfPreview("a.notpages.dev"), null);
+  assert.equal(productionOriginIfPreview(""), null);
+});
