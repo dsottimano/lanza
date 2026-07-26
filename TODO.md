@@ -1,62 +1,59 @@
-# Lanza — handoff (session 15, 2026-07-26)
+# Lanza — handoff (session 16, 2026-07-26)
 
-> ## 🔴 UNCOMMITTED — read before any git operation
+> ## Everything is committed, pushed and deployed.
 >
-> The whole security sweep is **uncommitted**: **45 files in `lanza`, 21 in
-> `lanza-broker`**. A `git checkout`, `git stash`, `git clean` or a branch switch
-> destroys it. Nothing is pushed and nothing is deployed.
+> Both repos are clean and match `origin/main`. The security sweep shipped, the broker
+> is live, and `lanza-site` **0.1.11 is on npm**. There is no uncommitted work.
 >
-> **Two decisions are Dave's, both still open:**
->
-> 1. **Commit it?** Suggested chunking: (a) broker auth — the OAuth/token/consent
->    files; (b) tenant web — middleware, session, proxies, template engine, CSP;
->    (c) supply chain — generator, theme allow-list, version/fanout, `.npmrc`,
->    publish workflow; (d) bot; (e) docs + tests. Commit locally, don't push, until
->    the CMS smoke test below passes.
-> 2. **The annotation rewrite** (`{{url u}}` / `{{text body}}`) — the one change that
->    ends the template bug class for good. It requires bare `{{x}}` to default to the
->    most restrictive policy, which **breaks every existing tenant template at build
->    time**, so it is a fleet-wide product decision, not a security patch. Details in
->    "Cleanup owed".
->
-> **Do not re-run the sweep from scratch on a cold start.** The findings, the fixes and
-> the reasoning are all recorded below and in `docs/security-model.md` (five invariants
-> now — I5 is new). The full audit + red-team reports were written to the session
-> scratchpad, which does not survive; the durable record is the docs and the tests.
->
-> **⚠️ `/goal` hook bug, if you use it again:** a goal phrased as an absolute
-> ("100% safe", "zero bugs") makes the Stop hook block forever — it re-checks the
-> literal, never sees it met, and loops until Claude Code's 9-block cap force-ends the
-> turn. It cost real tokens this session. The hook should check `stop_hook_active` in
-> its input and return success while true. Phrase goals as verifiable states.
+> **One thing is owed immediately:** `0.1.12` is committed but **not published** — it
+> carries the untitled-entry build fix. Until it ships, any tenant can brick their own
+> build by pressing Save on a new page.
 
-> ## ⚠️ A security sweep landed. Read this box before deploying anything.
+> ## 🔥 What the first live customer session cost, and the rules it earned
 >
-> Eight adversarial audits across the broker, the tenant gate, both proxies, MCP, the
-> CMS, the update path and the bot. **Five criticals**, most with executed proofs.
-> Everything below is fixed, tested and typechecked, but **nothing is deployed**.
+> A real user (`byrobychoi`, site `roby-s-world`) tried to connect an MCP client during
+> a demo. **Four separate failures, three of them shipped by us that same afternoon**,
+> all with a green test suite and clean server logs. This is the most valuable section
+> in this file — the bugs are fixed, the rules are not yet habits.
 >
-> **Deploy the broker first.** Tenants run *pinned* versions of `lanza-site`, so a
-> tenant-side fix reaches nobody until they update. The broker fixes protect the whole
-> fleet the moment they ship — including the worst finding.
+> **1. A security header is a behaviour change, and only a browser can prove it.**
+> The consent page shipped with `form-action 'self'`. Chrome enforces `form-action`
+> across the whole redirect **chain**, so the consent POST succeeded server-side —
+> consent consumed, auth code minted — and then the browser silently refused the 302
+> back to `https://claude.ai`. The code never arrived. Nothing failed on the server, so
+> nothing appeared in logs, and 60 tests stayed green.
+> → **Rule: any header that changes browser behaviour (CSP, `X-Frame-Options`, COOP/
+> COEP, `SameSite`, `Permissions-Policy`) is not done until the real flow has been run
+> in a real browser with the console open.** The deploy notes said exactly this for the
+> tenant CMS, and Dave did it. Nobody said it for the broker. That is where it bit.
 >
-> Order, and it matters:
-> 1. **Broker** (`../lanza-broker`) → push to `main`. Then set
->    `ALLOWED_TENANT_ORIGINS=dsottimano/lanza=https://lanzacms.com` (repo-scoped now;
->    the bare form still works but widens the audience check to every repo) and
->    **redeploy** — Pages binds env vars at deployment time.
-> 2. **Smoke-test the CMS.** `/admin` now ships a real CSP. No test can prove a browser
->    renders it; load the CMS once, open the editor, Brand, and Settings → Software,
->    and watch devtools for CSP violations.
-> 3. **Publish `lanza-site`** — see the checklist, and note the new `--ignore-scripts=false`
->    requirement (a `.npmrc` now disables lifecycle scripts, which would otherwise
->    suppress `prepack` and ship a stale admin SPA).
-> 4. **Bump the template**, and add `.npmrc` (`ignore-scripts=true`) to
->    `dsottimano/lanza-template` — the one in *this* repo protects only this repo; an
->    `.npmrc` is not inherited from a dependency.
+> **2. One message for several states costs hours.** "Access not granted. No token was
+> issued." covered *cancelled*, *expired*, and *already used* — and it was the wrong
+> sentence for two of them, actively implying failure where a token HAD been issued.
+> → **Rule: if two states need different actions from the user, they get different
+> messages.** Log which branch fired, so the next report is answerable from logs.
 >
-> Detail: `docs/security-model.md` (now five invariants — I5 is new and is the one that
-> bit) and the "Security sweep" section below.
+> **3. Get client-side evidence before theorising about server internals.** Two
+> confident diagnoses were offered here — a KV read-after-write race, and "he probably
+> clicked Cancel" — and both were wrong. One screenshot of the browser console ended it
+> in seconds.
+> → **Rule: ask for the console, the network tab, and the response headers first.**
+> This is the same lesson as the 4–6 minute build window below, in a new costume.
+>
+> **4. Cloudflare hides a failed build.** A schema-invalid entry
+> (`content/pages/en/untitled.md`, no `title`) failed the build, and Pages kept serving
+> the last good deployment — so the site looked healthy while every later edit silently
+> stopped going live.
+> → **Rule: after a content-shaped change, check the Deployments tab, not the page.**
+> A page that looks right is not evidence the build ran.
+>
+> **5. Publishing is not testing.** `0.1.11` went to npm and needed `0.1.12` within the
+> hour. A tarball can be exercised before it is public: `npm pack`, install it into a
+> scratch tenant, build.
+>
+> **The through-line:** every one of these was invisible from inside this repo and
+> appeared within minutes of a real person using it. That is now the third session in a
+> row where that sentence is true. **Prefer one real run over another green suite.**
 
 **Read first:** `docs/security-model.md` (authoritative on auth/authz) ·
 `docs/keys-and-secrets.md` (every credential, who holds it, blast radius) ·
@@ -64,8 +61,14 @@
 
 Status legend: ☑ done · ◐ in progress · ☐ todo
 
-Everything below **except the security sweep** is committed and pushed in both repos.
-Typecheck clean; `npm test` 102/102 + admin 83/83 in `lanza`, 56/56 in `lanza-broker`.
+Both repos clean and pushed. Typecheck clean; `npm test` 105/105 + admin 83/83 in
+`lanza`, 60/60 in `lanza-broker`.
+
+> **⚠️ `/goal` hook bug, if you use it again:** a goal phrased as an absolute
+> ("100% safe", "zero bugs") makes the Stop hook block forever — it re-checks the
+> literal, never sees it met, and loops until Claude Code's 9-block cap force-ends the
+> turn. The hook should check `stop_hook_active` in its input and return success while
+> true. Phrase goals as verifiable states.
 
 ---
 
@@ -74,10 +77,11 @@ Typecheck clean; `npm test` 102/102 + admin 83/83 in `lanza`, 56/56 in `lanza-br
 | | |
 |---|---|
 | Package | **`lanza-site`** on npm (unscoped — `@lanza` belongs to someone else) |
-| Versions | `latest: 0.1.10` · **`critical: 0.1.5`** — five behind, see #1 |
+| Versions | `latest: 0.1.11` · **`0.1.12` committed, NOT published** · **`critical: 0.1.5`** — six behind |
 | Template repo | `github.com/dsottimano/lanza-template`, pins **0.1.10**, **no lockfile** |
 | Broker | `connect.lanzacms.com` (Pages, deploys on push to `main`) |
 | Proven tenant | `datadefine/mcp-test` — thin, self-updating, MCP-verified |
+| First real customer | `byrobychoi/roby-s-world` — onboarded 2026-07-26, hit every bug in the box above |
 
 **The model, stated plainly** (it took most of a session to get straight, so don't
 re-derive it):
@@ -124,8 +128,13 @@ curl -s -X POST https://connect.lanzacms.com/api/admin/fanout \
 `curl` output is rewritten by the RTK hook into a schema summary — use `rtk proxy curl …`
 for the real body.
 
-### Publish checklist — all five steps, in order
+### Publish checklist — all six steps, in order
 
+0. **Exercise the tarball BEFORE it is public.** `npm pack`, install the resulting
+   `.tgz` into a scratch tenant, run a build, load `/admin`. Publishing is not testing:
+   0.1.11 went to npm and needed 0.1.12 within the hour for a bug one save would have
+   caught. A published version cannot be unpublished cleanly, and every new tenant
+   installs `latest`.
 1. `npm publish --ignore-scripts=false --otp=<code>` — Dave only; the agent cannot.
    **The flag is now required:** `.npmrc` sets `ignore-scripts=true` (supply-chain
    hardening for tenant builds), and that also suppresses our own `prepack`, which is
@@ -145,19 +154,31 @@ for the real body.
 
 ## ☐ Next up
 
-1. **☐ Move the `critical` floor** — it is at **0.1.5** while `latest` is 0.1.10, and
-   0.1.6 changed the CMS UI (the Brand Auto/Light/Dark control), so it is owed. **Do a
-   fan-out dry run first.** The fan-out was silently bricking sites until `de30ad4`
-   (it bumped `package.json` while leaving a stale `package-lock.json`, so `npm ci`
-   refused and the "rescue" stopped the site building). It is fixed but has never been
-   run with `apply:true` since. Prove it on `mcp-test`, then move the tag.
-2. **☐ Custom domains — Phase 2.** See the section below. Phase 1 (broker) shipped;
-   the tenant side is owed and a customer on a custom domain currently loses their
-   agent's review URL.
-3. **☐ Multi-user + roles.** New feature area, see the section below. Half-wired today
-   in a way that would look broken: a second user passes `/admin` and then 403s on every
-   save.
-4. **☐ Nothing in the product tells a tenant their MCP endpoint exists.** `admin/`,
+**Owed from the live session — do these first.**
+
+1. **☐ Publish `0.1.12`.** Committed, not published. It refuses to save an entry with
+   no title — the bug that broke a customer's build tonight. Until it ships, every
+   tenant can brick their own site with one click.
+   `npm publish --ignore-scripts=false --otp=<code>`
+2. **☐ Bump `dsottimano/lanza-template`** — still pins **0.1.10**, two releases behind,
+   so every NEW tenant starts on code with the untitled-entry bug and without the
+   security sweep. Also still needs its own `.npmrc` (`ignore-scripts=true`); the one in
+   this repo protects only this repo, and an `.npmrc` is not inherited from a dependency.
+3. **☐ Browser-verify the broker's auth flows end to end.** The consent-page CSP fix
+   (`85e786d`) is deployed but has only been reasoned about, not *run*: press Allow with
+   devtools open and confirm the 302 reaches `claude.ai` and the client gets tools. Same
+   for the two new pages (already-authorized, expired) and the wizard. This is rule 1
+   from the box at the top, applied to the thing that just broke.
+4. **☐ Any schema-invalid entry can still brick a build.** `title` is guarded now, but
+   that fixed one path, not the class — any required field missing on any collection
+   fails the whole build, and Cloudflare masks it by serving the last good deployment.
+   Options: validate against the collection schema in the editor before write (the CMS
+   already has `data/schema.json`), or make the build report the bad entry and skip it
+   rather than abort. **The MCP writers are already safe** — `create_content` requires
+   `title` — so this is a CMS-side gap only.
+5. **☐ Nothing in the product tells a tenant their MCP endpoint exists.** Promoted from
+   #4 last session because it stopped being theoretical: a real customer could not
+   connect, and neither could Dave without asking. `admin/`,
    `frontend/` and `content/` have **zero** mentions of `api/mcp`, MCP or connectors —
    the only ones are `docs/mcp-server.md` and `docs/security-model.md`, files a customer
    never sees. Dave built it and still had to ask how to connect. Fix: a **Settings →
@@ -165,18 +186,34 @@ for the real body.
    multi-site URL, a copy button, and the sign-in-as-the-right-GitHub-account warning
    (`mcp-server.md:177` — GitHub silently reuses a live session, so re-authenticating
    does *not* switch accounts).
-5. **☐ Say "this takes ~5 minutes" everywhere, not just the wizard.** The wizard now
+
+**Carried over.**
+
+6. **☐ Move the `critical` floor** — it is at **0.1.5** while `latest` is 0.1.11, and
+   0.1.6 changed the CMS UI (the Brand Auto/Light/Dark control), so it is owed — now
+   more so, since 0.1.11/0.1.12 carry the security sweep and the build-breaking fix.
+   **Do a fan-out dry run first.** The fan-out was silently bricking sites until
+   `de30ad4` (it bumped `package.json` while leaving a stale `package-lock.json`, so
+   `npm ci` refused and the "rescue" stopped the site building). It is fixed but has
+   never been run with `apply:true` since. Prove it on `mcp-test`, then move the tag.
+7. **☐ Custom domains — Phase 2.** Phase 1 (broker) shipped, and the `stagingUrl` half
+   is now done too (see that section). What remains is the **Settings → Domains field**,
+   so nobody hand-edits JSON on GitHub.
+8. **☐ Multi-user + roles.** New feature area, see the section below. Half-wired today
+   in a way that would look broken: a second user passes `/admin` and then 403s on every
+   save.
+9. **☐ Say "this takes ~5 minutes" everywhere, not just the wizard.** The wizard now
    names each Cloudflare stage and ticks an elapsed counter; MCP write tools return
    `reviewUrl` and the 4–6 minute warning. **Settings → Software and the CMS save flow
    still say nothing**, which is the remaining half of "I have no idea what's going on".
-6. **☐ Orphan repo on rejected install.** The tenant repo is created in the OAuth
-   callback, *before* the `lanza-cms` App install screen. **Reject** leaves a repo
-   nothing owns. Create it after consent, or detect the rejection at
-   `/api/onboard/setup` and offer to delete. (`onboarding-workflow.md` §1.)
-7. **☐ Support ticket to Cloudflare** for the already-installed trap: if the Workers and
-   Pages App is already on a GitHub account, Cloudflare's own connect flow dead-ends and
-   never writes the connection record. Reproduced without our code.
-8. **☐ ChatGPT (developer mode) and Codex as MCP clients.** Only Claude Code is proven.
+10. **☐ Orphan repo on rejected install.** The tenant repo is created in the OAuth
+    callback, *before* the `lanza-cms` App install screen. **Reject** leaves a repo
+    nothing owns. Create it after consent, or detect the rejection at
+    `/api/onboard/setup` and offer to delete. (`onboarding-workflow.md` §1.)
+11. **☐ Support ticket to Cloudflare** for the already-installed trap: if the Workers and
+    Pages App is already on a GitHub account, Cloudflare's own connect flow dead-ends and
+    never writes the connection record. Reproduced without our code.
+12. **☐ ChatGPT (developer mode) and Codex as MCP clients.** Only Claude Code is proven.
 
 ---
 
@@ -290,7 +327,44 @@ rather than a missing feature. Do not ship a list-of-users UI without changing t
 
 ---
 
-## ☑ Shipped this session (don't re-litigate)
+## ☑ Shipped in the live session (session 16)
+
+- **☑ The security sweep is committed, pushed and deployed.** 16 commits — 10 in
+  `lanza`, 6 in `lanza-broker` — chunked by finding, each message carrying the reasoning
+  rather than the diff. Broker went first (it protects the fleet immediately; tenant
+  fixes only reach a site when it updates).
+- **☑ `form-action 'self'` was blocking every OAuth connection** (broker `85e786d`).
+  The afternoon's CSP. See rule 1 at the top of this file — this is the one that cost
+  the demo.
+- **☑ Consent failures now say which failure it was** (broker `bf8d44e`). "Access not
+  granted" covered cancel / expired / already-used. A tombstone (`consent-used:<id>`,
+  10-min TTL) distinguishes a re-submit from an expired link, and the branch is logged.
+  Also fixed impossible advice on the picker: "go back and tick at least one site" could
+  not work, because the record had already been consumed — it is put back now.
+- **☑ Saving an untitled entry no longer breaks the build** (`d34b3b7`, ships in
+  0.1.12). `slugify("")` → `untitled.md` with no `title` key → `InvalidContentEntryDataError`
+  → Pages keeps serving the last good deployment. One click, whole site frozen.
+- **☑ `stagingUrl` works on a custom domain** (`de74ae5`). The old note claimed the
+  Pages project name could not be learned off `*.pages.dev`. Wrong: it is a pure
+  function of owner+repo. Three-step resolution (request host → explicit `pagesProject`
+  → derivation), used by both `get_site`/`reviewUrl` and the CMS's new View links.
+  **`pagesProject` is required for hand-created projects** — `dsottimano/lanza` is one,
+  its project is plainly `lanza`, and the derived name does not resolve.
+- **☑ CMS: per-entry View links + wider lists** (`86029ba`). View points at STAGING,
+  because that is where the CMS writes.
+- **☑ `parse5` pinned as a direct dependency** (`e73b766`). It was reached transitively
+  and is a build-blocking import; tenants install with no lockfile, so that tree was not
+  ours to rely on.
+- **☑ `lanzacms.com` declared in `domains`** (`c98e71f`) + `pagesProject`, so this site
+  stops being the one exception to the path we point every customer at.
+- **☑ Cloudflare Access removed from `staging.lanza.pages.dev`** (Dave). It had been
+  302'ing every review link to a Zero Trust login.
+- **☑ CHANGELOG.md exists.** The Software pane could list versions but never say what
+  changed, so an owner had no way to judge an update.
+
+---
+
+## ☑ Shipped in session 15 (don't re-litigate)
 
 - **☑ The staging/production model actually works end to end**, verified on
   `datadefine/mcp-test`: an MCP edit lands on `staging`, builds to its own deployment
@@ -349,11 +423,20 @@ over another green suite; then let the run finish before you believe it.
 
 ---
 
-## ☑ Security sweep (session 15) — fixed, tested, NOT deployed
+## ☑ Security sweep — findings and fixes (shipped 2026-07-26)
 
-Suites after: **102/102** tenant · **83/83** admin · **56/56** broker · `tsc` clean in
+**Deployed.** Broker live; tenant side ships in `lanza-site` 0.1.11+. Kept in full
+because the reasoning is the durable part — the audit reports went to a session
+scratchpad that no longer exists.
+
+Suites after: **105/105** tenant · **83/83** admin · **60/60** broker · `tsc` clean in
 tenant + broker + bot · real `lanza build` green (15 pages). Counts rose because every
 fix landed with an adversarial test that asserts refusal *and* that nothing was written.
+
+> **The sweep's own postscript:** two of its fixes caused outages the same day — the
+> consent-page CSP blocked every OAuth connection, and the always-consent change
+> introduced a misleading error page. Hardening is a behaviour change. See the rules at
+> the top of this file.
 
 `npm test` now runs the admin suite too. It didn't, which meant the menu-URL policy,
 the media allowlist and the theme allow-list had tests no documented step executed.
