@@ -1,0 +1,67 @@
+# Publish `lanza-site` to npm WITH provenance.
+#
+# Why this exists: nothing verified the artifact between "Dave publishes" and "a
+# tenant's Cloudflare build installs it" — no signature, no attestation, no hash
+# pinned in any tenant repo. That matters more here than for a normal package,
+# because `lanza-site` does not just render the site: `bin/lanza.mjs` copies
+# `functions/` into the tenant's repo root, so a release replaces `/admin`'s auth
+# middleware, `session.ts` and both proxies on every site at once. The entire
+# security model is downstream of one tarball.
+#
+# `--provenance` publishes a signed Sigstore attestation binding the tarball to THIS
+# workflow, this commit, and this repo. It does not stop a compromised npm account
+# on its own — but an out-of-band publish then has no provenance, which is visible,
+# checkable (`npm audit signatures`), and permanent. Free, and no key to manage.
+#
+# Trigger: push a tag (`git tag v0.1.11 && git push origin v0.1.11`). Deliberately
+# NOT on every push to main — publishing should be an explicit act.
+name: publish
+
+on:
+  push:
+    tags:
+      - "v*"
+
+permissions:
+  contents: read
+  id-token: write # required for provenance; do not remove
+
+jobs:
+  publish:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v6
+
+      - uses: actions/setup-node@v6
+        with:
+          node-version-file: .nvmrc
+          registry-url: https://registry.npmjs.org
+
+      - run: npm ci
+
+      # The whole suite, in both halves. A release that ships a failing security
+      # test is the thing this pipeline exists to prevent.
+      - run: npm test
+      - run: npm --prefix admin ci && npm --prefix admin test
+      - run: npx tsc --noEmit
+
+      # The tag must match the version being published, or `npm dist-tag` work and
+      # the template pin drift from reality.
+      - name: Tag matches package version
+        run: |
+          pkg="v$(node -p 'require("./package.json").version')"
+          [ "$pkg" = "${GITHUB_REF_NAME}" ] || {
+            echo "tag ${GITHUB_REF_NAME} != package.json ${pkg}"; exit 1;
+          }
+
+      # `--ignore-scripts=false` is REQUIRED: .npmrc sets ignore-scripts=true (so a
+      # compromised transitive cannot run code in a tenant's build), and that also
+      # suppresses our own `prepack`, which is what rebuilds the admin SPA into
+      # public/admin. Without this flag the tarball ships a stale CMS.
+      - name: Publish with provenance
+        run: npm publish --provenance --access public --ignore-scripts=false
+        env:
+          NODE_AUTH_TOKEN: ${{ secrets.NPM_TOKEN }}
+
+      # Prove the published artifact is the one this run built.
+      - run: npm audit signatures

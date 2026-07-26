@@ -14,12 +14,15 @@
     "bin",
     "frontend",
     "functions",
+    "public/_headers",
     "public/admin",
     "public/brand",
     "public/favicon",
     "public/social",
     "public/lanza.js",
-    "scripts"
+    "scripts",
+    "!**/*.test.mjs",
+    "!**/*.test.ts"
   ],
   "engines": {
     "node": ">=22"
@@ -31,7 +34,8 @@
     "prepack": "npm run build:admin",
     "preview": "astro preview",
     "check": "astro check",
-    "test": "node --experimental-strip-types --loader ./functions/_lib/ts-resolve.mjs --test functions/_lib/*.test.mjs"
+    "test:functions": "node --experimental-strip-types --loader ./functions/_lib/ts-resolve.mjs --test functions/_lib/*.test.mjs scripts/*.test.mjs",
+    "test": "npm run test:functions && npm --prefix admin test"
   },
   "dependencies": {
     "astro": "7.0.3",
