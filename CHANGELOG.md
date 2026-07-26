@@ -3,6 +3,21 @@
 `lanza-site` on npm. Tenants pin a version, so nothing here reaches a live site until
 that site updates (Settings → Software).
 
+## 0.1.12 — 2026-07-26
+
+### Fixed
+
+- **Saving an entry with no title broke the whole site build.** `title` is required by
+  the generated content schema, so an untitled entry fails the build outright
+  (`InvalidContentEntryDataError: title: Required`) rather than just rendering oddly —
+  and Cloudflare keeps serving the last good deployment, so the site looks fine while
+  every later edit silently stops going live. Pressing Save on a brand-new page wrote
+  `untitled.md` with no title key. The editor now refuses to save without one.
+
+  **If a site is already broken this way**, delete or fix the offending entry
+  (the build log names it, e.g. `content/pages/en/untitled.md`) on both `staging` and
+  `main`. Updating the package does not repair content already committed.
+
 ## 0.1.11 — 2026-07-26
 
 The security sweep, plus two CMS fixes. **This is the release to be on.**

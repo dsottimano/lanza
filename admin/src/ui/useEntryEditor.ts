@@ -72,6 +72,23 @@ export function useEntryEditor(props: EntryEditorProps, hooks: EntryEditorHooks)
   // then delete the old (two staging commits; no public rebuild until publish).
   async function save(): Promise<string> {
     hooks.beforeSave?.();
+
+    // A title is not a nicety — it is REQUIRED by the generated content schema, so an
+    // entry without one does not fail to render, it fails the whole site BUILD:
+    //   InvalidContentEntryDataError: title: Required
+    // Cloudflare then keeps serving the last good deployment, so the site looks fine
+    // while every later edit silently stops going live. Observed on a real tenant:
+    // pressing Save on a brand-new page wrote `untitled.md` with no title key (slugify
+    // falls back to "untitled" on empty input) and broke every subsequent build.
+    //
+    // Refusing here is the cheap place to catch it. The alternative — writing a
+    // placeholder title — leaves the tenant with a live page called "Untitled".
+    if (!String(data.title ?? "").trim()) {
+      throw new Error(
+        "Give this entry a title before saving. A title is required — saving without one breaks the site build.",
+      );
+    }
+
     // Always slugify: whatever the user typed becomes a filename + a URL, so it must
     // be slug-safe (no spaces, no slashes escaping the collection folder). An empty
     // slug falls back to the title. (slugify never returns "", so guard on the input.)
