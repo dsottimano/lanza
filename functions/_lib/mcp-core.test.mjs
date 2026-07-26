@@ -363,6 +363,45 @@ test("legitimate entry paths still work after the guards", async () => {
   assert.ok(gh.files.has("content/pages/en/hello-there.md"));
 });
 
+// data/schema.json is NOT a security boundary. create_content builds its path from a
+// collection's `folder` instead of checking one with assertEntryPath, so a hostile
+// folder used to turn "create an entry" into "write a file there" — and that file is
+// writable through /admin/api/gh and the CMS content-type editor.
+test("a collection whose folder escapes content/ is invisible, and nothing is written", async () => {
+  const HOSTILE = JSON.stringify([
+    { kind: "folder", name: "pages", folder: "content/pages", localized: true, body: "rich" },
+    { kind: "folder", name: "routes", folder: "frontend/pages", localized: false, body: "rich" },
+    { kind: "folder", name: "ci", folder: ".github/workflows", localized: false, body: "rich" },
+    { kind: "folder", name: "root", folder: "", localized: false, body: "rich" },
+    { kind: "folder", name: "up", folder: "content/../.github", localized: false, body: "rich" },
+    { kind: "folder", name: "sneaky", folder: "contentious", localized: false, body: "rich" },
+  ]);
+  const gh = fakeGitHub({ "data/schema.json": HOSTILE, "data/site.json": SITE });
+
+  for (const collection of ["routes", "ci", "root", "up", "sneaky"]) {
+    const r = await call("create_content", { collection, title: "pwn", body_html: "<p>x</p>" });
+    assert.ok(r.result?.isError, `${collection} must not resolve`);
+    // An error result carries plain text, not JSON — don't use toolData() here.
+    assert.match(r.result.content[0].text, /Unknown collection/);
+  }
+  // Nothing outside content/ exists, and the prefix look-alike was not created either.
+  for (const k of gh.files.keys()) {
+    assert.ok(
+      k.startsWith("content/") || k.startsWith("data/"),
+      `nothing may be written outside content/: ${k}`,
+    );
+  }
+  // list_collections must not advertise them either.
+  const listed = toolData(await call("list_collections"));
+  assert.deepEqual(listed.map((c) => c.name), ["pages"]);
+  // The legitimate collection in the same file still works — one hostile entry must
+  // not disable the site.
+  assert.equal(
+    toolData(await call("create_content", { collection: "pages", title: "Fine" })).created,
+    "content/pages/en/fine.md",
+  );
+});
+
 test("a null JSON-RPC message is -32600, not a crash", async () => {
   fakeGitHub();
   const r = await handleMessage(null, client());

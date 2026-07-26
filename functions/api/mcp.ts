@@ -19,9 +19,12 @@
 // GitHub writes: we mint a short-lived, repo-scoped App installation token from the
 // broker's /api/token (forwarding the access token as the session — it carries the
 // owner login), exactly like the gh proxy. No standing PAT. A GITHUB_TOKEN env var, if
-// set, is a self-host fallback when the broker is unavailable.
+// set, is a self-host fallback when the broker is UNAVAILABLE — never when it refuses
+// (I2; the mint is functions/_lib/broker-token.ts, shared so that distinction is
+// written once).
 
 import repo from "../../lanza.config.json";
+import { mintRepoToken, type TokenCache } from "../_lib/broker-token";
 import { ContentClient } from "../_lib/lanza-content";
 import { handleMessage, rpcError, type RpcMessage } from "../_lib/mcp-core";
 import { importPublicKey, verifySession } from "../_lib/session";
@@ -64,24 +67,13 @@ function unauthorized(origin: string): Response {
 
 // Best-effort per-isolate cache of the repo-scoped installation token (same token for
 // every request; ~1h). A miss just re-mints — correctness never depends on it.
-let tokenCache: { token: string; exp: number } | null = null;
+const tokenCache: TokenCache = new Map();
 
-async function mintGitHubToken(broker: string, accessToken: string): Promise<string | null> {
-  if (tokenCache && tokenCache.exp > Date.now() + 60_000) return tokenCache.token;
-  const res = await fetch(`${broker}/api/token`, {
-    method: "POST",
-    headers: { "X-Lanza-Session": accessToken, "Content-Type": "application/json" },
-    body: JSON.stringify({ owner: repo.owner, repo: repo.name }),
-  });
-  if (!res.ok) return null;
-  const data = (await res.json()) as { token?: string; expiresAt?: string };
-  if (!data.token) return null;
-  tokenCache = {
-    token: data.token,
-    exp: data.expiresAt ? Date.parse(data.expiresAt) : Date.now() + 3_000_000,
-  };
-  return data.token;
-}
+// A JSON-RPC batch fans out to one handleMessage per element, each of which can make
+// several GitHub calls. Workers cap a request at 50 subrequests, so an unbounded array
+// is a free way to blow that ceiling (and to amplify one authenticated request into
+// hundreds of writes). 20 is well above anything a real client sends.
+const MAX_BATCH = 20;
 
 export const onRequest = async (context: { request: Request; env: Env }): Promise<Response> => {
   const { request, env } = context;
@@ -100,8 +92,15 @@ export const onRequest = async (context: { request: Request; env: Env }): Promis
 
   const publicKey = env.HANDOFF_PUBLIC_KEY || CONFIG_PUBLIC_KEY;
   // The token's audience must be THIS site's MCP URL (RFC 8707) — a token minted for
-  // another Lanza site is rejected here.
-  const login = await verifySession(accessToken, await importPublicKey(publicKey), `${origin}/api/mcp`);
+  // another Lanza site is rejected here. The "mcp" family additionally refuses a CMS
+  // session presented as a bearer: the two are signed with one key, so audience alone
+  // is not what separates them (see session.ts).
+  const login = await verifySession(
+    accessToken,
+    await importPublicKey(publicKey),
+    `${origin}/api/mcp`,
+    "mcp",
+  );
   if (!login) return unauthorized(origin);
   // Only the site owner may drive the CMS.
   if (login.toLowerCase() !== repo.adminLogin.toLowerCase()) {
@@ -113,8 +112,19 @@ export const onRequest = async (context: { request: Request; env: Env }): Promis
 
   // --- GitHub write token: broker-minted (repo-scoped, ~1h), PAT fallback for self-host ---
   const broker = env.BROKER_ORIGIN || CONFIG_BROKER;
-  let githubToken = broker ? await mintGitHubToken(broker, accessToken) : null;
-  if (!githubToken) githubToken = env.GITHUB_TOKEN ?? null;
+  const minted = broker
+    ? await mintRepoToken(broker, accessToken, repo.owner, repo.name, tokenCache)
+    : null;
+  // A refusal is final (I2). Only an UNAVAILABLE broker may fall through to the PAT —
+  // otherwise revoking the GitHub App, or failing the broker's own audience check,
+  // would silently upgrade the caller to the standing whole-account token.
+  if (minted === "denied") {
+    return new Response(
+      JSON.stringify(rpcError(null, -32002, "Forbidden: the broker refused to mint a token for this session.")),
+      { status: 403, headers: { "content-type": "application/json", "cache-control": "no-store", ...CORS } },
+    );
+  }
+  const githubToken = minted ? minted.token : (env.GITHUB_TOKEN ?? null);
   if (!githubToken) {
     return jsonResponse(
       rpcError(null, -32000, "No GitHub token: the broker was unavailable and no GITHUB_TOKEN fallback is set."),
@@ -135,6 +145,9 @@ export const onRequest = async (context: { request: Request; env: Env }): Promis
   // so it stays the tenant's). get_site derives the staging URL from it.
   // Streamable HTTP accepts a single message or a batch (array).
   if (Array.isArray(payload)) {
+    if (payload.length > MAX_BATCH) {
+      return jsonResponse(rpcError(null, -32600, "Batch too large."), 400);
+    }
     const responses = (
       await Promise.all(payload.map((m) => handleMessage(m as RpcMessage, client, origin)))
     ).filter((r): r is Record<string, unknown> => r !== null);

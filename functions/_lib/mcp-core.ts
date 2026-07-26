@@ -158,6 +158,28 @@ interface CollectionDef {
 // two GitHub subrequests, against a 50-per-request ceiling; CLAUDE.md Rule 3).
 const collectionsCache = new WeakMap<ContentClient, Promise<CollectionDef[]>>();
 
+// Entries live under `content/`. Nothing else is a content folder.
+//
+// This exists because `create_content` does NOT go through assertEntryPath — it
+// BUILDS its path (`${entryFolder(col, locale)}/${slug}.md`) rather than checking one,
+// so the only guard on it was assertSafePath's structural test. That made
+// `data/schema.json` a security boundary: a collection declaring
+// `folder: "frontend/pages"` or `".github/workflows"` turned "create an entry" into
+// "write a file there". The forced `.md` suffix bounded the damage (Actions needs
+// `.yml`), but the schema file is writable through /admin/api/gh and the CMS's
+// content-type editor, so it should not be load-bearing for confinement at all.
+//
+// Dropping a hostile collection here rather than throwing is deliberate: a malformed
+// or hostile schema should make the collection INVISIBLE (create/read/update/delete
+// all resolve it by name and 404), not break every other collection on the site.
+const CONTENT_ROOT = "content/";
+
+function isContentFolder(folder: string): boolean {
+  const f = folder.replace(/^\/+/, "").replace(/\/+$/, "");
+  if (!f || f.includes("..") || f.includes("\\") || f.includes("%")) return false;
+  return `${f}/`.startsWith(CONTENT_ROOT);
+}
+
 async function getCollections(client: ContentClient): Promise<CollectionDef[]> {
   const cached = collectionsCache.get(client);
   if (cached) return cached;
@@ -172,7 +194,9 @@ async function getCollections(client: ContentClient): Promise<CollectionDef[]> {
     }
     // `kind: "files"` collections (Settings) are singleton JSON files, not entry
     // folders. They have no `folder`, and the MCP server does not edit them.
-    return (schema as CollectionDef[]).filter((c) => typeof c.folder === "string" && c.folder !== "");
+    return (schema as CollectionDef[])
+      .filter((c) => typeof c.folder === "string" && c.folder !== "")
+      .filter((c) => isContentFolder(c.folder));
   })();
   // Don't cache a rejection — a transient GitHub error would poison the request.
   pending.catch(() => collectionsCache.delete(client));
