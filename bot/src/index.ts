@@ -10,15 +10,42 @@ export interface Env {
   CONTENT_DIR: string;
   /** Comma-separated Telegram chat IDs allowed to use the bot. Empty = deny all. */
   ALLOWED_CHAT_IDS: string;
+  /**
+   * Comma-separated Telegram USER IDs allowed to use the bot. Empty = don't check the
+   * sender, which is right for a private chat and wrong for a group: a group id in
+   * ALLOWED_CHAT_IDS otherwise grants repo write to every current and future member.
+   */
+  ALLOWED_USER_IDS?: string;
 }
 
-function allowedChatIds(env: Env): Set<number> {
+// Compare the webhook secret without short-circuiting on the first differing byte.
+// The remote-timing signal is buried under network jitter, so this is hygiene rather
+// than a live hole — but it costs nothing, and `!==` on a secret is a habit worth not
+// having. Length is compared first and is not itself secret.
+function secretEquals(a: string, b: string): boolean {
+  if (a.length !== b.length) return false;
+  let diff = 0;
+  for (let i = 0; i < a.length; i++) diff |= a.charCodeAt(i) ^ b.charCodeAt(i);
+  return diff === 0;
+}
+
+function idSet(raw: string | undefined): Set<number> {
   return new Set(
-    (env.ALLOWED_CHAT_IDS ?? "")
+    (raw ?? "")
       .split(",")
       .map((s) => Number(s.trim()))
       .filter((n) => Number.isFinite(n) && n !== 0),
   );
+}
+
+function allowedChatIds(env: Env): Set<number> {
+  return idSet(env.ALLOWED_CHAT_IDS);
+}
+
+// Optional second gate. Empty means "don't check the sender" — correct for a private
+// chat, where the chat id is the person. Set it when a chat id is a GROUP.
+function allowedUserIds(env: Env): Set<number> {
+  return idSet(env.ALLOWED_USER_IDS);
 }
 
 function slugify(input: string): string {
@@ -42,10 +69,18 @@ function utf8ToBase64(str: string): string {
 }
 
 function draftMarkdown(title: string, body: string): string {
+  // Strip control characters BEFORE escaping. `split("\n")` already guarantees no
+  // newline and `.trim()` removes a trailing CR, but a mid-string CR or NUL survives
+  // both — and YAML rejects each outright ("deficient indentation", "null byte is not
+  // allowed in input"). That is a build-breaker, not a cosmetic bug: the file commits
+  // to the branch Astro builds from, the content collection fails to parse, and the
+  // whole site stops deploying until someone deletes it by hand. `draft: true` is no
+  // protection — the draft gate runs after frontmatter parsing.
+  const printableTitle = title.replace(/[\u0000-\u001F\u007F]/g, " ");
   // Escape backslashes first, then quotes: inside a double-quoted YAML scalar a
   // lone `\` starts an escape sequence, so a trailing/embedded backslash would
   // otherwise corrupt the frontmatter (e.g. swallow the closing quote).
-  const safeTitle = title.replace(/\\/g, "\\\\").replace(/"/g, '\\"');
+  const safeTitle = printableTitle.replace(/\\/g, "\\\\").replace(/"/g, '\\"');
   return [
     "---",
     `title: "${safeTitle}"`,
@@ -108,9 +143,18 @@ function buildBot(env: Env): Bot {
   // Authorization: only allow-listed chats reach the handlers. Fail closed —
   // an empty/unset allowlist drops every update (silently, to avoid being a
   // reply amplifier for unknown senders).
+  //
+  // The allowlist gates the CHAT, not the sender. For a private chat those are the
+  // same thing; for a group or supergroup id they are not — every member, including
+  // anyone added later by someone else, would inherit the bot's repo-write token.
+  // ALLOWED_USER_IDS narrows it to specific senders; leave it unset for the private-
+  // chat case, where the chat id already identifies one person.
   const allowed = allowedChatIds(env);
+  const allowedUsers = allowedUserIds(env);
   bot.use(async (ctx, next) => {
-    if (ctx.chat && allowed.has(ctx.chat.id)) await next();
+    if (!ctx.chat || !allowed.has(ctx.chat.id)) return;
+    if (allowedUsers.size && !(ctx.from && allowedUsers.has(ctx.from.id))) return;
+    await next();
   });
 
   bot.command("start", (ctx) =>
@@ -139,9 +183,17 @@ function buildBot(env: Env): Bot {
     } catch (err) {
       // Log details server-side; never echo internal/API errors to the user.
       console.error("createDraft failed:", err);
-      await ctx.reply("⚠️ Couldn't create the draft. Try again later.");
+      // The failure reply can itself fail (Telegram 429/5xx, or the webhook timeout).
+      // Unguarded, that rejection escapes fetch(), the Worker 500s, and Telegram
+      // RETRIES the same update — re-entering createDraft and burning GitHub
+      // subrequests against the account-wide free-tier budget on every retry.
+      await ctx.reply("⚠️ Couldn't create the draft. Try again later.").catch(() => {});
     }
   });
+
+  // Last resort: a handler that throws must not become a 500, for the retry-loop
+  // reason above. grammY swallows the error once it has been observed here.
+  bot.catch((err) => console.error("bot error:", err));
 
   return bot;
 }
@@ -164,7 +216,7 @@ export default {
     // a missing/empty WEBHOOK_SECRET rejects every request rather than waving it through.
     if (
       !env.WEBHOOK_SECRET ||
-      request.headers.get("X-Telegram-Bot-Api-Secret-Token") !== env.WEBHOOK_SECRET
+      !secretEquals(request.headers.get("X-Telegram-Bot-Api-Secret-Token") ?? "", env.WEBHOOK_SECRET)
     ) {
       return new Response("unauthorized", { status: 401 });
     }
