@@ -5,6 +5,11 @@ import type { CollectionEntry } from "astro:content";
 import Blocks from "./Blocks.astro";
 import HtmlTemplate from "./HtmlTemplate.astro";
 import { sanitizeBody } from "../lib/sanitize";
+// Build-time check on the sanitizer's OUTPUT. A post body is attacker-reachable (the
+// Telegram bot commits raw HTML; an MCP agent writes bodies) and DOMPurify being
+// correct is its only defence — so verify the result rather than trust the transform.
+// See frontend/lib/assert-rendered-safe.ts.
+import { assertSanitizedSafe } from "../lib/assert-rendered-safe";
 import { resolveTemplate, templateClass, isLanding } from "../lib/templates";
 
 interface Props {
@@ -14,7 +19,7 @@ interface Props {
 }
 
 const { page } = Astro.props;
-const body = sanitizeBody(page.body ?? "");
+const body = assertSanitizedSafe(sanitizeBody(page.body ?? ""), "page body");
 const template = Astro.props.template ?? resolveTemplate(page.data);
 const landing = isLanding(template);
 ---

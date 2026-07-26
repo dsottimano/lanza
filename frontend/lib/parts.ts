@@ -9,7 +9,10 @@
 // A part has no fields.json: its data isn't free-form page slots but computed
 // system data — the menu (Settings → Menu), site name/brand (Settings), and the
 // derived locale switcher. The template.html is the editable surface.
-import { render } from "./template-render";
+// renderChecked is render() plus a build-time parse5 check on the OUTPUT — the
+// backstop for a template-engine misclassification nobody has found yet. Build-time
+// only; see assert-rendered-safe.ts for why it is not inside render() itself.
+import { renderChecked } from "./assert-rendered-safe";
 
 // Eager, raw glob so the parts map resolves at build time (static site).
 const parts = import.meta.glob<string>("/templates/parts/*.html", {
@@ -21,5 +24,5 @@ const parts = import.meta.glob<string>("/templates/parts/*.html", {
 /** Render a part (header/footer) with `data`, or "" if the tenant has none. */
 export function renderPart(name: "header" | "footer", data: Record<string, unknown>): string {
   const src = parts[`/templates/parts/${name}.html`];
-  return src ? render(src, data) : "";
+  return src ? renderChecked(src, data, `templates/parts/${name}.html`) : "";
 }

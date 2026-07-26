@@ -9,7 +9,10 @@
 // The template owns the whole page; its {{placeholders}} are filled from the entry's
 // freeform `slots`. The template markup is author-trusted (emitted verbatim); the
 // engine HTML-escapes only the interpolated values, so no sanitize pass here.
-import { render } from "../lib/template-render";
+// renderChecked is render() plus a build-time parse5 check on the OUTPUT: it fails
+// the build if a VALUE produced markup a browser would act on. See
+// frontend/lib/assert-rendered-safe.ts.
+import { renderChecked } from "../lib/assert-rendered-safe";
 
 interface Props {
   name: string;
@@ -25,7 +28,7 @@ const templates = import.meta.glob<string>("/templates/*/template.html", {
   eager: true,
 });
 const source = templates[`/templates/${name}/template.html`];
-const html = source ? render(source, data) : null;
+const html = source ? renderChecked(source, data, `templates/${name}/template.html`) : null;
 ---
 
 {

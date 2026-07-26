@@ -4,6 +4,11 @@
 // via localeUrl, so the same markup serves every language.
 import type { CollectionEntry } from "astro:content";
 import { sanitizeBody } from "../lib/sanitize";
+// Build-time check on the sanitizer's OUTPUT. A post body is attacker-reachable (the
+// Telegram bot commits raw HTML; an MCP agent writes bodies) and DOMPurify being
+// correct is its only defence — so verify the result rather than trust the transform.
+// See frontend/lib/assert-rendered-safe.ts.
+import { assertSanitizedSafe } from "../lib/assert-rendered-safe";
 import { localeUrl, type Locale } from "../lib/i18n";
 import { resolveTerms } from "../lib/taxonomy";
 import { resolveTemplate, templateClass, isLanding } from "../lib/templates";
@@ -18,7 +23,7 @@ interface Props {
 }
 
 const { post, locale, author } = Astro.props;
-const body = sanitizeBody(post.body ?? "");
+const body = assertSanitizedSafe(sanitizeBody(post.body ?? ""), "post body");
 // Chips show resolved term titles ("Web Development"), not the stored slug.
 const categories = await resolveTerms("categories", locale, post.data.categories);
 const tags = await resolveTerms("tags", locale, post.data.tags);
