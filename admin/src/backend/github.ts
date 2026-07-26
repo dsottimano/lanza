@@ -268,6 +268,18 @@ export class GitHubClient {
     }
   }
 
+  /**
+   * Delete a path if it's there, no-op if it isn't. Returns whether it deleted.
+   * Callers that want "make sure this file is gone" shouldn't have to fetch a sha
+   * and hand-handle a 404 to say it.
+   */
+  async deleteFileIfExists(path: string, message: string): Promise<boolean> {
+    const sha = await this.currentSha(path);
+    if (!sha) return false;
+    await this.deleteFile(path, sha, message);
+    return true;
+  }
+
   async deleteFile(path: string, sha: string, message: string): Promise<void> {
     await this.req(this.contentsUrl(path, false), {
       method: "DELETE",

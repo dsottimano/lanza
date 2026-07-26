@@ -203,6 +203,23 @@ export async function setPinnedVersion(client: GitHubClient, version: string): P
   const { data, sha } = await client.loadJson("package.json", REPO.branch);
   const deps = (data.dependencies ?? {}) as Record<string, string>;
   if (deps[PACKAGE_NAME] === version) return;
+
+  // Drop any committed lockfile FIRST. Cloudflare runs `npm ci` when one exists,
+  // and `npm ci` refuses to install when the lock disagrees with package.json:
+  //   Invalid: lock file's lanza-site@0.1.7 does not satisfy lanza-site@0.1.9
+  // Nothing here ever regenerated the lock, so every update silently bricked the
+  // build — the site kept serving its previous deployment, so from the outside the
+  // update just appeared to do nothing. Sites created from the template no longer
+  // carry a lockfile, but ones created before that do, and this is what frees them.
+  //
+  // Deleting BEFORE the version bump matters: the in-between commit is then
+  // (old version, no lock), which builds fine. The other order leaves a commit
+  // where the two disagree and fires a red build on the way past.
+  await client.deleteFileIfExists(
+    "package-lock.json",
+    `lanza: remove package-lock.json so ${PACKAGE_NAME} updates can build`,
+  );
+
   data.dependencies = { ...deps, [PACKAGE_NAME]: version };
   await client.saveJson("package.json", data, `lanza: use ${PACKAGE_NAME} ${version}`, sha);
 }
