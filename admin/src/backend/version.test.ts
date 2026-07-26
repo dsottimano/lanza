@@ -4,6 +4,8 @@ import {
   updateAvailable,
   securityUpdateRequired,
   strandsOwner,
+  isUnsafeVersion,
+  parseForcedUpdate,
   SELF_UPDATE_SINCE,
   type VersionState,
 } from "./version";
@@ -66,6 +68,33 @@ describe("updateAvailable", () => {
 
   it("offers nothing for a repo with no dependency to bump", () => {
     expect(updateAvailable(state(null, "0.1.2"))).toBe(false);
+  });
+});
+
+describe("isUnsafeVersion", () => {
+  it("blocks anything below the floor and allows the rest", () => {
+    const s = state("0.1.2", "0.1.4", "0.1.2");
+    expect(isUnsafeVersion("0.1.1", s)).toBe(true);
+    expect(isUnsafeVersion("0.1.2", s)).toBe(false);
+    expect(isUnsafeVersion("0.1.4", s)).toBe(false);
+  });
+
+  it("blocks nothing when no floor is published", () => {
+    expect(isUnsafeVersion("0.0.1", state("0.1.2", "0.1.4", null))).toBe(false);
+  });
+});
+
+describe("parseForcedUpdate", () => {
+  it("recognises the broker's forced-update commit", () => {
+    expect(parseForcedUpdate("security: move lanza-site to 0.1.2")).toBe("0.1.2");
+  });
+
+  it("ignores ordinary commits", () => {
+    // A false positive would tell owners we changed their site when we didn't.
+    expect(parseForcedUpdate("lanza: use lanza-site 0.1.4")).toBe(null);
+    expect(parseForcedUpdate("chore: bump deps")).toBe(null);
+    expect(parseForcedUpdate("")).toBe(null);
+    expect(parseForcedUpdate("fix: security: move lanza-site to 0.1.2")).toBe(null);
   });
 });
 

@@ -135,6 +135,51 @@ export function securityUpdateRequired(state: VersionState): boolean {
   return compareVersions(current, floor) < 0;
 }
 
+// A version the publisher has marked unsafe — below the `critical` floor. The CMS
+// must not offer to move ONTO one: after a forced security update, the version list
+// would otherwise still invite the owner to walk straight back into it.
+//
+// This is a guard, not enforcement. The repo is theirs and they can edit
+// package.json directly; the broker's fan-out is what actually holds the line, by
+// moving them off it again. The UI's job is to not suggest it.
+export function isUnsafeVersion(version: string, state: VersionState): boolean {
+  const floor = state.registry?.critical;
+  return !!floor && compareVersions(version, floor) < 0;
+}
+
+// The commit the broker writes when it force-updates a site (see the broker's
+// api/admin/fanout.ts). Recognising it is how the CMS can explain a change the
+// owner did not make — otherwise their version silently differs from what they set.
+const FORCED_COMMIT = new RegExp(`^security: move ${PACKAGE_NAME} to (\\S+)`);
+
+export function parseForcedUpdate(message: string): string | null {
+  return FORCED_COMMIT.exec(message.trim())?.[1] ?? null;
+}
+
+/** The forced update that produced the running version, if that's what happened. */
+export async function loadForcedUpdate(
+  client: GitHubClient,
+  current: string | null,
+): Promise<{ version: string; date: string | null } | null> {
+  if (!current) return null;
+  try {
+    // Only the newest commit touching package.json on the branch that builds the
+    // live site. If the owner has changed their version since, this won't match and
+    // no notice is shown — the message must describe the version they're ON.
+    const [latest] = await client.listCommits(1, 1, {
+      path: "package.json",
+      ref: REPO.productionBranch,
+    });
+    if (!latest) return null;
+    const forced = parseForcedUpdate(latest.commit?.message ?? "");
+    if (!forced || forced !== current) return null;
+    return { version: forced, date: latest.commit?.author?.date ?? null };
+  } catch {
+    // Explanatory chrome — never break the pane over it.
+    return null;
+  }
+}
+
 // App-wide copy of the state, so the sidebar can always show the running version
 // (and flag an update) without every pane refetching. Loaded once at boot and
 // after an update, exactly like the pending-publish count in ui/staging.ts.

@@ -391,13 +391,16 @@ export class GitHubClient {
 
   // ── Read-only history/diff endpoints (used by theme revert) ──────────────
 
-  /** List commits on the branch, newest first (one page). */
-  async listCommits(perPage: number, page = 1): Promise<CommitListItem[]> {
-    const { branch } = REPO;
-    const q = `sha=${branch}&per_page=${perPage}&page=${page}`;
-    return (await this.req(
-      `/commits?${q}`,
-    )) as CommitListItem[];
+  /** List commits on the branch, newest first (one page). `path` narrows to commits
+   *  touching one file; `ref` reads a branch other than the working one. */
+  async listCommits(
+    perPage: number,
+    page = 1,
+    opts: { path?: string; ref?: string } = {},
+  ): Promise<CommitListItem[]> {
+    const parts = [`sha=${opts.ref ?? REPO.branch}`, `per_page=${perPage}`, `page=${page}`];
+    if (opts.path) parts.push(`path=${encodeURIComponent(opts.path)}`);
+    return (await this.req(`/commits?${parts.join("&")}`)) as CommitListItem[];
   }
 
   /** One commit via the REST API — includes parents and per-file statuses. */

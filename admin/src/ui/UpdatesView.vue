@@ -17,6 +17,8 @@ import {
   securityUpdateRequired,
   compareVersions,
   strandsOwner,
+  isUnsafeVersion,
+  loadForcedUpdate,
   type VersionState,
 } from "../backend/version";
 import { reportError, clearError } from "../errors";
@@ -30,6 +32,7 @@ const busy = ref<string | null>(null); // version currently being applied
 const doneMsg = ref<string | null>(null);
 const state = ref<VersionState | null>(null);
 const otherPending = ref(0);
+const forced = ref<{ version: string; date: string | null } | null>(null);
 
 const current = computed(() => state.value?.staged ?? state.value?.live ?? null);
 const hasUpdate = computed(() => (state.value ? updateAvailable(state.value) : false));
@@ -43,6 +46,7 @@ async function refresh() {
   loading.value = true;
   try {
     state.value = await loadVersionState(props.client);
+    forced.value = await loadForcedUpdate(props.client, state.value.live);
     const diff = await props.client.compare(REPO.productionBranch, REPO.branch);
     otherPending.value = (diff.files ?? []).filter((f) => f.filename !== "package.json").length;
   } catch (e) {
@@ -54,6 +58,9 @@ async function refresh() {
 
 async function apply(version: string) {
   if (busy.value) return;
+  // Belt and braces: the button for an unsafe version isn't rendered, so reaching
+  // here means something else called it. Refuse rather than write a known-bad pin.
+  if (state.value && isUnsafeVersion(version, state.value)) return;
   // Going back far enough removes this screen, and with it the way to come back.
   // Say so plainly before doing it, not after.
   if (
@@ -120,6 +127,19 @@ onMounted(refresh);
         {{ doneMsg }}
       </p>
 
+      <!-- A change the owner didn't make needs explaining, or their site silently
+           differs from what they chose. -->
+      <div v-if="forced" class="card mb-4 border-red-200 bg-red-50 p-6">
+        <p class="mb-1 text-sm font-medium text-red-900">
+          We updated your site to {{ forced.version }}{{ forced.date ? ` on ${when(forced.date)}` : "" }}
+        </p>
+        <p class="text-sm text-red-800">
+          The version you were running was found to be unsafe, so it was replaced for you —
+          this is the only kind of change we make without asking. Your content was not
+          touched, and you can still move to a newer version whenever you like.
+        </p>
+      </div>
+
       <p v-if="loading" class="text-sm text-zinc-500">Checking your version…</p>
 
       <!-- A repo generated before the package split: no dependency to bump. -->
@@ -182,6 +202,15 @@ onMounted(refresh);
               <span class="w-20 flex-shrink-0 font-mono text-xs text-zinc-900">{{ r.version }}</span>
               <span class="flex-1 text-xs text-zinc-500">{{ when(r.date) }}</span>
               <span v-if="r.version === current" class="text-xs text-zinc-500">in use</span>
+              <!-- Below the safe floor: no button at all. Offering "go back" to a
+                   version we just force-updated someone off would undo the rescue. -->
+              <span
+                v-else-if="state && isUnsafeVersion(r.version, state)"
+                class="text-xs text-red-700"
+                title="This version was marked unsafe and can't be selected."
+              >
+                unsafe
+              </span>
               <button
                 v-else
                 class="btn btn-ghost text-xs"
