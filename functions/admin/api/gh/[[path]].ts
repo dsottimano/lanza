@@ -22,6 +22,7 @@ import {
 // Per-tenant repo identity — the broker writes this at repo creation; the proxy is
 // the single place that turns repo-relative CMS paths into repos/<owner>/<name>/…
 import repo from "../../../../lanza.config.json";
+import { mintRepoToken, type TokenCache } from "../../../_lib/broker-token";
 import { SESSION_COOKIE, readCookie, importPublicKey, verifySession } from "../../../_lib/session";
 import { BROKER_ORIGIN as CONFIG_BROKER, HANDOFF_PUBLIC_KEY as CONFIG_PUBLIC_KEY } from "../../../_lib/tenant-config";
 
@@ -36,35 +37,12 @@ const GITHUB_API = "https://api.github.com";
 // Best-effort per-isolate cache of the repo-scoped installation token — the token is
 // the same for every editor of the repo, so caching by repo avoids a broker round-trip
 // on each CMS call. A cache miss just re-fetches; correctness never depends on it.
-const tokenCache = new Map<string, { token: string; exp: number }>();
-
-// "denied" = the broker positively refused this session (it is not the owner).
-// null = the broker could not answer. The two must never be conflated: falling
-// back to the standing PAT on a refusal would hand a rejected caller full access.
-type TokenResult = { token: string } | "denied" | null;
-
-async function brokerToken(broker: string, session: string): Promise<TokenResult> {
-  const key = `${repo.owner}/${repo.name}`;
-  const cached = tokenCache.get(key);
-  if (cached && cached.exp > Date.now() + 60_000) return { token: cached.token };
-  const res = await fetch(`${broker}/api/token`, {
-    method: "POST",
-    headers: { "X-Lanza-Session": session, "Content-Type": "application/json" },
-    body: JSON.stringify({ owner: repo.owner, repo: repo.name }),
-  });
-  if (res.status === 401 || res.status === 403) return "denied";
-  if (!res.ok) return null;
-  const data = (await res.json()) as { token?: string; expiresAt?: string };
-  if (!data.token) return null;
-  const exp = data.expiresAt ? Date.parse(data.expiresAt) : NaN;
-  tokenCache.set(key, {
-    token: data.token,
-    // A NaN expiry would make every future `exp > now` false and silently disable
-    // the cache — fall back to a fixed ~50min TTL instead.
-    exp: Number.isFinite(exp) ? exp : Date.now() + 3_000_000,
-  });
-  return { token: data.token };
-}
+//
+// The mint itself lives in _lib/broker-token.ts, shared with the MCP server, so I2
+// ("a denial is not an outage") has exactly one implementation. This file used to
+// carry its own copy; the MCP server carried a second one that got I2 WRONG, which is
+// the whole argument for not having two.
+const tokenCache: TokenCache = new Map();
 
 export const onRequest = async (context: {
   request: Request;
@@ -106,7 +84,10 @@ export const onRequest = async (context: {
 
   // Token: broker-minted (multi-tenant) first, else the legacy GITHUB_TOKEN PAT.
   const broker = env.BROKER_ORIGIN || CONFIG_BROKER;
-  const result = session && broker ? await brokerToken(broker, session) : null;
+  const result =
+    session && broker
+      ? await mintRepoToken(broker, session, repo.owner, repo.name, tokenCache)
+      : null;
   // A refusal is final. Only an UNAVAILABLE broker may fall through to the PAT,
   // otherwise a caller the broker just rejected would be handed the standing
   // token instead — turning a denial into an escalation.
@@ -145,6 +126,10 @@ export const onRequest = async (context: {
 
   const respHeaders = new Headers(upstream.headers);
   for (const name of STRIP_RESPONSE_HEADERS) respHeaders.delete(name);
+  // Enforce "never cached" rather than inherit it (CLAUDE.md Rule 2). This response
+  // carries repo contents fetched with a privileged token; no cache, anywhere, should
+  // hold it.
+  respHeaders.set("Cache-Control", "no-store");
 
   return new Response(upstream.body, {
     status: upstream.status,

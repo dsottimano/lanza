@@ -100,6 +100,9 @@ export const onRequest = async (context: {
   // re-serialization plus rate-limit headers we don't leak.
   const respHeaders = new Headers(upstream.headers);
   for (const name of STRIP_RESPONSE_HEADERS) respHeaders.delete(name);
+  // This response was fetched with an account-scoped Cloudflare API token. Enforce
+  // "never cached" rather than inherit whatever Cloudflare's API happened to send.
+  respHeaders.set("Cache-Control", "no-store");
 
   return new Response(upstream.body, {
     status: upstream.status,

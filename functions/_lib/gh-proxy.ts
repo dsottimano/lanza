@@ -29,10 +29,23 @@ export const FORWARD_REQUEST_HEADERS = [
 // Response headers to strip before returning to the browser: encoding/length
 // ones won't survive re-serialization (the body is already decoded by fetch()),
 // and the token-scope / rate-limit headers are server-internal — don't leak them.
+//
+// `cache-control` and `access-control-allow-origin` are stripped because we relay
+// GitHub's response headers wholesale, and GitHub sends `Cache-Control: private,
+// max-age=60` and `Access-Control-Allow-Origin: *`. Neither is exploitable today —
+// the session cookie is SameSite=Lax, and browsers reject `ACAO: *` on a credentialed
+// request — but CLAUDE.md Rule 2 says /admin is NEVER cached, and inheriting that
+// property from an upstream is not the same as enforcing it. Switching the cookie to
+// SameSite=None would make the pair live. The proxies set their own `no-store` after
+// this strip.
 export const STRIP_RESPONSE_HEADERS = [
   "content-encoding",
   "content-length",
   "transfer-encoding",
+  "cache-control",
+  "access-control-allow-origin",
+  "access-control-allow-credentials",
+  "access-control-expose-headers",
   "x-oauth-scopes",
   "x-accepted-oauth-scopes",
   "x-ratelimit-limit",

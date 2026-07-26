@@ -3,7 +3,7 @@ import vue from "@vitejs/plugin-vue";
 import tailwindcss from "@tailwindcss/vite";
 // Shared proxy policy — same modules the prod Pages Functions use, so the
 // allowlists and CSRF checks can't drift between dev and prod.
-import { crossOriginBlocked, isAllowed, upstreamPath } from "../functions/_lib/gh-proxy";
+import { crossOriginBlocked, isAllowed, upstreamPath, upstreamTargetAllowed } from "../functions/_lib/gh-proxy";
 import repo from "../lanza.config.json";
 import {
   isAllowed as cfIsAllowed,
@@ -74,6 +74,18 @@ function githubProxyDev(token: string | undefined): Plugin {
           // Repo-relative subPath → repos/<owner>/<name>/… (same as prod, via the
           // shared upstreamPath); /user passes through account-scoped.
           const target = `https://api.github.com/${upstreamPath(subPath, repo.owner, repo.name)}`;
+
+          // I3's second half, which this file used to skip: isAllowed() inspects a
+          // STRING, but what gets fetched is a parsed URL, and only the parser decides
+          // what a segment means. Prod re-checks the resolved target; dev must too, or
+          // the two drift — and this file's whole purpose is that they don't. It also
+          // matters more here than it looks: dev attaches a raw GITHUB_TOKEN with no
+          // ownership check at all.
+          if (!upstreamTargetAllowed(target, repo.owner, repo.name)) {
+            res.statusCode = 403;
+            res.end(JSON.stringify({ message: "Blocked by proxy: request resolves outside this repository." }));
+            return;
+          }
 
           let body = "";
           if (r.method !== "GET" && r.method !== "HEAD") {
