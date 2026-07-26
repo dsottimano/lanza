@@ -21,7 +21,7 @@
     "@tiptap/starter-kit": "3.27.1",
     "@tiptap/suggestion": "3.27.1",
     "@tiptap/vue-3": "3.27.1",
-    "js-yaml": "5.2.0",
+    "js-yaml": "5.2.2",
     "marked": "18.0.5",
     "vue": "3.5.39",
     "vue-router": "4.6.4"
