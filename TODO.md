@@ -91,18 +91,40 @@ answering — that route isn't in the deployed bundle.
       UI, and only after step 4. Moving the floor onto a version whose admin lacks a
       screen is the trap that bit twice on rental-model day. **0.1.6 changed the CMS UI**
       (Auto/Light/Dark in the Brand card), so the floor is owed and currently at 0.1.5.
-0b. **☐ Existing tenants have no staging build — patch their Pages projects.** Every
-   project created before broker `4de76c1` got a `production` deployment config and
-   nothing else, so preview builds ran without `NODE_VERSION` against
-   `engines.node >=22` and the `staging` branch never produced a deployment. The alias
-   falls through to the production artifact: `staging.<project>.pages.dev` returns
-   **200 serving main's content**, which reads as "my edit didn't save" when the edit is
-   safely staged. **This makes `get_site`'s `stagingUrl` actively misleading on those
-   tenants** — a stale 200 is worse than the null we're careful to return on custom
-   domains. Fix per project: Pages → Settings → Environment variables → **Preview**:
-   `NODE_VERSION=22`, then trigger one build of `staging`. `claude_test` needs this.
-   Found by driving a real edit through MCP and watching staging never change — no test
-   caught it, and none could have.
+0b. **☐ The staging branch never builds — CAUSE STILL UNCONFIRMED. Diagnose before
+   fixing again.**
+
+   **The symptom is certain.** A commit lands on `staging`, and minutes later
+   `staging.<project>.pages.dev` still serves **main's content, byte-identical**
+   (same md5), returning 200. So Cloudflare has no staging deployment and the branch
+   alias falls through to the production artifact. Found by driving a real edit through
+   MCP and watching the URL never change — no test caught it and none could have.
+
+   **Why it matters more than it looks:** `get_site` hands agents that URL as the place
+   to review before publishing. A stale 200 is worse than the `null` we carefully return
+   on custom domains — it reads as "my edit didn't save" when the edit is sitting safely
+   on staging. Shipped in 0.1.6+, so it's live and wrong on every affected tenant.
+
+   **A first diagnosis was WRONG — don't repeat it.** Broker `4de76c1` added a `preview`
+   entry to `deployment_configs`, on the theory that preview builds ran without
+   `NODE_VERSION` against `engines.node >=22`. But the template ships **`.nvmrc: 22`**,
+   which Pages honours, so preview builds already had Node 22. That commit is harmless
+   and probably worth keeping, but it is **not** established as the fix.
+
+   **Leading hypothesis:** preview deployments aren't enabled on the project at all.
+   `createProject` (`lanza-broker/functions/api/onboard/deploy.ts`) sets `source.config`
+   to `{owner, repo_name, production_branch, deployments_enabled}` and never sets
+   `preview_deployment_setting`, so the project takes whatever Cloudflare defaults to —
+   possibly `none`.
+
+   **The experiment that settles it**, on the next freshly onboarded tenant: open the
+   Pages project's **Deployments** tab and look for a `staging` build.
+   - *Never attempted* → previews are disabled; fix belongs in `source.config`
+     (`preview_deployment_setting`), not `deployment_configs`.
+   - *Attempted and failed* → read the build log; the `4de76c1` theory may yet be right.
+
+   Then: fix the broker for new projects, patch existing ones, and **correct `4de76c1`'s
+   commit message claim** rather than leaving a confident wrong answer in the history.
 1. **☑ Pre-package tenants retired.** `define-media-group`, `delete` and `delete22` are
    gone; `datadefine` now holds exactly one Lanza site, `claude_test` — thin,
    self-updating, onboarded through the wizard, and the MCP test target. No fat forks
