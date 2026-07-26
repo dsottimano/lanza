@@ -21,10 +21,10 @@ Sites are no longer frozen photocopies. **All code ships as the npm package
 | Thing | Where |
 |---|---|
 | Package | **`lanza-site`** on npm (unscoped — `@lanza` belongs to someone else) |
-| Current | npm: `latest: 0.1.5`, `critical: 0.1.5` · repo: **0.1.6, bumped and unpublished** |
+| Current | `latest: 0.1.6` · `critical: 0.1.5` — **the floor is one behind on purpose**, see "Next up" #0 |
 | Template repo | `github.com/dsottimano/lanza-template` (public, is_template) |
 | Broker points at it | `TEMPLATE_OWNER=dsottimano`, `TEMPLATE_REPO=lanza-template` |
-| Proven tenant | `datadefine/delete22` — onboarded through the wizard, thin, self-updating |
+| Proven tenant | `datadefine/claude_test` — onboarded through the wizard, thin, self-updating, MCP-verified |
 
 **The update loop works end to end and has been driven against live sites:** publish
 a version → the tenant's CMS (Settings → Software) shows it → one click writes
@@ -69,28 +69,25 @@ answering — that route isn't in the deployed bundle.
 
 ## ☐ Next up
 
-0. **☐ PUBLISH `lanza-site` 0.1.6** — version bumped, npm still on 0.1.5. Two
-   tenant-facing changes are in `main` and in no tenant's `node_modules`: the Brand
-   `scheme` key (`c315646`) and `get_site` returning `stagingUrl`/`liveUrl` (`12501aa`).
-   lanzacms.com already has both — it builds from this repo, not the package — which is
-   exactly why this is easy to forget.
+0. **◐ 0.1.6 PUBLISHED — the `critical` floor is still at 0.1.5.** `latest: 0.1.6`;
+   tarball verified to carry `stagingUrlFor` (`mcp-core.ts`), `SCHEME_TOKENS`
+   (`appearance.ts`) and a freshly built admin. Remaining step, once a real tenant's
+   Software pane is confirmed to offer 0.1.6:
 
    ```sh
-   npm publish --otp=<code>              # Dave only; the agent cannot
-   npm dist-tag add lanza-site@0.1.6 critical   # see the floor rule below
+   npm dist-tag add lanza-site@0.1.6 critical
    ```
 
-   **0.1.6 changes the CMS UI** (an Auto/Light/Dark control in the Brand card), so per
-   the floor rule the `critical` tag must not be left below it. Confirm the Software
-   pane offers 0.1.6 on a real tenant before moving the floor, not after.
-1. **☐ Retire the pre-package tenants — BLOCKED ON DAVE.** `datadefine/define-media-group`
-   and `datadefine/delete` are fat forks with no `lanza-site` dependency; the fan-out
-   reports them `unmanaged` and will never fix them. **Decision made: delete both, and a
-   replacement thin tenant (`datadefine/claude_test`) is already onboarded and healthy.**
-   The `dsottimano` gh token only has `pull` on them — `datadefine` is a separate User
-   account, so deletion must run as that login (`gh auth login`, then `gh repo delete`),
-   plus their Pages projects. `define-media-group` is already dead at the DNS level
-   (`/api/mcp` → connection refused), which is what broke the old `dmg` MCP entry.
+   **0.1.6 changes the CMS UI** (an Auto/Light/Dark control in the Brand card), so the
+   floor must not be left below it. Verify the pane FIRST — moving the floor onto a
+   version whose admin lacks a screen is the trap that bit twice on rental-model day.
+   No tenant has 0.1.6 until it updates; `claude_test` was still answering `get_site`
+   without `stagingUrl` on 0.1.5, which is what surfaced the whole gap.
+1. **☑ Pre-package tenants retired.** `define-media-group`, `delete` and `delete22` are
+   gone; `datadefine` now holds exactly one Lanza site, `claude_test` — thin,
+   self-updating, onboarded through the wizard, and the MCP test target. No fat forks
+   remain, so the fan-out's `unmanaged` case has nothing to report. **Their Cloudflare
+   Pages projects still need deleting** if that wasn't done alongside.
 2. **☑ Option B — CLOSED, deliberately not built** (2026-07-25). Lanza will not hold
    per-tenant Cloudflare tokens: a broker token store would put `page.write` on the
    whole fleet in one namespace. The store-nothing alternative was **verified
@@ -217,9 +214,9 @@ Full detail in `docs/security-model.md` §5.
 
 ## ☐ Cleanup owed
 
-- ☐ **Test repos under `datadefine`:** `delete`, `delete22`, `define-media-group`
-  (keep only if still wanted as the fat-fork example), plus their Pages projects.
-  `dsottimano/dave-test` too.
+- ◐ **Test repos under `datadefine`:** the repos are **deleted** (`delete`, `delete22`,
+  `define-media-group`) — only `claude_test` remains, and it's wanted. Still owed: their
+  **Pages projects**, and `dsottimano/dave-test`.
 - ☐ Delete `dsottimano/lanza-deploytest-11556` + the two `lanza-deploytest-*` Pages
   projects.
 - ☐ **Delete the nested `lanza/lanza-broker` checkout.** Canonical is the **sibling**
