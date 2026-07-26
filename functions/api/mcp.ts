@@ -27,6 +27,8 @@ import repo from "../../lanza.config.json";
 import { mintRepoToken, type TokenCache } from "../_lib/broker-token";
 import { ContentClient } from "../_lib/lanza-content";
 import { handleMessage, rpcError, type RpcMessage } from "../_lib/mcp-core";
+import { stagingUrlFor } from "../_lib/pages-project";
+import { WORKING_BRANCH } from "../_lib/gh-proxy";
 import { importPublicKey, verifySession } from "../_lib/session";
 import { BROKER_ORIGIN as CONFIG_BROKER, HANDOFF_PUBLIC_KEY as CONFIG_PUBLIC_KEY } from "../_lib/tenant-config";
 
@@ -141,19 +143,26 @@ export const onRequest = async (context: { request: Request; env: Env }): Promis
 
   const client = new ContentClient(repo, githubToken);
 
-  // `origin` is this site's own address (the broker router forwards to the tenant,
-  // so it stays the tenant's). get_site derives the staging URL from it.
+  // `origin` is this site's own address (the broker router forwards to the tenant, so
+  // it stays the tenant's). The staging URL is resolved HERE rather than in mcp-core,
+  // because on a custom domain it can only be derived from the repo identity — which
+  // this module holds (lanza.config.json) and mcp-core deliberately does not.
+  const site = {
+    origin,
+    stagingUrl: await stagingUrlFor(origin, WORKING_BRANCH, repo),
+  };
+
   // Streamable HTTP accepts a single message or a batch (array).
   if (Array.isArray(payload)) {
     if (payload.length > MAX_BATCH) {
       return jsonResponse(rpcError(null, -32600, "Batch too large."), 400);
     }
     const responses = (
-      await Promise.all(payload.map((m) => handleMessage(m as RpcMessage, client, origin)))
+      await Promise.all(payload.map((m) => handleMessage(m as RpcMessage, client, site)))
     ).filter((r): r is Record<string, unknown> => r !== null);
     return responses.length ? jsonResponse(responses) : jsonResponse(null, 202);
   }
 
-  const response = await handleMessage(payload as RpcMessage, client, origin);
+  const response = await handleMessage(payload as RpcMessage, client, site);
   return response ? jsonResponse(response) : jsonResponse(null, 202);
 };

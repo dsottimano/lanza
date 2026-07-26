@@ -48,7 +48,7 @@ export async function resolveStagingOrigin(client: GitHubClient): Promise<void> 
   // redirects to the live CMS, so this host is never itself a staging host.)
   const direct = /^([a-z0-9-]+)\.pages\.dev$/.exec(window.location.hostname);
   if (direct) {
-    stagingOrigin.value = `https://staging.${direct[1]}.pages.dev`;
+    stagingOrigin.value = `https://${REPO.branch}.${direct[1]}.pages.dev`;
     return;
   }
 
@@ -58,10 +58,23 @@ export async function resolveStagingOrigin(client: GitHubClient): Promise<void> 
   // every path, so this can only ever return OUR config.
   try {
     const { data } = await client.loadJson("lanza.config.json", REPO.productionBranch);
+
+    // Explicit `pagesProject` beats derivation: a site whose Pages project was not
+    // created by the broker (dsottimano/lanza is one — its project is just `lanza`)
+    // has a name no derivation can produce. Validated, not trusted; it becomes a
+    // hostname and this file is tenant-writable.
+    const declared = typeof data.pagesProject === "string" ? data.pagesProject.trim() : "";
+    if (declared) {
+      if (/^[a-z0-9][a-z0-9-]{0,57}$/.test(declared)) {
+        stagingOrigin.value = `https://${REPO.branch}.${declared}.pages.dev`;
+      }
+      return;
+    }
+
     const owner = typeof data.owner === "string" ? data.owner : "";
     const name = typeof data.name === "string" ? data.name : "";
     if (!owner || !name) return;
-    stagingOrigin.value = `https://staging.${slug(name)}-${await repoHash(owner, name)}.pages.dev`;
+    stagingOrigin.value = `https://${REPO.branch}.${slug(name)}-${await repoHash(owner, name)}.pages.dev`;
   } catch {
     // Advisory chrome only — a missing View link is never worth blocking the CMS for.
     stagingOrigin.value = null;

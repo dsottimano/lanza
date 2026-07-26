@@ -214,12 +214,26 @@ closed: no wildcards, no `http`, no hostname without a dot; unparseable JSON yie
 - **Settings → Domains field** that writes `domains`, so nobody hand-edits JSON on
   GitHub. Chosen flow: the user adds the domain in **Cloudflare's dashboard** themselves
   (works today, needs no API token), then enters it in the CMS.
-- **Store `pagesProject`** in `lanza.config.json` and have `stagingUrlFor`
-  (`functions/_lib/mcp-core.ts`) use it instead of deriving from the request host. Today
-  the derivation only works on `*.pages.dev`, so **`get_site` returns `stagingUrl: null`
-  on a custom domain** — the customers most likely to want a review URL are the ones who
-  lose it. The broker knows the real project name at creation (`deploy.ts`); the CMS can
-  also read it from its own hostname when running on the production origin.
+- **☑ SHIPPED — `stagingUrl` works on a custom domain.** The old note here said the
+  project name could not be learned off `*.pages.dev`. That was wrong: the broker's
+  name is a *pure function* of owner+repo (`<repo-slug>-<12 hex of sha256("owner/repo")>`,
+  `tenant-origin.ts`), and owner/repo are in `lanza.config.json` — so the hostname was
+  never needed. `functions/_lib/pages-project.ts` now resolves it in three steps:
+  the request host (free, on `*.pages.dev`), then an explicit `pagesProject`, then the
+  derivation. `get_site`/`reviewUrl` and the CMS's per-entry **View** links both use it.
+  **`pagesProject` is not optional for every site:** derivation describes how the broker
+  NAMES a project, not how every project got its name — `dsottimano/lanza` predates the
+  scheme and is plainly `lanza`, verified by probing (the derived
+  `lanza-76cae1b6cc54.pages.dev` does not resolve; `mcp-test-736f7e918662.pages.dev`
+  does). Any hand-created project needs the key. The derivation is now a **third copy**
+  (broker, `admin/src/backend/site-urls.ts`, `functions/_lib/pages-project.ts`) —
+  cross-checked against the broker on 7 inputs incl. edge cases, but they are separate
+  deployables and a divergence fails silently.
+- ☐ **`staging.lanza.pages.dev` is behind Cloudflare Access** (302 to
+  `dsottimano.cloudflareaccess.com`) — a leftover Zero Trust policy on *this* site's
+  staging host. Harmless for Dave, who can log in, but every View/review link on
+  lanzacms.com goes through an interstitial. Check whether onboarded tenants inherit
+  anything similar; they should not.
 - **Document the asymmetry:** production moves to `example.com`, but **staging stays at
   `staging.<project>.pages.dev`** — Cloudflare does not alias branch builds onto custom
   domains. The two addresses stop looking related, and that will surprise people.

@@ -5,7 +5,8 @@
 // Run: node --experimental-strip-types functions/_lib/mcp-core.test.mjs
 import { test } from "node:test";
 import assert from "node:assert/strict";
-import { handleMessage, TOOL_LIST, stagingUrlFor } from "./mcp-core.ts";
+import { handleMessage, TOOL_LIST } from "./mcp-core.ts";
+import { stagingUrlFor } from "./pages-project.ts";
 import { ContentClient } from "./lanza-content.ts";
 
 const REPO = { owner: "o", name: "n" };
@@ -117,7 +118,7 @@ test("get_site reads locales from data/site.json", async () => {
   const r = await handleMessage(
     { jsonrpc: "2.0", id: 4, method: "tools/call", params: { name: "get_site" } },
     client(),
-    "https://proj.pages.dev",
+    { origin: "https://proj.pages.dev", stagingUrl: "https://staging.proj.pages.dev" },
   );
   assert.deepEqual(toolData(r), {
     defaultLocale: "en",
@@ -140,19 +141,56 @@ test("get_site reports null URLs when the transport gives no origin", async () =
 
 // A wrong staging URL is worse than an absent one: the agent would send someone to
 // review changes on a 404 and they'd conclude the write silently failed.
-test("stagingUrlFor derives a branch alias only where one can exist", () => {
-  assert.equal(stagingUrlFor("https://proj.pages.dev"), "https://staging.proj.pages.dev");
-  // Custom domain — the alias lives on pages.dev under a project name we can't know.
-  assert.equal(stagingUrlFor("https://example.com"), null);
-  assert.equal(stagingUrlFor("https://www.example.com"), null);
+const TEST_REPO = { owner: "datadefine", name: "mcp-test" };
+
+test("stagingUrlFor reads the project straight off a pages.dev host", async () => {
+  assert.equal(await stagingUrlFor("https://proj.pages.dev", "staging"), "https://staging.proj.pages.dev");
   // Already on a branch alias: prefixing again would give staging.staging.…
-  assert.equal(stagingUrlFor("https://staging.proj.pages.dev"), null);
+  assert.equal(await stagingUrlFor("https://staging.proj.pages.dev", "staging"), null);
   // A host merely ENDING in the string isn't Cloudflare's.
-  assert.equal(stagingUrlFor("https://evil-pages.dev"), null);
-  assert.equal(stagingUrlFor("https://notpages.dev"), null);
-  assert.equal(stagingUrlFor(null), null);
-  assert.equal(stagingUrlFor(""), null);
-  assert.equal(stagingUrlFor("not a url"), null);
+  assert.equal(await stagingUrlFor("https://evil-pages.dev", "staging"), null);
+  assert.equal(await stagingUrlFor("https://notpages.dev", "staging"), null);
+  assert.equal(await stagingUrlFor(null, "staging"), null);
+  assert.equal(await stagingUrlFor("", "staging"), null);
+  assert.equal(await stagingUrlFor("not a url", "staging"), null);
+});
+
+// The custom-domain case. The hostname says nothing about the Pages project, but the
+// project name is a pure function of owner/repo, so the URL is still derivable — this
+// is what used to return null and leave custom-domain tenants with no review URL.
+test("stagingUrlFor derives the project from owner/repo on a custom domain", async () => {
+  const url = await stagingUrlFor("https://example.com", "staging", TEST_REPO);
+  assert.match(url, /^https:\/\/staging\.mcp-test-[0-9a-f]{12}\.pages\.dev$/);
+  // Deterministic — the whole design rests on this.
+  assert.equal(url, await stagingUrlFor("https://other.example", "staging", TEST_REPO));
+  // A different repo must not collide with it.
+  assert.notEqual(url, await stagingUrlFor("https://example.com", "staging", { ...TEST_REPO, name: "other" }));
+});
+
+// Derivation describes how the BROKER names a project, not how every project got its
+// name. dsottimano/lanza predates the scheme and is plainly `lanza`, so a site must be
+// able to say so — otherwise its review links point at a host that does not resolve.
+test("stagingUrlFor prefers an explicit pagesProject over derivation", async () => {
+  assert.equal(
+    await stagingUrlFor("https://lanzacms.com", "staging", { ...TEST_REPO, pagesProject: "lanza" }),
+    "https://staging.lanza.pages.dev",
+  );
+  // It becomes a hostname and lanza.config.json is tenant-writable, so it is
+  // validated, not trusted. A bad value yields no link rather than a bad one.
+  for (const bad of ["not a project", "-leading", "UPPER", "a".repeat(60), "x.y", "../evil"]) {
+    assert.equal(
+      await stagingUrlFor("https://lanzacms.com", "staging", { ...TEST_REPO, pagesProject: bad }),
+      null,
+      `should refuse ${bad}`,
+    );
+  }
+});
+
+// Without a repo identity there is nothing to derive from, and a guess would 404.
+test("stagingUrlFor stays null on a custom domain with no repo identity", async () => {
+  assert.equal(await stagingUrlFor("https://example.com", "staging"), null);
+  assert.equal(await stagingUrlFor("https://www.example.com", "staging", {}), null);
+  assert.equal(await stagingUrlFor("https://example.com", "staging", { owner: 1, name: 2 }), null);
 });
 
 test("list_collections returns the folder collections, not the files ones", async () => {

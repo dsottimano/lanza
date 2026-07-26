@@ -14,40 +14,32 @@ import { BRANCH, WORKING_BRANCH } from "./gh-proxy";
 export const SERVER_INFO = { name: "lanza-cms", title: "Lanza CMS", version: "0.1.0" };
 export const SUPPORTED_PROTOCOL = "2025-06-18";
 
-// Where the agent should send someone to REVIEW before publishing.
+// Where an agent can review a change before publishing.
 //
 // Every write lands on `staging` and nothing is public until publish, so an agent
 // that can't name the staging URL can't offer a review step — each client
 // otherwise re-derives Cloudflare's branch-alias convention by hand, which breaks
 // silently the day a branch is renamed.
 //
-// Cloudflare serves a branch at `<branch>.<project>.pages.dev`. The only thing this
-// module knows about its own address is the request origin, so that is what we
-// derive from: exactly `<project>.pages.dev` (three labels) means we can name the
-// alias. A custom domain CANNOT — the alias stays on pages.dev under a project name
-// we have no way to learn, since PAGES_PROJECT is an opt-in secret most tenants
-// never set. Report null there rather than hand back a URL that 404s; a wrong URL
-// is worse than an absent one.
-export function stagingUrlFor(siteOrigin: string | null | undefined): string | null {
-  if (!siteOrigin) return null;
-  let host: string;
-  try {
-    host = new URL(siteOrigin).hostname;
-  } catch {
-    return null;
-  }
-  const labels = host.split(".");
-  const isPagesDev = labels.length === 3 && host.endsWith(".pages.dev");
-  return isPagesDev ? `https://${WORKING_BRANCH}.${host}` : null;
+// This module holds no repo identity by design (see the header), and the staging
+// name is derived from exactly that — so the TRANSPORT resolves it and passes it in.
+// See functions/_lib/pages-project.ts.
+export interface SiteContext {
+  /** Origin this request arrived on, or null when the transport can't say. */
+  origin: string | null;
+  /** Reviewable staging URL, or null when it can't be named. */
+  stagingUrl: string | null;
 }
+
+const NO_SITE: SiteContext = { origin: null, stagingUrl: null };
 
 // What every write tool says afterwards. Two facts an agent cannot infer: WHERE the
 // change can be seen, and that it will NOT be there yet. A Pages build takes 4-6
 // minutes, and checking inside that window and reading "unchanged" as "broken" has
 // produced two false bug hunts in this codebase — both by agents, not users. Saying
 // it in the response is cheaper than either of them was.
-function stagedNote(siteOrigin: string | null): { note: string; reviewUrl?: string } {
-  const staging = stagingUrlFor(siteOrigin);
+function stagedNote(site: SiteContext): { note: string; reviewUrl?: string } {
+  const staging = site.stagingUrl;
   if (!staging) {
     return { note: "Staged, not yet public. Call publish to make it live." };
   }
@@ -66,9 +58,9 @@ function stagedNote(siteOrigin: string | null): { note: string; reviewUrl?: stri
 // staging/publish and draft semantics explicitly.
 // ---------------------------------------------------------------------------
 
-// `siteOrigin` is the origin this request arrived on, or null when the transport
-// can't say. Only get_site uses it; tools that don't need it just declare two
-// params, which still satisfies this signature.
+// `site` is resolved by the transport. Only get_site and the write tools use it;
+// tools that don't need it just declare two params, which still satisfies this
+// signature.
 interface ToolDef {
   name: string;
   description: string;
@@ -76,7 +68,7 @@ interface ToolDef {
   run(
     args: Record<string, unknown>,
     client: ContentClient,
-    siteOrigin: string | null,
+    site: SiteContext,
   ): Promise<unknown>;
 }
 
@@ -120,11 +112,11 @@ function readSiteFile(client: ContentClient): Promise<SiteFile> {
   return p;
 }
 
-// `siteOrigin` defaults to null so the locale-safety path (resolveLocale) can ask
-// for locales without caring about the transport — URLs are not part of that answer.
+// `site` defaults to empty so the locale-safety path (resolveLocale) can ask for
+// locales without caring about the transport — URLs are not part of that answer.
 async function getSite(
   client: ContentClient,
-  siteOrigin: string | null = null,
+  site_: SiteContext = NO_SITE,
 ): Promise<{
   defaultLocale: string;
   locales: string[];
@@ -137,8 +129,8 @@ async function getSite(
   return {
     defaultLocale: site.defaultLocale,
     locales: site.locales,
-    liveUrl: siteOrigin ?? null,
-    stagingUrl: stagingUrlFor(siteOrigin),
+    liveUrl: site_.origin,
+    stagingUrl: site_.stagingUrl,
     productionBranch: BRANCH,
     workingBranch: WORKING_BRANCH,
   };
@@ -261,7 +253,7 @@ export const TOOLS: ToolDef[] = [
     description:
       "Get this site's locales, default locale, and URLs. Call first — locale codes here are the ones the other tools accept. `stagingUrl` is where unpublished changes can be reviewed before calling publish; it is null when the site is on a custom domain, where the staging alias can't be derived.",
     inputSchema: obj({}),
-    run: (_args, client, siteOrigin) => getSite(client, siteOrigin),
+    run: (_args, client, site) => getSite(client, site),
   },
   {
     name: "list_collections",
@@ -334,7 +326,7 @@ export const TOOLS: ToolDef[] = [
       },
       ["collection", "title"],
     ),
-    run: async (args, client, siteOrigin) => {
+    run: async (args, client, site) => {
       const col = await resolveCollection(client, String(args.collection));
       const title = String(args.title);
       const locale = await resolveLocale(client, args.locale);
@@ -354,7 +346,7 @@ export const TOOLS: ToolDef[] = [
       // exists() just proved there's no sha; passing null skips save()'s own lookup
       // of the same endpoint.
       const commit = await client.save(path, data, body, `Create ${path} via MCP`, null);
-      return { created: path, commit, ...stagedNote(siteOrigin) };
+      return { created: path, commit, ...stagedNote(site) };
     },
   },
   {
@@ -373,13 +365,13 @@ export const TOOLS: ToolDef[] = [
       },
       ["path"],
     ),
-    run: async (args, client, siteOrigin) => {
+    run: async (args, client, site) => {
       const path = await assertEntryPath(client, String(args.path));
       const current = await client.read(path);
       const merged = { ...current.data, ...((args.frontmatter as Record<string, unknown>) ?? {}) };
       const body = args.body_html !== undefined ? String(args.body_html) : current.body;
       const commit = await client.save(path, merged, body, `Update ${path} via MCP`);
-      return { updated: path, commit, ...stagedNote(siteOrigin) };
+      return { updated: path, commit, ...stagedNote(site) };
     },
   },
   {
@@ -389,10 +381,10 @@ export const TOOLS: ToolDef[] = [
       { path: str("Repo path of the entry to delete."), message: str("Optional commit message.") },
       ["path"],
     ),
-    run: async (args, client, siteOrigin) => {
+    run: async (args, client, site) => {
       const path = await assertEntryPath(client, String(args.path));
       await client.remove(path, args.message ? String(args.message) : `Delete ${path} via MCP`);
-      return { deleted: path, ...stagedNote(siteOrigin) };
+      return { deleted: path, ...stagedNote(site) };
     },
   },
   {
@@ -443,7 +435,7 @@ export function rpcError(id: RpcMessage["id"], code: number, message: string) {
 async function callTool(
   params: Record<string, unknown> | undefined,
   client: ContentClient,
-  siteOrigin: string | null,
+  site: SiteContext,
 ): Promise<Record<string, unknown>> {
   const name = params?.name as string | undefined;
   const args = (params?.arguments as Record<string, unknown>) ?? {};
@@ -452,7 +444,7 @@ async function callTool(
     return { content: [{ type: "text", text: `Unknown tool: ${name}` }], isError: true };
   }
   try {
-    const result = await tool.run(args, client, siteOrigin);
+    const result = await tool.run(args, client, site);
     // Compact, NOT indent:2. Every byte here is a token the calling model pays for,
     // and indentation was ~46% of a get_schema response (14.9k chars → 8.0k). Models
     // parse minified JSON fine; this is the single largest saving on the wire.
@@ -468,7 +460,7 @@ async function callTool(
 export async function handleMessage(
   msg: RpcMessage,
   client: ContentClient,
-  siteOrigin: string | null = null,
+  site: SiteContext = NO_SITE,
 ): Promise<Record<string, unknown> | null> {
   // `null` is valid JSON, so it reaches here and would throw on destructuring —
   // a 500 (and, in a batch, one bad element discarding every good response)
@@ -499,7 +491,7 @@ export async function handleMessage(
     case "tools/list":
       return { jsonrpc: "2.0", id, result: { tools: TOOL_LIST } };
     case "tools/call":
-      return { jsonrpc: "2.0", id, result: await callTool(params, client, siteOrigin) };
+      return { jsonrpc: "2.0", id, result: await callTool(params, client, site) };
     default:
       return rpcError(id, -32601, `Method not found: ${method}`);
   }

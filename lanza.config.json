@@ -2,5 +2,6 @@
   "owner": "dsottimano",
   "name": "lanza",
   "adminLogin": "dsottimano",
-  "domains": ["lanzacms.com"]
+  "domains": ["lanzacms.com"],
+  "pagesProject": "lanza"
 }
