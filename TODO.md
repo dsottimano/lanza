@@ -229,11 +229,9 @@ closed: no wildcards, no `http`, no hostname without a dot; unparseable JSON yie
   (broker, `admin/src/backend/site-urls.ts`, `functions/_lib/pages-project.ts`) —
   cross-checked against the broker on 7 inputs incl. edge cases, but they are separate
   deployables and a divergence fails silently.
-- ☐ **`staging.lanza.pages.dev` is behind Cloudflare Access** (302 to
-  `dsottimano.cloudflareaccess.com`) — a leftover Zero Trust policy on *this* site's
-  staging host. Harmless for Dave, who can log in, but every View/review link on
-  lanzacms.com goes through an interstitial. Check whether onboarded tenants inherit
-  anything similar; they should not.
+- ☑ **Cloudflare Access removed from `staging.lanza.pages.dev`** (Dave, 2026-07-26).
+  A leftover Zero Trust policy 302'd every review link to `dsottimano.cloudflareaccess.com`.
+  Now 200 with `x-robots-tag: noindex`, as designed.
 - **Document the asymmetry:** production moves to `example.com`, but **staging stays at
   `staging.<project>.pages.dev`** — Cloudflare does not alias branch builds onto custom
   domains. The two addresses stop looking related, and that will surprise people.

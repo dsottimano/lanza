@@ -17,8 +17,10 @@
 //
 // It runs at BUILD time only (Astro/Node). It is deliberately not called from
 // `render()`, because the CMS preview imports that in the browser and parse5 must not
-// enter the admin bundle. parse5 is already present via isomorphic-dompurify → jsdom,
-// so this adds no new dependency.
+// enter the admin bundle. parse5 is a DIRECT dependency, pinned exact. It used to be
+// reached transitively (isomorphic-dompurify → jsdom, astro → hast-util-from-html), but
+// this import fails the BUILD if it ever goes missing, and tenants install with no
+// lockfile — so the tree that satisfies it must not be someone else's to change.
 //
 // FALSE POSITIVES ARE THE RISK, not false negatives: this throws, and a throw fails a
 // tenant's deploy. So it never flags author markup. It renders the template TWICE — once
