@@ -69,20 +69,28 @@ answering — that route isn't in the deployed bundle.
 
 ## ☐ Next up
 
-0. **◐ 0.1.6 PUBLISHED — the `critical` floor is still at 0.1.5.** `latest: 0.1.6`;
-   tarball verified to carry `stagingUrlFor` (`mcp-core.ts`), `SCHEME_TOKENS`
-   (`appearance.ts`) and a freshly built admin. Remaining step, once a real tenant's
-   Software pane is confirmed to offer 0.1.6:
+0. **◐ RELEASE 0.1.7.** Repo is bumped to 0.1.7; npm has `latest: 0.1.6`,
+   `critical: 0.1.5`. Run the checklist below **in order** — three of its five steps
+   were missing or mis-ordered today and each caused a real defect.
 
-   ```sh
-   npm dist-tag add lanza-site@0.1.6 critical
-   ```
+   ### Publish checklist (the whole thing, in order)
 
-   **0.1.6 changes the CMS UI** (an Auto/Light/Dark control in the Brand card), so the
-   floor must not be left below it. Verify the pane FIRST — moving the floor onto a
-   version whose admin lacks a screen is the trap that bit twice on rental-model day.
-   No tenant has 0.1.6 until it updates; `claude_test` was still answering `get_site`
-   without `stagingUrl` on 0.1.5, which is what surfaced the whole gap.
+   1. `npm publish --otp=<code>` — Dave only; the agent cannot.
+   2. **Verify the tarball took the intended code**, not a stale tree:
+      `npm pack lanza-site@<v>` and grep for whatever the release was for. `prepack`
+      rebuilds the admin, so a stale CMS can't ship, but the source can still surprise.
+   3. **Bump `dsottimano/lanza-template`'s `package.json`** to the new version.
+      **AFTER the publish, never before** — a template pinning a version npm doesn't
+      have makes `npm run build` fail on every new tenant's first deploy. *This step
+      did not exist until 2026-07-25 and the template sat at **0.1.3**, so every tenant
+      onboarded since started three versions back, below the critical floor, unsafe
+      from birth and missing all five out-of-repo bug fixes.*
+   4. **Update a real tenant** via Settings → Software and confirm the pane offers the
+      new version and its admin renders. Do this BEFORE step 5.
+   5. `npm dist-tag add lanza-site@<v> critical` — only if the release changed the CMS
+      UI, and only after step 4. Moving the floor onto a version whose admin lacks a
+      screen is the trap that bit twice on rental-model day. **0.1.6 changed the CMS UI**
+      (Auto/Light/Dark in the Brand card), so the floor is owed and currently at 0.1.5.
 0b. **☐ Existing tenants have no staging build — patch their Pages projects.** Every
    project created before broker `4de76c1` got a `production` deployment config and
    nothing else, so preview builds ran without `NODE_VERSION` against
