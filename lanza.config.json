@@ -1,5 +1,6 @@
 {
   "owner": "dsottimano",
   "name": "lanza",
-  "adminLogin": "dsottimano"
+  "adminLogin": "dsottimano",
+  "domains": ["lanzacms.com"]
 }
