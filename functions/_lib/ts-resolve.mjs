@@ -18,3 +18,15 @@ export async function resolve(specifier, context, next) {
   }
   return next(specifier, context);
 }
+
+// Node ESM demands `with { type: "json" }` on a JSON import; the Cloudflare/esbuild
+// bundler does not, and the Functions source is written for the bundler (e.g.
+// `import repo from "../../lanza.config.json"` in _middleware.ts). Supplying the
+// attribute here lets a test import a REAL Function module end to end — which is
+// what makes "the gate refused AND next() was never called" testable.
+export async function load(url, context, next) {
+  if (url.endsWith(".json")) {
+    return next(url, { ...context, importAttributes: { type: "json" } });
+  }
+  return next(url, context);
+}

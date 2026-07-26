@@ -57,7 +57,18 @@ export const onRequest = async (context: {
   const payload = await verifyRS256(token, key);
   if (!payload) return new Response("Invalid handoff signature.", { status: 401 });
 
-  const { login, aud, nonce, exp } = payload;
+  const { login, aud, nonce, exp, typ, scope } = payload;
+  // I5: say which token family you expect. This endpoint INSTALLS the session cookie,
+  // so it is the last place that should infer it. An MCP access token is already
+  // refused twice over here — it carries no `nonce`, and its `aud` ends `/api/mcp` —
+  // but both of those are incidental. security-model.md §6 states the rule; this is
+  // the line that makes it true rather than lucky.
+  if (typ !== undefined && typ !== "session") {
+    return new Response("Not a session token.", { status: 401 });
+  }
+  if (typeof scope === "string" && scope) {
+    return new Response("Not a session token.", { status: 401 });
+  }
   if (aud !== url.origin) return new Response("Handoff audience mismatch.", { status: 401 });
   if (!nonceCookie || nonce !== nonceCookie) {
     return new Response("Handoff nonce mismatch.", { status: 401 });

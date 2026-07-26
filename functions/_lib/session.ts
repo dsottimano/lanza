@@ -59,17 +59,48 @@ export async function verifyRS256(
   }
 }
 
-// Full session check: valid signature AND audience-bound to THIS site AND unexpired.
-// Returns the GitHub login, or null. `aud` is this tenant's own origin — a token the
-// broker minted for another site is rejected here (that's the cross-tenant guard).
+// The broker signs TWO families of token with ONE key: a 7-day CMS session (the
+// `lanza_session` cookie) and a 1-hour MCP access token. A valid signature says only
+// "the broker minted this" — it does not say which kind you are holding, and the two
+// are not interchangeable. The CMS session is far the more powerful: it opens /admin,
+// the GitHub proxy, and the account-scoped Cloudflare token.
+//
+// This mattered because the MCP token's audience is chosen by the client requesting it.
+// A client that named a bare tenant origin as its `resource` received a token with the
+// same `login`, the same `aud`, and the same signature as that site's CMS session — so
+// it WAS that site's CMS session, in anyone's hands, one owner click away. The broker
+// now refuses to mint one (it pins `resource` to an MCP endpoint, and labels both
+// families with `typ`); this check is the half that lives on the tenant, so a site is
+// protected even while talking to an older broker.
+//
+// Backward compatible on purpose: tokens minted before `typ` existed carry none, and
+// still verify. Only a WRONG `typ` is refused, never a missing one — so no one is
+// signed out. `scope` is the second tell: every OAuth access token has one (the
+// authorize endpoint defaults it to "mcp"), and a CMS session has never carried one.
+export type TokenFamily = "session" | "mcp";
+
+// Full check: valid signature AND the expected token family AND audience-bound to THIS
+// site AND unexpired. Returns the GitHub login, or null. `aud` is the tenant's own
+// origin for a session, or `<origin>/api/mcp` for MCP — a token the broker minted for
+// another site is rejected either way (the cross-tenant guard).
 export async function verifySession(
   token: string | undefined,
   key: CryptoKey,
   aud: string,
+  family: TokenFamily = "session",
 ): Promise<string | null> {
   const payload = await verifyRS256(token, key);
   if (!payload) return null;
-  const { login, aud: tokenAud, exp } = payload;
+  const { login, aud: tokenAud, exp, typ, scope } = payload;
+  if (typ !== undefined && typ !== family) return null;
+  // Only the session family is defined by the ABSENCE of `scope`; an MCP token always
+  // has one, so this test would reject every legitimate caller if applied to both.
+  // A non-string `scope` must be refused too, not ignored — the broker's verifier
+  // rejects it outright, and a claim that means different things on either side of the
+  // same key is exactly the asymmetry I5 exists to prevent. Not reachable today
+  // (`scope` comes from a query parameter, so it is always a string), which is why it
+  // is worth closing before something else signs with this key.
+  if (family === "session" && scope !== undefined && (typeof scope !== "string" || scope)) return null;
   if (tokenAud !== aud) return null;
   if (typeof exp !== "number" || exp * 1000 <= Date.now()) return null;
   return typeof login === "string" ? login : null;
