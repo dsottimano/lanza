@@ -39,8 +39,71 @@ const schema = JSON.parse(readFileSync(schemaPath, "utf8"));
 const IND = (d) => "  ".repeat(d);
 const lit = (v) => JSON.stringify(v);
 
+// schema.json is UNTRUSTED input compiled straight into code that `astro build`
+// then IMPORTS — inside the tenant's Cloudflare Pages build, with the build
+// environment's secrets and write access to the deployed output. Two writers reach
+// it and neither is a control: an uploaded theme bundle (third-party by
+// definition) and any editor session doing `PUT contents/data/schema.json`
+// (the content-type editor's checks live in a Vue computed, which is UI, not a
+// gate). So this generator is the last honest gatekeeper, and it validates every
+// value that lands in a code position — same posture as gen-redirects.mjs.
+//
+// The proven attack: a field named
+//   [(await import("node:child_process")).execSync("id > /tmp/PWNED")]
+// landed verbatim in an object-key position. That is a *computed key*, so the
+// generated file stayed syntactically valid and still parsed as the config Astro
+// expects — the build ran the payload and reported success.
+//
+// Field keys therefore go through lit() (a JSON string key can hold anything and
+// executes nothing), and the two values that cannot be quoted away — a collection
+// name (a JS identifier) and a loader base (a path) — are checked by shape.
+
+// A collection name is emitted as a `const` binding and re-exported by name, so it
+// must be a plain JS identifier. Nothing else can be made safe here.
+const COLLECTION_NAME_RE = /^[A-Za-z_$][A-Za-z0-9_$]*$/;
+
+function assertCollectionName(name) {
+  if (typeof name !== "string" || !COLLECTION_NAME_RE.test(name)) {
+    throw new Error(
+      `gen-content-config: illegal collection name ${JSON.stringify(name)} — ` +
+        "must be a plain identifier (letters, digits, _ and $; not starting with a digit).",
+    );
+  }
+}
+
+// The folder is quoted by lit(), so it cannot break out of the string — but it is
+// still a filesystem path handed to Astro's glob loader, and `..` there reads
+// outside the content tree. Reject traversal, absolute paths and backslashes
+// (WHATWG/Windows treat `\` as a separator) for the same reason lanza-content.ts
+// does.
+function assertFolder(folder, collection) {
+  if (typeof folder !== "string" || !folder) {
+    throw new Error(`gen-content-config: collection "${collection}" has no folder.`);
+  }
+  const bad =
+    folder.includes("\\") ||
+    folder.startsWith("/") ||
+    folder.includes("\0") ||
+    folder.split("/").some((seg) => seg === "..");
+  if (bad) {
+    throw new Error(
+      `gen-content-config: illegal folder ${JSON.stringify(folder)} on collection "${collection}" — ` +
+        "must be a repo-relative path with no `..`, backslash or leading slash.",
+    );
+  }
+}
+
+// Every field key is emitted quoted. A JSON string is inert in key position, so no
+// name — however hostile — can reach a code position through this path.
+function key(field) {
+  if (typeof field?.name !== "string" || !field.name) {
+    throw new Error(`gen-content-config: a field is missing its name (${JSON.stringify(field)}).`);
+  }
+  return lit(field.name);
+}
+
 function renderObject(fields, depth) {
-  const lines = fields.map((f) => `${IND(depth + 1)}${f.name}: ${render(f, depth + 1)},`);
+  const lines = fields.map((f) => `${IND(depth + 1)}${key(f)}: ${render(f, depth + 1)},`);
   return `z.object({\n${lines.join("\n")}\n${IND(depth)}})`;
 }
 
@@ -126,12 +189,20 @@ function render(field, depth) {
 
 const collections = schema.filter((c) => c.kind === "folder");
 
+// Validate the whole model BEFORE emitting anything: a hostile schema must fail
+// the build loudly, not generate quietly. Throwing here leaves the previous
+// content.config.ts on disk untouched — the write is the last statement.
+for (const c of collections) {
+  assertCollectionName(c.name);
+  assertFolder(c.folder, c.name);
+}
+
 const defs = collections
   .map((c) => {
-    const fields = c.fields.map((f) => `    ${f.name}: ${render(f, 2)},`).join("\n");
+    const fields = c.fields.map((f) => `    ${key(f)}: ${render(f, 2)},`).join("\n");
     return (
       `const ${c.name} = defineCollection({\n` +
-      `  loader: glob({ pattern: "**/*.{md,mdx}", base: "./${c.folder}" }),\n` +
+      `  loader: glob({ pattern: "**/*.{md,mdx}", base: ${lit(`./${c.folder}`)} }),\n` +
       `  schema: z.object({\n${fields}\n  }),\n});`
     );
   })

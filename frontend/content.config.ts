@@ -14,82 +14,82 @@ import { glob } from "astro/loaders";
 const posts = defineCollection({
   loader: glob({ pattern: "**/*.{md,mdx}", base: "./content/posts" }),
   schema: z.object({
-    title: z.string(),
-    seo: z.object({
-      metaTitle: z.string().optional(),
-      metaDescription: z.string().optional(),
-      ogImage: z.string().optional(),
-      canonical: z.string().optional(),
-      ogType: z.enum(["website", "article"]).default("article"),
-      noindex: z.boolean().default(false),
-      author: z.string().optional(),
+    "title": z.string(),
+    "seo": z.object({
+      "metaTitle": z.string().optional(),
+      "metaDescription": z.string().optional(),
+      "ogImage": z.string().optional(),
+      "canonical": z.string().optional(),
+      "ogType": z.enum(["website", "article"]).default("article"),
+      "noindex": z.boolean().default(false),
+      "author": z.string().optional(),
     }).optional(),
-    pubDate: z.coerce.date(),
-    updatedDate: z.preprocess(
+    "pubDate": z.coerce.date(),
+    "updatedDate": z.preprocess(
       (v) => (v === "" || v === null ? undefined : v),
       z.coerce.date().optional(),
     ),
-    draft: z.boolean().default(true),
-    description: z.string().optional(),
-    featuredImage: z.string().optional(),
-    categories: z.array(z.string()).default([]),
-    tags: z.array(z.string()).default([]),
-    author: z.string().optional(),
-    template: z.enum(["default", "full-width", "landing"]).default("default"),
+    "draft": z.boolean().default(true),
+    "description": z.string().optional(),
+    "featuredImage": z.string().optional(),
+    "categories": z.array(z.string()).default([]),
+    "tags": z.array(z.string()).default([]),
+    "author": z.string().optional(),
+    "template": z.enum(["default", "full-width", "landing"]).default("default"),
   }),
 });
 
 const pages = defineCollection({
   loader: glob({ pattern: "**/*.{md,mdx}", base: "./content/pages" }),
   schema: z.object({
-    title: z.string(),
-    draft: z.boolean().default(true),
-    seo: z.object({
-      metaTitle: z.string().optional(),
-      metaDescription: z.string().optional(),
-      ogImage: z.string().optional(),
-      canonical: z.string().optional(),
-      ogType: z.enum(["website", "article"]).default("website"),
-      noindex: z.boolean().default(false),
+    "title": z.string(),
+    "draft": z.boolean().default(true),
+    "seo": z.object({
+      "metaTitle": z.string().optional(),
+      "metaDescription": z.string().optional(),
+      "ogImage": z.string().optional(),
+      "canonical": z.string().optional(),
+      "ogType": z.enum(["website", "article"]).default("website"),
+      "noindex": z.boolean().default(false),
     }).optional(),
-    description: z.string().optional(),
-    featuredImage: z.string().optional(),
-    template: z.enum(["default", "full-width", "landing"]).default("default"),
-    preset: z.string().optional(),
-    slots: z.record(z.string(), z.any()).optional(),
-    blocks: z.array(
+    "description": z.string().optional(),
+    "featuredImage": z.string().optional(),
+    "template": z.enum(["default", "full-width", "landing"]).default("default"),
+    "preset": z.string().optional(),
+    "slots": z.record(z.string(), z.any()).optional(),
+    "blocks": z.array(
       z.discriminatedUnion("type", [
         z.object({
-          type: z.literal("hero"),
-          heading: z.string(),
-          subheading: z.string().optional(),
-          image: z.string().optional(),
-          ctaText: z.string().optional(),
-          ctaUrl: z.string().optional(),
+          "type": z.literal("hero"),
+          "heading": z.string(),
+          "subheading": z.string().optional(),
+          "image": z.string().optional(),
+          "ctaText": z.string().optional(),
+          "ctaUrl": z.string().optional(),
         }),
         z.object({
-          type: z.literal("text"),
-          body: z.string(),
+          "type": z.literal("text"),
+          "body": z.string(),
         }),
         z.object({
-          type: z.literal("image"),
-          image: z.string(),
-          alt: z.string().optional(),
-          caption: z.string().optional(),
+          "type": z.literal("image"),
+          "image": z.string(),
+          "alt": z.string().optional(),
+          "caption": z.string().optional(),
         }),
         z.object({
-          type: z.literal("gallery"),
-          images: z.array(z.object({
-            image: z.string(),
-            alt: z.string().optional(),
+          "type": z.literal("gallery"),
+          "images": z.array(z.object({
+            "image": z.string(),
+            "alt": z.string().optional(),
           })).default([]),
         }),
         z.object({
-          type: z.literal("cta"),
-          heading: z.string().optional(),
-          text: z.string().optional(),
-          buttonText: z.string(),
-          buttonUrl: z.string(),
+          "type": z.literal("cta"),
+          "heading": z.string().optional(),
+          "text": z.string().optional(),
+          "buttonText": z.string(),
+          "buttonUrl": z.string(),
         }),
       ]),
     ).default([]),
@@ -99,26 +99,26 @@ const pages = defineCollection({
 const categories = defineCollection({
   loader: glob({ pattern: "**/*.{md,mdx}", base: "./content/categories" }),
   schema: z.object({
-    title: z.string(),
-    description: z.string().optional(),
-    parent: z.string().optional(),
+    "title": z.string(),
+    "description": z.string().optional(),
+    "parent": z.string().optional(),
   }),
 });
 
 const tags = defineCollection({
   loader: glob({ pattern: "**/*.{md,mdx}", base: "./content/tags" }),
   schema: z.object({
-    title: z.string(),
-    description: z.string().optional(),
+    "title": z.string(),
+    "description": z.string().optional(),
   }),
 });
 
 const authors = defineCollection({
   loader: glob({ pattern: "**/*.{md,mdx}", base: "./content/authors" }),
   schema: z.object({
-    title: z.string(),
-    bio: z.string().optional(),
-    avatar: z.string().optional(),
+    "title": z.string(),
+    "bio": z.string().optional(),
+    "avatar": z.string().optional(),
   }),
 });
 
