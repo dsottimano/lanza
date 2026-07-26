@@ -1,0 +1,25 @@
+# Cloudflare Pages custom headers for the PUBLIC static site.
+# Shipped in the lanza-site package (package.json `files`), copied to the build
+# output root by Astro (publicDir → dist/, see astro-config.mjs), and left alone by
+# the tenant public/ overlay in bin/lanza.mjs unless a tenant writes their own.
+# Sibling of the generated _redirects (scripts/gen-redirects.mjs) — different file,
+# no collision.
+#
+# /admin's headers are NOT here, and cannot be: Cloudflare does not apply _headers
+# to responses produced by Pages Functions, and functions/admin/_middleware.ts wraps
+# every /admin response. The CMS CSP + X-Frame-Options live there
+# (functions/_lib/admin-gate.ts). This file would silently do nothing for /admin/*.
+#
+# Nothing here may touch Cache-Control: every public route is static and cacheable
+# (CLAUDE.md Rule 2).
+
+/*
+  X-Content-Type-Options: nosniff
+  Referrer-Policy: strict-origin-when-cross-origin
+  # Two directives that cost nothing here and blunt an injected tag: <object>/<embed>
+  # are never legitimate in a Lanza page, and a <base> would retarget every relative
+  # URL on it. Deliberately NOT a full CSP and deliberately NO frame-ancestors — a
+  # customer's public site may legitimately be embedded, and script-src would have to
+  # account for whatever a tenant's own theme loads. Post bodies are sanitized
+  # (frontend/lib/sanitize.ts); this is defence in depth, not the control.
+  Content-Security-Policy: object-src 'none'; base-uri 'none'
