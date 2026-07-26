@@ -7,6 +7,7 @@ import { entryFolder, type FolderCollection } from "../schema";
 import type { Locale } from "../backend/config";
 import { reportError } from "../errors";
 import { entryRoute } from "../router";
+import { entryUrl } from "../backend/site-urls";
 
 const props = defineProps<{
   client: GitHubClient;
@@ -42,8 +43,8 @@ watch(() => props.collection.name, load, { immediate: true });
 </script>
 
 <template>
-  <div class="mx-auto max-w-3xl px-6 py-10">
-    <div class="mb-7 flex items-end justify-between">
+  <div class="mx-auto max-w-5xl px-6 py-7">
+    <div class="mb-5 flex items-end justify-between">
       <div>
         <h1 class="font-serif text-3xl font-bold tracking-tight text-zinc-900">{{ collection.label }}</h1>
         <p v-if="!loading && !failed" class="mt-1 text-sm text-zinc-600">
@@ -85,14 +86,34 @@ watch(() => props.collection.name, load, { immediate: true });
     </div>
 
     <ul v-else class="card divide-y divide-[var(--border)] overflow-hidden">
-      <li v-for="e in entries" :key="e.path">
+      <li
+        v-for="e in entries"
+        :key="e.path"
+        class="group flex items-center transition hover:bg-[var(--surface)]"
+      >
         <router-link
-          class="group flex w-full items-center justify-between px-4 py-3.5 text-left transition hover:bg-[var(--surface)]"
+          class="min-w-0 flex-1 px-4 py-3.5 text-left"
           :to="entryRoute(collection.name, locale, slugOf(e))"
         >
-          <span class="text-sm text-zinc-800">{{ slugOf(e) }}</span>
-          <span class="text-zinc-500 transition group-hover:translate-x-0.5 group-hover:text-zinc-600">→</span>
+          <span class="block truncate text-sm text-zinc-800">{{ slugOf(e) }}</span>
         </router-link>
+        <!-- Points at STAGING, not the live site: an entry saved here isn't public
+             until Publish, so a live link would 404 on what you just wrote. Absent
+             for collections with no public page. -->
+        <a
+          v-if="entryUrl(collection.name, slugOf(e), locale)"
+          :href="entryUrl(collection.name, slugOf(e), locale)!"
+          target="_blank"
+          rel="noopener"
+          class="shrink-0 px-3 py-3.5 text-xs text-zinc-500 opacity-0 transition focus:opacity-100 hover:text-zinc-900 hover:underline group-hover:opacity-100"
+        >
+          View ↗
+        </a>
+        <span
+          class="shrink-0 pr-4 text-zinc-500 transition group-hover:translate-x-0.5 group-hover:text-zinc-600"
+          aria-hidden="true"
+          >→</span
+        >
       </li>
     </ul>
   </div>

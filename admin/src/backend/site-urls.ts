@@ -1,0 +1,90 @@
+// Where an entry can actually be viewed.
+//
+// The CMS writes to `staging`, so a "View" link must point at the STAGING deployment —
+// a just-saved entry does not exist on the live site until Publish, and linking there
+// would 404 on exactly the thing the editor just created.
+//
+// The Pages project name is a pure function of owner+repo, which is what makes this
+// derivable at all: `<repo-slug>-<12 hex of sha256("owner/repo")>`. The authority is
+// the broker (`functions/_lib/tenant-origin.ts`, projectNameCandidates) — the two
+// derivations must stay in step, because a change there silently points every link
+// here at a hostname that does not resolve.
+import { ref } from "vue";
+import type { GitHubClient } from "./github";
+import { REPO } from "./config";
+import { site } from "./site";
+
+// Mirrors the broker's slug()/repoHash() budget. Kept as literals rather than shared
+// constants because the SPA and the broker are separate deployables.
+const MAX_BASE = 42;
+const HASH_HEX = 12;
+
+function slug(repo: string): string {
+  return (
+    repo
+      .toLowerCase()
+      .replace(/[^a-z0-9-]+/g, "-")
+      .replace(/^-+|-+$/g, "")
+      .slice(0, MAX_BASE)
+      .replace(/-+$/, "") || "site"
+  );
+}
+
+async function repoHash(owner: string, repo: string): Promise<string> {
+  const data = new TextEncoder().encode(`${owner.toLowerCase()}/${repo.toLowerCase()}`);
+  const digest = await crypto.subtle.digest("SHA-256", data);
+  return Array.from(new Uint8Array(digest))
+    .map((b) => b.toString(16).padStart(2, "0"))
+    .join("")
+    .slice(0, HASH_HEX);
+}
+
+/** `https://staging.<project>.pages.dev`, or null while unresolved / underivable. */
+export const stagingOrigin = ref<string | null>(null);
+
+export async function resolveStagingOrigin(client: GitHubClient): Promise<void> {
+  // Fast path: on `<project>.pages.dev` the project name is already in the hostname,
+  // so the common tenant costs no request. (`staging.<project>.pages.dev/admin`
+  // redirects to the live CMS, so this host is never itself a staging host.)
+  const direct = /^([a-z0-9-]+)\.pages\.dev$/.exec(window.location.hostname);
+  if (direct) {
+    stagingOrigin.value = `https://staging.${direct[1]}.pages.dev`;
+    return;
+  }
+
+  // Custom domain: the hostname says nothing about the project, so derive it from
+  // owner/repo. The SPA deliberately does not hold its own repo identity (see
+  // config.ts) — but it can READ it, because the proxy prepends the tenant's repo to
+  // every path, so this can only ever return OUR config.
+  try {
+    const { data } = await client.loadJson("lanza.config.json", REPO.productionBranch);
+    const owner = typeof data.owner === "string" ? data.owner : "";
+    const name = typeof data.name === "string" ? data.name : "";
+    if (!owner || !name) return;
+    stagingOrigin.value = `https://staging.${slug(name)}-${await repoHash(owner, name)}.pages.dev`;
+  } catch {
+    // Advisory chrome only — a missing View link is never worth blocking the CMS for.
+    stagingOrigin.value = null;
+  }
+}
+
+// Public route per collection, mirroring frontend/pages/. A collection with no public
+// page (anything a tenant added in Settings → content types) returns null, and the
+// caller shows no link rather than a guess that 404s.
+const ROUTES: Record<string, string> = {
+  posts: "/posts/",
+  pages: "/",
+  categories: "/category/",
+  tags: "/tag/",
+  authors: "/author/",
+};
+
+/** Absolute staging URL for one entry, or null if it has no public page. */
+export function entryUrl(collection: string, slugName: string, locale: string): string | null {
+  const origin = stagingOrigin.value;
+  const route = ROUTES[collection];
+  if (!origin || !route) return null;
+  // Non-default locales are served under a /<locale> prefix; the default locale is not.
+  const prefix = locale && locale !== site.defaultLocale ? `/${locale}` : "";
+  return `${origin}${prefix}${route}${slugName}`;
+}

@@ -48,6 +48,7 @@ const OnboardingWizard = lazyPane(() => import("./ui/OnboardingWizard.vue"));
 import { GitHubClient } from "./backend/github";
 import type { Locale } from "./backend/config";
 import { site, loadSiteConfig } from "./backend/site";
+import { resolveStagingOrigin } from "./backend/site-urls";
 import { loadSchema } from "./backend/schema";
 import { refreshVersionState } from "./backend/version";
 import { reportError } from "./errors";
@@ -92,7 +93,15 @@ const defaultCollection = () =>
 // content model. Only after the model is loaded can routes resolve collections.
 client.value
   .ensureWorkingBranch()
-  .then(() => Promise.all([loadSiteConfig(client.value), loadSchema(client.value)]))
+  .then(() =>
+    Promise.all([
+      loadSiteConfig(client.value),
+      loadSchema(client.value),
+      // Advisory only — resolves the "View" links. Never rejects, so it cannot
+      // stop the boot chain that follows.
+      resolveStagingOrigin(client.value),
+    ]),
+  )
   .then(() => {
     // Booted at "/" → land on the default collection's list in the default locale.
     if (route.name === "home") {
