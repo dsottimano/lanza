@@ -21,7 +21,7 @@ Sites are no longer frozen photocopies. **All code ships as the npm package
 | Thing | Where |
 |---|---|
 | Package | **`lanza-site`** on npm (unscoped — `@lanza` belongs to someone else) |
-| Current | `latest: 0.1.5`, `critical: 0.1.5` |
+| Current | npm: `latest: 0.1.5`, `critical: 0.1.5` · repo: **0.1.6, bumped and unpublished** |
 | Template repo | `github.com/dsottimano/lanza-template` (public, is_template) |
 | Broker points at it | `TEMPLATE_OWNER=dsottimano`, `TEMPLATE_REPO=lanza-template` |
 | Proven tenant | `datadefine/delete22` — onboarded through the wizard, thin, self-updating |
@@ -69,10 +69,20 @@ answering — that route isn't in the deployed bundle.
 
 ## ☐ Next up
 
-0. **☐ PUBLISH `lanza-site`.** Two tenant-facing changes are committed and unpublished,
-   so no tenant has them: the Brand `scheme` key (`c315646`) and `get_site` returning
-   `stagingUrl`/`liveUrl`. Needs Dave's OTP (`npm publish --otp=…`). lanzacms.com already
-   has both — it builds from this repo, not the package.
+0. **☐ PUBLISH `lanza-site` 0.1.6** — version bumped, npm still on 0.1.5. Two
+   tenant-facing changes are in `main` and in no tenant's `node_modules`: the Brand
+   `scheme` key (`c315646`) and `get_site` returning `stagingUrl`/`liveUrl` (`12501aa`).
+   lanzacms.com already has both — it builds from this repo, not the package — which is
+   exactly why this is easy to forget.
+
+   ```sh
+   npm publish --otp=<code>              # Dave only; the agent cannot
+   npm dist-tag add lanza-site@0.1.6 critical   # see the floor rule below
+   ```
+
+   **0.1.6 changes the CMS UI** (an Auto/Light/Dark control in the Brand card), so per
+   the floor rule the `critical` tag must not be left below it. Confirm the Software
+   pane offers 0.1.6 on a real tenant before moving the floor, not after.
 1. **☐ Retire the pre-package tenants — BLOCKED ON DAVE.** `datadefine/define-media-group`
    and `datadefine/delete` are fat forks with no `lanza-site` dependency; the fan-out
    reports them `unmanaged` and will never fix them. **Decision made: delete both, and a
