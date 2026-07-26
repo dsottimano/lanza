@@ -141,32 +141,56 @@ must never fall back to it — see `security-model.md` §I2, which was a live bu
 | Env / artifact | Where | What it authorizes |
 |---|---|---|
 | `CLOUDFLARE_OAUTH_CLIENT_ID` / `_SECRET` | broker | The confidential OAuth client used to obtain each tenant's Cloudflare token. `client_secret_post`, no PKCE; CSRF is a random `state` in a short-lived HttpOnly cookie. |
-| `lanza_cf` cookie | the **user's browser** | `{access, refresh, expires_at, account_id}` as unauthenticated base64 JSON, `HttpOnly; Secure; Path=/`. Drives every wizard call to the Cloudflare API. |
-| `CLOUDFLARE_API_TOKEN` (tenant, optional) | tenant | Self-host direct mode for the Site Health panel and future KV/D1/R2 provisioning. |
+| `lanza_cf` cookie | the **user's browser** | `{access, expires_at, account_id}` as unauthenticated base64 JSON, `HttpOnly; Secure; Path=/`, `Max-Age=3600`. Drives every wizard call to the Cloudflare API. **Access token only** — no refresh token is issued (see scopes below). |
+| `CLOUDFLARE_API_TOKEN` (tenant, optional) | tenant | The tenant's **own** API token, created by them, for the Site Health panel and its KV/D1/R2 provisioning. Never held by Lanza — see "Cloudflare features are opt-in" below. |
 
 **Scopes** are sent explicitly (omitting `scope` makes Cloudflare return a generic
 error) as dot-notation IDs, which *are* the API-token permission IDs — not wrangler's
 `resource:access` strings. Full list: `GET /client/v4/oauth/scopes`.
 
-Currently requested (`api/auth/cf/login.ts`): `offline_access`,
-`account-settings.read`, `user-details.read`, `workers-kv-storage.write`, `d1.write`,
-`workers-r2.write`, `page.read`, `page.write`.
+Currently requested (`api/auth/cf/login.ts`): `account-settings.read`,
+`user-details.read`, `page.read`, `page.write`. **Four, and every one has a caller.**
 
 - `page.write` is required to *create* a project — `page.read` alone returns a `10000`
   auth error.
-- `offline_access` yields a refresh token **only if** the client also has the
-  `refresh_token` grant enabled. Grant alone or scope alone gives nothing; both
-  together work. Access tokens last ~16h and the broker refreshes silently.
 - `user-details.read` **is** used — `describeIdentity()` calls `GET /user` to show the
   tenant which Cloudflare account they are about to build in.
-- `workers-kv-storage.write`, `d1.write`, `workers-r2.write` are **still unused** by any
-  broker code path. Trim the *code* before the Cloudflare client — trimming the client
-  first breaks the connect step with a generic error.
+- `account-settings.read` backs `resolveAccount()` in `_lib/cf-accounts.ts`.
 
-> **Known-accepted risk.** Holding Cloudflare tokens in a browser cookie contradicts
-> the "token never exposed to the browser" invariant this doc's predecessor asserted.
-> It is recorded in `security-model.md` §5 as a decision, not an oversight. The fix is
-> Option B — a per-tenant server-side token store — which is designed and unbuilt.
+**Removed 2026-07-25** — do not re-add without a caller to point at:
+
+- `workers-kv-storage.write`, `d1.write`, `workers-r2.write` — no broker code path ever
+  provisioned storage. The tenant CMS does, but on the tenant's own token through
+  `functions/_lib/cf-proxy.ts`, never on this grant. They only widened the consent screen.
+- `offline_access` — would issue a refresh token. Access tokens last ~16h while the
+  `lanza_cf` cookie is capped at 3600s, so the token always outlives its own cookie and
+  the refresh branch in `api/onboard/deploy.ts` was unreachable. Removed along with
+  `refreshCfToken()`. (It yields a refresh token only if the client also has the
+  `refresh_token` grant enabled — grant alone or scope alone gives nothing.)
+
+Trim the *code* before the Cloudflare client — trimming the client first breaks the
+connect step with a generic error. The code side is done; the client still lists the
+old scopes, which is harmless (a client may offer more than a request asks for).
+
+> ### Cloudflare features are opt-in, and Lanza holds no tenant CF credentials
+>
+> **Decided 2026-07-25.** Lanza will not store per-tenant Cloudflare tokens. The
+> Site Health panel's provisioning features are therefore **optional and off by
+> default**: a tenant who wants them creates their own scoped API token and sets
+> `CLOUDFLARE_API_TOKEN` / `CLOUDFLARE_ACCOUNT_ID` / `PAGES_PROJECT` on their own
+> Pages project. Until they do, `functions/admin/api/cf/[[path]].ts` returns its
+> `503 {configured:false}` and the CMS renders a "this is optional" setup card.
+>
+> This closes **Option B** (a per-tenant server-side token store) as *deliberately
+> not built* rather than pending. Option B would have made the broker custodian of
+> every tenant's Cloudflare refresh token — one namespace whose compromise carries
+> `page.write` on the whole fleet. The store-nothing alternative (minting a scoped
+> API token per tenant during onboarding) was **verified impossible**: Cloudflare's
+> OAuth vocabulary has 371 scopes and none grant API-token management, and
+> `GET /user/tokens` on an OAuth token returns `403 code 9109`.
+>
+> The residual, accepted: the wizard's `lanza_cf` cookie still carries a CF **access**
+> token in the browser for up to an hour. Recorded in `security-model.md` §5.
 
 `/api/auth/cf/login` also honours an unauthenticated `?scope=` override, kept for
 debugging. That is a real loose end.

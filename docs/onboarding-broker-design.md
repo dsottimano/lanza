@@ -223,12 +223,19 @@ OAuth clients, GA "OAuth for all" 2026-06.)
 Token lifecycle (**VERIFIED 2026-07-05**): the access token is a **~16h bearer** AND a
 **refresh token IS available** — the recipe is enable **both** the `authorization_code`
 and `refresh_token` grant types on the client AND request the **`offline_access`** scope
-(grant alone or scope alone → no refresh token; both → one comes back). So the broker
-**consents once, then refreshes silently** in the background; the user does not re-auth
-every 16h. The broker stores `{access, refresh, expires_at}` and refreshes on demand.
-**Open sub-point:** where the runtime
-`functions/admin/api/cf/[[path]].ts` proxy sources the token — broker-injected into the
-tenant Pages project vs. proxied through the broker — resolve when wiring Phase 3.
+(grant alone or scope alone → no refresh token; both → one comes back).
+
+> **SUPERSEDED 2026-07-25.** The broker no longer requests `offline_access` and stores
+> nothing. Onboarding is a single ≤1h session, and the `lanza_cf` cookie's 3600s Max-Age
+> expires long before a ~16h access token does — so the refresh path was unreachable and
+> `refreshCfToken()` is gone. The cookie now holds `{access, expires_at, account_id}`.
+>
+> The **open sub-point below is also resolved**: the runtime
+> `functions/admin/api/cf/[[path]].ts` proxy sources the token from **neither** — it uses
+> the tenant's own hand-made `CLOUDFLARE_API_TOKEN`, set by the tenant on their own Pages
+> project, and Cloudflare features in the CMS are opt-in and off until they do it. Lanza
+> holds no per-tenant Cloudflare credential. See `keys-and-secrets.md` and
+> `security-model.md` §5 for why the broker-custodian design (Option B) was rejected.
 
 No Workers migration; no CF API token from the user; no secret typed (given §3.4-B).
 
@@ -243,13 +250,16 @@ after the one-time git authorize. Concrete facts learned:
 - **Scopes must be sent explicitly** — omitting `scope` triggers a generic "unexpected
   error" at consent. Scope IDs are **dot notation = API-token permission IDs** (not the
   `resource:access` colon strings wrangler uses); fetch via `GET /client/v4/oauth/scopes`.
-- **Scope set (trimmed 2026-07-10 for public-app publishing):** `account-settings.read`
-  (resolve account id), `page.read` **+ `page.write`** (create/deploy Pages — read alone →
-  10000 auth error on POST) **+ `offline_access`** (refresh token). The client must be
-  configured with these scopes AND both grant types (`authorization_code` + `refresh_token`).
-  Dropped `user-details.read`, `workers-kv-storage.write`, `d1.write`, `workers-r2.write`:
-  the OAuth token never called KV/D1/R2 or `/user` — that provisioning runs on the separate
-  hand-made `CLOUDFLARE_API_TOKEN` (cf-proxy). Re-add only if the proxy moves onto this token.
+- **Scope set (current, trimmed 2026-07-25):** `account-settings.read` (resolve account
+  id), `user-details.read` (`describeIdentity()` → `GET /user`, so the wizard can name the
+  account it is about to build in), `page.read` **+ `page.write`** (create/deploy Pages —
+  read alone → 10000 auth error on POST). **Four scopes, each with a caller.**
+  Dropped `workers-kv-storage.write`, `d1.write`, `workers-r2.write`: the OAuth token never
+  called KV/D1/R2 — that provisioning runs on the tenant's own hand-made
+  `CLOUDFLARE_API_TOKEN` (cf-proxy). Also dropped `offline_access` (see the superseded
+  note above). Re-add only if the proxy moves onto this token.
+  *(A 2026-07-10 entry claimed this trim plus dropping `user-details.read`; the code was
+  never changed and `user-details.read` is genuinely needed. 2026-07-25 is the real trim.)*
 - **Two deploy gotchas:** (a) `page.write` is required to create a project, not just read;
   (b) creating a git-sourced project **does not auto-deploy** — the UI shows "no deployment"
   until a push or an explicit **`POST …/deployments`** (branch=main), which we now call so no
@@ -369,6 +379,8 @@ identity** now shared by the CMS so onboarding and the editor read as one produc
 | 2026-07-05 | CF OAuth = **consent once, broker refreshes silently** | refresh token IS available — recipe: `authorization_code`+`refresh_token` grants on the client + `offline_access` scope (both needed); ~16h access token, refresh in background |
 | 2026-07-05 | CF OAuth **verified end-to-end** on `lanza-broker.pages.dev` (`/api/auth/cf/{login,callback}`) | token exchange + `GET /accounts` work; scopes must be sent explicitly as dot-notation IDs (§5) |
 | 2026-07-05 | **Full headless deploy chain proven** — token creates git-sourced Pages project + triggers deployment → live site | needs `page.write`; git-create doesn't auto-deploy so `POST …/deployments` after; the one manual git-authorize = deep-link `github.com/apps/cloudflare-workers-and-pages/installations/new` (Dave) |
+| 2026-07-25 | **Option B rejected — Lanza holds no tenant CF tokens.** CMS Cloudflare features become opt-in; tenants set their own `CLOUDFLARE_API_TOKEN` | a broker token store = `page.write` on the whole fleet in one namespace. The store-nothing alternative is impossible: CF OAuth has 371 scopes, none for API-token management, and `GET /user/tokens` on an OAuth token → `403 code 9109` (Dave) |
+| 2026-07-25 | **CF OAuth scopes trimmed to four**, `offline_access` dropped and the refresh path deleted | supersedes the 2026-07-05 "refreshes silently" row: the `lanza_cf` cookie caps at 3600s while an access token lasts ~16h, so `refreshCfToken()` was unreachable |
 
 ## 10. Build order
 

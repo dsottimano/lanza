@@ -176,7 +176,14 @@ onMounted(refreshAll);
               </button>
               <div v-if="open.cf && cfApiCard.state === 'notConfigured'" class="mt-2 rounded-lg bg-[var(--surface)] p-3 text-xs text-zinc-600">
                 <p class="mb-2">
-                  Connecting Cloudflare lets this page turn storage services on and off for you. To set it up:
+                  This is an <strong>optional extra</strong> — your site is published and running
+                  without it. Connecting Cloudflare adds a panel that can turn storage services
+                  (KV, D1, R2) on and off for you from here instead of the Cloudflare dashboard.
+                </p>
+                <p class="mb-2">
+                  It's off by default because it needs an API token, and Lanza deliberately
+                  doesn't hold your Cloudflare credentials — you create the token, you keep
+                  control of it, and you can revoke it at any time. To turn it on:
                 </p>
                 <ol class="ml-4 list-decimal space-y-1.5">
                   <li>
@@ -197,8 +204,8 @@ onMounted(refreshAll);
                     <code class="rounded bg-zinc-200 px-1">admin/.env</code>.
                   </li>
                 </ol>
-                <p v-if="cfApiCard.missing.length" class="mt-2 rounded bg-amber-50 px-2 py-1.5 text-amber-900">
-                  Currently missing on the server: <strong>{{ cfApiCard.missing.join(", ") }}</strong>.
+                <p v-if="cfApiCard.missing.length" class="mt-2 rounded bg-[var(--surface)] px-2 py-1.5 text-zinc-600">
+                  Not set yet: <strong>{{ cfApiCard.missing.join(", ") }}</strong>.
                 </p>
               </div>
 

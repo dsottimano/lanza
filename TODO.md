@@ -70,11 +70,14 @@ answering — that route isn't in the deployed bundle.
    and `datadefine/delete` are fat forks with no `lanza-site` dependency. Their CMS
    correctly says "Updates aren't available for this site", and the fan-out reports
    them `unmanaged` — it will never fix them. Either re-onboard or delete.
-2. **☐ Option B — get Cloudflare tokens out of the browser.** Unchanged and still the
-   biggest untouched item: **every onboarded tenant's Site Health returns 503
-   permanently** (the broker sets only `NODE_VERSION`), and CF tokens live in the
-   `lanza_cf` cookie. Wire tenant `functions/admin/api/cf/[[path]].ts` to source the
-   token through the broker; decide the broker's `{access, refresh, expires_at}` store.
+2. **☑ Option B — CLOSED, deliberately not built** (2026-07-25). Lanza will not hold
+   per-tenant Cloudflare tokens: a broker token store would put `page.write` on the
+   whole fleet in one namespace. The store-nothing alternative was **verified
+   impossible** — CF OAuth has 371 scopes, none for API-token management, and
+   `GET /user/tokens` on an OAuth token → `403 code 9109`. Instead, CMS Cloudflare
+   features are **opt-in**: the tenant creates their own API token. Site Health still
+   503s until they do, and the card now says that's optional, not broken. Scopes
+   trimmed to four; `offline_access` and the unreachable refresh path deleted.
 3. **☐ Orphan repo on rejected install.** The tenant repo is created in the OAuth
    callback, *before* the `lanza-cms` App install screen. **Reject** leaves a repo
    nothing owns. Create it after consent, or detect the rejection at
@@ -132,11 +135,15 @@ Full detail in `docs/security-model.md` §5.
 - ☐ **Sessions can't be revoked.** Stateless 7-day RS256 bearer, no `jti`. Also covers
   MCP grants: a multi-site `sites` claim can't be revoked before its 1h expiry.
 - ☐ **The handoff token *is* the session token.**
-- ☐ **CF tokens live in a browser cookie** (`lanza_cf`). Fixed by Option B.
-- ☐ **CF OAuth scopes: three unused.** `workers-kv-storage.write`, `d1.write`,
-  `workers-r2.write`. **Trim the code, not the CF client.** Do NOT reuse the trim in
-  the nested checkout — it also drops `user-details.read`, which `describeIdentity`
-  (`_lib/cf-accounts.ts`) needs for the wizard's identity strip. Re-derive from canonical.
+- ◐ **A CF access token still passes through the browser** (`lanza_cf`), now for at most
+  its 3600s cookie life and **with no refresh token** — `offline_access` is gone. The
+  wizard needs `page.write` in the browser flow to create the Pages project, so the
+  cookie can't be removed outright. Accepted as-is; Option B is closed (see above).
+- ☑ **CF OAuth scopes trimmed** to `account-settings.read`, `user-details.read`,
+  `page.read`, `page.write` — four, each with a caller. Code only; the **CF client still
+  lists the old scopes**, which is harmless and safe to trim now (Dave's to do). Keep
+  `user-details.read` — `describeIdentity` (`_lib/cf-accounts.ts`) needs it for the
+  wizard's identity strip. Do NOT reuse the nested checkout's trim; re-derive from canonical.
 - ☐ **Proxy relays upstream headers verbatim** (inherits GitHub's `Cache-Control` /
   `ACAO: *`). Latent unless the session cookie moves to `SameSite=None`.
 - ☐ **No `Origin` validation on the MCP transport** (broker router included).

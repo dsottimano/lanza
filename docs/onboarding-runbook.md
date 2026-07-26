@@ -85,11 +85,15 @@ scopeless. Register a separate OAuth client with `public_repo` and set
 
 ## 6. Cloudflare OAuth client
 
-Response Type **Code**, Token Auth **Client Secret POST**, **both** grant types
-`authorization_code` *and* `refresh_token` (a refresh token needs the grant *and*
-`offline_access` in scope — neither alone works), redirect URI exact-match
+Response Type **Code**, Token Auth **Client Secret POST**, grant type
+`authorization_code`, redirect URI exact-match
 `https://connect.lanzacms.com/api/auth/cf/callback`. Set
 `CLOUDFLARE_OAUTH_CLIENT_ID` / `_SECRET`.
+
+The `refresh_token` grant is **no longer needed** — since 2026-07-25 the broker does
+not request `offline_access` and never refreshes (onboarding is a single ≤1h session;
+`keys-and-secrets.md`). Leaving the grant enabled is harmless. Scopes the client must
+offer: `account-settings.read`, `user-details.read`, `page.read`, `page.write`.
 
 ## 7. Verify it works
 

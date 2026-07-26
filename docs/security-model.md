@@ -212,13 +212,29 @@ oversights.
   Not exploitable today (`SameSite=Lax`; `ACAO: *` is rejected with credentials),
   but the "never cached" rule in CLAUDE.md Rule 2 is inherited rather than
   enforced. Switching the session cookie to `SameSite=None` would make this live.
-- **Cloudflare OAuth tokens live in a browser cookie.** `lanza_cf` holds the CF
-  access + refresh tokens as unauthenticated base64 JSON (`HttpOnly; Secure`,
-  `Path=/`). The fix is Option B — a per-tenant server-side token store — designed
-  and unbuilt. Scopes also still include `workers-kv-storage.write`, `d1.write`
-  and `workers-r2.write`, which no broker code path uses. (`user-details.read` is
-  no longer in that list: `describeIdentity()` calls `GET /user` so the wizard can
-  show which Cloudflare account a site is about to be built in.)
+- **A Cloudflare access token passes through the browser during onboarding.**
+  `lanza_cf` holds it as unauthenticated base64 JSON (`HttpOnly; Secure; Path=/`,
+  `Max-Age=3600`). Reduced 2026-07-25 and **accepted as-is**: the cookie no longer
+  carries a refresh token (`offline_access` is not requested), so the credential
+  is bounded by the cookie's own hour. The wizard genuinely needs `page.write` in
+  the browser's flow to create the Pages project, so the cookie cannot be removed
+  outright.
+
+  **Option B is closed — deliberately not built.** A per-tenant server-side token
+  store would have made the broker custodian of every tenant's CF refresh token:
+  one namespace, `page.write` on the entire fleet, blast radius all tenants
+  instead of one. The store-nothing variant (mint a scoped API token per tenant at
+  onboarding) was **verified impossible** — Cloudflare's OAuth vocabulary carries
+  371 scopes and none grant API-token management, and `GET /user/tokens` on an
+  OAuth token is `403 code 9109`. Instead, Cloudflare provisioning in the CMS is
+  **opt-in**: the tenant creates their own token and sets it on their own Pages
+  project. See `keys-and-secrets.md`.
+
+  Scopes are now `account-settings.read`, `user-details.read`, `page.read`,
+  `page.write` — four, each with a caller. `workers-kv-storage.write`, `d1.write`
+  and `workers-r2.write` were removed; no broker code path ever used them. The
+  tenant CMS *does* provision KV/D1/R2, but on the tenant's own token via
+  `functions/_lib/cf-proxy.ts`, never on this grant.
 - **`/api/auth/cf/login` honours an unauthenticated `?scope=` override.**
 - **No `Origin` validation on the MCP transport.** The spec asks for it against
   DNS rebinding; impact is low because auth is Bearer, not cookie.

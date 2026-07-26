@@ -290,7 +290,9 @@ export function useHealthChecks(github: GitHubClient) {
         proxies.cf = true; // the proxy answered with its 503
         cfApiCard.state = "notConfigured";
         cfApiCard.missing = e.missing;
-        cfApiCard.summary = "Not set up yet.";
+        // Optional by design, not a fault: Lanza never holds your Cloudflare
+        // credentials, so connecting is opt-in and off until you add a token.
+        cfApiCard.summary = "Optional — not connected. Your site works without it.";
         cfApiCard.detail = e.message;
         cascadeNotConfigured();
         setCfLoading(false);
@@ -335,7 +337,7 @@ export function useHealthChecks(github: GitHubClient) {
 
   function cascadeNotConfigured(): void {
     pagesCard.state = "notConfigured";
-    pagesCard.summary = "Set up the Cloudflare connection first.";
+    pagesCard.summary = "Needs the optional Cloudflare connection.";
     siteUrlCard.suggestion = null;
     for (const k of SERVICE_KINDS) {
       services[k].state = "notConfigured";

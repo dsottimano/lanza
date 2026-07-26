@@ -261,9 +261,15 @@ otherwise invisible:
 
 ## 10. Still open
 
-- **Option B** — move Cloudflare tokens out of the browser cookie into a per-tenant
-  server-side store. Until then every onboarded tenant's Site Health panel 503s, since
-  the broker sets only `NODE_VERSION` on new projects.
+- ~~**Option B**~~ — **closed 2026-07-25, deliberately not built.** Lanza will not hold
+  per-tenant Cloudflare tokens. A tenant's Site Health panel therefore 503s until *they*
+  create an API token and set `CLOUDFLARE_API_TOKEN` / `CLOUDFLARE_ACCOUNT_ID` /
+  `PAGES_PROJECT` on their own Pages project — that is now the documented, opt-in path,
+  and the CMS card says so. The broker still sets only `NODE_VERSION` on new projects,
+  by design. Rationale and the verified dead end (CF OAuth cannot mint API tokens):
+  `keys-and-secrets.md`, `security-model.md` §5.
 - **Orphan repo** when a user rejects the App install.
 - **The already-installed trap** (§3) — Cloudflare's to fix.
-- Unused Cloudflare scopes still requested; trim the code before the client.
+- ~~Unused Cloudflare scopes~~ — trimmed in the code 2026-07-25 (`offline_access`,
+  `workers-kv-storage.write`, `d1.write`, `workers-r2.write`). The Cloudflare client
+  still lists them; trimming it is safe now that no request asks for them.
