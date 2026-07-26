@@ -127,3 +127,22 @@ describe("securityUpdateRequired", () => {
     expect(securityUpdateRequired(state(null, "0.2.0", "0.1.2"))).toBe(false);
   });
 });
+
+// 0.1.10 is the first release to carry a two-digit patch. Under string comparison
+// "0.1.10" < "0.1.9", which would hide every future update from the Software pane
+// and make the critical floor read a newer version as below it — the fan-out would
+// then "rescue" sites onto older code. Numeric-segment comparison is what prevents
+// that, so pin it.
+describe("compareVersions across a two-digit segment", () => {
+  it("orders 0.1.10 after 0.1.9", () => {
+    expect(compareVersions("0.1.10", "0.1.9")).toBeGreaterThan(0);
+    expect(compareVersions("0.1.9", "0.1.10")).toBeLessThan(0);
+    expect(compareVersions("0.1.10", "0.1.10")).toBe(0);
+  });
+
+  it("does not fall back to lexical order anywhere in the tuple", () => {
+    expect(compareVersions("0.1.2", "0.1.10")).toBeLessThan(0);
+    expect(compareVersions("0.10.0", "0.9.0")).toBeGreaterThan(0);
+    expect(compareVersions("10.0.0", "9.0.0")).toBeGreaterThan(0);
+  });
+});
