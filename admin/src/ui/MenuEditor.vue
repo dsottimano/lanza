@@ -5,6 +5,7 @@
 // inherit the desktop list until customized (stored as null). Extracted from the
 // old MenuView so HeaderFooterView can feed the same live model to the preview.
 import { computed, ref } from "vue";
+import { isSafeUrl } from "../backend/menu";
 import type { SiteMenu, MenuItem, LocationKey, DeviceKey } from "../backend/menu";
 
 // `location` locks the editor to one menu location and hides the location tabs —
@@ -64,9 +65,16 @@ function move(i: number, delta: number) {
   markDirty();
 }
 
-// Soft URL validation — relative /path or absolute http(s). Warns, never blocks.
+// Two levels, on purpose. A scheme outside the safe set (`javascript:`, `data:`)
+// BLOCKS the save — serializeMenu throws on it, so this red message tells the user
+// why before they hit Save rather than after. Anything else unusual (a bare
+// "about.html") is still only a hint, because it saves fine and just may not
+// resolve.
+function urlBlocks(url: string): boolean {
+  return !isSafeUrl(url);
+}
 function urlWarns(url: string): boolean {
-  return !!url && !(url.startsWith("/") || /^https?:\/\//.test(url));
+  return !!url && !urlBlocks(url) && !(url.startsWith("/") || /^https?:\/\//.test(url));
 }
 
 const inputCls = "input min-w-0 flex-1";
@@ -147,7 +155,11 @@ const iconBtn =
               <input v-model="it.label" :class="inputCls" placeholder="Label" @input="markDirty" />
               <input v-model="it.url" :class="inputCls" placeholder="/path/ or https://…" @input="markDirty" />
             </div>
-            <p v-if="urlWarns(it.url)" class="text-xs text-amber-600">
+            <p v-if="urlBlocks(it.url)" class="text-xs font-medium text-red-600">
+              That link scheme isn't allowed and won't save. Use <code>/about/</code>,
+              <code>https://…</code>, <code>mailto:</code>/<code>tel:</code>, or <code>#anchor</code>.
+            </p>
+            <p v-else-if="urlWarns(it.url)" class="text-xs text-amber-600">
               Use a relative path (<code>/about/</code>) or a full URL (<code>https://…</code>).
             </p>
           </div>

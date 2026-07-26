@@ -51,8 +51,46 @@ export function normalizeMenu(raw: Record<string, unknown>): SiteMenu {
   };
 }
 
+// MIRROR of frontend/lib/url.ts. Menu items become `<a href="{{ url }}">` in
+// templates/parts/header.html and footer.html, so a `javascript:` URL here runs on
+// the site's own origin — the origin that carries the /admin session cookie. The
+// render side is authoritative (the template engine applies the same policy), but
+// the CMS must not WRITE a link it knows the site will refuse to render.
+//
+// Separate build roots (Vite/TS here, Astro/TS there) mean no shared import — the
+// same arrangement as scripts/gen-redirects.mjs ↔ redirect-rules.ts. Keep in sync.
+export function isSafeUrl(url: string): boolean {
+  if (!url.trim()) return true; // a half-filled row is not yet a link
+  // TAB/LF/CR are stripped by the URL parser wherever they appear, and `\` is a path
+  // separator to it — so `/<TAB>/evil.example` and `/\evil.example` both resolve to
+  // another host despite looking root-relative. See frontend/lib/url.ts.
+  const u = url.replace(/[\t\n\r]/g, "");
+  if (/^(https?:|mailto:|tel:)/i.test(u)) return true;
+  if (u.startsWith("#")) return true;
+  return /^\/(?![/\\])/.test(u);
+}
+
+function unsafeUrls(model: SiteMenu): string[] {
+  const lists: (MenuItem[] | null)[] = [];
+  for (const loc of [model.header, model.footer]) lists.push(loc.desktop, loc.tablet, loc.mobile);
+  return lists
+    .flatMap((l) => l ?? [])
+    .map((i) => i.url)
+    .filter((u) => !isSafeUrl(u));
+}
+
 /** The JSON we persist to data/menu.json — the shape frontend/lib/site.ts reads. */
 export function serializeMenu(model: SiteMenu): { locations: { header: LocationMenu; footer: LocationMenu } } {
+  // Reject, don't warn: this is the one choke point every menu save goes through,
+  // and the caller (HeaderFooterView's SaveButton) surfaces the throw as a save
+  // error, so nothing is committed.
+  const bad = unsafeUrls(model);
+  if (bad.length) {
+    throw new Error(
+      `Unsafe menu link${bad.length > 1 ? "s" : ""}: ${bad.join(", ")}. ` +
+        "Use a path (/about), a full https:// URL, mailto:/tel:, or an #anchor.",
+    );
+  }
   return { locations: { header: { ...model.header }, footer: { ...model.footer } } };
 }
 

@@ -1,4 +1,5 @@
 import type { GitHubClient } from "./github";
+import { CONTENT_PREFIX, MEDIA_PREFIX, isDesignPath } from "./theme-fileset";
 
 // Prebuilt-theme support. A Lanza theme is a gzipped tarball:
 //
@@ -104,18 +105,41 @@ function bytesToB64(bytes: Uint8Array): string {
 const stripLead = (p: string) => p.replace(/^\.\//, "");
 
 // Theme bundles are UNTRUSTED uploads. A bundle commits to the repo, so a bad
-// path is an arbitrary-repo-write: traversal (`../`) could escape the tree, and
-// some prefixes escalate a "site theme" into CI/secret compromise. We reject:
-//   - traversal / absolute / NUL / backslash paths (malformed or escaping)
-//   - .git, .github (CI run → code execution)
-//   - functions/ (the gh proxy that injects the server-side GitHub token)
-//   - bot/ (the Telegram Worker + its secrets)
-// A theme has no legitimate reason to touch any of these. (Note: a full template
-// still ships build-time code — astro config, .astro pages — so applying one is
-// inherently trusting its author with the Pages build; that's why /admin sits
-// behind Cloudflare Access and the UI warns before applying.)
-const PROTECTED_PREFIXES = [".git/", ".github/", "functions/", "bot/"];
-
+// path is an arbitrary-repo-write. This is an ALLOW-list, and the allowed set is
+// exactly what backend/export.ts can PRODUCE: isDesignPath() from theme-fileset
+// (the design), plus the exporter's two opt-in "site dump" prefixes, content/ and
+// public/images/uploads/. One definition, both directions: nothing can be
+// imported that could not have been exported, and the export→re-import round trip
+// keeps working. The two dump prefixes are inert data — markdown entries (rendered
+// through frontend/lib/sanitize.ts) and media — not build inputs.
+//
+// It used to be a deny-list (".git/", ".github/", "functions/", "bot/"), which
+// left four things writable that are not design at all:
+//   - package.json      → a `postinstall`, or repointing the lanza-site dependency
+//                         at an arbitrary tarball. The Pages build command IS this
+//                         file's `build` script, so that is direct build execution,
+//                         and it also defeats the CMS's unsafe-version blocking.
+//   - astro.config.mjs  → imported by the build → build-time code execution.
+//   - lanza.config.json → decides who owns /admin (functions/admin/_middleware.ts
+//                         reads `adminLogin` from it). A theme shipping
+//                         "adminLogin":"attacker" hands over the CMS, the GitHub
+//                         proxy and the Cloudflare token on the next deploy. That is
+//                         a persistent AUTHORIZATION change, categorically worse
+//                         than the build-time execution a theme already implies.
+//   - data/schema.json  → compiled into build code by scripts/gen-content-config.mjs.
+//
+// data/schema.json stays IN the allow-list: shipping a content model is a real
+// theme feature (that is why the exporter packs it). What makes that safe is the
+// generator, which now validates every value that reaches a code position rather
+// than trusting the file — see scripts/gen-content-config.mjs.
+//
+// Residual, unchanged and accepted: the design itself is code — frontend/pages,
+// components and layouts are .astro compiled by the build — so applying a theme
+// still means trusting its author with the build. The point of the allow-list is
+// that it no longer means trusting them with WHO OWNS THE SITE. (The gate on
+// /admin is the session middleware in functions/admin/_middleware.ts —
+// Cloudflare Access, which an earlier version of this comment cited, is no longer
+// in the picture. See CLAUDE.md Rule 4.) The UI still warns before applying.
 function assertSafeRepoPath(rel: string): void {
   if (!rel || rel.includes("\0") || rel.includes("\\") || rel.startsWith("/")) {
     throw new Error(`Theme bundle has an illegal file path: "${rel}"`);
@@ -123,10 +147,12 @@ function assertSafeRepoPath(rel: string): void {
   if (rel.split("/").some((seg) => seg === "..")) {
     throw new Error(`Theme bundle path escapes the repo (..): "${rel}"`);
   }
-  for (const p of PROTECTED_PREFIXES) {
-    if (rel === p.slice(0, -1) || rel.startsWith(p)) {
-      throw new Error(`Theme may not write to a protected path: "${rel}"`);
-    }
+  const allowed =
+    isDesignPath(rel) || rel.startsWith(CONTENT_PREFIX) || rel.startsWith(MEDIA_PREFIX);
+  if (!allowed) {
+    throw new Error(
+      `Theme may only write design files — "${rel}" is outside the theme file set.`,
+    );
   }
 }
 
