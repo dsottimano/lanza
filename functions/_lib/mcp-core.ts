@@ -73,6 +73,34 @@ const obj = (
 
 const str = (description: string) => ({ type: "string", description });
 
+// Memoized per ContentClient, exactly like getCollections below and for the same
+// reason: resolveLocale calls this on EVERY write, so without it each create/update
+// paid an extra data/site.json fetch (up to two GitHub subrequests) on top of the
+// schema read it already does.
+const siteCache = new WeakMap<ContentClient, Promise<SiteFile>>();
+
+interface SiteFile {
+  defaultLocale: string;
+  locales: string[];
+}
+
+function readSiteFile(client: ContentClient): Promise<SiteFile> {
+  const cached = siteCache.get(client);
+  if (cached) return cached;
+  const p = (async () => {
+    const raw = await client.readRaw("data/site.json");
+    const site = raw
+      ? (JSON.parse(raw) as { defaultLocale?: string; locales?: Array<{ code: string }> })
+      : {};
+    return {
+      defaultLocale: site.defaultLocale ?? "en",
+      locales: (site.locales ?? []).map((l) => l.code),
+    };
+  })();
+  siteCache.set(client, p);
+  return p;
+}
+
 // `siteOrigin` defaults to null so the locale-safety path (resolveLocale) can ask
 // for locales without caring about the transport — URLs are not part of that answer.
 async function getSite(
@@ -86,13 +114,10 @@ async function getSite(
   productionBranch: string;
   workingBranch: string;
 }> {
-  const raw = await client.readRaw("data/site.json");
-  const site = raw
-    ? (JSON.parse(raw) as { defaultLocale?: string; locales?: Array<{ code: string }> })
-    : {};
+  const site = await readSiteFile(client);
   return {
-    defaultLocale: site.defaultLocale ?? "en",
-    locales: (site.locales ?? []).map((l) => l.code),
+    defaultLocale: site.defaultLocale,
+    locales: site.locales,
     liveUrl: siteOrigin ?? null,
     stagingUrl: stagingUrlFor(siteOrigin),
     productionBranch: BRANCH,
@@ -152,7 +177,8 @@ function entryFolder(col: CollectionDef, locale: string): string {
 // input, not a label — it must be a locale this site actually declares. Without
 // this, `locale: "../../.github/workflows"` writes CI config.
 async function resolveLocale(client: ContentClient, raw: unknown): Promise<string> {
-  const site = await getSite(client);
+  // readSiteFile, not getSite: this path only needs locales, and it's memoized.
+  const site = await readSiteFile(client);
   if (raw === undefined || raw === null || raw === "") return site.defaultLocale;
   const locale = String(raw);
   const known = site.locales.length ? site.locales : [site.defaultLocale];
@@ -282,7 +308,9 @@ export const TOOLS: ToolDef[] = [
           `"${path}" already exists. Use update_content to change it, or pick a different title.`,
         );
       }
-      const commit = await client.save(path, data, body, `Create ${path} via MCP`);
+      // exists() just proved there's no sha; passing null skips save()'s own lookup
+      // of the same endpoint.
+      const commit = await client.save(path, data, body, `Create ${path} via MCP`, null);
       return { created: path, commit, note: "Staged (not yet live). Call publish to make it public." };
     },
   },
@@ -382,7 +410,10 @@ async function callTool(
   }
   try {
     const result = await tool.run(args, client, siteOrigin);
-    return { content: [{ type: "text", text: JSON.stringify(result, null, 2) }] };
+    // Compact, NOT indent:2. Every byte here is a token the calling model pays for,
+    // and indentation was ~46% of a get_schema response (14.9k chars → 8.0k). Models
+    // parse minified JSON fine; this is the single largest saving on the wire.
+    return { content: [{ type: "text", text: JSON.stringify(result) }] };
   } catch (e) {
     const message = e instanceof Error ? e.message : String(e);
     return { content: [{ type: "text", text: `Error: ${message}` }], isError: true };

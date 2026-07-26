@@ -83,6 +83,18 @@ answering — that route isn't in the deployed bundle.
    version whose admin lacks a screen is the trap that bit twice on rental-model day.
    No tenant has 0.1.6 until it updates; `claude_test` was still answering `get_site`
    without `stagingUrl` on 0.1.5, which is what surfaced the whole gap.
+0b. **☐ Existing tenants have no staging build — patch their Pages projects.** Every
+   project created before broker `4de76c1` got a `production` deployment config and
+   nothing else, so preview builds ran without `NODE_VERSION` against
+   `engines.node >=22` and the `staging` branch never produced a deployment. The alias
+   falls through to the production artifact: `staging.<project>.pages.dev` returns
+   **200 serving main's content**, which reads as "my edit didn't save" when the edit is
+   safely staged. **This makes `get_site`'s `stagingUrl` actively misleading on those
+   tenants** — a stale 200 is worse than the null we're careful to return on custom
+   domains. Fix per project: Pages → Settings → Environment variables → **Preview**:
+   `NODE_VERSION=22`, then trigger one build of `staging`. `claude_test` needs this.
+   Found by driving a real edit through MCP and watching staging never change — no test
+   caught it, and none could have.
 1. **☑ Pre-package tenants retired.** `define-media-group`, `delete` and `delete22` are
    gone; `datadefine` now holds exactly one Lanza site, `claude_test` — thin,
    self-updating, onboarded through the wizard, and the MCP test target. No fat forks

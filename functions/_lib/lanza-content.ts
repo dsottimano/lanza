@@ -185,14 +185,20 @@ export class ContentClient {
 
   // Write a .md entry (create or update) to staging. Resolves the current sha so an
   // update never fails on a stale/missing sha (last-write-wins, like the CMS).
+  //
+  // `knownSha` lets a caller that ALREADY looked the path up skip the second lookup:
+  // create_content calls exists() first to refuse a clobber, which fetched the exact
+  // same endpoint this method would. Pass `null` for "I checked, it isn't there".
+  // Omit it and the lookup happens as before.
   async save(
     path: string,
     data: Record<string, unknown>,
     body: string,
     message: string,
+    knownSha?: string | null,
   ): Promise<string> {
     const content = encodeBase64(serializeFrontmatter(data, body));
-    const sha = await this.currentSha(path);
+    const sha = knownSha === undefined ? await this.currentSha(path) : (knownSha ?? undefined);
     const res = await this.gh(`contents/${encodePath(path)}`, {
       method: "PUT",
       body: JSON.stringify({ message, content, branch: WORKING_BRANCH, sha }),
