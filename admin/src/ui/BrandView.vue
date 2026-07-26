@@ -13,11 +13,13 @@ import {
   previewFontHref,
   COLOR_TOKENS,
   RADIUS_OPTIONS,
+  SCHEME_OPTIONS,
   FONT_CATALOG,
   FONT_IDS,
   PRESETS,
   type BrandConfig,
   type BrandColors,
+  type BrandPreset,
 } from "../backend/brand";
 import SaveButton from "./SaveButton.vue";
 import { reportError, clearError } from "../errors";
@@ -63,7 +65,11 @@ function setColor(key: keyof BrandColors, value: string) {
   if (HEX.test(value)) brand.colors[key] = value;
 }
 
-function applyPreset(p: BrandConfig) {
+// Field-by-field on purpose: a preset (and "reset to defaults") restyles the
+// palette/corners/motion/fonts and leaves everything else — today, `scheme` —
+// standing. Never assign the whole object, or applying a palette would quietly
+// drop a pinned light/dark choice on the next save.
+function applyPreset(p: BrandPreset) {
   brand.colors = { ...p.colors };
   brand.radius = p.radius;
   brand.motion = p.motion;
@@ -206,7 +212,7 @@ const fontOptions = FONT_IDS.map((id) => ({ id, label: FONT_CATALOG[id].label })
             </div>
           </section>
 
-          <!-- Corners + Motion -->
+          <!-- Corners + Motion + Color scheme -->
           <section class="card grid gap-5 p-5 sm:grid-cols-2">
             <div>
               <h2 class="mb-2 text-sm font-semibold text-zinc-900">Corners</h2>
@@ -241,6 +247,23 @@ const fontOptions = FONT_IDS.map((id) => ({ id, label: FONT_CATALOG[id].label })
                 </button>
               </div>
               <p class="mt-2 text-[0.68rem] text-zinc-400">Hover/press feedback on buttons, nav, and cards.</p>
+            </div>
+            <div>
+              <h2 class="mb-2 text-sm font-semibold text-zinc-900">Color scheme</h2>
+              <div class="segment">
+                <button
+                  v-for="s in SCHEME_OPTIONS"
+                  :key="s.value"
+                  class="segment-btn"
+                  :class="{ 'segment-btn--active': brand.scheme === s.value }"
+                  @click="brand.scheme = s.value"
+                >
+                  {{ s.label }}
+                </button>
+              </div>
+              <p class="mt-2 text-[0.68rem] text-zinc-400">
+                Auto follows each visitor's device setting. Light or Dark pins the site to one.
+              </p>
             </div>
           </section>
 

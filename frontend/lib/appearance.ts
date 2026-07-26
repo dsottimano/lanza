@@ -22,11 +22,15 @@ export interface BrandColors {
   border?: string;
 }
 
+/** "auto" follows the visitor's OS preference (the default); the others pin it. */
+export type ColorScheme = "auto" | "light" | "dark";
+
 export interface BrandConfig {
   colors?: BrandColors;
   radius?: string; // e.g. "2px" | "10px" | "18px"
   motion?: "on" | "off";
   fonts?: { heading?: string; body?: string }; // font-catalog ids
+  scheme?: ColorScheme;
 }
 
 export interface Appearance {
@@ -70,6 +74,51 @@ const COLOR_VAR: Record<keyof BrandColors, string> = {
   border: "--border",
 };
 
+// The tokens that DIFFER between site.css's `:root` and its
+// `@media (prefers-color-scheme: dark)` block — i.e. everything a pinned scheme
+// has to state outright. The rest of the palette is either mode-independent or
+// derived from these (`--bg: var(--paper)`, the back-compat alias block), so it
+// follows for free. Pinning only a subset is the trap: the unpinned half would
+// still flip, landing e.g. dark-mode --text-secondary on a light page.
+//
+// ⚠️  MIRROR: these values are frontend/styles/site.css's two token blocks,
+// repeated here because an inline style is the only thing that beats a media
+// query without a theme attribute. Edit both files together.
+const SCHEME_TOKENS: Record<Exclude<ColorScheme, "auto">, Record<string, string>> = {
+  light: {
+    "--paper": "#f3f1ea",
+    "--paper-card": "#fbf9f3",
+    "--ink": "#201d1b",
+    "--ink-deep": "#17140f",
+    "--accent": "#e4431b",
+    "--accent-bright": "#ff5a2c",
+    "--surface": "#eae7dd",
+    "--muted": "#6b655e",
+    "--border": "#ddd8cc",
+    "--rule": "#ddd8cc",
+    "--text-secondary": "#4a453f",
+    "--deed-green": "#17140f", // :root aliases this one to --ink-deep
+    "--deed-green-deep": "#0f0d0a",
+    "--on-accent": "#ffffff",
+  },
+  dark: {
+    "--paper": "#17140f",
+    "--paper-card": "#221e19",
+    "--ink": "#f3f1ea",
+    "--ink-deep": "#0f0d0a",
+    "--accent": "#ff5a2c",
+    "--accent-bright": "#ff7a4d",
+    "--surface": "#221e19",
+    "--muted": "#a49d92",
+    "--border": "#34302a",
+    "--rule": "#34302a",
+    "--text-secondary": "#cfc9bd",
+    "--deed-green": "#26201b",
+    "--deed-green-deep": "#1c1813",
+    "--on-accent": "#17140f",
+  },
+};
+
 const HEX = /^#(?:[0-9a-fA-F]{3}|[0-9a-fA-F]{6})$/;
 const LEN = /^[0-9.]+(?:px|rem|em|%)$/; // radius: a plain length only
 
@@ -86,6 +135,15 @@ export interface ResolvedBrand {
 export function resolveBrand(appearance: Appearance | null | undefined): ResolvedBrand {
   const brand = appearance?.brand ?? {};
   const decls: string[] = [];
+
+  // A pinned scheme opts out of the automatic light↔dark flip by stating that
+  // mode's whole token set inline, which beats site.css's media query (inline
+  // style > stylesheet). Emitted FIRST so an explicit brand colour still wins.
+  // "auto" — the default, and what every site predating this field has — emits
+  // nothing, so those sites render exactly as they did before.
+  if (brand.scheme === "light" || brand.scheme === "dark") {
+    for (const [v, hex] of Object.entries(SCHEME_TOKENS[brand.scheme])) decls.push(`${v}:${hex}`);
+  }
 
   const colors = brand.colors ?? {};
   for (const key of Object.keys(COLOR_VAR) as (keyof BrandColors)[]) {

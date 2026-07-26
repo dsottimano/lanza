@@ -22,12 +22,19 @@ export interface BrandColors {
   border: string;
 }
 
+/** "auto" follows the visitor's OS preference (the default); the others pin it. */
+export type ColorScheme = "auto" | "light" | "dark";
+
 export interface BrandConfig {
   colors: BrandColors;
   radius: string;
   motion: "on" | "off";
   fonts: { heading: string; body: string };
+  scheme: ColorScheme;
 }
+
+/** A palette preset is everything BUT the scheme — see PRESETS. */
+export type BrandPreset = Omit<BrandConfig, "scheme">;
 
 // The six palette swatches, in render order, with a short "what it paints" hint.
 export const COLOR_TOKENS: { key: keyof BrandColors; label: string; hint: string }[] = [
@@ -37,6 +44,14 @@ export const COLOR_TOKENS: { key: keyof BrandColors; label: string; hint: string
   { key: "muted", label: "Muted", hint: "Meta, captions, nav" },
   { key: "accent", label: "Accent", hint: "Links, buttons, marks" },
   { key: "border", label: "Border", hint: "Rules + dividers" },
+];
+
+// Light/dark. "Auto" is the historic behaviour — the site follows the visitor's
+// OS setting; the other two pin it. Render side: frontend/lib/appearance.ts.
+export const SCHEME_OPTIONS: { label: string; value: ColorScheme }[] = [
+  { label: "Auto", value: "auto" },
+  { label: "Light", value: "light" },
+  { label: "Dark", value: "dark" },
 ];
 
 export const RADIUS_OPTIONS: { label: string; value: string }[] = [
@@ -98,6 +113,7 @@ export const LANZA_DEFAULTS: BrandConfig = {
   radius: "2px",
   motion: "on",
   fonts: { heading: "jost", body: "jost" },
+  scheme: "auto",
 };
 
 export function defaultBrand(): BrandConfig {
@@ -107,7 +123,10 @@ export function defaultBrand(): BrandConfig {
 // One-click palettes. The first IS the Lanza wordmark and now equals the base
 // (LANZA_DEFAULTS) — Ink #201d1b on Paper #f3f1ea, Jost, sharp corners, the hot
 // launch accent #e4431b (the ↗ arrow); see /home/…/lanza-brand.
-export const PRESETS: { name: string; brand: BrandConfig }[] = [
+// A preset carries no `scheme`: light/dark is an axis of its own, so applying a
+// palette must not silently repoint it (that's also what keeps the editor's
+// round-trip lossless — see applyPreset in BrandView.vue).
+export const PRESETS: { name: string; brand: BrandPreset }[] = [
   {
     name: "Lanza brand",
     brand: {
@@ -172,6 +191,7 @@ export async function loadAppearance(client: GitHubClient): Promise<LoadedAppear
         heading: raw.fonts?.heading && FONT_CATALOG[raw.fonts.heading] ? raw.fonts.heading : seed.fonts.heading,
         body: raw.fonts?.body && FONT_CATALOG[raw.fonts.body] ? raw.fonts.body : seed.fonts.body,
       },
+      scheme: raw.scheme === "light" || raw.scheme === "dark" ? raw.scheme : seed.scheme,
     },
   };
 }

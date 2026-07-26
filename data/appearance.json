@@ -1,4 +1,7 @@
 {
   "theme": "freehold",
-  "logo": ""
+  "logo": "",
+  "brand": {
+    "scheme": "light"
+  }
 }
