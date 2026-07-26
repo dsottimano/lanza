@@ -7,8 +7,11 @@
 
 Status legend: ☑ done · ◐ in progress · ☐ todo
 
-**Everything is committed, pushed, and deployed.** Typecheck clean in both repos;
-`npm test` 37/37 + admin 47/47 in `lanza`, 31/31 in `lanza-broker`.
+**Everything is committed and pushed.** Typecheck clean in both repos; `npm test`
+39/39 + admin 47/47 in `lanza`, 31/31 in `lanza-broker`.
+
+**But NOT published** — see "Next up" #0. Two tenant-facing changes sit in `main` and in
+no tenant's `node_modules`. Publishing needs Dave's OTP; the agent cannot do it.
 
 ## What changed today — the rental model went live
 
@@ -66,10 +69,18 @@ answering — that route isn't in the deployed bundle.
 
 ## ☐ Next up
 
-1. **☐ Migrate or retire the pre-package tenants.** `datadefine/define-media-group`
-   and `datadefine/delete` are fat forks with no `lanza-site` dependency. Their CMS
-   correctly says "Updates aren't available for this site", and the fan-out reports
-   them `unmanaged` — it will never fix them. Either re-onboard or delete.
+0. **☐ PUBLISH `lanza-site`.** Two tenant-facing changes are committed and unpublished,
+   so no tenant has them: the Brand `scheme` key (`c315646`) and `get_site` returning
+   `stagingUrl`/`liveUrl`. Needs Dave's OTP (`npm publish --otp=…`). lanzacms.com already
+   has both — it builds from this repo, not the package.
+1. **☐ Retire the pre-package tenants — BLOCKED ON DAVE.** `datadefine/define-media-group`
+   and `datadefine/delete` are fat forks with no `lanza-site` dependency; the fan-out
+   reports them `unmanaged` and will never fix them. **Decision made: delete both, and a
+   replacement thin tenant (`datadefine/claude_test`) is already onboarded and healthy.**
+   The `dsottimano` gh token only has `pull` on them — `datadefine` is a separate User
+   account, so deletion must run as that login (`gh auth login`, then `gh repo delete`),
+   plus their Pages projects. `define-media-group` is already dead at the DNS level
+   (`/api/mcp` → connection refused), which is what broke the old `dmg` MCP entry.
 2. **☑ Option B — CLOSED, deliberately not built** (2026-07-25). Lanza will not hold
    per-tenant Cloudflare tokens: a broker token store would put `page.write` on the
    whole fleet in one namespace. The store-nothing alternative was **verified
@@ -87,11 +98,46 @@ answering — that route isn't in the deployed bundle.
    dead-ends and never writes the connection record. Reproduced without our code.
 5. **☐ ChatGPT (developer mode) and Codex as MCP clients.** Only Claude Code has been
    tried, and it works.
+6. **☐ Nothing in the product tells a tenant their MCP endpoint exists.** Grepped:
+   `admin/src/` has **zero** mentions of `api/mcp`, MCP or connectors, and so do
+   `frontend/` and `content/` — including `/agents`. The only mentions anywhere are
+   `docs/mcp-server.md` and `docs/security-model.md`, repo files a customer never sees.
+   Dave built it and still had to ask how to connect. Fix is a **Settings → Agents**
+   pane, same shape as Settings → Software: the site's own `/api/mcp` URL, the
+   multi-site URL, a copy button, and the sign-in-as-the-right-GitHub-account warning
+   (`mcp-server.md:177` — GitHub silently reuses a live session, so re-authenticating
+   does *not* switch accounts).
 
 ---
 
 ## ☑ Shipped today (don't re-litigate)
 
+- **☑ Option B closed + Cloudflare features made opt-in** (`6d0ca98`, broker `bf3fb5c`).
+  Detail in "Next up" #2. CF OAuth scopes trimmed to four in code **and on the CF client
+  (Dave did the dashboard side)**; `offline_access` and the unreachable `refreshCfToken()`
+  deleted — a ~16h access token in a 3600s cookie meant the refresh branch could never fire.
+- **☑ Brand `scheme: "auto" | "light" | "dark"`** (`c315646`). lanzacms.com was never dark;
+  `site.css`'s `prefers-color-scheme` flip had no opt-out, and `site.css` ships in the
+  package so it couldn't just be gated. Pinning a mode emits all 14 differing tokens
+  inline (inline beats a media query — no `data-theme` revival). Tenants without the key
+  are byte-identical, verified by executing `resolveBrand`, not by inspection.
+  lanzacms.com set to `"light"` (body text 14.83:1).
+- **☑ `get_site` now returns `liveUrl` + `stagingUrl`.** Found by driving the MCP from a
+  real client: the staging URL existed nowhere in the protocol, so the agent inferred
+  Cloudflare's branch-alias convention and curl'd it. The whole model is
+  write-to-staging-then-publish, so an agent that can't name the staging URL can't offer a
+  review step. Derived from the request origin; **null on a custom domain**, where the
+  alias lives on pages.dev under a project name the tenant can't learn (`PAGES_PROJECT` is
+  now opt-in). A wrong URL is worse than an absent one.
+- **☑ MCP verified end-to-end through the multi-site router.** `connect.lanzacms.com/api/mcp`
+  drove `list_sites` → `get_site` → collections against `datadefine/claude_test`. The
+  session-12 failure mode (green transport, dead content tools) is not present.
+  Config: the dead single-site `dmg` entry is removed; `lanza` moved to **user scope**, so
+  it works from any directory instead of only inside this repo.
+- **☑ Wizard identity strip + width** (broker `1f899e0`). The two accounts ran together as
+  one line of grey text; each is now a labelled chip, and the values link to the GitHub
+  account, the repo, and the Cloudflare account dashboard. Four hardcoded max-widths
+  became `--shell-width` / `--card-width`.
 - **☑ `@lanza/site` P4/P5 — the whole rental model.** The extraction plan had been
   code-complete since 2026-07-04 and simply never published; TODO called it
   "deferred post-v1", which was wrong. Publishing it is what surfaced everything below.
@@ -140,10 +186,10 @@ Full detail in `docs/security-model.md` §5.
   wizard needs `page.write` in the browser flow to create the Pages project, so the
   cookie can't be removed outright. Accepted as-is; Option B is closed (see above).
 - ☑ **CF OAuth scopes trimmed** to `account-settings.read`, `user-details.read`,
-  `page.read`, `page.write` — four, each with a caller. Code only; the **CF client still
-  lists the old scopes**, which is harmless and safe to trim now (Dave's to do). Keep
-  `user-details.read` — `describeIdentity` (`_lib/cf-accounts.ts`) needs it for the
-  wizard's identity strip. Do NOT reuse the nested checkout's trim; re-derive from canonical.
+  `page.read`, `page.write` — four, each with a caller. **Done on both sides**: the code
+  (`bf3fb5c`) and the Cloudflare OAuth client (Dave, dashboard). Keep `user-details.read`
+  — `describeIdentity` (`_lib/cf-accounts.ts`) needs it for the wizard's identity strip.
+  Do NOT reuse the nested checkout's trim; re-derive from canonical.
 - ☐ **Proxy relays upstream headers verbatim** (inherits GitHub's `Cache-Control` /
   `ACAO: *`). Latent unless the session cookie moves to `SameSite=None`.
 - ☐ **No `Origin` validation on the MCP transport** (broker router included).

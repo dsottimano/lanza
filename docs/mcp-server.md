@@ -118,7 +118,7 @@ go live. New entries are written `draft: false` (visible once published); pass
 
 | Tool | What it does |
 |---|---|
-| `get_site` | Locales + default locale. |
+| `get_site` | Locales + default locale, `liveUrl`, `stagingUrl`, and the two branch names. `stagingUrl` is Cloudflare's branch alias (`staging.<project>.pages.dev`), derived from the request origin — **null on a custom domain**, where the alias stays on pages.dev under a project name the tenant can't learn (`PAGES_PROJECT` is opt-in). Null rather than a guess: a URL that 404s reads as "the write failed". |
 | `list_collections` | Collections (posts, pages, …): folder, localized?, has-body? |
 | `get_schema` | Full content model (`data/schema.json`). |
 | `list_content` | List entry paths in a collection (+ locale). |

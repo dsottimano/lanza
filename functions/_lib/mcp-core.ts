@@ -9,9 +9,37 @@
 // Tools mirror the Vue CMS (admin/src/backend/github.ts): every write lands on the
 // `staging` branch; `publish` merges staging→main to go live.
 import { ContentClient, GitHubError, slugify, assertSafePath } from "./lanza-content";
+import { BRANCH, WORKING_BRANCH } from "./gh-proxy";
 
 export const SERVER_INFO = { name: "lanza-cms", title: "Lanza CMS", version: "0.1.0" };
 export const SUPPORTED_PROTOCOL = "2025-06-18";
+
+// Where the agent should send someone to REVIEW before publishing.
+//
+// Every write lands on `staging` and nothing is public until publish, so an agent
+// that can't name the staging URL can't offer a review step — each client
+// otherwise re-derives Cloudflare's branch-alias convention by hand, which breaks
+// silently the day a branch is renamed.
+//
+// Cloudflare serves a branch at `<branch>.<project>.pages.dev`. The only thing this
+// module knows about its own address is the request origin, so that is what we
+// derive from: exactly `<project>.pages.dev` (three labels) means we can name the
+// alias. A custom domain CANNOT — the alias stays on pages.dev under a project name
+// we have no way to learn, since PAGES_PROJECT is an opt-in secret most tenants
+// never set. Report null there rather than hand back a URL that 404s; a wrong URL
+// is worse than an absent one.
+export function stagingUrlFor(siteOrigin: string | null | undefined): string | null {
+  if (!siteOrigin) return null;
+  let host: string;
+  try {
+    host = new URL(siteOrigin).hostname;
+  } catch {
+    return null;
+  }
+  const labels = host.split(".");
+  const isPagesDev = labels.length === 3 && host.endsWith(".pages.dev");
+  return isPagesDev ? `https://${WORKING_BRANCH}.${host}` : null;
+}
 
 // ---------------------------------------------------------------------------
 // Tool definitions. `inputSchema` is JSON Schema (hand-written — no MCP SDK in the
@@ -19,11 +47,18 @@ export const SUPPORTED_PROTOCOL = "2025-06-18";
 // staging/publish and draft semantics explicitly.
 // ---------------------------------------------------------------------------
 
+// `siteOrigin` is the origin this request arrived on, or null when the transport
+// can't say. Only get_site uses it; tools that don't need it just declare two
+// params, which still satisfies this signature.
 interface ToolDef {
   name: string;
   description: string;
   inputSchema: Record<string, unknown>;
-  run(args: Record<string, unknown>, client: ContentClient): Promise<unknown>;
+  run(
+    args: Record<string, unknown>,
+    client: ContentClient,
+    siteOrigin: string | null,
+  ): Promise<unknown>;
 }
 
 const obj = (
@@ -38,9 +73,18 @@ const obj = (
 
 const str = (description: string) => ({ type: "string", description });
 
-async function getSite(client: ContentClient): Promise<{
+// `siteOrigin` defaults to null so the locale-safety path (resolveLocale) can ask
+// for locales without caring about the transport — URLs are not part of that answer.
+async function getSite(
+  client: ContentClient,
+  siteOrigin: string | null = null,
+): Promise<{
   defaultLocale: string;
   locales: string[];
+  liveUrl: string | null;
+  stagingUrl: string | null;
+  productionBranch: string;
+  workingBranch: string;
 }> {
   const raw = await client.readRaw("data/site.json");
   const site = raw
@@ -49,6 +93,10 @@ async function getSite(client: ContentClient): Promise<{
   return {
     defaultLocale: site.defaultLocale ?? "en",
     locales: (site.locales ?? []).map((l) => l.code),
+    liveUrl: siteOrigin ?? null,
+    stagingUrl: stagingUrlFor(siteOrigin),
+    productionBranch: BRANCH,
+    workingBranch: WORKING_BRANCH,
   };
 }
 
@@ -142,9 +190,9 @@ export const TOOLS: ToolDef[] = [
   {
     name: "get_site",
     description:
-      "Get this site's locales and default locale. Call first — locale codes here are the ones the other tools accept.",
+      "Get this site's locales, default locale, and URLs. Call first — locale codes here are the ones the other tools accept. `stagingUrl` is where unpublished changes can be reviewed before calling publish; it is null when the site is on a custom domain, where the staging alias can't be derived.",
     inputSchema: obj({}),
-    run: (_args, client) => getSite(client),
+    run: (_args, client, siteOrigin) => getSite(client, siteOrigin),
   },
   {
     name: "list_collections",
@@ -324,6 +372,7 @@ export function rpcError(id: RpcMessage["id"], code: number, message: string) {
 async function callTool(
   params: Record<string, unknown> | undefined,
   client: ContentClient,
+  siteOrigin: string | null,
 ): Promise<Record<string, unknown>> {
   const name = params?.name as string | undefined;
   const args = (params?.arguments as Record<string, unknown>) ?? {};
@@ -332,7 +381,7 @@ async function callTool(
     return { content: [{ type: "text", text: `Unknown tool: ${name}` }], isError: true };
   }
   try {
-    const result = await tool.run(args, client);
+    const result = await tool.run(args, client, siteOrigin);
     return { content: [{ type: "text", text: JSON.stringify(result, null, 2) }] };
   } catch (e) {
     const message = e instanceof Error ? e.message : String(e);
@@ -345,6 +394,7 @@ async function callTool(
 export async function handleMessage(
   msg: RpcMessage,
   client: ContentClient,
+  siteOrigin: string | null = null,
 ): Promise<Record<string, unknown> | null> {
   // `null` is valid JSON, so it reaches here and would throw on destructuring —
   // a 500 (and, in a batch, one bad element discarding every good response)
@@ -375,7 +425,7 @@ export async function handleMessage(
     case "tools/list":
       return { jsonrpc: "2.0", id, result: { tools: TOOL_LIST } };
     case "tools/call":
-      return { jsonrpc: "2.0", id, result: await callTool(params, client) };
+      return { jsonrpc: "2.0", id, result: await callTool(params, client, siteOrigin) };
     default:
       return rpcError(id, -32601, `Method not found: ${method}`);
   }

@@ -131,14 +131,16 @@ export const onRequest = async (context: { request: Request; env: Env }): Promis
 
   const client = new ContentClient(repo, githubToken);
 
+  // `origin` is this site's own address (the broker router forwards to the tenant,
+  // so it stays the tenant's). get_site derives the staging URL from it.
   // Streamable HTTP accepts a single message or a batch (array).
   if (Array.isArray(payload)) {
-    const responses = (await Promise.all(payload.map((m) => handleMessage(m as RpcMessage, client)))).filter(
-      (r): r is Record<string, unknown> => r !== null,
-    );
+    const responses = (
+      await Promise.all(payload.map((m) => handleMessage(m as RpcMessage, client, origin)))
+    ).filter((r): r is Record<string, unknown> => r !== null);
     return responses.length ? jsonResponse(responses) : jsonResponse(null, 202);
   }
 
-  const response = await handleMessage(payload as RpcMessage, client);
+  const response = await handleMessage(payload as RpcMessage, client, origin);
   return response ? jsonResponse(response) : jsonResponse(null, 202);
 };

@@ -5,7 +5,7 @@
 // Run: node --experimental-strip-types functions/_lib/mcp-core.test.mjs
 import { test } from "node:test";
 import assert from "node:assert/strict";
-import { handleMessage, TOOL_LIST } from "./mcp-core.ts";
+import { handleMessage, TOOL_LIST, stagingUrlFor } from "./mcp-core.ts";
 import { ContentClient } from "./lanza-content.ts";
 
 const REPO = { owner: "o", name: "n" };
@@ -114,8 +114,45 @@ test("unknown method → -32601", async () => {
 
 test("get_site reads locales from data/site.json", async () => {
   fakeGitHub({ "data/site.json": SITE });
-  const r = await handleMessage({ jsonrpc: "2.0", id: 4, method: "tools/call", params: { name: "get_site" } }, client());
-  assert.deepEqual(toolData(r), { defaultLocale: "en", locales: ["en", "es"] });
+  const r = await handleMessage(
+    { jsonrpc: "2.0", id: 4, method: "tools/call", params: { name: "get_site" } },
+    client(),
+    "https://proj.pages.dev",
+  );
+  assert.deepEqual(toolData(r), {
+    defaultLocale: "en",
+    locales: ["en", "es"],
+    liveUrl: "https://proj.pages.dev",
+    stagingUrl: "https://staging.proj.pages.dev",
+    productionBranch: "main",
+    workingBranch: "staging",
+  });
+});
+
+// Without an origin (a transport that can't say) the URLs are null, not guessed.
+test("get_site reports null URLs when the transport gives no origin", async () => {
+  fakeGitHub({ "data/site.json": SITE });
+  const r = await handleMessage({ jsonrpc: "2.0", id: 41, method: "tools/call", params: { name: "get_site" } }, client());
+  const data = toolData(r);
+  assert.equal(data.liveUrl, null);
+  assert.equal(data.stagingUrl, null);
+});
+
+// A wrong staging URL is worse than an absent one: the agent would send someone to
+// review changes on a 404 and they'd conclude the write silently failed.
+test("stagingUrlFor derives a branch alias only where one can exist", () => {
+  assert.equal(stagingUrlFor("https://proj.pages.dev"), "https://staging.proj.pages.dev");
+  // Custom domain — the alias lives on pages.dev under a project name we can't know.
+  assert.equal(stagingUrlFor("https://example.com"), null);
+  assert.equal(stagingUrlFor("https://www.example.com"), null);
+  // Already on a branch alias: prefixing again would give staging.staging.…
+  assert.equal(stagingUrlFor("https://staging.proj.pages.dev"), null);
+  // A host merely ENDING in the string isn't Cloudflare's.
+  assert.equal(stagingUrlFor("https://evil-pages.dev"), null);
+  assert.equal(stagingUrlFor("https://notpages.dev"), null);
+  assert.equal(stagingUrlFor(null), null);
+  assert.equal(stagingUrlFor(""), null);
+  assert.equal(stagingUrlFor("not a url"), null);
 });
 
 test("list_collections returns the folder collections, not the files ones", async () => {
