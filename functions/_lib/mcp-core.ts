@@ -41,6 +41,25 @@ export function stagingUrlFor(siteOrigin: string | null | undefined): string | n
   return isPagesDev ? `https://${WORKING_BRANCH}.${host}` : null;
 }
 
+// What every write tool says afterwards. Two facts an agent cannot infer: WHERE the
+// change can be seen, and that it will NOT be there yet. A Pages build takes 4-6
+// minutes, and checking inside that window and reading "unchanged" as "broken" has
+// produced two false bug hunts in this codebase — both by agents, not users. Saying
+// it in the response is cheaper than either of them was.
+function stagedNote(siteOrigin: string | null): { note: string; reviewUrl?: string } {
+  const staging = stagingUrlFor(siteOrigin);
+  if (!staging) {
+    return { note: "Staged, not yet public. Call publish to make it live." };
+  }
+  return {
+    note:
+      "Staged, not yet public. Call publish to make it live. Review it first at reviewUrl — " +
+      "a Cloudflare build takes about 4-6 minutes, so the page will still show the old " +
+      "content until then. That delay is normal and is not a failed write.",
+    reviewUrl: staging,
+  };
+}
+
 // ---------------------------------------------------------------------------
 // Tool definitions. `inputSchema` is JSON Schema (hand-written — no MCP SDK in the
 // Workers runtime). Descriptions are the agent's only contract, so they carry the
@@ -291,7 +310,7 @@ export const TOOLS: ToolDef[] = [
       },
       ["collection", "title"],
     ),
-    run: async (args, client) => {
+    run: async (args, client, siteOrigin) => {
       const col = await resolveCollection(client, String(args.collection));
       const title = String(args.title);
       const locale = await resolveLocale(client, args.locale);
@@ -311,7 +330,7 @@ export const TOOLS: ToolDef[] = [
       // exists() just proved there's no sha; passing null skips save()'s own lookup
       // of the same endpoint.
       const commit = await client.save(path, data, body, `Create ${path} via MCP`, null);
-      return { created: path, commit, note: "Staged (not yet live). Call publish to make it public." };
+      return { created: path, commit, ...stagedNote(siteOrigin) };
     },
   },
   {
@@ -330,13 +349,13 @@ export const TOOLS: ToolDef[] = [
       },
       ["path"],
     ),
-    run: async (args, client) => {
+    run: async (args, client, siteOrigin) => {
       const path = await assertEntryPath(client, String(args.path));
       const current = await client.read(path);
       const merged = { ...current.data, ...((args.frontmatter as Record<string, unknown>) ?? {}) };
       const body = args.body_html !== undefined ? String(args.body_html) : current.body;
       const commit = await client.save(path, merged, body, `Update ${path} via MCP`);
-      return { updated: path, commit, note: "Staged (not yet live). Call publish to make it public." };
+      return { updated: path, commit, ...stagedNote(siteOrigin) };
     },
   },
   {
@@ -346,10 +365,10 @@ export const TOOLS: ToolDef[] = [
       { path: str("Repo path of the entry to delete."), message: str("Optional commit message.") },
       ["path"],
     ),
-    run: async (args, client) => {
+    run: async (args, client, siteOrigin) => {
       const path = await assertEntryPath(client, String(args.path));
       await client.remove(path, args.message ? String(args.message) : `Delete ${path} via MCP`);
-      return { deleted: path, note: "Staged (not yet live). Call publish to make it public." };
+      return { deleted: path, ...stagedNote(siteOrigin) };
     },
   },
   {

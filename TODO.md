@@ -91,40 +91,36 @@ answering — that route isn't in the deployed bundle.
       UI, and only after step 4. Moving the floor onto a version whose admin lacks a
       screen is the trap that bit twice on rental-model day. **0.1.6 changed the CMS UI**
       (Auto/Light/Dark in the Brand card), so the floor is owed and currently at 0.1.5.
-0b. **☐ The staging branch never builds — CAUSE STILL UNCONFIRMED. Diagnose before
-   fixing again.**
+0b. **☑ RESOLVED — there was never a staging bug. It was build latency with no
+   feedback.** Kept as a worked example of how two confident wrong diagnoses happened.
 
-   **The symptom is certain.** A commit lands on `staging`, and minutes later
-   `staging.<project>.pages.dev` still serves **main's content, byte-identical**
-   (same md5), returning 200. So Cloudflare has no staging deployment and the branch
-   alias falls through to the production artifact. Found by driving a real edit through
-   MCP and watching the URL never change — no test caught it and none could have.
+   **Verified on `datadefine/mcp-test` (2026-07-26):** after an MCP edit pushed a commit
+   to `staging`, `staging.<project>.pages.dev` serves **its own build** — 200, md5
+   `5e1db573`, 2607 bytes against production's `219a2a9e`, 2420 bytes. Previews were
+   enabled and working the entire time. No broker change was ever needed.
 
-   **Why it matters more than it looks:** `get_site` hands agents that URL as the place
-   to review before publishing. A stale 200 is worse than the `null` we carefully return
-   on custom domains — it reads as "my edit didn't save" when the edit is sitting safely
-   on staging. Shipped in 0.1.6+, so it's live and wrong on every affected tenant.
+   **How this got misdiagnosed twice.** A Pages build takes **4–6 minutes**. Checks kept
+   landing inside that window and reading "not built yet" as "never builds":
+   1. On `claude_test`, staging was checked ~4.5 min after the commit, looked unchanged,
+      and was called a permanent hole. → produced broker `4de76c1`, blaming a missing
+      `preview` entry in `deployment_configs`. **Wrong** — the template ships `.nvmrc: 22`,
+      which Pages honours, so preview builds always had Node 22. Commit is harmless
+      (explicit beats default) but fixed nothing; **its message overstates and should not
+      be trusted.**
+   2. On a fresh `mcp-test`, staging 404'd moments after onboarding — because no preview
+      build existed *yet*. → produced the `preview_deployment_setting` hypothesis.
+      **Also wrong.** The first push to the branch built it normally.
 
-   **A first diagnosis was WRONG — don't repeat it.** Broker `4de76c1` added a `preview`
-   entry to `deployment_configs`, on the theory that preview builds ran without
-   `NODE_VERSION` against `engines.node >=22`. But the template ships **`.nvmrc: 22`**,
-   which Pages honours, so preview builds already had Node 22. That commit is harmless
-   and probably worth keeping, but it is **not** established as the fix.
+   **The lesson, and it is the same one as session 12:** both errors came from measuring
+   an async system before it finished and treating the reading as final. A 404 or a stale
+   page during a known 4–6 minute build window is not evidence of anything. Wait for the
+   build, or check the Deployments tab for whether a build was *attempted*, before
+   theorising about a cause.
 
-   **Leading hypothesis:** preview deployments aren't enabled on the project at all.
-   `createProject` (`lanza-broker/functions/api/onboard/deploy.ts`) sets `source.config`
-   to `{owner, repo_name, production_branch, deployments_enabled}` and never sets
-   `preview_deployment_setting`, so the project takes whatever Cloudflare defaults to —
-   possibly `none`.
-
-   **The experiment that settles it**, on the next freshly onboarded tenant: open the
-   Pages project's **Deployments** tab and look for a `staging` build.
-   - *Never attempted* → previews are disabled; fix belongs in `source.config`
-     (`preview_deployment_setting`), not `deployment_configs`.
-   - *Attempted and failed* → read the build log; the `4de76c1` theory may yet be right.
-
-   Then: fix the broker for new projects, patch existing ones, and **correct `4de76c1`'s
-   commit message claim** rather than leaving a confident wrong answer in the history.
+   **What's actually owed is feedback, not a fix** — see the build-progress item: the
+   wizard says "Sit tight" with a bare `deploy` token for 4–6 minutes, and nothing
+   anywhere tells a user (or an agent) that a staging edit takes minutes to appear. That
+   missing signal is what cost this session two false bug hunts.
 1. **☑ Pre-package tenants retired.** `define-media-group`, `delete` and `delete22` are
    gone; `datadefine` now holds exactly one Lanza site, `claude_test` — thin,
    self-updating, onboarded through the wizard, and the MCP test target. No fat forks
