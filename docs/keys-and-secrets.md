@@ -102,8 +102,12 @@ Why separate: login must be scopeless, because a login credential that could wri
 repos would make every `/admin` visit a repo-write grant. Repo creation genuinely needs
 `public_repo`. One client cannot be both.
 
-**Neither user token is ever persisted.** The only GitHub credential that outlives a
-request is the App's own private key (§4).
+**Neither user token is ever persisted.** On the broker, the only GitHub credential
+that outlives a request is the App's own private key (§4).
+
+**The Telegram bot is the exception, and it is outside the broker.** It carries a
+standing fine-grained PAT with `Contents: read+write` on `dsottimano/lanza`, writing to
+`main`. It is the one long-lived repo-write credential in the system — see §6.
 
 ---
 
@@ -212,7 +216,25 @@ debugging. That is a real loose end.
 | `CLOUDFLARE_OAUTH_CLIENT_ID` / `_SECRET` | OAuth client | `api/auth/cf/*` | Obtain Cloudflare tokens as consenting users. |
 | `GH_APP_SLUG` | plain (default `lanza-cms`) | `onboard/oauth/callback.ts` | None. |
 | `TEMPLATE_OWNER` / `TEMPLATE_REPO` | plain | `_lib/gh-app.ts` | None. |
-| `ALLOWED_TENANT_ORIGINS` | plain, comma-separated | `api/token.ts` | Widens which origins may mint. Keep tight. |
+| `ALLOWED_TENANT_ORIGINS` | plain, comma-separated | `api/token.ts` | Widens which origins may mint. Keep tight, and **scope each entry to its repo** (`owner/repo=https://origin`) — a bare origin applies to every repo. |
+| `FANOUT_SECRET` | plain bearer | `api/admin/fanout.ts` | **Fleet-wide.** One header value plus `{"apply":true}` writes `package.json` on every repo the App can reach, including strangers'. No rate limit, no audit trail. Unset = endpoint disabled (503), which is the safe default. |
+
+### Bot (Cloudflare Worker `telegram-bot`, `wrangler secret put`)
+
+Absent from this document until 2026-07-26, which mattered: §1 states "the only GitHub
+credential that outlives a request is the App's own private key". **That is false while
+the bot is deployed.**
+
+| Name | Kind | Consumer | Leak impact |
+|---|---|---|---|
+| `BOT_TOKEN` | Telegram bot token | `bot/src/index.ts` | Full control of the bot: read every allow-listed chat, post as it. |
+| `BOT_INFO` | `getMe` JSON | `bot/src/index.ts` | None — public metadata. |
+| `WEBHOOK_SECRET` | plain bearer | `bot/src/index.ts` | Drive the bot's draft-creation path directly, bypassing Telegram. |
+| `GITHUB_TOKEN` | fine-grained PAT | `bot/src/index.ts` | **The only long-lived standing repo-write credential in the system.** `Contents: read+write` on `dsottimano/lanza`, targeting `main` — the branch Astro builds from. Everything else was deliberately engineered into per-request installation tokens; this one was not. |
+
+Rotate the bot PAT on age alone: unlike the broker's installation tokens it has no
+natural expiry, and nothing else in §7 covers it. Consider pointing `GITHUB_BRANCH` at
+`staging` so the bot cannot write to `main` at all.
 
 ### Tenant
 
