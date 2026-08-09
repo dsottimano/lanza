@@ -135,16 +135,71 @@ requires a client secret, which is why a server exists in the auth path at all.
 
       Verify before designing around it.
 
-- [ ] **Prototype on a throwaway repo, not a customer.**
-      `/admin` authenticates as the signed-in user and calls `api.github.com` with
-      their own token; **branch protection on `main`** is the publish gate.
-      Per `lanza-mcp-test-target`, use a datadefine-owned site — never lanzacms.com.
+- [x] **Prototype built** — `prototype/device-cms/` against `dsottimano/dave-test`.
+      Sign-in, `permissions.push`, and a real write to `staging` all confirmed live.
+
+- [x] **Branch protection as the publish gate — FALSIFIED 2026-08-09.**
+
+      Tested on a throwaway **private** repo, account plan **free**:
+
+      ```
+      POST /repos/…/rulesets                      → 403
+      PUT  /repos/…/branches/main/protection      → 403
+      "Upgrade to GitHub Pro or make this repository public to enable this feature."
+      ```
+
+      Both mechanisms are paid-plan-only on private repos. And tenant repos **must**
+      be private (see §3a), so the target user — GitHub Free, private repo — cannot
+      have either. Branch protection is not available as the publish gate.
+
+      **What survives, and it is most of it.** `permissions` is returned on a free
+      private repo:
+      `{"private":true,"permissions":{"admin":true,"maintain":true,"push":true,…}}`
+
+      So GitHub still *answers* both questions; it just cannot *enforce* the second
+      one for free tenants:
+
+      | Question | Answered by | Enforced by |
+      |---|---|---|
+      | May this person edit? | GitHub — `permissions.push` | GitHub (the token is bounded) |
+      | May this person publish? | GitHub — `permissions.admin` | **us**, a one-line check before `POST /merges` |
+
+      This is still the win. The lists go away — no `adminLogin`, no `editors`, no
+      invite panel, no publish-then-rebuild delay, no 7-day revocation lag. What is
+      left is a single call asking GitHub "is this person an admin on this repo?"
+      before allowing a merge. `roles.ts` collapses from a path/branch/tree policy
+      engine into that one question.
 
 - [ ] **Decide where the token lives.** This is the one real tension: the user's own
       token in the browser reintroduces exfiltration risk that the HttpOnly cookie +
       proxy currently prevents. Likely answer: **keep the thin same-origin proxy,
       delete the identity system.** The proxy stops being a policy engine and becomes
       a header-attacher; GitHub's own permissions bound what the token can do.
+
+---
+
+## 3a. Tenant repos must be private — and that is what constrains the design
+
+The platform is open source. A tenant's **content** is not, and conflating the two is
+how drafts end up world-readable.
+
+| What leaks in a public tenant repo | Why it matters |
+|---|---|
+| **Drafts** | `draft: true` is the publish gate. In a public repo an unpublished post is readable **the moment Save is pressed** — embargoed announcements, unannounced pricing, a post naming a client. A CMS whose "unpublished" is publicly readable is not offering unpublished |
+| The `staging` branch | Every save lands there, so Save silently means "readable by anyone" |
+| Git history | Deleting a page does not unpublish it. On a public repo there is no undo, including for something written in error or about a person |
+| `lanza.config.json` | `adminLogin` + `editors` is a precise list of whose account to phish |
+| Media uploads | Land in the repo whether or not any page references them |
+| Commit author emails | Exposed on every commit |
+
+**Therefore tenant repos default to private** — which is exactly why the branch-
+protection result above is disqualifying rather than a detail.
+
+> **`dsottimano/lanza` stays PUBLIC** — decided 2026-08-09. It is the product repo and
+> being open is the point. The consequence is accepted knowingly: **our own drafts are
+> world-readable**, and `docs/` publishes a detailed map of the auth surface (no
+> secrets — verified — but a map). Do not put anything in this repo that is not meant
+> to be read.
 
 ---
 
