@@ -46,6 +46,14 @@ function githubProxyDev(token: string | undefined): Plugin {
           const method = r.method ?? "GET";
           const subPath = r.url ?? "";
 
+          // NO role check here, deliberately — unlike prod, which enforces
+          // functions/_lib/roles.ts per request. Dev has no session and no login:
+          // it authenticates with a GITHUB_TOKEN from admin/.env, so whoever is
+          // running the server already holds the repo's credentials and is the
+          // owner by construction. A role gate over that would be theatre, and
+          // faking a login to drive it would make dev diverge from prod in a way
+          // that hides real behaviour rather than reproducing it.
+
           // Same allowlist + CSRF check as prod (functions/_lib/gh-proxy.ts).
           if (!isAllowed(method, subPath)) {
             reject(

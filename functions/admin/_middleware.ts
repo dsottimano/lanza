@@ -21,8 +21,8 @@ import {
   verifySession,
   importPublicKey,
   readCookie,
-  isAllowedLogin,
 } from "../_lib/session";
+import { resolveRole, roleMayUseCloudflare } from "../_lib/roles";
 import {
   HANDOFF_PUBLIC_KEY as CONFIG_PUBLIC_KEY,
   productionOriginIfPreview,
@@ -40,6 +40,9 @@ export const onRequest = async (context: {
   request: Request;
   env: Env;
   next: () => Promise<Response>;
+  // Pages hands `data` to the downstream Function. The gh proxy reads the role from
+  // here rather than re-deriving it, so there is one place that decides who you are.
+  data?: Record<string, unknown>;
 }): Promise<Response> => {
   const { request, env, next } = context;
   const url = new URL(request.url);
@@ -89,14 +92,26 @@ export const onRequest = async (context: {
     );
   }
   // A valid signature only proves the broker authenticated SOMEONE — it mints a
-  // token for any GitHub user who logs in. Ownership is a separate check, and it
+  // token for any GitHub user who logs in. Authorization is a separate check, and it
   // belongs here: /admin/api/cf/* trusts this middleware entirely and attaches an
   // account-scoped Cloudflare token.
-  if (isAllowedLogin(login, env.ADMIN_LOGIN || repo.adminLogin)) {
-    return withAdminSecurityHeaders(await next());
+  //
+  // Two roles now, not one. `adminLogin` is unchanged and still means full access;
+  // `editors` is the invited, content-only role. An env ADMIN_LOGIN keeps overriding
+  // the committed owner list for a self-hosted site, exactly as before.
+  const role = resolveRole(login, env.ADMIN_LOGIN || repo.adminLogin, repo.editors);
+  if (!role) return deny(url, "Not authenticated.");
+
+  // Cloudflare is owner-only and has no per-path nuance: that proxy performs no
+  // authorization of its own and carries an ACCOUNT-scoped token, so this is the
+  // whole gate for it (I1). Everything else an editor may reach is gated per
+  // request by the gh proxy, which re-asks rather than trusting this admission.
+  if (url.pathname.startsWith("/admin/api/cf/") && !roleMayUseCloudflare(role)) {
+    return deny(url, "Only an owner can change hosting settings.");
   }
 
-  return deny(url, "Not authenticated.");
+  context.data = { ...(context.data ?? {}), role, login };
+  return withAdminSecurityHeaders(await next());
 };
 
 // Unauthenticated. XHR/API calls get a JSON 401 (the SPA can surface a "sign in"

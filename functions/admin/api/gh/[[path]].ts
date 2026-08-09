@@ -18,7 +18,10 @@ import {
   isAllowed,
   upstreamPath,
   upstreamTargetAllowed,
+  BRANCH,
+  WORKING_BRANCH,
 } from "../../../_lib/gh-proxy";
+import { editorMayCall, type Role } from "../../../_lib/roles";
 // Per-tenant repo identity — the broker writes this at repo creation; the proxy is
 // the single place that turns repo-relative CMS paths into repos/<owner>/<name>/…
 import repo from "../../../../lanza.config.json";
@@ -48,10 +51,15 @@ export const onRequest = async (context: {
   request: Request;
   env: Env;
   params: { path?: string | string[] };
+  // Set by functions/admin/_middleware.ts, which is the only thing that can reach
+  // this route. Absent role = treat as an editor (the lesser of the two), never as
+  // an owner — a missing claim must not be the permissive case.
+  data?: { role?: Role; login?: string };
 }): Promise<Response> => {
   const { request, env, params } = context;
   const url = new URL(request.url);
   const session = readCookie(request.headers.get("Cookie"), SESSION_COOKIE);
+  const role: Role = context.data?.role === "owner" ? "owner" : "editor";
 
   // `[[path]]` catch-all → array of path segments after /admin/api/gh/.
   const seg = params.path;
@@ -80,6 +88,36 @@ export const onRequest = async (context: {
   // CSRF guard: reject a cross-origin write riding an authenticated editor's browser.
   if (crossOriginBlocked(request.method, request.headers.get("origin"), url.host)) {
     return json(403, { message: "Cross-origin write rejected." });
+  }
+
+  // The body is read ONCE, here, and the same bytes are forwarded below. The role
+  // check has to inspect what GitHub will actually execute — a re-read or a
+  // re-serialized copy would be checking a different request than the one that runs.
+  const hasBody = request.method !== "GET" && request.method !== "HEAD";
+  const bodyBytes = hasBody ? await request.arrayBuffer() : undefined;
+
+  // Role. The allowlist above says which endpoints the CMS may use at all; this says
+  // which of them THIS person may use. Asked here rather than inherited from the
+  // middleware's admission, because being let into /admin has never been the same
+  // thing as being allowed to do a particular write (security-model.md I1).
+  if (role !== "owner") {
+    let parsed: unknown = null;
+    if (bodyBytes && bodyBytes.byteLength) {
+      try {
+        parsed = JSON.parse(new TextDecoder().decode(bodyBytes));
+      } catch {
+        // Unparseable body on a write: refuse rather than check nothing. Every
+        // write the CMS makes is JSON, so this is malformed or hostile either way.
+        return json(403, { message: "Blocked: unreadable request body." });
+      }
+    }
+    const decision = editorMayCall(request.method, subPath, parsed, {
+      workingBranch: WORKING_BRANCH,
+      productionBranch: BRANCH,
+    });
+    if (!decision.ok) {
+      return json(403, { message: decision.reason ?? "Not allowed for your role." });
+    }
   }
 
   // Token: broker-minted (multi-tenant) first, else the legacy GITHUB_TOKEN PAT.
@@ -116,12 +154,10 @@ export const onRequest = async (context: {
   if (!headers.has("Accept")) headers.set("Accept", "application/vnd.github+json");
   headers.set("User-Agent", "lanza-cms");
 
-  const hasBody = request.method !== "GET" && request.method !== "HEAD";
-
   const upstream = await fetch(target, {
     method: request.method,
     headers,
-    body: hasBody ? await request.arrayBuffer() : undefined,
+    body: bodyBytes,
   });
 
   const respHeaders = new Headers(upstream.headers);
