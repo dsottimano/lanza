@@ -71,13 +71,31 @@ exists.**
 **One fact gates the entire direction.** GitHub's OAuth token exchange normally
 requires a client secret, which is why a server exists in the auth path at all.
 
-- [ ] **Verify GitHub Device Flow works for this without a client secret.**
-      (Device Flow is `POST /login/device/code` with only a `client_id`, then polling
-      `/login/oauth/access_token`. It must be explicitly enabled on the app.)
-      **UNVERIFIED — assert nothing until this is tested.** ~30 minutes.
-  - If **yes** → a zero-secret CMS is possible.
-  - If **no** → the floor is **one** stateless endpoint holding **one** OAuth client
-    secret. Still an order of magnitude better than today.
+- [x] **Verify GitHub Device Flow works for this without a client secret.**
+      **VERIFIED 2026-08-09 — secretless, blocked only by an App toggle.**
+
+      ```
+      POST https://github.com/login/device/code   (Accept: application/json)
+        client_id=Iv23ct5fK2N5QtDUbzyx        → 400 {"error":"device_flow_disabled",
+                                                     "Device Flow must be explicitly
+                                                      enabled for this App"}
+        client_id=Iv23NOTAREALCLIENTID        → 404 {"error":"Not Found"}
+      ```
+
+      The control is what makes this conclusive: a bogus id 404s, ours reaches a
+      **per-App policy check**. GitHub resolved the `lanza-cms` App from the
+      `client_id` alone and never asked for a secret. The flow is secretless by
+      construction; the only blocker is a checkbox.
+
+- [ ] **Flip the toggle** — GitHub App settings → `lanza-cms` → General →
+      **Enable Device Flow** → Save. (Owner action; needs the App owner's login.
+      If the App is org-owned it is under the org's Developer settings instead.)
+
+- [ ] **Then complete the round trip** and confirm the two things step 1 cannot show:
+      1. `/login/oauth/access_token` returns a token with **no `client_secret`**.
+      2. What that user-to-server token can actually reach — it should be bounded by
+         the App's installed repos **intersected with the user's own permissions**,
+         which is precisely the property that makes `roles.ts` redundant.
 
 - [ ] **Prototype on a throwaway repo, not a customer.**
       `/admin` authenticates as the signed-in user and calls `api.github.com` with
