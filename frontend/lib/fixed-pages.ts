@@ -19,7 +19,7 @@ import site from "/data/site.json";
 // (and get indexed for) lanzacms.com's copy at their own domain. Only the product
 // site sets `productSite: true` in data/site.json. The blog index is not in here:
 // every tenant needs it.
-const PRODUCT_ONLY = new Set(["how-it-works", "start", "agents"]);
+const PRODUCT_ONLY = new Set(["how-it-works", "start", "agents", "architecture"]);
 
 export interface FixedPage {
   slug: string;
@@ -43,6 +43,25 @@ const ALL_FIXED_PAGES: FixedPage[] = [
         title: "Cómo funciona",
         description:
           "La vida de un cambio, de principio a fin: usted lo pide, un agente edita su repositorio, GitHub lo guarda y Cloudflare lo sirve. Sin base de datos, sin servidor, sin ataduras.",
+      },
+    },
+  },
+  {
+    // The deep layer under /how-it-works: same machine, stated as a wiring diagram
+    // rather than a story. Kept a separate page so the narrative one stays readable
+    // by someone who does not want to know what RS256 is.
+    slug: "architecture",
+    template: "landing",
+    seo: {
+      en: {
+        title: "Architecture",
+        description:
+          "Every moving part named: what runs where, who holds which secret and for how long, how signing in actually works, and what an agent is allowed to touch.",
+      },
+      es: {
+        title: "Arquitectura",
+        description:
+          "Cada pieza con su nombre: qué se ejecuta dónde, quién guarda qué secreto y por cuánto tiempo, cómo funciona de verdad el inicio de sesión y qué puede tocar un agente.",
       },
     },
   },

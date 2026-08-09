@@ -38,6 +38,7 @@ const es = {
   devHead: "Es suyo hasta el último archivo.",
   devBody: "Astro + Git + Cloudflare Pages, todo en el plan gratuito. Sin base de datos que administrar, sin runtime que mantener. Sáltese el asistente de connect.lanzacms.com por completo: bifúrquelo, alójelo usted mismo, conecte su propio agente al mismo modelo de contenido. Nada aquí le retiene.",
   devLink: "Leer el contrato para agentes",
+  devLinkArch: "Ver la arquitectura completa",
   ctaHead: "¿Listo para lanzar?",
   ctaSub: "Vea lo que cuesta y empiece en unos 30 minutos.",
   cta: "Empezar",
@@ -59,6 +60,7 @@ const en = {
   devHead: "Yours down to the last file.",
   devBody: "Astro + Git + Cloudflare Pages, all on the free tier. No database to run, no runtime to keep alive. Skip the connect.lanzacms.com wizard entirely: fork it, self-host it, point your own agent at the same content model. Nothing here holds you in.",
   devLink: "Read the agent contract",
+  devLinkArch: "See the full architecture",
   ctaHead: "Ready to launch?",
   ctaSub: "See what it costs and start in about 30 minutes.",
   cta: "Start your site",
@@ -111,7 +113,10 @@ const t = isEn ? en : es;
       <span class="hiw-eyebrow">{t.devEyebrow}</span>
       <h2 class="hiw-h2">{t.devHead}</h2>
       <p class="hiw-lede">{t.devBody}</p>
-      <a class="hiw-link" href={href("agents/")}>{t.devLink}<span class="hiw-arrow" aria-hidden="true">↗</span></a>
+      <p class="hiw-links">
+        <a class="hiw-link" href={href("architecture/")}>{t.devLinkArch}<span class="hiw-arrow" aria-hidden="true">↗</span></a>
+        <a class="hiw-link" href={href("agents/")}>{t.devLink}<span class="hiw-arrow" aria-hidden="true">↗</span></a>
+      </p>
     </div>
   </section>
 
@@ -287,6 +292,7 @@ const t = isEn ? en : es;
   .hiw-h2 { font-family: var(--font-heading); font-weight: 600; font-size: clamp(1.9rem, 4vw, 3rem); line-height: 1.06; letter-spacing: -0.02em; color: #fff; margin: 0 0 1.2rem; max-width: 20ch; }
   .hiw-lede { font-size: 1.14rem; line-height: 1.7; color: #a8a199; max-width: 60ch; margin: 0 0 1.6rem; }
   .hiw-link { font-family: var(--font-mono); font-size: 0.76rem; letter-spacing: 0.1em; text-transform: uppercase; color: var(--accent-bright); text-decoration: none; }
+  .hiw-links { display: flex; flex-wrap: wrap; gap: 1.2rem 2.2rem; margin: 0; }
 
   /* closing cta */
   .hiw-cta { background: var(--surface); padding: clamp(3.5rem, 8vw, 6rem) 0; text-align: center; }

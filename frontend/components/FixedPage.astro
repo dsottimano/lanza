@@ -7,6 +7,7 @@
 // fixed page binds to its component; everything else about it is data in the registry.
 import Base from "../layouts/Base.astro";
 import Agents from "./Agents.astro";
+import Architecture from "./Architecture.astro";
 import HowItWorks from "./HowItWorks.astro";
 import Start from "./Start.astro";
 import JournalIndex from "./JournalIndex.astro";
@@ -23,6 +24,7 @@ const { slug, locale } = Astro.props;
 
 const COMPONENTS: Record<string, unknown> = {
   agents: Agents,
+  architecture: Architecture,
   "how-it-works": HowItWorks,
   start: Start,
   posts: JournalIndex,

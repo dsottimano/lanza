@@ -1,0 +1,508 @@
+---
+// /architecture — the deep layer. /how-it-works tells the story of an edit in
+// plain language; this page is the wiring diagram behind it, in the dev/agent
+// register: every component named, who runs it, who holds which secret, and how
+// long each credential lives.
+//
+// Everything here is checked against the code and docs/ rather than written from
+// memory — the auth sequence mirrors functions/admin/api/auth/{login,handoff}.ts
+// and functions/_lib/session.ts, the credential lifetimes mirror
+// docs/keys-and-secrets.md, and the agent section mirrors docs/mcp-server.md.
+// If one of those changes, this page is wrong and must change with it.
+//
+// Static + cacheable: no client JS at all. Bilingual, driven by the same fixed-page
+// registry as its siblings (lib/fixed-pages.ts).
+import { DEFAULT_LOCALE, localeUrl, type Locale } from "../lib/i18n";
+
+interface Props {
+  locale?: Locale;
+}
+const { locale = DEFAULT_LOCALE } = Astro.props;
+const isEn = locale === "en";
+const href = (path: string) => localeUrl(locale, path);
+
+const en = {
+  tag: "ARCHITECTURE · THE WHOLE MACHINE",
+  headline: "Every moving part, named.",
+  sub: "How it works is the story of an edit. This is the wiring behind it: what each piece is, who runs it, which secrets it holds, and how long they live. Nothing here is a diagram of an ideal — it is what the code does.",
+
+  partsEyebrow: "The parts",
+  partsHead: "Six pieces. You own four of them.",
+  partsIntro: "There is no application server anywhere in this list. Your site is compiled to files ahead of time, and the only thing that ever runs on a request is Cloudflare handing one over.",
+  partsCols: ["Piece", "What it actually is", "Who runs it", "Holds secrets"],
+  parts: [
+    ["Your repository", "Markdown and HTML files on GitHub. The source of truth for every word on your site.", "You", "No"],
+    ["Your site", "An Astro static build, served by Cloudflare Pages. Plain HTML by the time a visitor sees it.", "You", "No"],
+    ["Lanza, the CMS", "A Vue app at /admin. Static files — it has no backend of its own.", "You", "No"],
+    ["lanza-site", "The npm package holding the render code and the site's server functions. You pin a version.", "You", "No"],
+    ["The broker", "connect.lanzacms.com — onboarding, login, and minting short-lived tokens.", "Lanza", "Yes — all of them"],
+    ["/api/mcp", "The endpoint an AI agent connects to in order to edit your site.", "You", "No"],
+  ],
+
+  editEyebrow: "Life of an edit",
+  editHead: "Save writes to a branch. Publish is a merge.",
+  editIntro: "The CMS never writes to your live site. It writes to a staging branch, and publishing is an ordinary git merge — which is why every change is reversible and nothing is ever half-applied.",
+  editSteps: [
+    { t: "You save", c: "PUT → staging", b: "The CMS commits to the staging branch through its own /admin/api/gh proxy. Your browser never holds a GitHub token: the proxy attaches one per request, scoped to this one repository, and it expires in about an hour." },
+    { t: "You review", c: "staging.<project>.pages.dev", b: "Cloudflare builds the staging branch too, so there is a real URL showing exactly what you just wrote, before anyone else can see it." },
+    { t: "You publish", c: "merge staging → main", b: "One merge. No separate deploy step and no copy of your content living anywhere else." },
+    { t: "Cloudflare rebuilds", c: "astro build → dist", b: "The push to main triggers a static build. Entries marked draft never render, whether or not they were merged." },
+    { t: "You change your mind", c: "git revert", b: "Every version is a commit. Rolling back is the same operation a developer would use, and the CMS keeps theme history for the same reason." },
+  ],
+
+  authEyebrow: "Signing in",
+  authHead: "Two checks, and both are required.",
+  authIntro: "Your site holds no signing secret. It verifies with a public key baked into the package — which means the thing that proves who you are lives somewhere it cannot be stolen from you.",
+  authSteps: [
+    "You open /admin. It sends you to GitHub, asking for identity only — no repository scopes at all.",
+    "GitHub returns to the broker, not to your site. The broker is the only place that holds the private key.",
+    "The broker signs a session (RS256) naming your GitHub login, your site's origin, a one-shot nonce, and an expiry.",
+    "It posts that token back to your site in a form body — never in a URL, so it cannot land in history, a log, or a referrer header.",
+    "Your site verifies the signature with the baked-in public key, then checks the audience is this site, the nonce matches the cookie it set, and the token has not expired.",
+    "Then, separately, it checks your login against the site's owner list.",
+  ],
+  authCalloutHead: "Why the last step is its own step",
+  authCalloutBody: "The broker will sign a token for any GitHub user who logs in — that is what an identity provider does. So a valid signature proves someone authenticated; it does not prove they own this site. Authorization is a second, independent check, and it runs on both the login endpoint and every request to /admin. A signature-only gate would admit any GitHub account on earth.",
+
+  keysEyebrow: "Blast radius",
+  keysHead: "Nothing long-lived, nothing broadly scoped.",
+  keysIntro: "The useful question about a credential is not whether it is encrypted. It is what an attacker reaches if they hold it, and for how long.",
+  keysCols: ["Credential", "Reaches", "Lifetime"],
+  keys: [
+    ["Your session cookie", "Your site's /admin only — HttpOnly, Secure, and scoped so it is never sent on public pages", "7 days"],
+    ["The GitHub token behind a save", "One repository, contents only. Minted per request; never sent to the browser", "~1 hour"],
+    ["An agent's access token", "The sites you ticked on the consent screen, and nothing else", "1 hour, refreshable"],
+    ["A token minted for one agent call", "Exactly one site — the audience is pinned to it", "5 minutes"],
+    ["Your site's own key material", "Nothing. It holds a public key and can only verify", "—"],
+  ],
+
+  agentEyebrow: "For agents",
+  agentHead: "An agent edits your site the way you do.",
+  agentBody: "Your site exposes an MCP endpoint. An agent that connects to it goes through the same OAuth round-trip you do — authorization code with PKCE, discovery over the standard well-known documents, and a GitHub login for identity. If you own several Lanza sites, one consent screen asks which of them this agent may touch, and that choice is carried on the token itself; a tampered response can only narrow the grant, never widen it. The agent is given a token bound to one site's endpoint. It never receives a GitHub token, and there is no personal access token to create, paste, or leak.",
+  agentLink: "Read the agent contract",
+
+  costEyebrow: "What it costs to run",
+  costHead: "Static sites are cheap because nothing is running.",
+  costBody: "Page views on Cloudflare Pages are unmetered — there is no per-visit cost and no traffic level at which your bill starts moving. There is no database to pay for and no server sitting idle, because there is no server. The only recurring cost is your domain name, which you buy from whoever you like and point wherever you like.",
+  costTiles: [
+    ["$0", "to build, host and serve"],
+    ["~$12", "a year for a domain — the only bill"],
+    ["0", "databases, servers, and things to patch"],
+  ],
+
+  ownEyebrow: "Updates, and leaving",
+  ownHead: "You pin the version. You keep the files.",
+  ownBody: "Your site depends on a published package at a version you choose, so an improvement we ship does not change your site until you take it — from Settings, when it suits you. And the exit is not a feature we had to build: your content is already a folder of ordinary files in a repository you own. The broker is a convenience layered on top of a CMS that works without it — supply your own GitHub credentials and owner list and you can run the whole thing yourself, with us removed from the picture entirely.",
+
+  ctaHead: "Read the plain-language version.",
+  ctaSub: "Same machine, told as a story instead of a diagram.",
+  cta: "How it works",
+};
+
+const es = {
+  tag: "ARQUITECTURA · LA MÁQUINA COMPLETA",
+  headline: "Cada pieza, con su nombre.",
+  sub: "Cómo funciona cuenta la historia de un cambio. Esto es el cableado que hay detrás: qué es cada pieza, quién la opera, qué secretos guarda y cuánto duran. Nada aquí es el diagrama de un ideal — es lo que hace el código.",
+
+  partsEyebrow: "Las piezas",
+  partsHead: "Seis piezas. Cuatro son suyas.",
+  partsIntro: "En esta lista no hay ningún servidor de aplicaciones. Su sitio se compila a archivos por adelantado, y lo único que ocurre al recibir una visita es que Cloudflare entrega uno.",
+  partsCols: ["Pieza", "Qué es en realidad", "Quién la opera", "Guarda secretos"],
+  parts: [
+    ["Su repositorio", "Archivos Markdown y HTML en GitHub. La fuente de la verdad de cada palabra de su sitio.", "Usted", "No"],
+    ["Su sitio", "Un build estático de Astro, servido por Cloudflare Pages. HTML puro cuando llega al visitante.", "Usted", "No"],
+    ["Lanza, el CMS", "Una aplicación Vue en /admin. Archivos estáticos — no tiene backend propio.", "Usted", "No"],
+    ["lanza-site", "El paquete npm con el código de render y las funciones del sitio. Usted fija la versión.", "Usted", "No"],
+    ["El intermediario", "connect.lanzacms.com — alta, inicio de sesión y emisión de tokens de vida corta.", "Lanza", "Sí — todos"],
+    ["/api/mcp", "El punto de conexión al que se conecta un agente de IA para editar su sitio.", "Usted", "No"],
+  ],
+
+  editEyebrow: "La vida de un cambio",
+  editHead: "Guardar escribe en una rama. Publicar es una fusión.",
+  editIntro: "El CMS nunca escribe en su sitio en vivo. Escribe en una rama de preparación, y publicar es una fusión de git corriente — por eso todo cambio es reversible y nada queda aplicado a medias.",
+  editSteps: [
+    { t: "Usted guarda", c: "PUT → staging", b: "El CMS hace commit en la rama staging a través de su propio proxy /admin/api/gh. Su navegador nunca tiene un token de GitHub: el proxy adjunta uno por petición, limitado a este único repositorio, y caduca en aproximadamente una hora." },
+    { t: "Usted revisa", c: "staging.<proyecto>.pages.dev", b: "Cloudflare también construye la rama de preparación, así que existe una URL real que muestra exactamente lo que acaba de escribir, antes de que nadie más pueda verlo." },
+    { t: "Usted publica", c: "merge staging → main", b: "Una fusión. Sin paso de despliegue aparte y sin ninguna copia de su contenido viviendo en otro sitio." },
+    { t: "Cloudflare reconstruye", c: "astro build → dist", b: "El push a main dispara un build estático. Las entradas marcadas como borrador no se renderizan, se hayan fusionado o no." },
+    { t: "Usted cambia de opinión", c: "git revert", b: "Cada versión es un commit. Revertir es la misma operación que usaría un programador, y el CMS guarda el historial de temas por la misma razón." },
+  ],
+
+  authEyebrow: "Iniciar sesión",
+  authHead: "Dos comprobaciones, y ambas son obligatorias.",
+  authIntro: "Su sitio no guarda ninguna clave de firma. Verifica con una clave pública incluida en el paquete — es decir, lo que demuestra quién es usted vive en un lugar del que no se le puede robar.",
+  authSteps: [
+    "Usted abre /admin. Le envía a GitHub pidiendo solo identidad — sin ningún permiso sobre repositorios.",
+    "GitHub vuelve al intermediario, no a su sitio. El intermediario es el único lugar que guarda la clave privada.",
+    "El intermediario firma una sesión (RS256) que nombra su usuario de GitHub, el origen de su sitio, un nonce de un solo uso y una caducidad.",
+    "Envía ese token a su sitio en el cuerpo de un formulario — nunca en una URL, para que no acabe en el historial, en un registro ni en una cabecera de referencia.",
+    "Su sitio verifica la firma con la clave pública incluida, y luego comprueba que la audiencia es este sitio, que el nonce coincide con la cookie que puso y que el token no ha caducado.",
+    "Y después, por separado, comprueba su usuario contra la lista de propietarios del sitio.",
+  ],
+  authCalloutHead: "Por qué el último paso es un paso aparte",
+  authCalloutBody: "El intermediario firmará un token para cualquier usuario de GitHub que inicie sesión — eso es lo que hace un proveedor de identidad. Así que una firma válida demuestra que alguien se autenticó; no demuestra que sea el dueño de este sitio. La autorización es una segunda comprobación independiente, y se ejecuta tanto en el inicio de sesión como en cada petición a /admin. Una puerta que solo mirase la firma admitiría a cualquier cuenta de GitHub del mundo.",
+
+  keysEyebrow: "Radio de impacto",
+  keysHead: "Nada duradero, nada de alcance amplio.",
+  keysIntro: "La pregunta útil sobre una credencial no es si está cifrada. Es hasta dónde llega quien la tenga, y durante cuánto tiempo.",
+  keysCols: ["Credencial", "Hasta dónde llega", "Duración"],
+  keys: [
+    ["Su cookie de sesión", "Solo el /admin de su sitio — HttpOnly, Secure y limitada para no viajar nunca en páginas públicas", "7 días"],
+    ["El token de GitHub tras un guardado", "Un repositorio, solo contenidos. Se emite por petición; nunca llega al navegador", "~1 hora"],
+    ["El token de acceso de un agente", "Los sitios que usted marcó en la pantalla de consentimiento, y ninguno más", "1 hora, renovable"],
+    ["Un token emitido para una llamada de agente", "Exactamente un sitio — la audiencia queda fijada a él", "5 minutos"],
+    ["El material de clave de su propio sitio", "Nada. Guarda una clave pública y solo puede verificar", "—"],
+  ],
+
+  agentEyebrow: "Para agentes",
+  agentHead: "Un agente edita su sitio igual que usted.",
+  agentBody: "Su sitio expone un punto de conexión MCP. Un agente que se conecte pasa por la misma ronda de OAuth que usted — código de autorización con PKCE, descubrimiento mediante los documentos estándar y un inicio de sesión de GitHub como identidad. Si tiene varios sitios Lanza, una pantalla de consentimiento pregunta cuáles puede tocar este agente, y esa elección viaja en el propio token; una respuesta manipulada solo puede restringir el permiso, nunca ampliarlo. Al agente se le entrega un token ligado al punto de conexión de un solo sitio. Nunca recibe un token de GitHub, y no hay ningún token personal que crear, pegar ni filtrar.",
+  agentLink: "Leer el contrato para agentes",
+
+  costEyebrow: "Lo que cuesta mantenerlo",
+  costHead: "Los sitios estáticos son baratos porque no hay nada ejecutándose.",
+  costBody: "Las vistas de página en Cloudflare Pages no se miden — no hay coste por visita ni un nivel de tráfico a partir del cual su factura empiece a moverse. No hay base de datos que pagar ni servidor ocioso, porque no hay servidor. El único coste recurrente es su dominio, que compra a quien quiera y apunta a donde quiera.",
+  costTiles: [
+    ["$0", "por construir, alojar y servir"],
+    ["~$12", "al año por un dominio — la única factura"],
+    ["0", "bases de datos, servidores y cosas que parchear"],
+  ],
+
+  ownEyebrow: "Actualizaciones, y marcharse",
+  ownHead: "Usted fija la versión. Usted se queda los archivos.",
+  ownBody: "Su sitio depende de un paquete publicado en la versión que usted elija, así que una mejora que publiquemos no cambia su sitio hasta que usted la tome — desde Ajustes, cuando le convenga. Y la salida no es una función que tuviéramos que construir: su contenido ya es una carpeta de archivos corrientes en un repositorio suyo. El intermediario es una comodidad añadida sobre un CMS que funciona sin él — ponga sus propias credenciales de GitHub y su lista de propietarios y puede operarlo entero usted mismo, con nosotros fuera del cuadro por completo.",
+
+  ctaHead: "Lea la versión en lenguaje llano.",
+  ctaSub: "La misma máquina, contada como historia en vez de como diagrama.",
+  cta: "Cómo funciona",
+};
+
+const t = isEn ? en : es;
+---
+
+<div class="arc">
+  <header class="arc-head">
+    <span class="arc-tag">{t.tag}</span>
+    <h1 class="arc-headline">{t.headline}</h1>
+    <p class="arc-sub">{t.sub}</p>
+  </header>
+
+  <!-- the parts -->
+  <section class="arc-sec">
+    <div class="arc-wrap">
+      <span class="arc-eyebrow">{t.partsEyebrow}</span>
+      <h2 class="arc-h2">{t.partsHead}</h2>
+      <p class="arc-lede">{t.partsIntro}</p>
+      <div class="arc-scroll">
+        <table class="arc-table">
+          <thead>
+            <tr>{t.partsCols.map((c) => <th scope="col">{c}</th>)}</tr>
+          </thead>
+          <tbody>
+            {t.parts.map(([name, what, who, secrets]) => (
+              <tr>
+                <th scope="row">{name}</th>
+                <td>{what}</td>
+                <td class="arc-td--tight">{who}</td>
+                <td class="arc-td--tight">
+                  <span class={secrets === "No" ? "arc-flag arc-flag--no" : "arc-flag arc-flag--yes"}>{secrets}</span>
+                </td>
+              </tr>
+            ))}
+          </tbody>
+        </table>
+      </div>
+    </div>
+  </section>
+
+  <!-- life of an edit -->
+  <section class="arc-sec arc-sec--tint">
+    <div class="arc-wrap">
+      <span class="arc-eyebrow">{t.editEyebrow}</span>
+      <h2 class="arc-h2">{t.editHead}</h2>
+      <p class="arc-lede">{t.editIntro}</p>
+      <ol class="arc-steps">
+        {t.editSteps.map((s, i) => (
+          <li class="arc-step">
+            <span class="arc-step__num">{String(i + 1).padStart(2, "0")}</span>
+            <div class="arc-step__body">
+              <h3 class="arc-step__t">{s.t}</h3>
+              <code class="arc-code">{s.c}</code>
+              <p class="arc-step__b">{s.b}</p>
+            </div>
+          </li>
+        ))}
+      </ol>
+    </div>
+  </section>
+
+  <!-- signing in -->
+  <section class="arc-sec">
+    <div class="arc-wrap">
+      <span class="arc-eyebrow">{t.authEyebrow}</span>
+      <h2 class="arc-h2">{t.authHead}</h2>
+      <p class="arc-lede">{t.authIntro}</p>
+      <ol class="arc-seq">
+        {t.authSteps.map((s) => <li>{s}</li>)}
+      </ol>
+      <aside class="arc-callout">
+        <h3 class="arc-callout__t">{t.authCalloutHead}</h3>
+        <p class="arc-callout__b">{t.authCalloutBody}</p>
+      </aside>
+    </div>
+  </section>
+
+  <!-- blast radius -->
+  <section class="arc-sec arc-sec--tint">
+    <div class="arc-wrap">
+      <span class="arc-eyebrow">{t.keysEyebrow}</span>
+      <h2 class="arc-h2">{t.keysHead}</h2>
+      <p class="arc-lede">{t.keysIntro}</p>
+      <div class="arc-scroll">
+        <table class="arc-table">
+          <thead>
+            <tr>{t.keysCols.map((c) => <th scope="col">{c}</th>)}</tr>
+          </thead>
+          <tbody>
+            {t.keys.map(([cred, reaches, life]) => (
+              <tr>
+                <th scope="row">{cred}</th>
+                <td>{reaches}</td>
+                <td class="arc-td--tight"><code class="arc-code arc-code--bare">{life}</code></td>
+              </tr>
+            ))}
+          </tbody>
+        </table>
+      </div>
+    </div>
+  </section>
+
+  <!-- agents -->
+  <section class="arc-band">
+    <div class="arc-wrap">
+      <span class="arc-eyebrow arc-eyebrow--bright">{t.agentEyebrow}</span>
+      <h2 class="arc-h2 arc-h2--invert">{t.agentHead}</h2>
+      <p class="arc-lede arc-lede--invert">{t.agentBody}</p>
+      <a class="arc-link" href={href("agents/")}>{t.agentLink}<span class="arc-arrow" aria-hidden="true">↗</span></a>
+    </div>
+  </section>
+
+  <!-- cost -->
+  <section class="arc-sec">
+    <div class="arc-wrap">
+      <span class="arc-eyebrow">{t.costEyebrow}</span>
+      <h2 class="arc-h2">{t.costHead}</h2>
+      <p class="arc-lede">{t.costBody}</p>
+      <div class="arc-tiles">
+        {t.costTiles.map(([value, label]) => (
+          <div class="arc-tile">
+            <span class="arc-tile__v">{value}</span>
+            <span class="arc-tile__l">{label}</span>
+          </div>
+        ))}
+      </div>
+    </div>
+  </section>
+
+  <!-- updates + leaving -->
+  <section class="arc-sec arc-sec--tint">
+    <div class="arc-wrap">
+      <span class="arc-eyebrow">{t.ownEyebrow}</span>
+      <h2 class="arc-h2">{t.ownHead}</h2>
+      <p class="arc-lede">{t.ownBody}</p>
+    </div>
+  </section>
+
+  <section class="arc-cta">
+    <div class="arc-wrap arc-wrap--narrow">
+      <h2 class="arc-cta__head">{t.ctaHead}</h2>
+      <p class="arc-cta__sub">{t.ctaSub}</p>
+      <a class="arc-btn" href={href("how-it-works/")}>{t.cta}<span class="arc-arrow" aria-hidden="true">↗</span></a>
+    </div>
+  </section>
+</div>
+
+<style>
+  .arc { color: var(--ink); font-family: var(--font-ui); }
+  .arc-wrap { max-width: var(--wide); margin: 0 auto; padding: 0 1.5rem; }
+  .arc-wrap--narrow { max-width: 62rem; }
+
+  /* header */
+  .arc-head { max-width: var(--wide); margin: 0 auto; padding: clamp(3rem, 7vw, 5.5rem) 1.5rem clamp(1.5rem, 4vw, 2.5rem); }
+  .arc-tag {
+    display: inline-block;
+    font-family: var(--font-mono);
+    font-size: 0.7rem;
+    letter-spacing: 0.22em;
+    color: var(--accent);
+    padding-bottom: 0.9rem;
+    margin-bottom: 1.4rem;
+    border-bottom: 1px solid var(--rule);
+  }
+  .arc-headline {
+    font-family: var(--font-heading);
+    font-weight: 600;
+    font-size: clamp(2.4rem, 5.4vw, 4.2rem);
+    line-height: 1.02;
+    letter-spacing: -0.03em;
+    margin: 0 0 1.2rem;
+    max-width: 18ch;
+    text-wrap: balance;
+  }
+  .arc-sub { font-size: 1.16rem; line-height: 1.65; color: var(--text-secondary); max-width: 62ch; margin: 0; }
+
+  /* sections */
+  .arc-sec { padding: clamp(3rem, 7vw, 5rem) 0; }
+  .arc-sec--tint { background: var(--surface); }
+  .arc-eyebrow {
+    display: inline-block;
+    font-family: var(--font-mono);
+    font-size: 0.7rem;
+    letter-spacing: 0.22em;
+    text-transform: uppercase;
+    color: var(--accent);
+    margin-bottom: 1.1rem;
+  }
+  .arc-h2 {
+    font-family: var(--font-heading);
+    font-weight: 600;
+    font-size: clamp(1.8rem, 3.8vw, 2.8rem);
+    line-height: 1.06;
+    letter-spacing: -0.02em;
+    margin: 0 0 1.1rem;
+    max-width: 22ch;
+    text-wrap: balance;
+  }
+  .arc-lede { font-size: 1.1rem; line-height: 1.7; color: var(--text-secondary); max-width: 66ch; margin: 0 0 2rem; }
+
+  /* tables — wide content scrolls inside itself, never the page */
+  .arc-scroll { overflow-x: auto; }
+  .arc-table { width: 100%; border-collapse: collapse; min-width: 44rem; text-align: left; }
+  .arc-table th,
+  .arc-table td {
+    padding: 0.95rem 1rem 0.95rem 0;
+    border-top: 1px solid var(--rule);
+    vertical-align: top;
+    font-size: 0.98rem;
+    line-height: 1.55;
+  }
+  .arc-table thead th {
+    border-top: 0;
+    border-bottom: 1px solid var(--ink);
+    font-family: var(--font-mono);
+    font-size: 0.7rem;
+    letter-spacing: 0.16em;
+    text-transform: uppercase;
+    color: var(--muted);
+    font-weight: 500;
+    padding-bottom: 0.7rem;
+  }
+  .arc-table tbody th { font-weight: 600; color: var(--ink); padding-right: 1.5rem; }
+  .arc-table td { color: var(--text-secondary); padding-right: 1.5rem; }
+  .arc-td--tight { white-space: nowrap; }
+
+  .arc-flag { font-family: var(--font-mono); font-size: 0.78rem; letter-spacing: 0.04em; }
+  .arc-flag--no { color: var(--text-secondary); }
+  .arc-flag--yes { color: var(--accent); font-weight: 500; }
+
+  /* numbered steps */
+  .arc-steps { list-style: none; margin: 0; padding: 0; display: grid; gap: 1.6rem; }
+  .arc-step { display: grid; grid-template-columns: auto 1fr; gap: 1.2rem; align-items: start; }
+  .arc-step__num {
+    font-family: var(--font-mono);
+    font-size: 0.78rem;
+    letter-spacing: 0.1em;
+    color: var(--accent);
+    padding-top: 0.3rem;
+  }
+  .arc-step__body { border-left: 2px solid var(--rule); padding-left: 1.4rem; }
+  .arc-step__t {
+    font-family: var(--font-heading);
+    font-weight: 600;
+    font-size: 1.28rem;
+    line-height: 1.2;
+    letter-spacing: -0.01em;
+    margin: 0 0 0.6rem;
+  }
+  .arc-step__b { font-size: 1rem; line-height: 1.65; color: var(--text-secondary); max-width: 62ch; margin: 0.7rem 0 0; }
+
+  .arc-code {
+    display: inline-block;
+    font-family: var(--font-mono);
+    font-size: 0.76rem;
+    color: var(--text-secondary);
+    background: var(--paper-card);
+    border: 1px solid var(--rule);
+    border-radius: 2px;
+    padding: 0.26rem 0.55rem;
+  }
+  .arc-sec--tint .arc-code { background: var(--paper); }
+  .arc-code--bare { background: none; border: 0; padding: 0; }
+
+  /* auth sequence */
+  .arc-seq { margin: 0 0 2rem; padding: 0 0 0 1.4rem; max-width: 68ch; display: grid; gap: 0.85rem; }
+  .arc-seq li { font-size: 1.02rem; line-height: 1.65; color: var(--text-secondary); padding-left: 0.4rem; }
+  .arc-seq li::marker { font-family: var(--font-mono); font-size: 0.82rem; color: var(--accent); }
+
+  .arc-callout {
+    border-left: 3px solid var(--accent);
+    background: var(--paper-card);
+    padding: 1.5rem 1.6rem;
+    max-width: 68ch;
+  }
+  .arc-callout__t {
+    font-family: var(--font-heading);
+    font-weight: 600;
+    font-size: 1.18rem;
+    line-height: 1.25;
+    margin: 0 0 0.7rem;
+  }
+  .arc-callout__b { font-size: 1rem; line-height: 1.68; color: var(--text-secondary); margin: 0; }
+
+  /* cost tiles */
+  .arc-tiles { display: grid; grid-template-columns: repeat(auto-fit, minmax(14rem, 1fr)); gap: 1px; background: var(--rule); border: 1px solid var(--rule); }
+  .arc-tile { background: var(--bg); padding: 1.6rem 1.4rem; display: grid; gap: 0.5rem; }
+  .arc-sec--tint .arc-tile { background: var(--surface); }
+  .arc-tile__v { font-family: var(--font-heading); font-weight: 600; font-size: clamp(1.9rem, 4vw, 2.6rem); line-height: 1; letter-spacing: -0.02em; color: var(--accent); }
+  .arc-tile__l { font-size: 0.95rem; line-height: 1.5; color: var(--text-secondary); }
+
+  /* dark agent band */
+  .arc-band { background: var(--ink-deep); padding: clamp(3.5rem, 8vw, 5.5rem) 0; }
+  .arc-eyebrow--bright { color: var(--accent-bright); }
+  .arc-h2--invert { color: #fff; }
+  .arc-lede--invert { color: #a8a199; max-width: 68ch; margin-bottom: 1.6rem; }
+  .arc-link { font-family: var(--font-mono); font-size: 0.76rem; letter-spacing: 0.1em; text-transform: uppercase; color: var(--accent-bright); text-decoration: none; }
+
+  /* closing cta */
+  .arc-cta { background: var(--ink); padding: clamp(3.5rem, 8vw, 5.5rem) 0; text-align: center; }
+  .arc-cta__head { font-family: var(--font-heading); font-weight: 600; font-size: clamp(1.9rem, 4.6vw, 3rem); line-height: 1.04; letter-spacing: -0.02em; margin: 0 0 0.9rem; color: #fff; }
+  .arc-cta__sub { font-size: 1.08rem; color: #a8a199; margin: 0 auto 1.8rem; max-width: 44ch; }
+  .arc-btn {
+    display: inline-flex;
+    align-items: center;
+    background: var(--accent);
+    color: var(--on-accent);
+    font-family: var(--font-mono);
+    font-size: 0.8rem;
+    letter-spacing: 0.14em;
+    text-transform: uppercase;
+    padding: 1.05rem 2rem;
+    border-radius: var(--radius);
+    text-decoration: none;
+    transition: transform 140ms ease, background 140ms ease;
+  }
+  .arc-btn:hover { transform: translateY(-2px); background: var(--accent-bright); }
+
+  .arc-arrow { display: inline-block; margin-left: 0.4em; transition: transform 160ms ease; }
+  .arc-link:hover .arc-arrow, .arc-btn:hover .arc-arrow { transform: translate(2px, -2px); }
+  .arc a:focus-visible, .arc-btn:focus-visible { outline: 2px solid var(--accent); outline-offset: 3px; }
+
+  @media (prefers-reduced-motion: reduce) {
+    .arc-btn, .arc-arrow { transition: none; }
+  }
+
+  @media (max-width: 640px) {
+    .arc-step { grid-template-columns: 1fr; gap: 0.5rem; }
+    .arc-step__body { border-left: 0; padding-left: 0; }
+  }
+</style>
