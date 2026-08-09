@@ -6,7 +6,7 @@ preset: "manifesto"
 slots:
   tag: "OWN YOUR PRESENCE · NOT RENTED"
   headline: "Own your presence on the web."
-  sub: "On social media you can post all day — but you never own any of it. Your writing, your identity, your audience: the day the platform is done with you, it's gone. Lanza makes a site that's truly yours — a plain folder of files on GitHub and Cloudflare, free to run and edited just by asking an AI agent. You hold a copy of everything, so you're never locked in and never stranded."
+  sub: "You can post on social media all day and own none of it — your writing, your audience, gone the day the platform is done with you. Lanza gives you a real site instead: a folder of files on GitHub and Cloudflare, free to run, edited by asking an AI agent. You keep a copy of everything."
   cta1: "Start your site"
   cta1Url: "https://connect.lanzacms.com/"
   cta2: "How it works"
@@ -51,7 +51,7 @@ slots:
       href: "/agents"
   ownEyebrow: "Owned · secure · yours to leave"
   ownHeadline: "Yours to keep. Yours to leave."
-  ownBody: "It's a plain folder of files you own on GitHub, hosted behind Cloudflare — no database and no server, the two things that usually get hacked, so there's almost nothing to attack. Every change is a commit you can roll back, so nothing gets quietly altered. And because the whole site is just files in your hands, no host and no platform can strand you: if you ever want to move, you take everything and go. That's the part social media never gives you."
+  ownBody: "Your site is a folder of files you own, served by Cloudflare. There is no database and no server — the two things that usually get hacked — so there is almost nothing to attack. Every change is a commit, so nothing is altered quietly and anything can be undone. And if you ever want to leave, you take the files with you."
   tiles:
     - value: "$0"
       label: "to build, host and run"

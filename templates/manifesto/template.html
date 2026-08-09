@@ -160,14 +160,20 @@
   }
 
   /* ── Spine: the life of an edit ───────────────────────────────────── */
+  /* Five stages of a real sequence, so the row and the wire earn their place.
+     They were `repeat(5, 1fr)` at `gap: 0` — five ~200px columns of 0.9rem text
+     touching each other, which is the densest thing on the page and the hardest
+     to scan. Widened to a real gutter, and the count steps down before the
+     columns get too narrow to read rather than at a phone breakpoint. */
   .lz-spine {
     list-style: none;
-    margin: 2rem 0 0;
+    margin: 2.6rem 0 0;
     padding: 0;
     position: relative;
     display: grid;
     grid-template-columns: repeat(5, 1fr);
-    gap: 0;
+    column-gap: clamp(1.4rem, 2.6vw, 2.6rem);
+    row-gap: 2.4rem;
   }
   /* the trajectory wire */
   .lz-spine::before {
@@ -179,7 +185,7 @@
     height: 2px;
     background: linear-gradient(90deg, color-mix(in srgb, var(--accent) 30%, transparent), var(--accent));
   }
-  .lz-step { position: relative; padding: 1.6rem 1.2rem 0 0; }
+  .lz-step { position: relative; padding: 1.7rem 0 0 0; }
   .lz-step__dot {
     position: absolute;
     top: 0;
@@ -207,15 +213,15 @@
   .lz-step__svc {
     display: inline-block;
     font-family: var(--font-mono);
-    font-size: 0.68rem;
+    font-size: 0.72rem;
     letter-spacing: 0.02em;
     color: var(--lz-onInk-dim);
     background: rgba(243,241,234,0.06);
-    padding: 0.2rem 0.5rem;
+    padding: 0.25rem 0.55rem;
     border-radius: 2px;
-    margin-bottom: 0.8rem;
+    margin-bottom: 0.9rem;
   }
-  .lz-step__body { font-size: 0.9rem; line-height: 1.55; color: var(--lz-onInk-dim); margin: 0; }
+  .lz-step__body { font-size: 0.97rem; line-height: 1.65; color: var(--lz-onInk-dim); margin: 0; }
   .lz-spine__arrow {
     position: absolute;
     top: -0.7rem;
@@ -228,10 +234,10 @@
 
   /* ── Three doors ──────────────────────────────────────────────────── */
   .lz-doors {
-    margin-top: 2rem;
+    margin-top: 2.4rem;
     display: grid;
     grid-template-columns: repeat(3, 1fr);
-    gap: 1rem;
+    gap: 1.5rem;
   }
   .lz-door {
     display: flex;
@@ -239,7 +245,7 @@
     background: var(--paper-card);
     border: 1px solid var(--rule);
     border-radius: var(--radius);
-    padding: 1.7rem 1.5rem;
+    padding: 1.9rem 1.7rem;
     text-decoration: none;
     color: var(--ink);
     transition: transform 160ms ease, border-color 160ms ease, box-shadow 160ms ease;
@@ -256,7 +262,7 @@
     line-height: 1.15;
     margin: 0 0 0.7rem;
   }
-  .lz-door__body { font-size: 0.95rem; line-height: 1.6; color: var(--text-secondary); margin: 0 0 1.3rem; flex: 1; }
+  .lz-door__body { font-size: 1rem; line-height: 1.65; color: var(--text-secondary); margin: 0 0 1.5rem; flex: 1; }
   .lz-door__cta {
     font-family: var(--font-mono);
     font-size: 0.7rem;
@@ -267,7 +273,7 @@
   .lz-door:hover .lz-arrow { transform: translate(2px, -2px); }
 
   /* ── Tiles (cost / time) ──────────────────────────────────────────── */
-  .lz-tiles { display: grid; grid-template-columns: repeat(3, 1fr); gap: 1rem; }
+  .lz-tiles { display: grid; grid-template-columns: repeat(3, 1fr); gap: 1.5rem; }
   .lz-tile {
     border: 1px solid var(--rule);
     border-left: 3px solid var(--accent);
@@ -285,7 +291,9 @@
     color: var(--ink);
     letter-spacing: -0.02em;
   }
-  .lz-tile__l { font-family: var(--font-mono); font-size: 0.72rem; letter-spacing: 0.04em; color: var(--text-secondary); line-height: 1.45; }
+  /* The label under a 2.6rem number was 0.72rem mono — too small a step to read
+     as a caption for it, so the pair scanned as one grey smudge. */
+  .lz-tile__l { font-family: var(--font-mono); font-size: 0.8rem; letter-spacing: 0.03em; color: var(--text-secondary); line-height: 1.5; }
 
   /* ── Close ────────────────────────────────────────────────────────── */
   .lz-close { text-align: center; }
@@ -321,6 +329,16 @@
   }
 
   /* ── Responsive ───────────────────────────────────────────────────── */
+  /* The five stages stop being readable well before a phone: at ~1100px each
+     column is under 190px and the body text breaks every three or four words.
+     Step down to three here — and drop the trajectory wire with it, because a
+     horizontal wire across a grid that now wraps would connect the wrong nodes.
+     Declared BEFORE the 900px block so that one still wins below 900. */
+  @media (max-width: 1180px) {
+    .lz-spine { grid-template-columns: repeat(3, 1fr); }
+    .lz-spine::before,
+    .lz-spine__arrow { display: none; }
+  }
   @media (max-width: 900px) {
     .lz-hero__grid { grid-template-columns: 1fr; }
     .lz-demo { max-width: 32rem; }
