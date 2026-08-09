@@ -31,6 +31,12 @@ const props = defineProps<{
   healthOpen: boolean;
   updatesOpen: boolean;
   contentTypesOpen: boolean;
+  peopleOpen: boolean;
+  // Owner chrome. Publish, settings and hosting are structurally absent for an
+  // editor rather than disabled — a greyed-out control that will never enable is
+  // just a question the UI refuses to answer. Defaults to false so the rail is
+  // never briefly permissive while access is still loading.
+  isOwner: boolean;
   publishOpen: boolean;
   locale: Locale;
   helpOpen: boolean;
@@ -46,6 +52,7 @@ const emit = defineEmits<{
   (e: "health"): void;
   (e: "updates"): void;
   (e: "contentTypes"): void;
+  (e: "people"): void;
   (e: "publish"): void;
   (e: "help"): void;
 }>();
@@ -63,12 +70,17 @@ const seoFile = settingsFiles.find((f) => f.name === "seo_defaults");
 const redirectsFile = settingsFiles.find((f) => f.name === "redirects");
 
 // ── Collapsible group state ──────────────────────────────────────────────
-type GroupId = "content" | "taxonomies" | "settings";
-const STORAGE_KEY = "lanza.sidebar.groups";
+type GroupId = "content" | "taxonomies" | "design" | "structure" | "site";
+// Bumped from ".groups": the stored value keyed the old single "settings" group,
+// and merging that over the new defaults would leave the three replacements at
+// their defaults anyway while carrying a key nothing reads. A new key retires it.
+const STORAGE_KEY = "lanza.sidebar.groups.v2";
 const DEFAULT_OPEN: Record<GroupId, boolean> = {
   content: true,
   taxonomies: true,
-  settings: false,
+  design: false,
+  structure: false,
+  site: false,
 };
 
 function loadOpen(): Record<GroupId, boolean> {
@@ -97,18 +109,19 @@ watch(
 // (Languages/Blocks/Themes/Site health + the settings/menu/redirects files).
 const contentNames = new Set(content.map((c) => c.name));
 const taxonomyNames = new Set(taxonomies.map((c) => c.name));
-const settingsActive = computed(
-  () =>
-    props.activeSettings !== null ||
-    props.languagesOpen ||
-    props.headerFooterOpen ||
-    props.brandThemesOpen ||
-    props.blocksOpen ||
-    props.healthOpen ||
-    props.contentTypesOpen,
+const designActive = computed(
+  () => props.brandThemesOpen || props.headerFooterOpen || props.blocksOpen,
+);
+const structureActive = computed(
+  () => props.contentTypesOpen || props.languagesOpen || props.activeSettings !== null,
+);
+const siteActive = computed(
+  () => props.peopleOpen || props.healthOpen || props.updatesOpen,
 );
 const activeGroup = computed<GroupId | null>(() => {
-  if (settingsActive.value) return "settings";
+  if (designActive.value) return "design";
+  if (structureActive.value) return "structure";
+  if (siteActive.value) return "site";
   if (contentNames.has(props.activeCollection)) return "content";
   if (taxonomyNames.has(props.activeCollection)) return "taxonomies";
   return null;
@@ -207,84 +220,109 @@ const itemActive = "nav-item--active";
         </div>
       </div>
 
-      <!-- Settings -->
-      <div class="rail-group">
-        <button
-          class="group-toggle"
-          :class="groupLabel"
-          :aria-expanded="isOpen('settings')"
-          @click="toggle('settings')"
-        >
-          <span>Settings</span>
-          <svg class="group-chevron" :class="{ 'group-chevron--open': isOpen('settings') }" viewBox="0 0 10 10" aria-hidden="true">
-            <path d="M2.5 4 5 6.5 7.5 4" fill="none" stroke="currentColor" stroke-width="1.4" stroke-linecap="round" stroke-linejoin="round" />
-          </svg>
-        </button>
-        <div class="group-body" :class="{ 'group-body--open': isOpen('settings') }">
-          <div class="group-body__inner flex flex-col gap-0.5">
-            <button
-              :class="[item, contentTypesOpen ? itemActive : '']"
-              @click="emit('contentTypes')"
-            >
-              Content types
-            </button>
-            <button
-              :class="[item, languagesOpen ? itemActive : '']"
-              @click="emit('languages')"
-            >
-              Languages
-            </button>
-            <button
-              v-if="seoFile"
-              :class="[item, activeSettings === seoFile.name ? itemActive : '']"
-              @click="emit('openSettings', seoFile)"
-            >
-              {{ seoFile.label }}
-            </button>
-            <button
-              :class="[item, headerFooterOpen ? itemActive : '']"
-              @click="emit('headerFooter')"
-            >
-              Header &amp; footer
-            </button>
-            <button
-              :class="[item, brandThemesOpen ? itemActive : '']"
-              @click="emit('brandThemes')"
-            >
-              Brand &amp; themes
-            </button>
-            <button
-              v-if="redirectsFile"
-              :class="[item, activeSettings === redirectsFile.name ? itemActive : '']"
-              @click="emit('openSettings', redirectsFile)"
-            >
-              {{ redirectsFile.label }}
-            </button>
-            <button
-              :class="[item, blocksOpen ? itemActive : '']"
-              @click="emit('blocks')"
-            >
-              Blocks
-            </button>
-            <button
-              :class="[item, healthOpen ? itemActive : '']"
-              @click="emit('health')"
-            >
-              Site health
-            </button>
-            <button
-              :class="[item, updatesOpen ? itemActive : '']"
-              @click="emit('updates')"
-            >
-              Software
-            </button>
+      <!-- Settings — owner only, and split three ways.
+           It was one flat list of nine unrelated items: content types next to
+           software updates next to redirects. Nine siblings is not a menu, it is
+           a drawer. These three answer different questions — how the site LOOKS,
+           how it is ORGANISED, and how it is RUN — so they are three groups. -->
+      <template v-if="isOwner">
+        <div class="rail-group">
+          <button
+            class="group-toggle"
+            :class="groupLabel"
+            :aria-expanded="isOpen('design')"
+            @click="toggle('design')"
+          >
+            <span>Design</span>
+            <svg class="group-chevron" :class="{ 'group-chevron--open': isOpen('design') }" viewBox="0 0 10 10" aria-hidden="true">
+              <path d="M2.5 4 5 6.5 7.5 4" fill="none" stroke="currentColor" stroke-width="1.4" stroke-linecap="round" stroke-linejoin="round" />
+            </svg>
+          </button>
+          <div class="group-body" :class="{ 'group-body--open': isOpen('design') }">
+            <div class="group-body__inner flex flex-col gap-0.5">
+              <button :class="[item, brandThemesOpen ? itemActive : '']" @click="emit('brandThemes')">
+                Brand &amp; themes
+              </button>
+              <button :class="[item, headerFooterOpen ? itemActive : '']" @click="emit('headerFooter')">
+                Header &amp; footer
+              </button>
+              <button :class="[item, blocksOpen ? itemActive : '']" @click="emit('blocks')">
+                Blocks
+              </button>
+            </div>
           </div>
         </div>
-      </div>
+
+        <div class="rail-group">
+          <button
+            class="group-toggle"
+            :class="groupLabel"
+            :aria-expanded="isOpen('structure')"
+            @click="toggle('structure')"
+          >
+            <span>Structure</span>
+            <svg class="group-chevron" :class="{ 'group-chevron--open': isOpen('structure') }" viewBox="0 0 10 10" aria-hidden="true">
+              <path d="M2.5 4 5 6.5 7.5 4" fill="none" stroke="currentColor" stroke-width="1.4" stroke-linecap="round" stroke-linejoin="round" />
+            </svg>
+          </button>
+          <div class="group-body" :class="{ 'group-body--open': isOpen('structure') }">
+            <div class="group-body__inner flex flex-col gap-0.5">
+              <button :class="[item, contentTypesOpen ? itemActive : '']" @click="emit('contentTypes')">
+                Content types
+              </button>
+              <button :class="[item, languagesOpen ? itemActive : '']" @click="emit('languages')">
+                Languages
+              </button>
+              <button
+                v-if="seoFile"
+                :class="[item, activeSettings === seoFile.name ? itemActive : '']"
+                @click="emit('openSettings', seoFile)"
+              >
+                {{ seoFile.label }}
+              </button>
+              <button
+                v-if="redirectsFile"
+                :class="[item, activeSettings === redirectsFile.name ? itemActive : '']"
+                @click="emit('openSettings', redirectsFile)"
+              >
+                {{ redirectsFile.label }}
+              </button>
+            </div>
+          </div>
+        </div>
+
+        <div class="rail-group">
+          <button
+            class="group-toggle"
+            :class="groupLabel"
+            :aria-expanded="isOpen('site')"
+            @click="toggle('site')"
+          >
+            <span>Site</span>
+            <svg class="group-chevron" :class="{ 'group-chevron--open': isOpen('site') }" viewBox="0 0 10 10" aria-hidden="true">
+              <path d="M2.5 4 5 6.5 7.5 4" fill="none" stroke="currentColor" stroke-width="1.4" stroke-linecap="round" stroke-linejoin="round" />
+            </svg>
+          </button>
+          <div class="group-body" :class="{ 'group-body--open': isOpen('site') }">
+            <div class="group-body__inner flex flex-col gap-0.5">
+              <button :class="[item, peopleOpen ? itemActive : '']" @click="emit('people')">
+                People
+              </button>
+              <button :class="[item, healthOpen ? itemActive : '']" @click="emit('health')">
+                Site health
+              </button>
+              <button :class="[item, updatesOpen ? itemActive : '']" @click="emit('updates')">
+                Software
+              </button>
+            </div>
+          </div>
+        </div>
+      </template>
     </div>
 
     <div class="flex-shrink-0 border-t border-[var(--border)] pt-2 flex flex-col gap-0.5">
       <button
+        v-if="isOwner"
         class="nav-item flex items-center gap-1.5"
         :class="{ 'nav-item--active': publishOpen }"
         @click="emit('publish')"

@@ -43,6 +43,7 @@ const LanguagesView = lazyPane(() => import("./ui/LanguagesView.vue"));
 const HeaderFooterView = lazyPane(() => import("./ui/HeaderFooterView.vue"));
 const BrandThemesView = lazyPane(() => import("./ui/BrandThemesView.vue"));
 const ContentTypesView = lazyPane(() => import("./ui/ContentTypesView.vue"));
+const PeopleView = lazyPane(() => import("./ui/PeopleView.vue"));
 const PublishView = lazyPane(() => import("./ui/PublishView.vue"));
 const OnboardingWizard = lazyPane(() => import("./ui/OnboardingWizard.vue"));
 import { GitHubClient } from "./backend/github";
@@ -51,6 +52,7 @@ import { site, loadSiteConfig } from "./backend/site";
 import { resolveStagingOrigin } from "./backend/site-urls";
 import { loadSchema } from "./backend/schema";
 import { refreshVersionState } from "./backend/version";
+import { access, loadAccess } from "./backend/access";
 import { reportError } from "./errors";
 import { confirmDiscard } from "./ui/dirty";
 import {
@@ -77,6 +79,7 @@ type Pane =
   | "brandThemes"
   | "blocks"
   | "contentTypes"
+  | "people"
   | "publish";
 
 const route = useRoute();
@@ -100,6 +103,10 @@ client.value
       // Advisory only — resolves the "View" links. Never rejects, so it cannot
       // stop the boot chain that follows.
       resolveStagingOrigin(client.value),
+      // Who is signed in and what they may do. Also never rejects: it fails to
+      // "not an owner", so a hiccup hides owner-only controls rather than
+      // offering them. The server enforces the same rule either way.
+      loadAccess(client.value),
     ]),
   )
   .then(() => {
@@ -116,6 +123,12 @@ client.value
     void refreshVersionState(client.value);
   });
 
+// Does this user get the owner's chrome? Publish, settings and hosting are hidden
+// from an editor — and while access is still loading, so that the answer is never
+// "yes" by default. This only decides what is OFFERED: the gh proxy re-checks every
+// write against lanza.config.json regardless (functions/_lib/roles.ts).
+const ownerView = computed(() => access.loaded && access.role === "owner");
+
 // Every navigation guards on unsaved changes — one global guard replaces the
 // per-action confirmDiscard() calls the manual nav functions used to make.
 router.beforeEach(() => confirmDiscard());
@@ -130,6 +143,7 @@ const SPECIAL_PANELS: Record<string, Pane> = {
   health: "health",
   updates: "updates",
   languages: "languages",
+  people: "people",
 };
 function settingsFileByName(name: string): FileEntry | null {
   const fc = COLLECTIONS.find((c) => c.kind === "files");
@@ -237,6 +251,8 @@ function onOnboarded() {
       :health-open="pane === 'health'"
       :updates-open="pane === 'updates'"
       :content-types-open="pane === 'contentTypes'"
+      :people-open="pane === 'people'"
+      :is-owner="ownerView"
       :publish-open="pane === 'publish'"
       :locale="locale"
       :help-open="pane === 'help'"
@@ -250,6 +266,7 @@ function onOnboarded() {
       @health="openPanel('health')"
       @updates="openPanel('updates')"
       @content-types="openPanel('contentTypes')"
+      @people="openPanel('people')"
       @publish="openPublish"
       @help="openHelp"
     />
@@ -317,6 +334,7 @@ function onOnboarded() {
         :client="client"
         @back="backToList"
       />
+      <PeopleView v-else-if="pane === 'people'" :client="client" @back="backToList" />
       <PublishView
         v-else-if="pane === 'publish'"
         :client="client"
