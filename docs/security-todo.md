@@ -10,7 +10,58 @@ work it implies. Companions: `security-model.md` (**authoritative on authz**),
 > re-implementation of that answer.
 
 This document is a direction and a set of experiments, **not an approved migration.**
-Nothing here should be refactored before §3 is verified.
+
+---
+
+## 0. START HERE — status and next steps
+
+**Session of 2026-08-09 ended here. Nothing in the product was changed by any of this
+work — the experiments were a throwaway repo and a prototype. `main` is clean.**
+
+### What is settled (all tested live, not assumed — see §3)
+
+| Question | Answer |
+|---|---|
+| Can the CMS log in with no secret? | **Yes** — GitHub Device Flow |
+| Can it refresh with no secret? | **Yes** — so zero secrets, permanently |
+| Who may edit? | GitHub — `permissions.push` |
+| Who may publish? | GitHub knows (`permissions.admin`) but **cannot enforce it** on a free private repo |
+| Is the token safely bounded? | **Yes** — installation ∩ user permission. 2 writable repos out of 33 owned |
+| Can a browser do this alone? | **No** — `github.com/login/*` sends no CORS. Zero-**secret**, not zero-**server** |
+
+### The decision that is actually open
+
+**Do we migrate?** It is a real migration, not a quick change. Nothing is broken
+today; the current system works. The case for it is in §1 and §9. Do not start it
+casually, and do not start it in the same session as unrelated feature work.
+
+### Next steps, in order
+
+1. **Decide** whether to migrate at all. Owner call, not a technical one.
+2. If yes → **design the target** before writing anything: where the refresh token
+   lives, what the thin proxy keeps, how publish is checked, what onboarding still
+   needs the broker for. Write it here first.
+3. Then migrate **by deletion**, in phases (§4), each phase verified with `npm test`.
+
+### Do these regardless — they are small and unrelated to the migration (§6)
+
+- [ ] Rotate the credentials `keys-and-secrets.md` §7 lists as owed
+- [ ] Point the bot's `GITHUB_TOKEN` at `staging`, not `main`
+- [ ] Purge the Cloudflare cache so the deleted `/hgjhg/` stops 200-ing
+- [ ] Scope down the local `gh` PAT (`admin:org`, `admin:enterprise`, `delete_repo`)
+
+### One live gap shipped on 2026-08-09 — decide before it bites
+
+The **People panel is deployed** and says nothing about the fact that **removing an
+editor does not lock them out for up to 7 days** (sessions cannot be revoked, §7).
+Either surface that in the panel or fix the underlying gap. This is the only item
+here where the current UI actively misleads a user.
+
+### Where the prototype is
+
+`prototype/device-cms/` — `node prototype/device-cms/server.mjs` → localhost:4400.
+Runs against `dsottimano/dave-test`. Holds no secret. Not shipped (absent from
+`package.json` `files[]`). Safe to delete once the direction is decided.
 
 ---
 
