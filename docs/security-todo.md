@@ -121,19 +121,28 @@ requires a client secret, which is why a server exists in the auth path at all.
       `push` *is* "may this person edit". `dsottimano/lanza` → `push: true`;
       `torvalds/linux` → `push: false, pull: true`.
 
-- [ ] **Remaining unknown: token refresh.** `expires_in: 28800` means *Expire user
-      authorization tokens* is on, so a refresh token is issued — and refreshing a
-      GitHub App user token is **documented as requiring the client secret**, which
-      would put one secret back. Untested here.
+- [x] **Token refresh — TESTED 2026-08-09. No secret required.**
 
-      Two ways out, neither needing a secret:
-      - **Treat 8h as the session lifetime and re-run device flow to log in again.**
-        This is *better* than today's 7-day unrevocable session, not worse.
-      - Turn off token expiry on the App — **rejected**: a non-expiring token is a
-        worse credential to hold, and the point of this exercise is smaller blast
-        radius, not longer-lived tokens.
+      A refresh token works immediately; there is no need to wait for the access
+      token to expire. Sent `client_id` + `grant_type=refresh_token` +
+      `refresh_token`, **no `client_secret`** → a new `ghu_` access token came back.
 
-      Verify before designing around it.
+      ```
+      access_token  ghu_…  expires_in                 28800  (8 hours)
+      refresh_token ghr_…  refresh_token_expires_in 15897600 (184 days)
+      refresh WITHOUT client_secret → SUCCESS
+      ```
+
+      **So the CMS can hold zero secrets, permanently** — not just for login, but
+      for the whole token lifecycle. The last unknown is closed.
+
+      **One honest caveat.** The refresh token lives **184 days**, so it is now the
+      longest-lived credential in the design — it must sit in an HttpOnly cookie, and
+      it should be treated as the thing worth protecting. It is still better than
+      what it replaces: today's 7-day session **cannot be revoked at all**, whereas a
+      GitHub refresh token is revoked instantly by the user from their own GitHub
+      settings, or by uninstalling the App. Revocation moves from "impossible" to
+      "the user can do it themselves, without us."
 
 - [x] **Prototype built** — `prototype/device-cms/` against `dsottimano/dave-test`.
       Sign-in, `permissions.push`, and a real write to `staging` all confirmed live.
