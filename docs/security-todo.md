@@ -149,9 +149,11 @@ requires a client secret, which is why a server exists in the auth path at all.
       `client_id` alone and never asked for a secret. The flow is secretless by
       construction; the only blocker is a checkbox.
 
-- [ ] **Flip the toggle** — GitHub App settings → `lanza-cms` → General →
-      **Enable Device Flow** → Save. (Owner action; needs the App owner's login.
-      If the App is org-owned it is under the org's Developer settings instead.)
+- [x] **Flip the toggle.** **DONE — confirmed 2026-08-09** by probing
+      `POST /login/device/code` with the real `client_id`: it now returns a live
+      `device_code` + `user_code` instead of `device_flow_disabled`. The checkbox
+      was already flipped during the round-trip work below; this box was just
+      never ticked.
 
 - [x] **Complete the round trip.** **DONE 2026-08-09 — both confirmed.**
 
@@ -403,7 +405,7 @@ Six steps, no secret at any of them.
 | # | Step | Who holds what |
 |---|---|---|
 | 1 | Unauthenticated `/admin` renders a **sign-in screen** (not a redirect — device flow has nowhere to redirect to) | — |
-| 2 | `POST /admin/api/auth/device/start` relays to `github.com/login/device/code` with `client_id` only; returns `user_code` + `verification_uri` | `client_id` is public |
+| 2 | `POST /admin/api/auth/device/start` relays to `github.com/login/device/code` with `client_id` only; returns `user_code` + `verification_uri`, and keeps the **device code server-side in an HttpOnly cookie** | `client_id` is public |
 | 3 | The person enters the code at `github.com/login/device` | GitHub authenticates them |
 | 4 | `POST /admin/api/auth/device/poll` relays to `github.com/login/oauth/access_token`; on success sets **two HttpOnly cookies** and returns neither to JS | tenant holds them per-browser, not per-site |
 | 5 | The proxy attaches the access token to every GitHub call | browser JS never sees a token |
@@ -425,7 +427,18 @@ their own GitHub settings, or by removing them as a collaborator.
 
 **Why a server still exists** (§3's CORS finding): `github.com/login/*` sends no
 `Access-Control-Allow-Origin`, so the browser cannot do steps 2, 4 or 6 itself.
-Three thin relays and a token-attacher. Zero-**secret**, not zero-**server**.
+**Two** thin relays and a token-attacher — step 6 happens *inside* the proxy, which
+already has the request in hand and can append `Set-Cookie` to its own response, so a
+third `/refresh` route would be an endpoint nothing calls. Zero-**secret**, not
+zero-**server**.
+
+**The device code never reaches the page.** `/start` puts it in an HttpOnly cookie and
+returns only what a human reads off the screen; `/poll` takes it from that cookie and
+ignores the request body. Without that binding, someone could approve a flow with
+their OWN GitHub account and feed the code to a victim's browser — signing that
+browser in as the attacker, who then receives whatever the victim writes. It is the
+device-flow shape of a login CSRF, and it is why this differs from the prototype,
+which passed the device code through the page.
 
 ### 10.2 Roles come from GitHub's own booleans
 
@@ -544,7 +557,7 @@ live, so no phase can sign anyone out mid-flight.
 
 | # | Phase | Done when |
 |---|---|---|
-| 1 | Add the three device relays + cookies. Change nothing else | Local dev login against a test repo yields both cookies |
+| 1 | Add the device relays + cookies. Change nothing else | **DONE — see §10.9** |
 | 2 | Gate reads GitHub `permissions`; roles resolve from booleans. **Both** cookie families accepted | An RS256 session and a `ghu_` cookie both open `/admin` |
 | 3 | Proxy uses the user token; drop the broker mint and the PAT fallback | Editor + owner writes work; the 29 cases still pass |
 | 4 | **Delete** §10.5's CMS half. Everyone re-authenticates once | Grep finds no `HANDOFF`, no `adminLogin` |
@@ -557,3 +570,40 @@ live, so no phase can sign anyone out mid-flight.
 phases 1–3 verify against local dev + a test repo, and only phase 4's cutover touches
 a live tenant. `dmg` (datadefine-owned) is the tenant-side test target, never
 lanzacms.com.
+
+### 10.9 Phase 1 — status
+
+**Shipped 2026-08-09.** Additive only: nothing existing changed behaviour, and the
+old auth path is untouched and still the only thing that authorises anything.
+
+- `functions/_lib/device-flow.ts` — the whole flow as a pure, runtime-neutral module
+  (the `gh-proxy.ts` pattern), so dev and prod cannot drift when phase 3 wires it in
+- `functions/admin/api/auth/device/{start,poll}.ts` — the two relays
+- `functions/_lib/device-flow.test.mjs` — 20 tests; `admin-gate` gains 5
+- **`npm test` green: 154 functions (was 134) + 91 admin. `tsc --noEmit` clean.**
+
+**Verified live against GitHub:**
+
+| | |
+|---|---|
+| App toggle | Device Flow **enabled** — real `device_code` + `user_code` returned |
+| `/start` request shape | Accepted; `client_id` the only field sent |
+| `/poll` request shape | **~60 live polls** answered `authorization_pending`. A malformed or secret-requiring request returns `invalid_request` / `incorrect_client_credentials` instead, so this confirms the exact three-field, secretless body is what GitHub expects |
+| `permissions` on the test repo | Present and complete — the §10.2 role source, confirmed on `dsottimano/dave-test` |
+
+**NOT yet verified in this implementation:** the final token exchange and the refresh
+round trip. §3 proved both live last session with ad-hoc code, and the module's own
+tests cover its reading of those replies — but *this* code has not held a real `ghu_`
+token yet. **Phase 2 must not be called done until it has.** It needs a human to
+approve a code once, at a browser that can reach GitHub.
+
+> Attempted 2026-08-09 and abandoned: the approval leg could not be completed
+> (GitHub returning 404/500 on mobile sign-in at the time). Not a defect in this
+> work — and a note worth keeping, because it is the first real-world instance of
+> device flow's one hard dependency: **the person must be able to sign in to
+> github.com on some device.** Nothing here can route around that.
+
+**Two design changes made while building, both in §10.1:** two relays rather than
+three (the proxy refreshes inline; a `/refresh` route would be dead code), and the
+device code is now bound to the browser in an HttpOnly cookie instead of passing
+through the page as the prototype did.

@@ -20,6 +20,12 @@ const AUTH_EXEMPT = new Set([
   "/admin/api/auth/login",
   "/admin/api/auth/handoff",
   "/admin/api/auth/logout",
+  // The device-flow sign-in (docs/security-todo.md §10.1). Unauthenticated by
+  // necessity — they ARE how you authenticate. Neither grants anything on its own:
+  // /start asks GitHub for a code, and /poll can only ever return a token for the
+  // person who just approved one at github.com with their own GitHub credentials.
+  "/admin/api/auth/device/start",
+  "/admin/api/auth/device/poll",
 ]);
 
 /** May this exact /admin path be served without a session? */

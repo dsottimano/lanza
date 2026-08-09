@@ -36,12 +36,20 @@ test("the auth exemption is an exact set, not a prefix", () => {
   assert.ok(isAuthExempt("/admin/api/auth/login"));
   assert.ok(isAuthExempt("/admin/api/auth/handoff"));
   assert.ok(isAuthExempt("/admin/api/auth/logout"));
+  // The device-flow sign-in (docs/security-todo.md §10.1).
+  assert.ok(isAuthExempt("/admin/api/auth/device/start"));
+  assert.ok(isAuthExempt("/admin/api/auth/device/poll"));
   // One trailing slash is tolerated so a stray link still starts a login.
   assert.ok(isAuthExempt("/admin/api/auth/login/"));
 
   // Everything that merely LOOKS like it lives under the auth prefix.
   assert.ok(!isAuthExempt("/admin/api/auth/"));
   assert.ok(!isAuthExempt("/admin/api/auth/anything-else"));
+  // Adding a nested pair must not admit the directory above them, nor anything
+  // else hung off it — the exact-set property is the whole defence here.
+  assert.ok(!isAuthExempt("/admin/api/auth/device"));
+  assert.ok(!isAuthExempt("/admin/api/auth/device/"));
+  assert.ok(!isAuthExempt("/admin/api/auth/device/start/../../cf/accounts"));
   assert.ok(!isAuthExempt("/admin/api/auth/login/../cf/accounts"));
   assert.ok(!isAuthExempt("/admin/api/authx/login"));
   assert.ok(!isAuthExempt("/admin/api/cf/accounts"));
