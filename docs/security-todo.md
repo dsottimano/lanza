@@ -9,7 +9,9 @@ work it implies. Companions: `security-model.md` (**authoritative on authz**),
 > authoritatively and instantly. Almost everything we hold a secret for is a
 > re-implementation of that answer.
 
-This document is a direction and a set of experiments, **not an approved migration.**
+**Updated 2026-08-09: the migration is approved.** §0 records the decision and the
+choices that shape it; **§10 is the target design** and is authoritative for the work.
+§1–§9 are the reasoning that got there, kept as written.
 
 ---
 
@@ -29,19 +31,28 @@ work — the experiments were a throwaway repo and a prototype. `main` is clean.
 | Is the token safely bounded? | **Yes** — installation ∩ user permission. 2 writable repos out of 33 owned |
 | Can a browser do this alone? | **No** — `github.com/login/*` sends no CORS. Zero-**secret**, not zero-**server** |
 
-### The decision that is actually open
+### The decision — MADE 2026-08-09. We migrate.
 
-**Do we migrate?** It is a real migration, not a quick change. Nothing is broken
-today; the current system works. The case for it is in §1 and §9. Do not start it
-casually, and do not start it in the same session as unrelated feature work.
+Owner's call, recorded with the three choices that shape it:
 
-### Next steps, in order
+| Question | Decision |
+|---|---|
+| Login UX — device code instead of one click | **Accepted.** See the correction below: it is once per browser, not once a day |
+| Editors | **GitHub collaborators, CMS-enforced.** An invited editor must actually be able to write the repo. §10.3 states the limit this carries |
+| Scope | **Everything §4 lists** — CMS, MCP, `FANOUT_SECRET`, the bot PAT. §10.7 corrects one item that cannot in fact be deleted |
+| A third role? | **Viewer, where GitHub can express it** — org-owned repos only. §10.2 |
 
-1. **Decide** whether to migrate at all. Owner call, not a technical one.
-2. If yes → **design the target** before writing anything: where the refresh token
-   lives, what the thin proxy keeps, how publish is checked, what onboarding still
-   needs the broker for. Write it here first.
-3. Then migrate **by deletion**, in phases (§4), each phase verified with `npm test`.
+**The target design is §10.** Read it before writing any code. Phases are §10.8;
+each ends at a green `npm test` (baseline: 134 functions + 91 admin).
+
+> **Correction to an earlier framing.** The 8-hour token does *not* mean an 8-hourly
+> device code. GitHub fixes that TTL and it is not ours to extend — the only App
+> setting that touches it *disables* expiry entirely, which yields a permanent
+> `ghu_` token and **no refresh token at all**, strictly worse. It does not matter:
+> refresh happens server-side and silently, and §3 measured a *fresh* 184-day
+> refresh token coming back from each refresh. The window slides, so **a person who
+> opens the CMS at least once every 184 days enters a device code exactly once, per
+> browser, ever.**
 
 ### Do these regardless — they are small and unrelated to the migration (§6)
 
@@ -372,3 +383,177 @@ Not 100x. Roughly:
 
 An order of magnitude in parts, and a **categorical** change in blast radius. That is
 the win, and it comes from deleting code rather than writing it.
+
+---
+
+## 10. The target design — authoritative for the migration
+
+**Written 2026-08-09, after the decision in §0.** This is what we are building
+toward. `security-model.md` stays authoritative for what is *deployed*; this
+describes what replaces it, and does not become true until the phases in §10.8 land.
+
+**The thesis, restated as a design rule:** *GitHub is the identity system.* We do not
+mint tokens, keep lists of people, or answer "who is this" — we ask, cache the answer
+briefly, and enforce our own product policy on top of it.
+
+### 10.1 The auth path
+
+Six steps, no secret at any of them.
+
+| # | Step | Who holds what |
+|---|---|---|
+| 1 | Unauthenticated `/admin` renders a **sign-in screen** (not a redirect — device flow has nowhere to redirect to) | — |
+| 2 | `POST /admin/api/auth/device/start` relays to `github.com/login/device/code` with `client_id` only; returns `user_code` + `verification_uri` | `client_id` is public |
+| 3 | The person enters the code at `github.com/login/device` | GitHub authenticates them |
+| 4 | `POST /admin/api/auth/device/poll` relays to `github.com/login/oauth/access_token`; on success sets **two HttpOnly cookies** and returns neither to JS | tenant holds them per-browser, not per-site |
+| 5 | The proxy attaches the access token to every GitHub call | browser JS never sees a token |
+| 6 | On a `401` from GitHub, the proxy refreshes once (`client_id` + `grant_type=refresh_token`, **no secret**), re-sets both cookies, retries | refresh rotates → sliding window |
+
+**Where the tokens live** — the question §3 left open:
+
+```
+lanza_gh          ghu_…  Max-Age 28800     (8h)    HttpOnly Secure SameSite=Lax Path=/admin
+lanza_gh_refresh  ghr_…  Max-Age 15897600  (184d)  HttpOnly Secure SameSite=Lax Path=/admin
+```
+
+`Path=/admin` keeps both off every cached public route, exactly as `lanza_session`
+does today. The refresh token becomes the most valuable thing in the design and is
+treated as such — it is never returned to the page, never logged, and only ever sent
+to `github.com`. It is still better than what it replaces: today's 7-day session
+**cannot be revoked at all**, whereas this is revoked instantly by the user from
+their own GitHub settings, or by removing them as a collaborator.
+
+**Why a server still exists** (§3's CORS finding): `github.com/login/*` sends no
+`Access-Control-Allow-Origin`, so the browser cannot do steps 2, 4 or 6 itself.
+Three thin relays and a token-attacher. Zero-**secret**, not zero-**server**.
+
+### 10.2 Roles come from GitHub's own booleans
+
+`GET /repos/{owner}/{repo}` → `permissions`. No lists, anywhere.
+
+| GitHub says | Lanza role | May |
+|---|---|---|
+| `admin: true` | **owner** | everything — publish, settings, templates, Cloudflare |
+| `push: true` | **editor** | content only, working branch only |
+| `pull: true` only | **viewer** | read-only `/admin` |
+| no access | — | `403`, and the token could not write anyway |
+
+**On the viewer role.** GitHub's API reference is explicit that the collaborator
+`permission` parameter is *"Only valid on organization-owned repositories"*, default
+`push` — so on a **personal-account** repo every collaborator gets write, and a
+viewer cannot be expressed there. It costs nothing to read the boolean, so we do:
+the role is correct the day a tenant repo is org-owned, and simply never occurs
+before then. We do not simulate it with a list of our own — that is the exact move
+this migration exists to stop.
+
+**Caching.** One `GET /repos` per request is a round-trip we do not need. Cache the
+permissions per isolate, keyed by a hash of the access token, **60-second TTL**.
+That makes removal-of-access take effect in ≤60s — against 7 days today.
+
+### 10.3 Publish, and the limit we are accepting
+
+Owner-only publish is **one call before `POST /merges`**: `permissions.admin`.
+`roles.ts` collapses from a policy engine into that question plus the editor write
+rules it already enforces.
+
+State this plainly wherever it is user-visible, because it is a real change:
+
+> An editor is a repo collaborator, so they hold genuine write access to the
+> repository. The CMS refuses to let them publish. **Git does not.** An editor who
+> wants to can `git push` to `main` from a laptop and bypass every check here.
+
+Branch protection would close it and is **paid-plan-only on private repos** (§3,
+falsified live), and tenant repos must be private (§3a). So on GitHub Free this is
+enforced by the CMS and advisory at the repo. That is the honest description, and it
+is the trade the owner accepted: an invited editor must actually be able to edit, and
+someone you hand repo write to is someone you already trust.
+
+### 10.4 What the proxy keeps — it is demoted, not deleted
+
+**Keeps** (each earns its place):
+
+- **Attaching the token from an HttpOnly cookie.** The whole reason the browser
+  never holds a durable credential. XSS on `/admin` can still *drive* the proxy while
+  the page is open — true today too, and stated in `frontend/lib/url.ts`.
+- **Repo confinement** — `upstreamPath` + `upstreamTargetAllowed`. A user token is
+  bounded to *installation ∩ their permission*, which can be more than one repo; this
+  pins this site's proxy to this site's repo.
+- **The method+path allowlist.** §4 guessed most of it would go. It should not: with
+  editors enforceable (§0), path checks are load-bearing anyway, and the allowlist is
+  what keeps an XSS-driven call to something the CMS never does from reaching GitHub.
+- **`roles.ts`'s editor write rules** — content-only prefixes, working-branch-only,
+  `POST /merges` refused, tree entries checked, dot-segment and multi-round
+  percent-decoding defences. **All 29 adversarial cases survive**, because §5 is right
+  that those bypasses exist in any design where we decide who writes what — and we
+  still do.
+- The CSRF origin check and the `/admin` security headers.
+
+**Drops:** the broker mint round-trip (`broker-token.ts` and invariant I2 with it —
+there is no second credential to escalate *to*), the standing `GITHUB_TOKEN` PAT
+fallback, RS256 session verification, and `resolveRole`'s list lookup.
+
+### 10.5 What is deleted
+
+- `HANDOFF_PRIVATE_KEY`, `HANDOFF_PUBLIC_KEY`, `functions/_lib/session.ts`,
+  `functions/admin/api/auth/{login,handoff}.ts`, `functions/_lib/broker-token.ts`
+- `adminLogin` and `editors` from `lanza.config.json`; `admin/src/backend/access.ts`'s
+  list handling; **`PeopleView.vue` becomes a link to GitHub's collaborators
+  settings** — GitHub's UI *is* the invite panel, and it is instant
+- The 7-day unrevocable session, and the §7 revocation gap with it
+- The MCP OAuth AS: consent screen, refresh rotation, `sites` claim, the router
+- `FANOUT_SECRET` and its endpoint
+
+### 10.6 MCP
+
+Device flow is *designed* for input-constrained clients, so MCP uses the same
+`client_id` and the same flow: the client obtains its own `ghu_` token and sends it
+as the bearer; `functions/api/mcp.ts` validates it by asking GitHub the same
+`permissions` question as §10.2. The audience/`sites`/`typ` machinery exists to stop
+one broker-signed token being mistaken for another family — with no minting, there
+are no families, and the whole class of confusion in `session.ts`'s long comment
+disappears rather than being defended against.
+
+### 10.7 What survives, and one thing §4 got wrong
+
+**Survives, correctly:** static-only output, git as the database, no D1/R2 for
+content, the tenant holding no signing key, onboarding as a one-time wizard.
+
+**The broker does not go away — it leaves the *runtime* path.** It still holds
+`GH_APP_PRIVATE_KEY` to create a repo and install the App, and Cloudflare credentials
+to create a Pages project. That is onboarding, once per tenant, not per request.
+
+**Two secrets §4 implies are deletable, and are not:**
+
+1. **The bot's `GITHUB_TOKEN` cannot be eliminated.** The bot is an unattended
+   Worker with no user present; device flow needs a human at a browser. A machine
+   that writes a repo has to hold something. It can be *scoped* and *pointed at
+   `staging`* (§6) — that is the whole available win, and §4's "delete the bot's
+   standing PAT" overstates it.
+2. **The tenant still holds `CLOUDFLARE_API_TOKEN`** for `/admin/api/cf/*`. §1's
+   "a tenant holds only a public key" was never true for a tenant with hosting
+   controls wired up.
+
+Final inventory: broker ~2 (onboarding only), tenant 1 (Cloudflare), bot 3. From
+~12 + 1 + a keypair — and, more to the point, **nothing left whose leak is
+fleet-wide**.
+
+### 10.8 Phases
+
+Each ends green on `npm test`. Nothing is deleted until its replacement is proven
+live, so no phase can sign anyone out mid-flight.
+
+| # | Phase | Done when |
+|---|---|---|
+| 1 | Add the three device relays + cookies. Change nothing else | Local dev login against a test repo yields both cookies |
+| 2 | Gate reads GitHub `permissions`; roles resolve from booleans. **Both** cookie families accepted | An RS256 session and a `ghu_` cookie both open `/admin` |
+| 3 | Proxy uses the user token; drop the broker mint and the PAT fallback | Editor + owner writes work; the 29 cases still pass |
+| 4 | **Delete** §10.5's CMS half. Everyone re-authenticates once | Grep finds no `HANDOFF`, no `adminLogin` |
+| 5 | MCP to device flow; delete the AS | MCP writes against `dmg`, not lanzacms.com |
+| 6 | `FANOUT_SECRET` endpoint → a local operator script; bot scoped to `staging` | Fan-out runs from a laptop with the operator's own credentials |
+| 7 | Rotate what remains (§6); update `security-model.md`, `keys-and-secrets.md`, `/architecture` (§8) | Docs describe the deployed system again |
+
+**Testing constraint to solve in phase 1:** a Pages **preview** cannot host a login —
+`productionOriginIfPreview` bounces all of `/admin` to production, deliberately. So
+phases 1–3 verify against local dev + a test repo, and only phase 4's cutover touches
+a live tenant. `dmg` (datadefine-owned) is the tenant-side test target, never
+lanzacms.com.
