@@ -1,0 +1,186 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1" />
+<title>Device-flow CMS prototype</title>
+<style>
+  :root { --paper:#f3f1ea; --ink:#201d1b; --muted:#6b6560; --accent:#e4431b; --rule:#ddd8cc; --ok:#1a7f4b; }
+  * { box-sizing: border-box; }
+  body { margin:0; padding:2rem 1.5rem 4rem; background:var(--paper); color:var(--ink);
+         font:16px/1.6 ui-sans-serif,system-ui,sans-serif; }
+  main { max-width: 54rem; margin: 0 auto; }
+  h1 { font-size:1.9rem; letter-spacing:-0.02em; margin:0 0 .3rem; }
+  .sub { color:var(--muted); margin:0 0 2rem; }
+  section { border:1px solid var(--rule); background:#fbf9f3; padding:1.2rem 1.3rem; margin-bottom:1.1rem; }
+  h2 { font-size:.72rem; letter-spacing:.18em; text-transform:uppercase; color:var(--accent);
+       margin:0 0 .9rem; font-weight:600; }
+  button { font:inherit; padding:.6rem 1.1rem; border:1px solid var(--ink); background:var(--ink);
+           color:var(--paper); cursor:pointer; }
+  button.ghost { background:transparent; color:var(--ink); }
+  button:disabled { opacity:.45; cursor:default; }
+  code, pre { font-family:ui-monospace,Menlo,monospace; font-size:.86rem; }
+  pre { background:#efece2; padding:.8rem 1rem; overflow-x:auto; margin:.6rem 0 0; white-space:pre-wrap; }
+  .code { font-size:2rem; letter-spacing:.28em; font-family:ui-monospace,monospace; margin:.5rem 0; }
+  .row { display:flex; gap:.6rem; flex-wrap:wrap; align-items:center; }
+  .verdict { font-weight:600; }
+  .yes { color:var(--ok); } .no { color:var(--accent); }
+  textarea { width:100%; min-height:7rem; font-family:ui-monospace,monospace; font-size:.86rem;
+             padding:.7rem; border:1px solid var(--rule); background:#fff; }
+  .hint { color:var(--muted); font-size:.86rem; }
+</style>
+</head>
+<body>
+<main>
+  <h1>Device-flow CMS prototype</h1>
+  <p class="sub">Zero secrets. GitHub decides who may edit, and branch protection decides who may publish.</p>
+
+  <section>
+    <h2>1 · Sign in</h2>
+    <div class="row">
+      <button id="signin">Start device flow</button>
+      <button id="signout" class="ghost">Sign out</button>
+    </div>
+    <div id="deviceBox" hidden>
+      <p class="hint">Open <a id="vuri" target="_blank" rel="noopener">github.com/login/device</a> and enter:</p>
+      <div class="code" id="ucode"></div>
+      <p class="hint" id="pollstate">Waiting for approval…</p>
+    </div>
+    <pre id="who" hidden></pre>
+  </section>
+
+  <section>
+    <h2>2 · May this person edit? — GitHub answers</h2>
+    <p class="hint">No <code>adminLogin</code>, no <code>editors</code> list, no <code>roles.ts</code>. One API call.</p>
+    <button id="perms" disabled>Check permissions</button>
+    <pre id="permsOut" hidden></pre>
+  </section>
+
+  <section>
+    <h2>3 · Edit content on the working branch</h2>
+    <textarea id="body"># Hello from the device-flow prototype
+
+No secret was used to write this.</textarea>
+    <div class="row" style="margin-top:.7rem">
+      <button id="save" disabled>Save to staging</button>
+    </div>
+    <pre id="saveOut" hidden></pre>
+  </section>
+
+  <section>
+    <h2>4 · May this person publish? — branch protection answers</h2>
+    <p class="hint">Publish is a merge into <code>main</code>. Nothing in this prototype checks a role;
+       GitHub either allows the merge or refuses it.</p>
+    <button id="publish" disabled>Publish (merge staging → main)</button>
+    <pre id="pubOut" hidden></pre>
+  </section>
+</main>
+
+<script type="module">
+const $ = (id) => document.getElementById(id);
+const show = (el, text) => { el.hidden = false; el.textContent = text; };
+let cfg = await (await fetch("/api/config")).json();
+let signedIn = false;
+
+const gh = async (path, opts = {}) => {
+  const r = await fetch(`/api/gh/${path}`, {
+    method: opts.method ?? "GET",
+    headers: opts.body ? { "content-type": "application/json" } : {},
+    body: opts.body ? JSON.stringify(opts.body) : undefined,
+  });
+  let data = null;
+  try { data = await r.json(); } catch { /* empty body */ }
+  return { status: r.status, data };
+};
+
+const setEnabled = (on) => {
+  signedIn = on;
+  for (const id of ["perms", "save", "publish"]) $(id).disabled = !on;
+};
+
+$("signin").onclick = async () => {
+  const start = await (await fetch("/api/device/start", { method: "POST" })).json();
+  if (!start.device_code) return show($("who"), JSON.stringify(start, null, 2));
+  $("deviceBox").hidden = false;
+  $("ucode").textContent = start.user_code;
+  $("vuri").href = start.verification_uri;
+  $("vuri").textContent = start.verification_uri;
+
+  const deadline = Date.now() + (start.expires_in ?? 900) * 1000;
+  const tick = async () => {
+    if (Date.now() > deadline) { $("pollstate").textContent = "Code expired — start again."; return; }
+    const r = await (await fetch("/api/device/poll", {
+      method: "POST", headers: { "content-type": "application/json" },
+      body: JSON.stringify({ device_code: start.device_code }),
+    })).json();
+    if (r.ok) {
+      $("pollstate").textContent = `Signed in. Token expires in ${r.expires_in}s. It is in an HttpOnly cookie — this page cannot read it.`;
+      const me = await gh("user");
+      show($("who"), `signed in as: ${me.data?.login}\ntoken visible to JavaScript: no`);
+      setEnabled(true);
+      return;
+    }
+    setTimeout(tick, (start.interval ?? 5) * 1000);
+  };
+  setTimeout(tick, (start.interval ?? 5) * 1000);
+};
+
+$("signout").onclick = async () => {
+  await fetch("/api/logout");
+  setEnabled(false);
+  show($("who"), "signed out");
+};
+
+$("perms").onclick = async () => {
+  const r = await gh(`repos/${cfg.repo}`);
+  const p = r.data?.permissions ?? {};
+  show($("permsOut"),
+    `GET /repos/${cfg.repo} → ${r.status}\n` +
+    `permissions: ${JSON.stringify(p)}\n\n` +
+    `may edit  (permissions.push)  : ${p.push ? "YES" : "NO"}\n` +
+    `may admin (permissions.admin) : ${p.admin ? "YES" : "NO"}\n\n` +
+    `This is the whole authorization decision. GitHub computed it.`);
+};
+
+$("save").onclick = async () => {
+  // Make sure the working branch exists, branching from production.
+  const head = await gh(`repos/${cfg.repo}/git/ref/heads/${cfg.productionBranch}`);
+  const work = await gh(`repos/${cfg.repo}/git/ref/heads/${cfg.workingBranch}`);
+  let log = "";
+  if (work.status === 404 && head.data?.object?.sha) {
+    const made = await gh(`repos/${cfg.repo}/git/refs`, {
+      method: "POST",
+      body: { ref: `refs/heads/${cfg.workingBranch}`, sha: head.data.object.sha },
+    });
+    log += `created ${cfg.workingBranch}: ${made.status}\n`;
+  }
+  const path = "prototype-note.md";
+  const existing = await gh(`repos/${cfg.repo}/contents/${path}?ref=${cfg.workingBranch}`);
+  const put = await gh(`repos/${cfg.repo}/contents/${path}`, {
+    method: "PUT",
+    body: {
+      message: "prototype: write via device-flow token",
+      content: btoa(unescape(encodeURIComponent($("body").value))),
+      branch: cfg.workingBranch,
+      ...(existing.data?.sha ? { sha: existing.data.sha } : {}),
+    },
+  });
+  show($("saveOut"), `${log}PUT contents/${path} (branch ${cfg.workingBranch}) → ${put.status}\n` +
+    (put.status < 300 ? "written." : JSON.stringify(put.data, null, 2)));
+};
+
+$("publish").onclick = async () => {
+  const r = await gh(`repos/${cfg.repo}/merges`, {
+    method: "POST",
+    body: { base: cfg.productionBranch, head: cfg.workingBranch, commit_message: "prototype: publish" },
+  });
+  const verdict =
+    r.status === 201 ? "MERGED — GitHub allowed it (this account may publish)" :
+    r.status === 204 ? "nothing to merge — main already up to date" :
+    r.status === 403 || r.status === 409 ? "REFUSED by GitHub — branch protection is the publish gate" :
+    "see response";
+  show($("pubOut"), `POST /merges → ${r.status}\n${verdict}\n\n${JSON.stringify(r.data, null, 2)}`);
+};
+</script>
+</body>
+</html>
