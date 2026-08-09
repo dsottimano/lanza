@@ -5,14 +5,15 @@
 // No jargon. Ends on the real create-your-site action (connect.lanzacms.com).
 // Bilingual. Pure CSS/type, static + cacheable. Rendered by pages/start.astro
 // + en mirror.
-import type { Locale } from "../lib/i18n";
+import { DEFAULT_LOCALE, localeUrl, type Locale } from "../lib/i18n";
 
 interface Props {
   locale?: Locale;
 }
-const { locale = "es" } = Astro.props;
+const { locale = DEFAULT_LOCALE } = Astro.props;
 const isEn = locale === "en";
-const base = isEn ? "/en" : "";
+// See HowItWorks.astro: the old `isEn ? "/en" : ""` inverted the prefix rule.
+const href = (path: string) => localeUrl(locale, path);
 const startUrl = "https://connect.lanzacms.com/";
 
 const es = {
@@ -181,7 +182,7 @@ const t = isEn ? en : es;
       <h2 class="st-cta__head">{t.ctaHead}</h2>
       <p class="st-cta__sub">{t.ctaSub}</p>
       <a class="st-btn" href={startUrl}>{t.cta}<span class="st-arrow" aria-hidden="true">↗</span></a>
-      <a class="st-learn" href={`${base}/how-it-works`}>{t.learn}</a>
+      <a class="st-learn" href={href("how-it-works/")}>{t.learn}</a>
     </div>
   </section>
 </div>

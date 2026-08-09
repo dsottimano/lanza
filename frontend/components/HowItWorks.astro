@@ -7,14 +7,20 @@
 // real stack, named: your words → agent → git → GitHub → Cloudflare Pages
 // (Astro) → global edge → Google + agents. Static + cacheable (inline is:inline
 // script only). Bilingual. Rendered by pages/how-it-works.astro + en mirror.
-import type { Locale } from "../lib/i18n";
+import { DEFAULT_LOCALE, localeUrl, type Locale } from "../lib/i18n";
 
 interface Props {
   locale?: Locale;
 }
-const { locale = "es" } = Astro.props;
+const { locale = DEFAULT_LOCALE } = Astro.props;
 const isEn = locale === "en";
-const base = isEn ? "/en" : "";
+// Internal links go through localeUrl, which applies the ONE prefix rule (default
+// locale at the root, others prefixed). This used to be `isEn ? "/en" : ""`, from
+// when the default locale was Spanish — after the switch to en-default it was
+// exactly backwards: the English page linked to /en/start (404) and the Spanish
+// page linked to /start (the English one). Deriving it removes the magic string,
+// so flipping data/site.json can never strand these links again.
+const href = (path: string) => localeUrl(locale, path);
 
 const es = {
   tag: "CÓMO FUNCIONA · SIN MAGIA",
@@ -105,7 +111,7 @@ const t = isEn ? en : es;
       <span class="hiw-eyebrow">{t.devEyebrow}</span>
       <h2 class="hiw-h2">{t.devHead}</h2>
       <p class="hiw-lede">{t.devBody}</p>
-      <a class="hiw-link" href={`${base}/agents`}>{t.devLink}<span class="hiw-arrow" aria-hidden="true">↗</span></a>
+      <a class="hiw-link" href={href("agents/")}>{t.devLink}<span class="hiw-arrow" aria-hidden="true">↗</span></a>
     </div>
   </section>
 
@@ -113,7 +119,7 @@ const t = isEn ? en : es;
     <div class="hiw-wrap hiw-wrap--narrow">
       <h2 class="hiw-cta__head">{t.ctaHead}</h2>
       <p class="hiw-cta__sub">{t.ctaSub}</p>
-      <a class="hiw-btn" href={`${base}/start`}>{t.cta}<span class="hiw-arrow" aria-hidden="true">↗</span></a>
+      <a class="hiw-btn" href={href("start/")}>{t.cta}<span class="hiw-arrow" aria-hidden="true">↗</span></a>
     </div>
   </section>
 </div>

@@ -5,14 +5,15 @@
 // how to operate one on a human's behalf (the repo + schema.ts content model).
 // Points to the existing /llms.txt generator rather than duplicating it.
 // Bilingual. Static + cacheable. Rendered by pages/agents.astro + en mirror.
-import type { Locale } from "../lib/i18n";
+import { DEFAULT_LOCALE, localeUrl, type Locale } from "../lib/i18n";
 
 interface Props {
   locale?: Locale;
 }
-const { locale = "es" } = Astro.props;
+const { locale = DEFAULT_LOCALE } = Astro.props;
 const isEn = locale === "en";
-const base = isEn ? "/en" : "";
+// See HowItWorks.astro: the old `isEn ? "/en" : ""` inverted the prefix rule.
+const href = (path: string) => localeUrl(locale, path);
 
 const es = {
   tag: "PARA AGENTES · CONTRATO",
@@ -99,7 +100,7 @@ const t = isEn ? en : es;
           </li>
         ))}
       </ol>
-      <a class="ag-link" href={`${base}/how-it-works`}>{t.linkHow}<span class="ag-arrow" aria-hidden="true">↗</span></a>
+      <a class="ag-link" href={href("how-it-works/")}>{t.linkHow}<span class="ag-arrow" aria-hidden="true">↗</span></a>
       <p class="ag-note">{t.note}</p>
     </div>
   </section>
