@@ -91,11 +91,49 @@ requires a client secret, which is why a server exists in the auth path at all.
       **Enable Device Flow** → Save. (Owner action; needs the App owner's login.
       If the App is org-owned it is under the org's Developer settings instead.)
 
-- [ ] **Then complete the round trip** and confirm the two things step 1 cannot show:
-      1. `/login/oauth/access_token` returns a token with **no `client_secret`**.
-      2. What that user-to-server token can actually reach — it should be bounded by
-         the App's installed repos **intersected with the user's own permissions**,
-         which is precisely the property that makes `roles.ts` redundant.
+- [x] **Complete the round trip.** **DONE 2026-08-09 — both confirmed.**
+
+      **1. The token exchange needs no secret.** Sent `client_id` + `device_code` +
+      `grant_type`, nothing else. Got a `ghu_` user-to-server token:
+      `token_type: bearer`, `expires_in: 28800` (8h), `scope: ""` (empty — a GitHub
+      App token carries no classic OAuth scopes; its power comes from the
+      installation).
+
+      **2. The token is DOUBLY bounded — this is the finding.**
+
+      | | |
+      |---|---|
+      | Repos the account owns | **33** |
+      | Repos the App installation covers | **2** (`dsottimano/lanza`, `dsottimano/dave-test`) |
+      | Repos the token can **write** | **exactly those 2** |
+
+      Write probe against the other 31 owned repos → **`403`**, despite the user
+      holding `admin: true` on every one. Probe against `torvalds/linux` → `403`.
+      Capability is **App installation ∩ the user's own permission**; neither alone.
+
+      The probe was non-destructive by construction: the `PUT` omitted `content`, so
+      an authorised call fails validation (`422`) and an unauthorised one fails auth
+      (`403`). Nothing could be created either way. `422` = allowed, `403` = refused.
+
+      **3. GitHub already returns the boolean `roles.ts` re-implements.**
+      `GET /repos/{owner}/{repo}` →
+      `permissions: {admin, maintain, push, triage, pull}`.
+      `push` *is* "may this person edit". `dsottimano/lanza` → `push: true`;
+      `torvalds/linux` → `push: false, pull: true`.
+
+- [ ] **Remaining unknown: token refresh.** `expires_in: 28800` means *Expire user
+      authorization tokens* is on, so a refresh token is issued — and refreshing a
+      GitHub App user token is **documented as requiring the client secret**, which
+      would put one secret back. Untested here.
+
+      Two ways out, neither needing a secret:
+      - **Treat 8h as the session lifetime and re-run device flow to log in again.**
+        This is *better* than today's 7-day unrevocable session, not worse.
+      - Turn off token expiry on the App — **rejected**: a non-expiring token is a
+        worse credential to hold, and the point of this exercise is smaller blast
+        radius, not longer-lived tokens.
+
+      Verify before designing around it.
 
 - [ ] **Prototype on a throwaway repo, not a customer.**
       `/admin` authenticates as the signed-in user and calls `api.github.com` with
