@@ -591,17 +591,25 @@ old auth path is untouched and still the only thing that authorises anything.
 | `/poll` request shape | **~60 live polls** answered `authorization_pending`. A malformed or secret-requiring request returns `invalid_request` / `incorrect_client_credentials` instead, so this confirms the exact three-field, secretless body is what GitHub expects |
 | `permissions` on the test repo | Present and complete — the §10.2 role source, confirmed on `dsottimano/dave-test` |
 
-**NOT yet verified in this implementation:** the final token exchange and the refresh
-round trip. §3 proved both live last session with ad-hoc code, and the module's own
-tests cover its reading of those replies — but *this* code has not held a real `ghu_`
-token yet. **Phase 2 must not be called done until it has.** It needs a human to
-approve a code once, at a browser that can reach GitHub.
+**Round trip VERIFIED END TO END in this code, 2026-08-09.** Not the ad-hoc script
+of §3 — `functions/_lib/device-flow.ts` itself, against the real App and
+`dsottimano/dave-test`:
 
-> Attempted 2026-08-09 and abandoned: the approval leg could not be completed
-> (GitHub returning 404/500 on mobile sign-in at the time). Not a defect in this
-> work — and a note worth keeping, because it is the first real-world instance of
-> device flow's one hard dependency: **the person must be able to sign in to
-> github.com on some device.** Nothing here can route around that.
+```
+poll    → ghu_… (40 chars)  expires_in 28800 (8h)
+          ghr_…             refresh_token_expires_in 15897600 (184d)
+who     → dsottimano
+repo    → 200  permissions {admin,maintain,push,triage,pull: true}  → role: owner
+refresh → NEW ghu_, refresh token ROTATED, window back to 184 days  ← it slides
+          the refreshed token still authenticates: true
+cookies → lanza_gh (Max-Age 28800) · lanza_gh_refresh (Max-Age 15897600)
+          lanza_gh_device cleared
+secrets used: 0
+```
+
+Every claim §10 rests on is now measured rather than argued: secretless login,
+secretless refresh, rotation, the sliding window, and `permissions` as the role
+source. **Phase 2 is unblocked.**
 
 **Two design changes made while building, both in §10.1:** two relays rather than
 three (the proxy refreshes inline; a `/refresh` route would be dead code), and the
