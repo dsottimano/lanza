@@ -409,7 +409,12 @@ Six steps, no secret at any of them.
 | 3 | The person enters the code at `github.com/login/device` | GitHub authenticates them |
 | 4 | `POST /admin/api/auth/device/poll` relays to `github.com/login/oauth/access_token`; on success sets **two HttpOnly cookies** and returns neither to JS | tenant holds them per-browser, not per-site |
 | 5 | The proxy attaches the access token to every GitHub call | browser JS never sees a token |
-| 6 | On a `401` from GitHub, the proxy refreshes once (`client_id` + `grant_type=refresh_token`, **no secret**), re-sets both cookies, retries | refresh rotates → sliding window |
+| 6 | On an expired access token, **the gate** refreshes once (`client_id` + `grant_type=refresh_token`, **no secret**), re-sets both cookies, retries | refresh rotates → sliding window |
+
+**Correction to step 6, made in phase 2.** This said *the proxy* refreshes. It is the
+**gate** that does, because the gate runs on every `/admin` request — SPA navigations
+included — and owns the response it can append `Set-Cookie` to. In the proxy, a person
+who merely had the CMS open would still fall off after 8 hours.
 
 **Where the tokens live** — the question §3 left open:
 
@@ -558,7 +563,7 @@ live, so no phase can sign anyone out mid-flight.
 | # | Phase | Done when |
 |---|---|---|
 | 1 | Add the device relays + cookies. Change nothing else | **DONE — see §10.9** |
-| 2 | Gate reads GitHub `permissions`; roles resolve from booleans. **Both** cookie families accepted | An RS256 session and a `ghu_` cookie both open `/admin` |
+| 2 | Gate reads GitHub `permissions`; roles resolve from booleans. **Both** cookie families accepted | **DONE — see §10.10** |
 | 3 | Proxy uses the user token; drop the broker mint and the PAT fallback | Editor + owner writes work; the 29 cases still pass |
 | 4 | **Delete** §10.5's CMS half. Everyone re-authenticates once | Grep finds no `HANDOFF`, no `adminLogin` |
 | 5 | MCP to device flow; delete the AS | MCP writes against `dmg`, not lanzacms.com |
@@ -615,3 +620,51 @@ source. **Phase 2 is unblocked.**
 three (the proxy refreshes inline; a `/refresh` route would be dead code), and the
 device code is now bound to the browser in an HttpOnly cookie instead of passing
 through the page as the prototype did.
+
+### 10.10 Phase 2 — status
+
+**Shipped 2026-08-09.** The gate now accepts **two** credential families and prefers
+neither by accident: a GitHub user token answers first, and *anything* it does not
+answer with a role — expired, denied, GitHub unreachable — falls through to the
+RS256 session rather than refusing. A browser can hold both, and a stale `ghu_`
+cookie must not lock out a working session. Nobody is signed out by this phase.
+
+- `functions/_lib/gh-identity.ts` — "may this user write this repo?", asked of
+  GitHub. `GET /repos/{owner}/{name}` + `GET /user` in parallel, 60-second
+  per-isolate cache keyed by a SHA-256 of the token
+- `functions/_lib/roles.ts` — `roleFromPermissions()` (the booleans → owner /
+  editor / viewer) and `roleMayWrite()`. `resolveRole`'s list lookup is untouched
+  and still serves family 2 until phase 4
+- `functions/admin/_middleware.ts` — both families, plus the inline refresh
+- `functions/admin/api/gh/[[path]].ts` — `viewer` is read-only; `GET /user` answers
+  from the gate's identity instead of demanding an RS256 session
+- **`npm test` green: 170 functions (was 154) + 91 admin. `tsc --noEmit` clean.**
+
+**Four outcomes, deliberately not three.** Collapsing any two of them has a cost a
+test now names: `expired` folded into `denied` signs everyone out every 8 hours
+instead of refreshing them, and `unavailable` folded into `denied` turns a GitHub
+outage into "you have been removed from your own repository". `unavailable` is never
+cached, so an outage cannot become a sticky answer.
+
+**Verified live, `wrangler pages dev` running the real Functions against
+`dsottimano/lanza` and the real App — a device code entered by hand, no secret:**
+
+```
+start        → user_code B5FA-A420, device code in an HttpOnly cookie only
+poll         → lanza_gh + lanza_gh_refresh set; body says {"status":"ok"}, nothing more
+GET /admin/api/gh/user      → 200 {"login":"dsottimano"}   ← identity, with no RS256 session
+GET /admin/                 → 200                          ← was a 302 to login
+GET /admin/api/cf/accounts  → passed the owner-only gate   ← role came from permissions.admin
+GET /admin/api/gh/contents/ → 500 "no token"               ← phase 3's job, and NOT an auth failure
+refresh-token-only browser  → 200, NEW access token, refresh token ROTATED
+dead refresh token          → 401 + all three cookies cleared
+garbage lanza_gh, no session→ 401 "Not authenticated."     ← fell through to family 2, as designed
+```
+
+The last two lines are the phase's real claim: the new family fails *closed*, and
+failing does not consume the old one.
+
+**Not yet done, and phase 3's problem:** the proxy still mints a broker token, so a
+device-flow-only browser can sign in and read its own identity but cannot yet edit.
+The CMS also has no sign-in screen for the device code — until phase 3 lands the
+flow is reachable by the two API routes only.

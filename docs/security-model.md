@@ -10,6 +10,17 @@ Companion docs: `keys-and-secrets.md` (every credential and who holds it),
 (why/decisions), `mcp-server.md` (the agent surface). **This file is authoritative
 where they disagree.**
 
+> **Mid-migration, since 2026-08-09 (phase 2 of `security-todo.md` §10.8).** The
+> `/admin` gate now accepts **two** credential families: the broker-signed RS256
+> session described throughout this file, and a GitHub user token obtained by device
+> flow with no secret anywhere. Everything below still describes the first family
+> accurately — nothing was removed. For the second, GitHub answers both halves of I1
+> instead of the config lists: identity is `GET /user`, authorization is
+> `GET /repos/{owner}/{repo}` → `permissions` (`functions/_lib/gh-identity.ts`),
+> cached 60s. The rest of the model — the allowlist, repo confinement, the editor
+> write rules, I1–I5 — is unchanged and applies to both. This file is rewritten in
+> phase 7, once the first family is deleted.
+
 ---
 
 ## 1. The five invariants

@@ -9,7 +9,13 @@
 // Run: node --experimental-strip-types --loader ./functions/_lib/ts-resolve.mjs functions/_lib/roles.test.mjs
 import { test } from "node:test";
 import assert from "node:assert/strict";
-import { resolveRole, editorMayCall, roleMayUseCloudflare } from "./roles.ts";
+import {
+  resolveRole,
+  roleFromPermissions,
+  roleMayWrite,
+  editorMayCall,
+  roleMayUseCloudflare,
+} from "./roles.ts";
 
 const POLICY = { workingBranch: "staging", productionBranch: "main" };
 const may = (method, path, body = null) => editorMayCall(method, path, body, POLICY);
@@ -200,4 +206,39 @@ test("a dot segment cannot walk out of the content directory", () => {
     assert.equal(may("PUT", `contents/${p}`, { branch: "staging" }).ok, false, p);
     assert.equal(may("POST", "git/trees", { tree: [{ path: p }] }).ok, false, p);
   }
+});
+
+// ── roles from GitHub's own booleans (§10.2) ────────────────────────────────
+// The migration's whole claim is that no list is needed, so these assert the
+// mapping AND that an absent/blank answer never becomes a role by default.
+
+test("GitHub's permissions map to the three roles, most-privileged first", () => {
+  // GitHub sets every lower boolean too, so an admin arrives with push and pull.
+  const admin = { admin: true, maintain: true, push: true, triage: true, pull: true };
+  assert.equal(roleFromPermissions(admin), "owner");
+  assert.equal(roleFromPermissions({ admin: false, push: true, pull: true }), "editor");
+  assert.equal(roleFromPermissions({ admin: false, push: false, maintain: true, pull: true }), "editor");
+  assert.equal(roleFromPermissions({ admin: false, push: false, pull: true }), "viewer");
+});
+
+test("no access, no permissions object, and a junk value all resolve to null", () => {
+  assert.equal(roleFromPermissions({ admin: false, push: false, pull: false }), null);
+  assert.equal(roleFromPermissions({}), null);
+  assert.equal(roleFromPermissions(undefined), null);
+  assert.equal(roleFromPermissions(null), null);
+  assert.equal(roleFromPermissions("admin"), null);
+});
+
+test("a truthy-but-not-true value is not permission", () => {
+  // GitHub answers with booleans. Anything else is a shape we do not recognise, and
+  // "we did not recognise it" must not read as "yes".
+  assert.equal(roleFromPermissions({ admin: "true", push: "yes", pull: 1 }), null);
+});
+
+test("a viewer may not write; the other two may", () => {
+  assert.equal(roleMayWrite("viewer"), false);
+  assert.equal(roleMayWrite("editor"), true);
+  assert.equal(roleMayWrite("owner"), true);
+  // And a viewer is not a back door into Cloudflare either.
+  assert.equal(roleMayUseCloudflare("viewer"), false);
 });

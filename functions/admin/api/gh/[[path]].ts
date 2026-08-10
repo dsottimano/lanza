@@ -21,7 +21,7 @@ import {
   BRANCH,
   WORKING_BRANCH,
 } from "../../../_lib/gh-proxy";
-import { editorMayCall, type Role } from "../../../_lib/roles";
+import { editorMayCall, roleMayWrite, type Role } from "../../../_lib/roles";
 // Per-tenant repo identity — the broker writes this at repo creation; the proxy is
 // the single place that turns repo-relative CMS paths into repos/<owner>/<name>/…
 import repo from "../../../../lanza.config.json";
@@ -59,7 +59,10 @@ export const onRequest = async (context: {
   const { request, env, params } = context;
   const url = new URL(request.url);
   const session = readCookie(request.headers.get("Cookie"), SESSION_COOKIE);
-  const role: Role = context.data?.role === "owner" ? "owner" : "editor";
+  // Absent role = treat as an editor (the middle role), never as an owner — a
+  // missing claim must not be the permissive case.
+  const claimed = context.data?.role;
+  const role: Role = claimed === "owner" || claimed === "viewer" ? claimed : "editor";
 
   // `[[path]]` catch-all → array of path segments after /admin/api/gh/.
   const seg = params.path;
@@ -68,11 +71,15 @@ export const onRequest = async (context: {
   // GET /user — an installation token can't call it. Synthesize {login} from the
   // broker-signed session (the CMS uses this only for its health-check display).
   if (request.method === "GET" && subPath.replace(/[?#].*$/, "").replace(/^\/+/, "") === "user") {
+    // The gate already asked GitHub who this is (device-flow family), so take its
+    // answer; only fall back to re-verifying the broker session for a browser that
+    // holds one of those instead.
     const publicKey = env.HANDOFF_PUBLIC_KEY || CONFIG_PUBLIC_KEY;
     const login =
-      publicKey && session
+      context.data?.login ||
+      (publicKey && session
         ? await verifySession(session, await importPublicKey(publicKey), url.origin)
-        : null;
+        : null);
     if (!login) return json(401, { message: "Not authenticated." });
     return json(200, { login });
   }
@@ -100,7 +107,14 @@ export const onRequest = async (context: {
   // which of them THIS person may use. Asked here rather than inherited from the
   // middleware's admission, because being let into /admin has never been the same
   // thing as being allowed to do a particular write (security-model.md I1).
-  if (role !== "owner") {
+  // A viewer writes nothing, anywhere — there is no path-by-path nuance to check.
+  // Their token could not write the repo either, but a refusal here says why, where
+  // GitHub's would arrive mid-save as an unexplained failure.
+  if (!roleMayWrite(role) && hasBody) {
+    return json(403, { message: "A viewer has read-only access to this site." });
+  }
+
+  if (role === "editor") {
     let parsed: unknown = null;
     if (bodyBytes && bodyBytes.byteLength) {
       try {

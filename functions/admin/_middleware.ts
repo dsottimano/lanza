@@ -22,8 +22,17 @@ import {
   importPublicKey,
   readCookie,
 } from "../_lib/session";
-import { resolveRole, roleMayUseCloudflare } from "../_lib/roles";
+import { resolveRole, roleMayUseCloudflare, type Role } from "../_lib/roles";
+import { identityFor } from "../_lib/gh-identity";
 import {
+  ACCESS_COOKIE,
+  REFRESH_COOKIE,
+  authCookies,
+  clearAuthCookies,
+  refreshTokens,
+} from "../_lib/device-flow";
+import {
+  GITHUB_CLIENT_ID as CONFIG_CLIENT_ID,
   HANDOFF_PUBLIC_KEY as CONFIG_PUBLIC_KEY,
   productionOriginIfPreview,
 } from "../_lib/tenant-config";
@@ -34,6 +43,7 @@ import repo from "../../lanza.config.json";
 interface Env {
   HANDOFF_PUBLIC_KEY?: string;
   ADMIN_LOGIN?: string;
+  GITHUB_CLIENT_ID?: string;
 }
 
 export const onRequest = async (context: {
@@ -81,26 +91,49 @@ export const onRequest = async (context: {
   // an EXACT match, not a prefix — see isAuthExempt for the bypass a prefix allowed.
   if (isAuthExempt(url.pathname)) return withAdminSecurityHeaders(await next());
 
-  let login: string | null = null;
-  const publicKey = env.HANDOFF_PUBLIC_KEY || CONFIG_PUBLIC_KEY;
-  if (publicKey) {
-    const key = await importPublicKey(publicKey);
-    login = await verifySession(
-      readCookie(request.headers.get("Cookie"), SESSION_COOKIE),
-      key,
-      url.origin,
-    );
-  }
-  // A valid signature only proves the broker authenticated SOMEONE — it mints a
-  // token for any GitHub user who logs in. Authorization is a separate check, and it
-  // belongs here: /admin/api/cf/* trusts this middleware entirely and attaches an
-  // account-scoped Cloudflare token.
+  const cookies = request.headers.get("Cookie");
+
+  // ── Family 1 (incoming): a GitHub user token, and GitHub answers both questions.
+  // Identity is "whose token is this", role is `permissions` on this repo — no list
+  // of people is consulted, and removal of access takes effect within 60s.
+  const gh = await githubAuth(cookies, env);
+
+  // ── Family 2 (outgoing): a broker-signed RS256 session and the committed lists.
+  // Still live, deliberately: this phase ADDS a way in, it does not close one, so
+  // nobody is signed out mid-migration. Deleted in phase 4 (§10.8).
   //
-  // Two roles now, not one. `adminLogin` is unchanged and still means full access;
-  // `editors` is the invited, content-only role. An env ADMIN_LOGIN keeps overriding
-  // the committed owner list for a self-hosted site, exactly as before.
-  const role = resolveRole(login, env.ADMIN_LOGIN || repo.adminLogin, repo.editors);
-  if (!role) return deny(url, "Not authenticated.");
+  // Family 1 wins when it produces a role. Anything else about it — expired, no
+  // access, GitHub unreachable — falls through to family 2 rather than denying,
+  // because a browser can hold both and a stale GitHub cookie must not lock out a
+  // working session. If family 2 also comes up empty, gh.kind decides what to say.
+  let role: Role | null = gh.kind === "ok" ? gh.role : null;
+  let login: string | null = gh.kind === "ok" ? gh.login : null;
+
+  if (!role) {
+    const publicKey = env.HANDOFF_PUBLIC_KEY || CONFIG_PUBLIC_KEY;
+    if (publicKey) {
+      const key = await importPublicKey(publicKey);
+      login = await verifySession(readCookie(cookies, SESSION_COOKIE), key, url.origin);
+    }
+    // A valid signature only proves the broker authenticated SOMEONE — it mints a
+    // token for any GitHub user who logs in. Authorization is a separate check, and
+    // it belongs here: /admin/api/cf/* trusts this middleware entirely and attaches
+    // an account-scoped Cloudflare token.
+    role = resolveRole(login, env.ADMIN_LOGIN || repo.adminLogin, repo.editors);
+  }
+
+  if (!role) {
+    const refused =
+      gh.kind === "denied"
+        ? deny(url, "This GitHub account cannot edit this repository.", 403)
+        : gh.kind === "unavailable"
+          ? deny(url, "GitHub could not be reached to check your access.", 503)
+          : deny(url, "Not authenticated.");
+    // Carry any cookie clearing through the refusal — a dead refresh token has to be
+    // dropped on the response that noticed it, or the browser presents it forever.
+    for (const set of gh.setCookies) refused.headers.append("set-cookie", set);
+    return refused;
+  }
 
   // Cloudflare is owner-only and has no per-path nuance: that proxy performs no
   // authorization of its own and carries an ACCOUNT-scoped token, so this is the
@@ -111,16 +144,67 @@ export const onRequest = async (context: {
   }
 
   context.data = { ...(context.data ?? {}), role, login };
-  return withAdminSecurityHeaders(await next());
+  const response = withAdminSecurityHeaders(await next());
+  // A refresh happened while answering this request. The gate is where it belongs:
+  // it runs on EVERY /admin request — the SPA's own navigations included — and it
+  // owns the response, so one implementation keeps every route signed in. (§10.1
+  // put this in the gh proxy; the proxy only sees /admin/api/gh/*, so it would have
+  // let a person who merely opened the CMS fall off after 8 hours.)
+  for (const set of gh.setCookies) response.headers.append("set-cookie", set);
+  return response;
 };
 
+/**
+ * Family 1: turn the device-flow cookies into a role, refreshing once if the access
+ * token has expired. Never throws and never denies on its own — it reports what
+ * GitHub said and lets the gate decide.
+ */
+type GhAuth =
+  | { kind: "none" | "expired" | "denied" | "unavailable"; setCookies: string[] }
+  | { kind: "ok"; login: string; role: Role; setCookies: string[] };
+
+async function githubAuth(cookies: string | null, env: Env): Promise<GhAuth> {
+  const access = readCookie(cookies, ACCESS_COOKIE);
+  const refresh = readCookie(cookies, REFRESH_COOKIE);
+  if (!access && !refresh) return { kind: "none", setCookies: [] };
+
+  let setCookies: string[] = [];
+  let result = access
+    ? await identityFor(access, repo.owner, repo.name)
+    : ({ status: "expired" } as const);
+
+  // The access token lives 8 hours; the refresh token 184 days and rotating, so this
+  // is the step that makes a device code a once-per-browser event rather than a
+  // daily one. `client_id` and the refresh token, no secret (verified live, §10.9).
+  if (result.status === "expired" && refresh) {
+    const refreshed = await refreshTokens(env.GITHUB_CLIENT_ID || CONFIG_CLIENT_ID, refresh);
+    if (refreshed.status === "ok") {
+      setCookies = authCookies(refreshed.tokens);
+      result = await identityFor(refreshed.tokens.accessToken, repo.owner, repo.name);
+    } else if (refreshed.status === "error") {
+      // The refresh token is spent or revoked. Drop all three cookies so the browser
+      // stops presenting a credential that can never work again — leaving them would
+      // send a dead token to GitHub on every future request.
+      setCookies = clearAuthCookies();
+    }
+  }
+
+  if (result.status === "ok") {
+    return { kind: "ok", ...result.identity, setCookies };
+  }
+  return { kind: result.status, setCookies };
+}
+
 // Unauthenticated. XHR/API calls get a JSON 401 (the SPA can surface a "sign in"
-// prompt); top-level navigations are redirected into the login flow.
-function deny(url: URL, message: string): Response {
-  if (url.pathname.startsWith("/admin/api/")) {
+// prompt); top-level navigations are redirected into the login flow. `status`
+// overrides the 401 when the reason is not "who are you" — 403 when GitHub knows
+// them and says no, 503 when GitHub could not be asked. Neither is a login problem,
+// and a redirect into a login would be a lie in both cases.
+function deny(url: URL, message: string, status = 401): Response {
+  if (status !== 401 || url.pathname.startsWith("/admin/api/")) {
     return withAdminSecurityHeaders(
       new Response(JSON.stringify({ message }), {
-        status: 401,
+        status,
         headers: { "content-type": "application/json", "cache-control": "no-store" },
       }),
     );

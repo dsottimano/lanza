@@ -1,13 +1,19 @@
 // Who may do what inside /admin. Pure decisions, no I/O, so the adversarial cases
 // are testable without booting a Worker — the same split as admin-gate.ts.
 //
-// There are exactly two roles, and the difference is deliberately small:
+// The roles, and the difference between them is deliberately small:
 //
-//   owner   — the login(s) in lanza.config.json `adminLogin`. Everything.
-//   editor  — a login in `editors`. May write CONTENT on the working branch.
-//             May not publish, may not change settings, may not touch Cloudflare,
-//             and — the one that matters most — may not edit the file that says
-//             who is an owner.
+//   owner   — everything.
+//   editor  — may write CONTENT on the working branch. May not publish, may not
+//             change settings, may not touch Cloudflare, and — the one that matters
+//             most — may not edit the file that says who is an owner.
+//   viewer  — reads /admin, writes nothing.
+//
+// WHERE A ROLE COMES FROM is mid-migration (docs/security-todo.md §10.8). GitHub's
+// own `permissions` booleans are the answer (roleFromPermissions, below); the list
+// lookup in resolveRole is the outgoing path, still live for anyone holding a
+// broker-signed session, and deleted in phase 4. Everything BELOW that point — what
+// each role may actually do — is shared by both and does not change.
 //
 // The gate in functions/admin/_middleware.ts decides IDENTITY (a valid broker
 // signature) and then ROLE (this module). Both proxies under /admin/api then ask
@@ -20,7 +26,42 @@
 // content. This bounds what a compromised or careless editor reaches; it is not a
 // sandbox for someone you would not otherwise let near the site.
 
-export type Role = "owner" | "editor";
+export type Role = "owner" | "editor" | "viewer";
+
+/**
+ * The role GitHub's own booleans imply (docs/security-todo.md §10.2). This is what
+ * replaces the lists above: `GET /repos/{owner}/{repo}` → `permissions`, and no
+ * record of who anyone is is kept anywhere.
+ *
+ * Read most-privileged first — GitHub sets every lower boolean too, so an admin
+ * arrives with `push` and `pull` also true.
+ *
+ * On `viewer`: GitHub's collaborator `permission` parameter is documented as *"Only
+ * valid on organization-owned repositories"*, defaulting to `push`. So on a personal
+ * repo every collaborator gets write and this role simply never occurs. It costs one
+ * boolean read to be correct the day a tenant repo is org-owned, and simulating it
+ * with a list of our own is the exact move this migration exists to stop.
+ */
+export function roleFromPermissions(permissions: unknown): Role | null {
+  const p =
+    permissions && typeof permissions === "object"
+      ? (permissions as Record<string, unknown>)
+      : null;
+  if (!p) return null;
+  if (p.admin === true) return "owner";
+  if (p.push === true || p.maintain === true) return "editor";
+  if (p.pull === true) return "viewer";
+  return null;
+}
+
+/**
+ * A viewer may read the CMS and change nothing. Their token cannot write the repo
+ * either — GitHub would refuse — but a 403 from us says something useful, where a
+ * 403 from GitHub arrives mid-save as an unexplained failure.
+ */
+export function roleMayWrite(role: Role): boolean {
+  return role !== "viewer";
+}
 
 /** Parse a comma list (the `adminLogin` form) or an array (the `editors` form). */
 function loginSet(value: unknown): Set<string> {
