@@ -54,6 +54,26 @@ each ends at a green `npm test` (baseline: 134 functions + 91 admin).
 > opens the CMS at least once every 184 days enters a device code exactly once, per
 > browser, ever.**
 
+### Next session, in order — phase 3 (updated 2026-08-09, end of session 2)
+
+Phases 1 and 2 are shipped, green and verified live (§10.9, §10.10). Pick up here:
+
+- [ ] **Proxy uses the user's own token.** `functions/admin/api/gh/[[path]].ts`:
+      read `lanza_gh`, attach it, drop the `mintRepoToken` round-trip and the
+      `GITHUB_TOKEN` fallback. Keep the allowlist, the repo confinement and the
+      editor write rules exactly as they are — §10.4 says why each stays
+- [ ] **Same for the dev path** (`admin/vite.config.ts`), or the two drift
+- [ ] **The sign-in screen the SPA does not have yet.** `/start` → show the user
+      code + `verification_uri` → poll `/poll` on the interval GitHub returns →
+      reload on `{"status":"ok"}`. Today the flow is reachable only by curl, so a
+      device-flow-only browser can sign in but has no way to *start*
+- [ ] **Re-run the 29 adversarial cases** (`npm test`) — a user token is broader
+      than an installation token, so confinement matters more, not less
+- [ ] Verify the same way phase 2 was: `npx wrangler pages dev public
+      --port 8788 --compatibility-date=2026-01-01`, real App, a real device code
+
+Nothing is deleted in phase 3. Phase 4 is the cutover that removes the old family.
+
 ### Do these regardless — they are small and unrelated to the migration (§6)
 
 - [ ] Rotate the credentials `keys-and-secrets.md` §7 lists as owed
