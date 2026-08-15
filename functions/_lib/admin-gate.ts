@@ -98,9 +98,22 @@ export const ADMIN_SECURITY_HEADERS: Record<string, string> = {
  * Re-emit a response with the /admin security headers attached. A Response from
  * next() has immutable headers, so it has to be rebuilt; 204/304 carry a null body
  * and are safe to pass through the same constructor.
+ *
+ * `scriptNonce` widens `script-src` for THIS response only, and exists for exactly
+ * one caller: the sign-in page, which the gate generates itself and which therefore
+ * cannot load a bundled asset (the whole of /admin/ is behind the gate it is trying
+ * to get you through). A nonce is per-response by construction — signin-page.ts
+ * mints a fresh one with the HTML it belongs to — so it cannot become a standing
+ * hole the way `'unsafe-inline'` would.
  */
-export function withAdminSecurityHeaders(res: Response): Response {
+export function withAdminSecurityHeaders(res: Response, scriptNonce?: string): Response {
   const out = new Response(res.body, res);
   for (const [name, value] of Object.entries(ADMIN_SECURITY_HEADERS)) out.headers.set(name, value);
+  if (scriptNonce) {
+    out.headers.set(
+      "Content-Security-Policy",
+      ADMIN_CSP.replace("script-src 'self'", `script-src 'self' 'nonce-${scriptNonce}'`),
+    );
+  }
   return out;
 }

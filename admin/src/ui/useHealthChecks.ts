@@ -251,9 +251,11 @@ export function useHealthChecks(github: GitHubClient) {
         proxies.gh = true; // the proxy answered (with an HTTP error)
         githubCard.authIssue =
           e.status === 401 || e.status === 403 || e.status === 404;
-        githubCard.summary = githubCard.authIssue
-          ? "Can't reach your content — the GitHub token looks missing or expired."
-          : "GitHub isn't responding as expected.";
+        githubCard.summary = !githubCard.authIssue
+          ? "GitHub isn't responding as expected."
+          : e.status === 401
+            ? "Your GitHub sign-in has expired — reload /admin to sign in again."
+            : "Can't reach your content — this account may not have write access to the repository.";
         githubCard.detail = `${e.status}: ${e.message}`;
       } else {
         proxies.gh = false; // never got a response (network / proxy down)

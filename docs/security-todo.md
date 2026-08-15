@@ -54,25 +54,33 @@ each ends at a green `npm test` (baseline: 134 functions + 91 admin).
 > opens the CMS at least once every 184 days enters a device code exactly once, per
 > browser, ever.**
 
-### Next session, in order — phase 3 (updated 2026-08-09, end of session 2)
+### Next session, in order — phase 4 (updated 2026-08-15, end of session 3)
 
-Phases 1 and 2 are shipped, green and verified live (§10.9, §10.10). Pick up here:
+Phases 1, 2 and 3 are shipped, green and verified live (§10.9, §10.10, §10.11).
+**The device-flow family is now the only one that can edit anything** — phase 3's
+cutover, taken deliberately (see §10.11). Phase 4 removes the family that is left
+behind, and nothing in it is reversible by a redeploy, so do it in this order:
 
-- [ ] **Proxy uses the user's own token.** `functions/admin/api/gh/[[path]].ts`:
-      read `lanza_gh`, attach it, drop the `mintRepoToken` round-trip and the
-      `GITHUB_TOKEN` fallback. Keep the allowlist, the repo confinement and the
-      editor write rules exactly as they are — §10.4 says why each stays
-- [ ] **Same for the dev path** (`admin/vite.config.ts`), or the two drift
-- [ ] **The sign-in screen the SPA does not have yet.** `/start` → show the user
-      code + `verification_uri` → poll `/poll` on the interval GitHub returns →
-      reload on `{"status":"ok"}`. Today the flow is reachable only by curl, so a
-      device-flow-only browser can sign in but has no way to *start*
-- [ ] **Re-run the 29 adversarial cases** (`npm test`) — a user token is broader
-      than an installation token, so confinement matters more, not less
-- [ ] Verify the same way phase 2 was: `npx wrangler pages dev public
-      --port 8788 --compatibility-date=2026-01-01`, real App, a real device code
+- [ ] **Sign in once on the live site first** and confirm the CMS works end to end.
+      Phase 4 deletes the fallback; do not delete it while unable to use the thing
+      that replaced it
+- [ ] **Delete §10.5's CMS half**: `HANDOFF_PRIVATE_KEY`, `HANDOFF_PUBLIC_KEY`,
+      `functions/_lib/session.ts`, `functions/admin/api/auth/{login,handoff}.ts`,
+      `functions/_lib/broker-token.ts` (check `functions/api/mcp.ts` first — it is
+      the last caller of the mint, and it goes in phase 5, so either sequence them
+      or take mcp.ts with it)
+- [ ] **`adminLogin` and `editors` out of `lanza.config.json`**, and
+      `resolveRole`'s list lookup with them. `admin/src/backend/access.ts` reads the
+      role from `GET /admin/api/gh/user`-adjacent identity instead;
+      **`PeopleView.vue` becomes a link to GitHub's collaborators settings**
+- [ ] **The gh proxy's `GET /user` RS256 fallback** (the one thing that still
+      imports `session.ts` there) — the gate's identity is the whole answer after this
+- [ ] Grep for `HANDOFF`, `adminLogin`, `lanza_session`, `mintRepoToken`. Any hit
+      outside `docs/` means phase 4 is not done
+- [ ] `npm test` green (baseline now **184 functions + 91 admin**), then verify with
+      `npx wrangler pages dev public --port 8788 --compatibility-date=2026-01-01`
 
-Nothing is deleted in phase 3. Phase 4 is the cutover that removes the old family.
+Then phase 5 (MCP to device flow), 6 (`FANOUT_SECRET`), 7 (rotation + docs).
 
 ### Do these regardless — they are small and unrelated to the migration (§6)
 
@@ -580,11 +588,17 @@ fleet-wide**.
 Each ends green on `npm test`. Nothing is deleted until its replacement is proven
 live, so no phase can sign anyone out mid-flight.
 
+**Amended after phase 3.** That last sentence did not survive contact: dropping the
+mint means a browser holding only the RS256 session can no longer edit, whatever
+else it still holds. The choice was to take that here — with the sign-in screen
+shipping alongside it — or to keep the broker on the runtime path until phase 4 and
+leave the real cutover untested. §10.11 records the decision and its reasoning.
+
 | # | Phase | Done when |
 |---|---|---|
 | 1 | Add the device relays + cookies. Change nothing else | **DONE — see §10.9** |
 | 2 | Gate reads GitHub `permissions`; roles resolve from booleans. **Both** cookie families accepted | **DONE — see §10.10** |
-| 3 | Proxy uses the user token; drop the broker mint and the PAT fallback | Editor + owner writes work; the 29 cases still pass |
+| 3 | Proxy uses the user token; drop the broker mint and the PAT fallback | **DONE — see §10.11** |
 | 4 | **Delete** §10.5's CMS half. Everyone re-authenticates once | Grep finds no `HANDOFF`, no `adminLogin` |
 | 5 | MCP to device flow; delete the AS | MCP writes against `dmg`, not lanzacms.com |
 | 6 | `FANOUT_SECRET` endpoint → a local operator script; bot scoped to `staging` | Fan-out runs from a laptop with the operator's own credentials |
@@ -688,3 +702,83 @@ failing does not consume the old one.
 device-flow-only browser can sign in and read its own identity but cannot yet edit.
 The CMS also has no sign-in screen for the device code — until phase 3 lands the
 flow is reachable by the two API routes only.
+
+### 10.11 Phase 3 — status
+
+**Shipped 2026-08-15.** The proxy now sends the **signed-in person's own GitHub
+token**. There is no mint on the runtime path and no standing PAT: what the CMS can
+do is exactly what that person can do at github.com.
+
+- `functions/admin/api/gh/[[path]].ts` — the token comes from the gate, not from
+  the cookie. **That is a correction to the plan**, which said "read `lanza_gh`":
+  after an inline refresh the cookie on the request in hand is already dead, and
+  the browser only learns the new one from that response's `Set-Cookie`. Reading
+  the cookie downstream would 401 exactly one request per 8 hours, intermittently,
+  for reasons no log would explain. `mintRepoToken`, the `GITHUB_TOKEN` fallback,
+  the per-isolate token cache and the `BROKER_ORIGIN` import are gone
+- `functions/_lib/signin-page.ts` — the sign-in screen (§10.1 step 1), served **by
+  the gate**, not by the SPA: the bundle lives behind the gate it is trying to get
+  you through. One inline script on a per-response CSP nonce
+  (`withAdminSecurityHeaders(res, nonce)`), because `script-src 'self'` gives it no
+  other way to run and exempting a static asset would widen the unauthenticated
+  surface for a 40-line poller
+- `functions/admin/_middleware.ts` — an unauthenticated navigation **renders** that
+  screen (200) instead of redirecting to `/admin/api/auth/login`. Device flow has
+  nowhere to redirect to
+- `admin/src/ui/{ErrorDialog.vue,useHealthChecks.ts}` — a 401 now reads "your
+  GitHub sign-in expired, reload to sign in again" instead of telling the person to
+  ask an admin about a `GITHUB_TOKEN` that no longer exists
+- **`npm test` green: 184 functions (was 170) + 91 admin.** `tsc --noEmit` and
+  `vue-tsc --noEmit` clean
+
+**`admin/vite.config.ts` needed no token change, and that is not drift.** Dev
+already attaches a user PAT from `admin/.env`; prod attaches a user token from a
+cookie. Same shape, same access model. What must not drift is *policy*, and the
+allowlist, CSRF check and resolved-target re-check are imported from
+`functions/_lib/gh-proxy.ts` in both. Dev cannot run the device flow at all — there
+is no gate under Vite, so there are no cookies to hold tokens in.
+
+**New: `functions/_lib/gh-proxy-route.test.mjs`** — 12 cases driving the REAL route
+with a stubbed fetch. `gh-proxy.test.mjs` and `roles.test.mjs` test the decisions;
+this tests the file that *applies* them and attaches a credential. It matters more
+now than it did: an installation token reached one repo, and a user token reaches
+every repo that person can touch, so a confinement bug lands on their other work.
+Every refusal asserts the stub was **never called**, not just the status code —
+allowlist, traversal in four encodings, viewer-writes-nothing,
+editor-cannot-publish, editor confined to content + `staging`, missing role ≠ owner,
+cross-origin write, and no-token.
+
+**The cutover this phase actually made, stated plainly.** §10.8 says no phase signs
+anyone out mid-flight. Phase 3 does, for one family: a browser holding only the
+RS256 session is still admitted by the gate, but the proxy has no GitHub token for
+it and answers `401 "Sign in with GitHub again to edit this site."` The alternative
+was keeping the mint as a fallback, which leaves the broker on the runtime path and
+leaves the real cutover untested until phase 4. **Decided deliberately** (Dave,
+2026-08-15): take it here, where the sign-in screen ships in the same commit and the
+fix is one device code. For the same reason the screen does **not** offer the old
+login as a second option — it would sign someone into a CMS where every read fails.
+
+**Verified live, `wrangler pages dev` running the real Functions against
+`dsottimano/lanza` and the real App — a device code entered by hand, no secret:**
+
+```
+GET  /admin/  (no cookies)   → 200 the sign-in screen, no-store, CSP carries the
+                               script's nonce and nothing else changed
+start                        → user_code A417-AFE0, device code in an HttpOnly cookie
+poll                         → {"status":"ok"}; lanza_gh + lanza_gh_refresh set
+GET  /admin/api/gh/user      → 200 {"login":"dsottimano"}   (no round-trip to GitHub)
+GET  contents/lanza.config.json?ref=staging → 200   ← was 500 "no token" in phase 2
+GET  git/ref/heads/staging   → 200
+PUT  contents/content/posts/.phase3-write-check.md (branch staging) → 200 committed
+GET  that path               → 200, content matches
+DELETE it                    → 200;  read-after-delete → 404   (staging left clean)
+GET  orgs/anything           → 403 allowlist, GitHub never called
+GET  contents/..%2f..%2f..%2forgs/evil → 403 "Malformed path." (refused at the gate)
+GET  /admin/  (signed in)    → 200 the SPA itself, not the sign-in screen
+GET  /admin/api/gh/contents/… (no cookies) → 401
+secrets used: 0
+```
+
+The write pair is the phase's real claim: a person signed in with nothing but a
+device code created and deleted a file in the repository, and the only credential
+involved was their own.

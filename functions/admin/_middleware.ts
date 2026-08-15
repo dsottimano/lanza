@@ -16,6 +16,7 @@ import {
   isAuthExempt,
   withAdminSecurityHeaders,
 } from "../_lib/admin-gate";
+import { signInPage } from "../_lib/signin-page";
 import {
   SESSION_COOKIE,
   verifySession,
@@ -143,7 +144,11 @@ export const onRequest = async (context: {
     return deny(url, "Only an owner can change hosting settings.");
   }
 
-  context.data = { ...(context.data ?? {}), role, login };
+  // The gh proxy attaches this to its GitHub calls. It is handed over here rather
+  // than re-read from the cookie downstream for the reason above: after a refresh
+  // the cookie in the request is already dead. Absent for a browser on the old
+  // RS256 session — the proxy has nothing to send for it, and says so (§10.8 phase 3).
+  context.data = { ...(context.data ?? {}), role, login, token: gh.kind === "ok" ? gh.token : null };
   const response = withAdminSecurityHeaders(await next());
   // A refresh happened while answering this request. The gate is where it belongs:
   // it runs on EVERY /admin request — the SPA's own navigations included — and it
@@ -161,7 +166,7 @@ export const onRequest = async (context: {
  */
 type GhAuth =
   | { kind: "none" | "expired" | "denied" | "unavailable"; setCookies: string[] }
-  | { kind: "ok"; login: string; role: Role; setCookies: string[] };
+  | { kind: "ok"; login: string; role: Role; token: string; setCookies: string[] };
 
 async function githubAuth(cookies: string | null, env: Env): Promise<GhAuth> {
   const access = readCookie(cookies, ACCESS_COOKIE);
@@ -169,6 +174,11 @@ async function githubAuth(cookies: string | null, env: Env): Promise<GhAuth> {
   if (!access && !refresh) return { kind: "none", setCookies: [] };
 
   let setCookies: string[] = [];
+  // The token this request will actually use. It is NOT always the cookie that
+  // arrived: a refresh below replaces it, and the gh proxy has to send the new one —
+  // the browser only learns it from this response's Set-Cookie, which is too late
+  // for the request in hand.
+  let token = access;
   let result = access
     ? await identityFor(access, repo.owner, repo.name)
     : ({ status: "expired" } as const);
@@ -180,7 +190,8 @@ async function githubAuth(cookies: string | null, env: Env): Promise<GhAuth> {
     const refreshed = await refreshTokens(env.GITHUB_CLIENT_ID || CONFIG_CLIENT_ID, refresh);
     if (refreshed.status === "ok") {
       setCookies = authCookies(refreshed.tokens);
-      result = await identityFor(refreshed.tokens.accessToken, repo.owner, repo.name);
+      token = refreshed.tokens.accessToken;
+      result = await identityFor(token, repo.owner, repo.name);
     } else if (refreshed.status === "error") {
       // The refresh token is spent or revoked. Drop all three cookies so the browser
       // stops presenting a credential that can never work again — leaving them would
@@ -190,16 +201,22 @@ async function githubAuth(cookies: string | null, env: Env): Promise<GhAuth> {
   }
 
   if (result.status === "ok") {
-    return { kind: "ok", ...result.identity, setCookies };
+    // `token` is the very argument identityFor just answered about, so it is set.
+    return { kind: "ok", ...result.identity, token: token as string, setCookies };
   }
   return { kind: result.status, setCookies };
 }
 
-// Unauthenticated. XHR/API calls get a JSON 401 (the SPA can surface a "sign in"
-// prompt); top-level navigations are redirected into the login flow. `status`
-// overrides the 401 when the reason is not "who are you" — 403 when GitHub knows
-// them and says no, 503 when GitHub could not be asked. Neither is a login problem,
-// and a redirect into a login would be a lie in both cases.
+// Unauthenticated. XHR/API calls get a JSON 401 (the SPA surfaces a "sign in"
+// prompt); top-level navigations get the sign-in screen itself. `status` overrides
+// the 401 when the reason is not "who are you" — 403 when GitHub knows them and
+// says no, 503 when GitHub could not be asked. Neither is a login problem, and
+// offering a sign-in would be a lie in both cases.
+//
+// It RENDERS rather than redirects because device flow has nowhere to redirect to:
+// the person reads a code off a screen and types it at github.com. The 200 is the
+// honest status for a page that loaded and works — the refusal is that the request
+// never reached anything under /admin/ (§10.1 step 1).
 function deny(url: URL, message: string, status = 401): Response {
   if (status !== 401 || url.pathname.startsWith("/admin/api/")) {
     return withAdminSecurityHeaders(
@@ -209,13 +226,12 @@ function deny(url: URL, message: string, status = 401): Response {
       }),
     );
   }
+  const page = signInPage();
   return withAdminSecurityHeaders(
-    new Response(null, {
-      status: 302,
-      headers: {
-        Location: new URL("/admin/api/auth/login", url).toString(),
-        "Cache-Control": "no-store",
-      },
+    new Response(page.html, {
+      status: 200,
+      headers: { "content-type": "text/html; charset=utf-8", "Cache-Control": "no-store" },
     }),
+    page.nonce,
   );
 }

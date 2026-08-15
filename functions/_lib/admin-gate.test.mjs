@@ -102,10 +102,51 @@ test("an unauthenticated non-exempt path is still refused (identity check intact
   assert.equal(api.res.status, 401);
   assert.equal(api.reached, false);
 
+  // A navigation is answered with the sign-in screen instead (§10.1 step 1). The
+  // refusal is that nothing under /admin/ ran, which is what `reached` asserts —
+  // the page itself loaded, so 200 is the honest status for it.
   const page = await gate("/admin/");
-  assert.equal(page.res.status, 302);
+  assert.equal(page.res.status, 200);
   assert.equal(page.reached, false);
-  assert.match(page.res.headers.get("Location"), /\/admin\/api\/auth\/login$/);
+  assert.match(page.res.headers.get("content-type"), /text\/html/);
+});
+
+// Device flow has nowhere to redirect to — the person reads a code off a screen and
+// types it at github.com — so the gate has to RENDER one. It is served from the
+// gate, not the SPA bundle, because the bundle lives behind the gate.
+test("an unauthenticated navigation renders the sign-in screen, never cached", async () => {
+  const { res, reached } = await gate("/admin/");
+  assert.equal(reached, false);
+  assert.equal(res.headers.get("Cache-Control"), "no-store");
+  const html = await res.text();
+  assert.match(html, /Get a sign-in code/);
+  // It drives the two relays, and asks for nothing else.
+  assert.match(html, /\/admin\/api\/auth\/device\/start/);
+  assert.match(html, /\/admin\/api\/auth\/device\/poll/);
+  // It never handles a credential: the code it shows comes from /start's response
+  // body, and the tokens only ever exist as HttpOnly cookies.
+  assert.ok(!/ghu_|access_token|client_secret/.test(html));
+});
+
+test("the sign-in screen's inline script runs on a per-response nonce, not a standing hole", async () => {
+  const first = await gate("/admin/");
+  const html = await first.res.text();
+  const nonce = html.match(/<script nonce="([^"]+)">/)?.[1];
+  assert.ok(nonce, "the page must carry a script nonce");
+  const csp = first.res.headers.get("Content-Security-Policy");
+  assert.ok(csp.includes(`script-src 'self' 'nonce-${nonce}'`), csp);
+  // Widened for THIS script only — everything else the policy said still holds.
+  assert.ok(!csp.includes("unsafe-inline") || !/script-src[^;]*unsafe-inline/.test(csp));
+  assert.match(csp, /frame-ancestors 'none'/);
+
+  // A nonce reused across responses is the same as having none.
+  const second = await gate("/admin/");
+  const other = (await second.res.text()).match(/<script nonce="([^"]+)">/)[1];
+  assert.notEqual(nonce, other);
+
+  // And no other /admin response carries a nonce at all.
+  const api = await gate("/admin/api/cf/accounts");
+  assert.ok(!api.res.headers.get("Content-Security-Policy").includes("nonce-"));
 });
 
 test("a garbage session cookie is refused — a bearer is not a session", async () => {
@@ -128,12 +169,17 @@ test("every /admin response carries the security headers, refusals included", as
   const cases = [
     await gate("/admin/api/auth/login"), // exempt pass-through
     await gate("/admin/api/cf/accounts"), // 401
-    await gate("/admin/"), // 302 to login
+    await gate("/admin/"), // the sign-in screen
     await gate("/admin/api/auth/..%2fcf/x"), // malformed
   ];
   for (const { res } of cases) {
     for (const [name, value] of Object.entries(ADMIN_SECURITY_HEADERS)) {
-      assert.equal(res.headers.get(name), value, name);
+      // The sign-in screen's CSP differs by its script nonce and nothing else.
+      if (name === "Content-Security-Policy") {
+        assert.equal(res.headers.get(name).replace(/ 'nonce-[a-f0-9]+'/, ""), value, name);
+      } else {
+        assert.equal(res.headers.get(name), value, name);
+      }
     }
   }
 });

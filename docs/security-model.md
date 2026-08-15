@@ -10,6 +10,19 @@ Companion docs: `keys-and-secrets.md` (every credential and who holds it),
 (why/decisions), `mcp-server.md` (the agent surface). **This file is authoritative
 where they disagree.**
 
+> **Mid-migration, as of 2026-08-15 — read this first.** The zero-secret migration
+> (`security-todo.md` §10) has landed phases 1–3, and three things this file
+> describes are no longer how `/admin` works:
+> **(1)** sign-in is GitHub **device flow**, not the broker OAuth round-trip, and an
+> unauthenticated `/admin` navigation renders a sign-in screen rather than redirecting;
+> **(2)** the role comes from GitHub's `permissions` on the repo, not from
+> `adminLogin`/`editors` — those lists are read only by the outgoing path;
+> **(3)** the gh proxy attaches the **signed-in person's own** GitHub token — there is
+> no broker mint and no `GITHUB_TOKEN` fallback on it any more.
+> Everything else here — the invariants, the allowlist, the editor write rules, the
+> traversal defences — is unchanged and still enforced. `security-todo.md` §10 is
+> authoritative until phase 7 rewrites this file.
+
 > **Mid-migration, since 2026-08-09 (phase 2 of `security-todo.md` §10.8).** The
 > `/admin` gate now accepts **two** credential families: the broker-signed RS256
 > session described throughout this file, and a GitHub user token obtained by device

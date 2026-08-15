@@ -16,6 +16,15 @@ import {
 // the token injected server-side, so the SPA never holds a token in dev either.
 // The token comes from admin/.env (GITHUB_TOKEN, NON-VITE-prefixed → never
 // bundled, never reaches the client). Same client code runs in dev and prod.
+//
+// Prod now attaches the SIGNED-IN PERSON'S OWN GitHub token (device flow, §10) and
+// dev still attaches the one in .env. That is not drift: both are a user token with
+// that user's access, and it is the same shape the proxy sees either way. What must
+// not drift is POLICY — the allowlist, the CSRF check and the resolved-target
+// re-check are imported from functions/_lib/gh-proxy.ts, not restated here. Dev
+// cannot run the device flow itself: there is no gate under Vite, so there are no
+// cookies to hold tokens in. Sign-in is verified against `wrangler pages dev`,
+// which runs the real Functions (§10.8).
 function githubProxyDev(token: string | undefined): Plugin {
   return {
     name: "lanza-github-proxy-dev",

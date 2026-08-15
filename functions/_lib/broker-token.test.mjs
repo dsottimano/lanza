@@ -15,8 +15,9 @@ import { mintRepoToken } from "./broker-token.ts";
 
 const PAT = "ghp_standing_pat_do_not_leak";
 
-// The exact expression in functions/api/mcp.ts and functions/admin/api/gh/[[path]].ts.
-// If a refusal ever reaches it, the PAT leaks — so the tests run it, not a paraphrase.
+// The exact expression in functions/api/mcp.ts — the last caller of the mint, now
+// that the gh proxy sends the signed-in person's own token (phase 3). If a refusal
+// ever reaches it, the PAT leaks — so the tests run it, not a paraphrase.
 function tokenTheCallerWouldUse(result) {
   if (result === "denied") return null; // handler returns 403 before this point
   return result ? result.token : PAT;

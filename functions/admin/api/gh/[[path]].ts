@@ -4,12 +4,14 @@
 // token NEVER reaches the browser. The whole /admin/* path is gated by the auth
 // middleware, so only the allowlisted editor reaches here.
 //
-// Multi-tenant token: instead of a standing GITHUB_TOKEN PAT, this proxy asks the
-// BROKER to mint a short-lived, repo-scoped App installation token (Contents:write),
-// forwarding the editor's broker-signed session. Zero standing secret on the tenant.
-// A GITHUB_TOKEN env var, if set, is used as a fallback (the dogfood keeps one while
-// we transition). `GET /user` can't use an installation token, so it's synthesized
-// from the session (the CMS uses it only for a health-check login display).
+// The token is the SIGNED-IN PERSON'S OWN GitHub token, obtained by device flow and
+// held in an HttpOnly cookie (docs/security-todo.md §10). The gate hands it over in
+// `data` — post-refresh, which the cookie on this request may not be. There is no
+// mint and no standing PAT: what this proxy can do is exactly what this person can
+// do at github.com, so nothing here is an escalation of their own access. What it
+// still does is NARROW that access — allowlist, repo confinement, editor write
+// rules — because a user token reaches every repo they can touch, not just this one
+// (§10.4).
 
 import {
   FORWARD_REQUEST_HEADERS,
@@ -25,27 +27,14 @@ import { editorMayCall, roleMayWrite, type Role } from "../../../_lib/roles";
 // Per-tenant repo identity — the broker writes this at repo creation; the proxy is
 // the single place that turns repo-relative CMS paths into repos/<owner>/<name>/…
 import repo from "../../../../lanza.config.json";
-import { mintRepoToken, type TokenCache } from "../../../_lib/broker-token";
 import { SESSION_COOKIE, readCookie, importPublicKey, verifySession } from "../../../_lib/session";
-import { BROKER_ORIGIN as CONFIG_BROKER, HANDOFF_PUBLIC_KEY as CONFIG_PUBLIC_KEY } from "../../../_lib/tenant-config";
+import { HANDOFF_PUBLIC_KEY as CONFIG_PUBLIC_KEY } from "../../../_lib/tenant-config";
 
 interface Env {
-  GITHUB_TOKEN?: string;
-  BROKER_ORIGIN?: string;
   HANDOFF_PUBLIC_KEY?: string;
 }
 
 const GITHUB_API = "https://api.github.com";
-
-// Best-effort per-isolate cache of the repo-scoped installation token — the token is
-// the same for every editor of the repo, so caching by repo avoids a broker round-trip
-// on each CMS call. A cache miss just re-fetches; correctness never depends on it.
-//
-// The mint itself lives in _lib/broker-token.ts, shared with the MCP server, so I2
-// ("a denial is not an outage") has exactly one implementation. This file used to
-// carry its own copy; the MCP server carried a second one that got I2 WRONG, which is
-// the whole argument for not having two.
-const tokenCache: TokenCache = new Map();
 
 export const onRequest = async (context: {
   request: Request;
@@ -54,11 +43,10 @@ export const onRequest = async (context: {
   // Set by functions/admin/_middleware.ts, which is the only thing that can reach
   // this route. Absent role = treat as an editor (the lesser of the two), never as
   // an owner — a missing claim must not be the permissive case.
-  data?: { role?: Role; login?: string };
+  data?: { role?: Role; login?: string; token?: string | null };
 }): Promise<Response> => {
   const { request, env, params } = context;
   const url = new URL(request.url);
-  const session = readCookie(request.headers.get("Cookie"), SESSION_COOKIE);
   // Absent role = treat as an editor (the middle role), never as an owner — a
   // missing claim must not be the permissive case.
   const claimed = context.data?.role;
@@ -68,12 +56,12 @@ export const onRequest = async (context: {
   const seg = params.path;
   const subPath = Array.isArray(seg) ? seg.join("/") : (seg ?? "");
 
-  // GET /user — an installation token can't call it. Synthesize {login} from the
-  // broker-signed session (the CMS uses this only for its health-check display).
+  // GET /user — answered here rather than forwarded. The gate has already asked
+  // GitHub who this is, so passing it upstream would buy a second round-trip for an
+  // answer we hold. A browser on the outgoing RS256 session has no GitHub token at
+  // all, so for it the session IS the only answer — that fallback goes in phase 4.
   if (request.method === "GET" && subPath.replace(/[?#].*$/, "").replace(/^\/+/, "") === "user") {
-    // The gate already asked GitHub who this is (device-flow family), so take its
-    // answer; only fall back to re-verifying the broker session for a browser that
-    // holds one of those instead.
+    const session = readCookie(request.headers.get("Cookie"), SESSION_COOKIE);
     const publicKey = env.HANDOFF_PUBLIC_KEY || CONFIG_PUBLIC_KEY;
     const login =
       context.data?.login ||
@@ -134,23 +122,14 @@ export const onRequest = async (context: {
     }
   }
 
-  // Token: broker-minted (multi-tenant) first, else the legacy GITHUB_TOKEN PAT.
-  const broker = env.BROKER_ORIGIN || CONFIG_BROKER;
-  const result =
-    session && broker
-      ? await mintRepoToken(broker, session, repo.owner, repo.name, tokenCache)
-      : null;
-  // A refusal is final. Only an UNAVAILABLE broker may fall through to the PAT,
-  // otherwise a caller the broker just rejected would be handed the standing
-  // token instead — turning a denial into an escalation.
-  if (result === "denied") {
-    return json(403, { message: "Your session is not authorized to edit this repository." });
-  }
-  const token = result ? result.token : (env.GITHUB_TOKEN ?? null);
+  // The person's own token, from the gate. A browser that got in on the outgoing
+  // RS256 session has none — it is a credential for OUR broker, not for GitHub, and
+  // there is nothing left here to trade it for. Say "sign in", not "server error":
+  // one device code fixes it, and 401 is what the SPA already reads as an auth
+  // problem. (Deleted along with that family in phase 4.)
+  const token = context.data?.token;
   if (!token) {
-    return json(500, {
-      message: "GitHub proxy: no token — the broker was unavailable and no GITHUB_TOKEN is set.",
-    });
+    return json(401, { message: "Sign in with GitHub again to edit this site." });
   }
 
   const target = `${GITHUB_API}/${upstreamPath(subPath, repo.owner, repo.name)}${url.search}`;

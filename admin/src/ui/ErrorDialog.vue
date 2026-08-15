@@ -1,7 +1,8 @@
 <script setup lang="ts">
 // The single, app-wide error dialog. Renders whatever reportError() last set.
-// The GitHub token is server-side now, so auth-ish failures (401/403/404) point
-// at the server/proxy config rather than a token the editor can fix in-browser.
+// The GitHub token is server-side, in an HttpOnly cookie, so an auth-ish failure
+// (401/403/404) is either a lapsed sign-in the person can redo or missing access to
+// the repository — never a token they could paste in here.
 import { errorState, clearError, isAuthError } from "../errors";
 </script>
 
@@ -22,10 +23,17 @@ import { errorState, clearError, isAuthError } from "../errors";
       <p class="text-sm leading-relaxed break-words text-zinc-600">{{ errorState.message }}</p>
       <p v-if="errorState.status" class="mt-1 text-xs text-zinc-500">GitHub status {{ errorState.status }}</p>
 
-      <p v-if="isAuthError(errorState.status)" class="mt-3 text-sm text-zinc-500">
-        The server's GitHub token may be missing, expired, or lacking
-        <strong>Contents: read &amp; write</strong> on this repo. Contact the site
-        admin to check the <code class="rounded bg-zinc-100 px-1.5 py-0.5 font-mono text-[0.85em] text-zinc-700">GITHUB_TOKEN</code> setting.
+      <!-- A 401 is now "your GitHub sign-in ran out", not a server misconfiguration:
+           the proxy sends YOUR token, so there is a fix you can perform yourself. A
+           reload lands on the sign-in screen. 403/404 still mean the account is
+           signed in but lacks access to this repository. -->
+      <p v-if="errorState.status === 401" class="mt-3 text-sm text-zinc-500">
+        Your GitHub sign-in has expired.
+        <a class="underline" href="/admin/">Reload to sign in again.</a>
+      </p>
+      <p v-else-if="isAuthError(errorState.status)" class="mt-3 text-sm text-zinc-500">
+        Your GitHub account may not have <strong>write access</strong> to this site's
+        repository. Ask the site owner to add you as a collaborator.
       </p>
 
       <div class="mt-5 flex justify-end gap-2">
