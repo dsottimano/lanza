@@ -126,6 +126,12 @@ test("an unauthenticated navigation renders the sign-in screen, never cached", a
   // It never handles a credential: the code it shows comes from /start's response
   // body, and the tokens only ever exist as HttpOnly cookies.
   assert.ok(!/ghu_|access_token|client_secret/.test(html));
+  // Copying the code by hand off a screen is the one manual step in the whole
+  // flow — give it a button. The clipboard API needs a secure context and can be
+  // refused, so the script must keep a path that still works when it is.
+  assert.match(html, /id="copy"/);
+  assert.match(html, /navigator\.clipboard/);
+  assert.match(html, /selectNodeContents/);
 });
 
 test("the sign-in screen's inline script runs on a per-response nonce, not a standing hole", async () => {

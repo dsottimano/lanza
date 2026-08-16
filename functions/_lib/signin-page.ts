@@ -41,7 +41,12 @@ const STYLE = `
   a { color:var(--ink); }
   .code { font-family: ui-monospace, SFMono-Regular, Menlo, monospace; font-size:1.75rem;
           letter-spacing:.18em; color:var(--ink); text-align:center; border:1px dashed var(--line);
-          padding:.75rem; margin:0 0 1rem; }
+          padding:.75rem; margin:0; flex:1; user-select:all; }
+  .coderow { display:flex; align-items:stretch; gap:.5rem; margin:0 0 1rem; }
+  /* Secondary next to the code — the primary action is at github.com, not here. */
+  .copy { width:auto; flex:0 0 auto; padding:0 .9rem; background:#fff; color:var(--ink);
+          font-size:.85rem; white-space:nowrap; }
+  .copy:hover { background:var(--paper); }
   .status { font-size:.85rem; }
   .error { color:#9b1c1c; font-size:.875rem; }
   .foot { margin:1.5rem 0 0; padding-top:1rem; border-top:1px solid var(--line); font-size:.8rem; }
@@ -82,6 +87,36 @@ const SCRIPT = `
            : 'GitHub would not complete the sign-in (' + (b.error || res.status) + ').', true);
     }).catch(function () { setTimeout(function () { poll(interval); }, interval * 1000); });
   }
+
+  // Copy the code. navigator.clipboard needs a secure context — https, or localhost
+  // for dev — and can still be refused by permission policy, so the failure path
+  // SELECTS the code instead of just saying "copy failed": the person then has a
+  // working Ctrl+C rather than a dead button and a code they must retype.
+  var copyBtn = document.getElementById('copy');
+  var codeEl = document.getElementById('code');
+  copyBtn.addEventListener('click', function () {
+    var text = codeEl.textContent;
+    var done = function () {
+      copyBtn.textContent = 'Copied';
+      setTimeout(function () { copyBtn.textContent = 'Copy'; }, 1500);
+    };
+    var selectInstead = function () {
+      try {
+        var range = document.createRange();
+        range.selectNodeContents(codeEl);
+        var sel = window.getSelection();
+        sel.removeAllRanges();
+        sel.addRange(range);
+        copyBtn.textContent = 'Press Ctrl+C';
+      } catch (e) { copyBtn.textContent = 'Copy failed'; }
+      setTimeout(function () { copyBtn.textContent = 'Copy'; }, 2500);
+    };
+    if (navigator.clipboard && navigator.clipboard.writeText) {
+      navigator.clipboard.writeText(text).then(done, selectInstead);
+    } else {
+      selectInstead();
+    }
+  });
 
   begin.addEventListener('click', function () {
     begin.disabled = true;
@@ -135,7 +170,10 @@ export function signInPage(): { html: string; nonce: string } {
       <li>Open <a id="verify" href="https://github.com/login/device" target="_blank" rel="noopener noreferrer">github.com/login/device</a></li>
       <li>Enter this code:</li>
     </ol>
-    <p class="code" id="code"></p>
+    <div class="coderow">
+      <p class="code" id="code"></p>
+      <button class="copy" id="copy" type="button">Copy</button>
+    </div>
     <p class="status" id="status">Waiting for you to finish at GitHub…</p>
   </div>
 
