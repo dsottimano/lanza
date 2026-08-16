@@ -27,12 +27,10 @@ import { editorMayCall, roleMayWrite, type Role } from "../../../_lib/roles";
 // Per-tenant repo identity — the broker writes this at repo creation; the proxy is
 // the single place that turns repo-relative CMS paths into repos/<owner>/<name>/…
 import repo from "../../../../lanza.config.json";
-import { SESSION_COOKIE, readCookie, importPublicKey, verifySession } from "../../../_lib/session";
-import { HANDOFF_PUBLIC_KEY as CONFIG_PUBLIC_KEY } from "../../../_lib/tenant-config";
 
-interface Env {
-  HANDOFF_PUBLIC_KEY?: string;
-}
+// No Env: this proxy reads no configuration and holds no credential of its own. The
+// token comes from the gate, the repo identity from lanza.config.json.
+type Env = Record<string, never>;
 
 const GITHUB_API = "https://api.github.com";
 
@@ -45,7 +43,7 @@ export const onRequest = async (context: {
   // an owner — a missing claim must not be the permissive case.
   data?: { role?: Role; login?: string; token?: string | null };
 }): Promise<Response> => {
-  const { request, env, params } = context;
+  const { request, params } = context;
   const url = new URL(request.url);
   // Absent role = treat as an editor (the middle role), never as an owner — a
   // missing claim must not be the permissive case.
@@ -58,16 +56,11 @@ export const onRequest = async (context: {
 
   // GET /user — answered here rather than forwarded. The gate has already asked
   // GitHub who this is, so passing it upstream would buy a second round-trip for an
-  // answer we hold. A browser on the outgoing RS256 session has no GitHub token at
-  // all, so for it the session IS the only answer — that fallback goes in phase 4.
+  // answer we already hold. There is no longer a second source: the gate admits
+  // nobody without a GitHub token, so if `login` is absent, nothing else here knows
+  // it either.
   if (request.method === "GET" && subPath.replace(/[?#].*$/, "").replace(/^\/+/, "") === "user") {
-    const session = readCookie(request.headers.get("Cookie"), SESSION_COOKIE);
-    const publicKey = env.HANDOFF_PUBLIC_KEY || CONFIG_PUBLIC_KEY;
-    const login =
-      context.data?.login ||
-      (publicKey && session
-        ? await verifySession(session, await importPublicKey(publicKey), url.origin)
-        : null);
+    const login = context.data?.login;
     if (!login) return json(401, { message: "Not authenticated." });
     return json(200, { login });
   }

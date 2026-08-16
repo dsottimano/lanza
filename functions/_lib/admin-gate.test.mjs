@@ -157,6 +157,31 @@ test("a garbage session cookie is refused — a bearer is not a session", async 
   assert.equal(reached, false);
 });
 
+// REPORTED FROM PRODUCTION, 2026-08-15. Phase 2 accepted the broker session so that
+// adding a way in did not close one; phase 3 then took the mint off the runtime
+// path, and the session could no longer DO anything. The combination admitted a
+// browser into a CMS where every call 401s — and an empty content list renders the
+// ONBOARDING WIZARD, on a site that has content. The gate is where that is fixed:
+// a credential that cannot work must be refused, because only a refusal says
+// "sign in".
+test("a browser holding only the broker session is not admitted, and the cookie is dropped", async () => {
+  // Any lanza_session value: the gate no longer verifies one, so a real signature
+  // would fare no better. That is the point of the test.
+  const nav = await gate("/admin/", { cookie: "lanza_session=looks.legit.enough" });
+  assert.equal(nav.reached, false, "the SPA must not load — that is the broken state");
+  assert.match(await nav.res.text(), /Get a sign-in code/);
+  const cleared = nav.res.headers.getSetCookie().join("; ");
+  assert.match(cleared, /lanza_session=;/);
+  assert.match(cleared, /Max-Age=0/);
+
+  // Cloudflare in particular: that proxy authorizes nothing itself and attaches an
+  // ACCOUNT-scoped token (I1), so until this change the 7-day unrevocable session
+  // still drove it — by then the only thing it could still drive.
+  const cf = await gate("/admin/api/cf/accounts", { cookie: "lanza_session=looks.legit.enough" });
+  assert.equal(cf.res.status, 401);
+  assert.equal(cf.reached, false);
+});
+
 test("the three login endpoints still pass through unauthenticated", async () => {
   for (const path of ["/admin/api/auth/login", "/admin/api/auth/handoff", "/admin/api/auth/logout"]) {
     const { res, reached } = await gate(path);

@@ -3,10 +3,13 @@
 // under /admin/* (the static SPA and both api proxies) BEFORE the gh/cf Pages
 // Functions execute. It deliberately lives at functions/admin/ and NOT at the
 // project root: a root _middleware would run on the public site too and defeat
-// its caching (see CLAUDE.md Rule 2). Three exact auth endpoints are exempt so the
-// login round-trip (login → broker → handoff) can complete while unauthenticated.
-// The session cookie is a broker-signed RS256 token, verified here with the
-// baked-in public key + bound to this site's origin (design §3.4-B).
+// its caching (see CLAUDE.md Rule 2). The auth endpoints are exempt by exact match
+// so the sign-in flow can complete while unauthenticated.
+//
+// Who you are comes from GITHUB: a device-flow user token in an HttpOnly cookie,
+// and `permissions` on this repo for the role (docs/security-todo.md §10). An
+// unauthenticated navigation is answered with the sign-in screen, not a redirect —
+// device flow has nowhere to redirect to.
 //
 // It is also the only place /admin's security headers can be set: Cloudflare does
 // not apply public/_headers to Pages Function responses, and this middleware wraps
@@ -17,13 +20,10 @@ import {
   withAdminSecurityHeaders,
 } from "../_lib/admin-gate";
 import { signInPage } from "../_lib/signin-page";
-import {
-  SESSION_COOKIE,
-  verifySession,
-  importPublicKey,
-  readCookie,
-} from "../_lib/session";
-import { resolveRole, roleMayUseCloudflare, type Role } from "../_lib/roles";
+// Only for reading and clearing the outgoing session cookie — nothing verifies it
+// here any more. `session.ts` goes in phase 4.
+import { SESSION_COOKIE, readCookie } from "../_lib/session";
+import { roleMayUseCloudflare, type Role } from "../_lib/roles";
 import { identityFor } from "../_lib/gh-identity";
 import {
   ACCESS_COOKIE,
@@ -99,29 +99,24 @@ export const onRequest = async (context: {
   // of people is consulted, and removal of access takes effect within 60s.
   const gh = await githubAuth(cookies, env);
 
-  // ── Family 2 (outgoing): a broker-signed RS256 session and the committed lists.
-  // Still live, deliberately: this phase ADDS a way in, it does not close one, so
-  // nobody is signed out mid-migration. Deleted in phase 4 (§10.8).
+  // ── The broker's RS256 session is NO LONGER A WAY IN. ────────────────────────
+  // Phase 2 accepted both families so that adding a way in did not close one. Phase
+  // 3 took the mint off the runtime path, and that changed what the old session can
+  // DO: nothing. The proxy has no GitHub token for it, so admitting it produced the
+  // worst state in the product — the CMS loads, every call 401s, and the empty
+  // result renders the onboarding wizard, on a site that has content. A credential
+  // that opens a door onto a room where nothing works is worse than one that is
+  // refused, because only the refusal tells you to sign in.
   //
-  // Family 1 wins when it produces a role. Anything else about it — expired, no
-  // access, GitHub unreachable — falls through to family 2 rather than denying,
-  // because a browser can hold both and a stale GitHub cookie must not lock out a
-  // working session. If family 2 also comes up empty, gh.kind decides what to say.
-  let role: Role | null = gh.kind === "ok" ? gh.role : null;
-  let login: string | null = gh.kind === "ok" ? gh.login : null;
-
-  if (!role) {
-    const publicKey = env.HANDOFF_PUBLIC_KEY || CONFIG_PUBLIC_KEY;
-    if (publicKey) {
-      const key = await importPublicKey(publicKey);
-      login = await verifySession(readCookie(cookies, SESSION_COOKIE), key, url.origin);
-    }
-    // A valid signature only proves the broker authenticated SOMEONE — it mints a
-    // token for any GitHub user who logs in. Authorization is a separate check, and
-    // it belongs here: /admin/api/cf/* trusts this middleware entirely and attaches
-    // an account-scoped Cloudflare token.
-    role = resolveRole(login, env.ADMIN_LOGIN || repo.adminLogin, repo.editors);
-  }
+  // It also closed a gap rather than opening one: /admin/api/cf/* does no
+  // authorization of its own and attaches an ACCOUNT-scoped Cloudflare token (I1),
+  // so until this line the 7-day unrevocable session still drove Cloudflare — by
+  // then the only thing it could still drive.
+  //
+  // The code for that family is deleted in phase 4; this is the behaviour change,
+  // made where the bug is.
+  const role: Role | null = gh.kind === "ok" ? gh.role : null;
+  const login: string | null = gh.kind === "ok" ? gh.login : null;
 
   if (!role) {
     const refused =
@@ -133,6 +128,12 @@ export const onRequest = async (context: {
     // Carry any cookie clearing through the refusal — a dead refresh token has to be
     // dropped on the response that noticed it, or the browser presents it forever.
     for (const set of gh.setCookies) refused.headers.append("set-cookie", set);
+    // Drop the broker session too. It authorises nothing now, and leaving it in the
+    // browser means every future request still carries a credential whose only
+    // remaining effect would be to confuse whoever debugs this next.
+    if (readCookie(cookies, SESSION_COOKIE)) {
+      refused.headers.append("set-cookie", `${SESSION_COOKIE}=; Path=/admin; Max-Age=0`);
+    }
     return refused;
   }
 
