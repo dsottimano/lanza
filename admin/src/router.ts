@@ -9,6 +9,7 @@
 //   #/pages/en/home       → editing the English "home" page
 //   #/pages/en/new        → a new page
 //   #/settings/parts      → the Header & footer editor
+//   #/pending             → everything waiting to be published
 //   #/publish · #/help
 //
 // Language is part of the URL, not a mode: the entry editor's locale bar
@@ -27,6 +28,7 @@ export const router = createRouter({
     // aren't read as a collection name.
     { path: "/settings/:panel", name: "settings", component: Blank },
     { path: "/publish", name: "publish", component: Blank },
+    { path: "/pending", name: "pending", component: Blank },
     { path: "/help", name: "help", component: Blank },
     { path: "/:collection/:locale", name: "list", component: Blank },
     { path: "/:collection/:locale/:slug", name: "entry", component: Blank },

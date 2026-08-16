@@ -45,6 +45,7 @@ const BrandThemesView = lazyPane(() => import("./ui/BrandThemesView.vue"));
 const ContentTypesView = lazyPane(() => import("./ui/ContentTypesView.vue"));
 const PeopleView = lazyPane(() => import("./ui/PeopleView.vue"));
 const PublishView = lazyPane(() => import("./ui/PublishView.vue"));
+const PendingView = lazyPane(() => import("./ui/PendingView.vue"));
 const OnboardingWizard = lazyPane(() => import("./ui/OnboardingWizard.vue"));
 import { GitHubClient } from "./backend/github";
 import type { Locale } from "./backend/config";
@@ -80,7 +81,8 @@ type Pane =
   | "blocks"
   | "contentTypes"
   | "people"
-  | "publish";
+  | "publish"
+  | "pending";
 
 const route = useRoute();
 const router = useRouter();
@@ -173,6 +175,8 @@ const pane = computed<Pane>(() => {
     }
     case "publish":
       return "publish";
+    case "pending":
+      return "pending";
     case "help":
       return "help";
     default:
@@ -198,6 +202,9 @@ function openPanel(panel: string) {
 }
 function openPublish() {
   router.push("/publish");
+}
+function openPending() {
+  router.push("/pending");
 }
 function openHelp() {
   router.push("/help");
@@ -249,6 +256,7 @@ function onOnboarded() {
       :people-open="pane === 'people'"
       :is-owner="ownerView"
       :publish-open="pane === 'publish'"
+      :pending-open="pane === 'pending'"
       :help-open="pane === 'help'"
       @select="selectCollection"
       @open-settings="openSettings"
@@ -261,6 +269,7 @@ function onOnboarded() {
       @content-types="openPanel('contentTypes')"
       @people="openPanel('people')"
       @publish="openPublish"
+      @pending="openPending"
       @help="openHelp"
     />
     <main class="min-w-0 flex-1">
@@ -330,6 +339,11 @@ function onOnboarded() {
       <PeopleView v-else-if="pane === 'people'" :client="client" @back="backToList" />
       <PublishView
         v-else-if="pane === 'publish'"
+        :client="client"
+        @back="backToList"
+      />
+      <PendingView
+        v-else-if="pane === 'pending'"
         :client="client"
         @back="backToList"
       />

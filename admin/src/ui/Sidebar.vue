@@ -36,6 +36,7 @@ const props = defineProps<{
   // never briefly permissive while access is still loading.
   isOwner: boolean;
   publishOpen: boolean;
+  pendingOpen: boolean;
   helpOpen: boolean;
 }>();
 const emit = defineEmits<{
@@ -50,6 +51,7 @@ const emit = defineEmits<{
   (e: "contentTypes"): void;
   (e: "people"): void;
   (e: "publish"): void;
+  (e: "pending"): void;
   (e: "help"): void;
 }>();
 
@@ -299,6 +301,16 @@ const itemActive = "nav-item--active";
     </div>
 
     <div class="flex-shrink-0 border-t border-[var(--border)] pt-2 flex flex-col gap-0.5">
+      <!-- Sits directly above Publish because it is the step before it: see what
+           would go out, then send it. Owner-only for the same reason Publish is. -->
+      <button
+        v-if="isOwner"
+        class="nav-item flex items-center gap-1.5"
+        :class="{ 'nav-item--active': pendingOpen }"
+        @click="emit('pending')"
+      >
+        <span aria-hidden="true">📋</span> Waiting to publish
+      </button>
       <button
         v-if="isOwner"
         class="nav-item flex items-center gap-1.5"
