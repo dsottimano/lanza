@@ -67,3 +67,10 @@ markdown on load and re-saves HTML.
 - Touched auth, a proxy allowlist, or an MCP tool that takes a path? → re-read
   `docs/security-model.md` §5 and run `npm test` (it carries the adversarial
   traversal/confinement cases — they assert refusal *and* that nothing was written).
+- **Added or edited a file under `functions/`, including a `*.test.mjs`?** → Cloudflare
+  bundles that whole directory, tests included, with an **older esbuild** than the local
+  one, so `npm test` passing proves nothing about the deploy. Newer syntax fails the
+  BUILD and the site silently keeps serving the previous version. Import attributes
+  (`with { type: "json" }`) are the known casualty — import JSON bare; the test loader
+  `functions/_lib/ts-resolve.mjs` supplies the attribute for node. Check it the way CI
+  will: `npx wrangler@3.114.17 pages functions build --outdir /tmp/fnbuild`.

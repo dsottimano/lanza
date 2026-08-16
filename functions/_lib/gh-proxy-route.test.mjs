@@ -14,7 +14,11 @@
 import { test } from "node:test";
 import assert from "node:assert/strict";
 import { onRequest } from "../admin/api/gh/[[path]].ts";
-import repo from "../../lanza.config.json" with { type: "json" };
+// No `with { type: "json" }`, deliberately: ts-resolve.mjs supplies it for node, and
+// CLOUDFLARE BUNDLES THIS FILE. Everything under functions/ goes through the Pages
+// Functions bundler — tests included — and its esbuild cannot parse an import
+// attribute. The attribute here failed the deploy, not the test run.
+import repo from "../../lanza.config.json";
 
 const HOST = "https://lanzacms.com";
 const TOKEN = "ghu_the_signed_in_persons_own_token";
