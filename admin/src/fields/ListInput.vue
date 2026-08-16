@@ -7,8 +7,14 @@ import { computed, ref } from "vue";
 import type { Field, Variant } from "../schema";
 import FieldInput from "./FieldInput.vue";
 import { inputCls } from "./styles";
+import { childPath } from "./field-paths";
 
-const props = defineProps<{ field: Field }>();
+const props = defineProps<{
+  field: Field;
+  // The list's own path; each item extends it with its index (`cards.0`), which is what
+  // makes "Item 2 → Step label" addressable in the preview. See field-paths.ts.
+  path?: string;
+}>();
 const model = defineModel<any[]>();
 
 // Initialise the array once, at setup — never mutate reactive state in render.
@@ -39,6 +45,17 @@ function variantOf(item: any): Variant | undefined {
   return props.field.types?.find((v) => v.name === item?.type);
 }
 
+/**
+ * The path of item `i` (`cards.0`), or of a field inside it (`cards.0.heading`).
+ * undefined when this list has no path of its own — an unstamped subtree reports no
+ * field rather than a wrong one.
+ */
+function itemPath(i: number, name?: string): string | undefined {
+  if (!props.path) return undefined;
+  const item = childPath(props.path, i);
+  return name === undefined ? item : childPath(item, name);
+}
+
 function remove(i: number) {
   items.value.splice(i, 1);
 }
@@ -52,7 +69,12 @@ function move(i: number, dir: -1 | 1) {
 
 <template>
   <div class="flex flex-col gap-2.5">
-    <div v-for="(item, i) in items" :key="i" class="rounded-xl border border-[var(--border)] bg-[var(--paper-card)] p-3">
+    <div
+      v-for="(item, i) in items"
+      :key="i"
+      class="rounded-xl border border-[var(--border)] bg-[var(--paper-card)] p-3"
+      :data-field-path="itemPath(i)"
+    >
       <div class="mb-2.5 flex items-center justify-between">
         <span class="text-[0.7rem] font-bold tracking-wide text-zinc-500 uppercase">
           {{ variantOf(item)?.label ?? `${singular} ${i + 1}` }}
@@ -95,6 +117,7 @@ function move(i: number, dir: -1 | 1) {
           v-for="f in variantOf(item)!.fields"
           :key="f.name"
           :field="f"
+          :path="itemPath(i, f.name)"
           v-model="item[f.name]"
         />
       </template>
@@ -105,6 +128,7 @@ function move(i: number, dir: -1 | 1) {
           v-for="f in field.fields"
           :key="f.name"
           :field="f"
+          :path="itemPath(i, f.name)"
           v-model="item[f.name]"
         />
       </template>

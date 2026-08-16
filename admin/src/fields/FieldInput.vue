@@ -8,8 +8,17 @@ import ListInput from "./ListInput.vue";
 import RelationInput from "./RelationInput.vue";
 import ImageInput from "./ImageInput.vue";
 import { inputCls } from "./styles";
+import { childPath } from "./field-paths";
 
-const props = defineProps<{ field: Field }>();
+const props = defineProps<{
+  field: Field;
+  // This field's path within the form's data (`cards.0.heading`). Stamped on the root
+  // element as `data-field-path` so ONE delegated focus listener up in FieldRows can
+  // tell the preview which region to bring into view — no per-input handlers, and the
+  // nested case answers correctly because `closest` finds the innermost stamp.
+  // Optional: an unstamped subtree simply reports no field.
+  path?: string;
+}>();
 const model = defineModel<any>();
 
 const isRequired = computed(() => props.field.required !== false);
@@ -61,7 +70,11 @@ const singular = computed(() => (props.field.labelSingular ?? "item").toLowerCas
 
 <template>
   <!-- object: a collapsible group of nested fields -->
-  <fieldset v-if="field.widget === 'object'" class="mb-4 rounded-xl border border-[var(--border)] px-3.5">
+  <fieldset
+    v-if="field.widget === 'object'"
+    class="mb-4 rounded-xl border border-[var(--border)] px-3.5"
+    :data-field-path="path"
+  >
     <legend
       class="flex cursor-pointer items-center gap-1.5 py-2.5 text-xs font-bold tracking-wide text-zinc-700 uppercase select-none"
       @click="open = !open"
@@ -79,6 +92,7 @@ const singular = computed(() => (props.field.labelSingular ?? "item").toLowerCas
         v-for="sub in field.fields"
         :key="sub.name"
         :field="sub"
+        :path="childPath(path, sub.name)"
         v-model="objModel[sub.name]"
       />
     </div>
@@ -86,7 +100,7 @@ const singular = computed(() => (props.field.labelSingular ?? "item").toLowerCas
 
   <!-- list: a labelled OUTER container makes the array read as a repeating group
        (a tinted, accent-edged box) with its item cards nested inside. -->
-  <div v-else-if="field.widget === 'list'" class="mb-4">
+  <div v-else-if="field.widget === 'list'" class="mb-4" :data-field-path="path">
     <div class="rounded-xl border border-[var(--border)] border-l-[3px] border-l-[var(--accent)] bg-[var(--surface)]/50 p-3">
       <div class="mb-2.5 flex items-baseline justify-between gap-2">
         <label class="text-xs font-bold tracking-wide text-zinc-600 uppercase">{{ field.label }}</label>
@@ -94,20 +108,20 @@ const singular = computed(() => (props.field.labelSingular ?? "item").toLowerCas
           {{ itemCount }} {{ itemCount === 1 ? singular : `${singular}s` }}
         </span>
       </div>
-      <ListInput :field="field" v-model="model" />
+      <ListInput :field="field" :path="path" v-model="model" />
     </div>
     <p v-if="field.hint" class="mt-1.5 text-xs text-zinc-500">{{ field.hint }}</p>
   </div>
 
   <!-- relation: pick slug(s) from a target collection -->
-  <div v-else-if="field.widget === 'relation'" class="mb-4">
+  <div v-else-if="field.widget === 'relation'" class="mb-4" :data-field-path="path">
     <label class="mb-1.5 block text-xs font-semibold text-zinc-600">{{ field.label }}</label>
     <RelationInput :field="field" v-model="model" />
     <p v-if="field.hint" class="mt-1.5 text-xs text-zinc-500">{{ field.hint }}</p>
   </div>
 
   <!-- scalar widgets -->
-  <div v-else class="mb-4">
+  <div v-else class="mb-4" :data-field-path="path">
     <label class="mb-1.5 block text-xs font-semibold text-zinc-600" :for="field.name">{{ field.label }}</label>
 
     <textarea

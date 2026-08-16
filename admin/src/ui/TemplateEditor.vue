@@ -8,9 +8,9 @@
 // backend/templates.ts. This replaces the old plain-text-box fallthrough for the
 // `preset`/`slots` fields; EditorView filters them out of the generic field panel
 // and mounts this instead.
-import { computed, ref, watch } from "vue";
+import { computed, onBeforeUnmount, ref, watch } from "vue";
 import FieldForm from "../fields/FieldForm.vue";
-import { toSlotPaths } from "../fields/field-paths";
+import { toEntryPath, toSlotPaths } from "../fields/field-paths";
 import SaveButton from "./SaveButton.vue";
 import { inputCls } from "../fields/styles";
 import type { GitHubClient } from "../backend/github";
@@ -32,6 +32,11 @@ const props = defineProps<{
   changed?: readonly string[];
 }>();
 
+// Where the person is working, as an ENTRY path, so the editor can bring that region of
+// the preview into view. Emitted rather than acted on here: this pane doesn't own the
+// preview.
+const emit = defineEmits<{ focusField: [path: string] }>();
+
 const data = props.data;
 
 const templates = computed(() => props.templates);
@@ -44,6 +49,27 @@ const slotsData = computed(() => data.slots as Record<string, unknown>);
 // the slots object the form edits, so nothing downstream has to know what `slots` is
 // called or strip a prefix of its own (fields/field-paths.ts).
 const changedSlots = computed(() => toSlotPaths(props.changed ?? []));
+
+// Focus → the preview follows. Two guards, because focus fires far more often than a
+// scroll should:
+//   • DEDUPE — re-entering the field you are already in must not re-scroll. Clicking
+//     into a textarea you are already typing in fires focusin again.
+//   • DEBOUNCE — tabbing through a fieldset walks every field on the way, and each one
+//     would otherwise yank the preview somewhere else.
+// The conversion is the same single line as `changedSlots`, run the other way.
+const FOCUS_SETTLE_MS = 120;
+let focusTimer: ReturnType<typeof setTimeout> | undefined;
+let lastFocused = "";
+
+function onFieldFocus(slotPath: string): void {
+  const entryPath = toEntryPath(slotPath);
+  if (entryPath === lastFocused) return;
+  lastFocused = entryPath;
+  clearTimeout(focusTimer);
+  focusTimer = setTimeout(() => emit("focusField", entryPath), FOCUS_SETTLE_MS);
+}
+
+onBeforeUnmount(() => clearTimeout(focusTimer));
 
 // Empty select value clears the preset; picking one guarantees a slots object.
 const presetModel = computed<string>({
@@ -148,6 +174,7 @@ watch(
             :locale="locale"
             :changed="changedSlots"
             dense
+            @focus-field="onFieldFocus"
           />
         </div>
 

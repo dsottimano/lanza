@@ -112,6 +112,34 @@ export function selectionForClick(target: EventTarget | null): string | null {
   const el = (target as Element | null)?.closest?.("[data-lanza-field]") ?? null;
   return el ? toEntryPath(el.getAttribute("data-lanza-field") ?? "") : null;
 }
+
+// A margin off each edge of the frame: a region touching the very top or bottom reads as
+// "at the edge", not as "in view".
+const EDGE_MARGIN_PX = 24;
+// How much of a region has to be inside that band before scrolling to it is just twitch.
+const ENOUGH_VISIBLE = 0.6;
+
+/**
+ * Does a region need scrolling into view, or is it already there?
+ *
+ * This exists because focus now drives the preview: without it, tabbing between two
+ * fields whose regions are both on screen would scroll the page for each one, and the
+ * preview would twitch continuously while someone worked.
+ *
+ * Measured as the fraction of the region inside the comfortable band — not "is the top
+ * edge visible", which scrolls for a region that is 95% on screen, and not "do the boxes
+ * overlap", which leaves a region sitting on the very edge. A region TALLER than the band
+ * can never be 60% inside it, so it is judged against the band's own height: filling the
+ * screen counts as seen.
+ */
+export function needsScroll(top: number, height: number, viewportHeight: number): boolean {
+  const bandTop = EDGE_MARGIN_PX;
+  const bandBottom = viewportHeight - EDGE_MARGIN_PX;
+  if (bandBottom <= bandTop) return true; // frame too short to judge — just scroll
+  const visible = Math.min(top + height, bandBottom) - Math.max(top, bandTop);
+  const reference = Math.max(1, Math.min(height, bandBottom - bandTop));
+  return visible / reference < ENOUGH_VISIBLE;
+}
 </script>
 
 <script setup lang="ts">
@@ -301,15 +329,32 @@ defineExpose({
     applyHighlights();
   },
   /**
-   * Scroll the first region under this entry path into view. Returns whether one was
-   * found — a field can be absent because the template doesn't place it, or because the
-   * frame hasn't painted the latest body yet.
+   * Bring the first region under this entry path into view, and report whether one
+   * exists. Two deliberate non-actions, because this is now driven by FOCUS and fires
+   * whenever someone moves between fields:
+   *   • No region — a `title`, an SEO field, a slot this template ignores — leaves the
+   *     preview exactly where it is. Jumping to the top would lose the reader's place to
+   *     tell them nothing.
+   *   • A region already comfortably in view is not scrolled to (see needsScroll), so
+   *     working across two nearby fields doesn't make the page twitch.
    */
   scrollToField(path: string): boolean {
     const selector = highlightSelector([path]);
-    const el = selector ? iframe.value?.contentDocument?.querySelector(selector) : null;
-    el?.scrollIntoView({ block: "center", behavior: "smooth" });
-    return el != null;
+    const doc = iframe.value?.contentDocument;
+    const el = selector ? doc?.querySelector(selector) : null;
+    if (!el) return false;
+
+    const rect = el.getBoundingClientRect?.();
+    const viewportHeight = doc?.documentElement?.clientHeight ?? 0;
+    if (rect && !needsScroll(rect.top, rect.height, viewportHeight)) return true;
+
+    // Reduced motion is asked of the FRAME's window — the preview is where the movement
+    // happens — falling back to this one. Smooth scrolling that fires on every focus
+    // change is exactly the kind of motion the setting exists to stop.
+    const win = iframe.value?.contentWindow ?? window;
+    const reduced = win.matchMedia?.("(prefers-reduced-motion: reduce)")?.matches === true;
+    el.scrollIntoView({ block: "center", behavior: reduced ? "auto" : "smooth" });
+    return true;
   },
 });
 

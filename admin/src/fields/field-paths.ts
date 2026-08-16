@@ -14,6 +14,32 @@
 export const SLOTS_PREFIX = "slots";
 
 /**
+ * A field's path inside its parent's. The ONE place a path is composed — object keys and
+ * list indices are the same operation, so they are the same function, and no component
+ * builds a path with `+`.
+ *
+ *   childPath(undefined, "cards") === "cards"        a top-level field
+ *   childPath("cards", 0)         === "cards.0"      a list item
+ *   childPath("cards.0", "title") === "cards.0.title"
+ */
+export function childPath(parent: string | undefined, key: string | number): string {
+  return parent ? `${parent}.${key}` : String(key);
+}
+
+/**
+ * The innermost field path at a DOM target — for one delegated focus listener instead of
+ * a handler per input. `closest` means a nested field reports its own path and not its
+ * container's, which is the whole reason the listener can be delegated.
+ *
+ * Duck-typed rather than `instanceof Element`: a target may come from another realm, and
+ * an instanceof guard would silently reject every event.
+ */
+export function fieldPathOfTarget(target: EventTarget | null): string | null {
+  const el = (target as Element | null)?.closest?.("[data-field-path]") ?? null;
+  return el?.getAttribute("data-field-path") || null;
+}
+
+/**
  * Does a changed path touch this field? True when either contains the other, because a
  * report can name a path at any depth:
  *   `cards.0.heading` changed → the `cards` field is affected (the leaf is inside it)
@@ -44,6 +70,18 @@ export function anyTouchesField(changedPaths: readonly string[], fieldName: stri
  * fields this form renders, and keeping them would open groups for changes that are not
  * in them. `slots` on its own becomes "" — the whole object changed.
  */
+/**
+ * A slot path back to an entry path — the exact inverse of `toSlotPaths`, for the other
+ * direction of the same conversation: the review tells the form what changed, the form
+ * tells the preview where the person is working.
+ *
+ * (PreviewPane has its own `toEntryPath` for MARKER paths. Same shape, different source:
+ * that one also has to account for the reserved `body` key, which is not a slot.)
+ */
+export function toEntryPath(slotPath: string): string {
+  return slotPath ? `${SLOTS_PREFIX}.${slotPath}` : SLOTS_PREFIX;
+}
+
 export function toSlotPaths(entryPaths: readonly string[]): string[] {
   const out: string[] = [];
   for (const path of entryPaths) {

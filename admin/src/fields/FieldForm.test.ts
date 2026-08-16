@@ -1,9 +1,19 @@
-import { describe, it, expect } from "vitest";
+import { describe, it, expect, vi } from "vitest";
 import { mount } from "@vue/test-utils";
 import FieldForm, { sectionsOf } from "./FieldForm.vue";
 import TemplateEditor from "../ui/TemplateEditor.vue";
-import { touchesField, anyTouchesField, toSlotPaths } from "./field-paths";
+import {
+  touchesField,
+  anyTouchesField,
+  toSlotPaths,
+  toEntryPath,
+  childPath,
+  fieldPathOfTarget,
+} from "./field-paths";
 import type { Field } from "../schema";
+import { render } from "../../../frontend/lib/template-render";
+import manifestoTemplate from "../../../templates/manifesto/template.html?raw";
+import manifestoFields from "../../../templates/manifesto/fields.json";
 
 // A template's slots are a tall stack of equal-weight inputs, and the preview never gets
 // real width. Grouping collapses them — but the fields are mostly agent-written, so the
@@ -221,5 +231,203 @@ describe("TemplateEditor — entry paths reach the right group", () => {
     const w = mountEditor();
     expect(w.findAll(".field-group")).toHaveLength(2);
     expect(w.findAll(".field-group").every((g) => !(g.element as HTMLDetailsElement).open)).toBe(true);
+  });
+});
+
+// ── Focus drives the preview ────────────────────────────────────────────────
+// The owner's actual complaint: editing "Item 2 → Step label" while the preview shows a
+// different section. For focus to move the preview, a field first has to know its own
+// path — which it did not, because FieldInput recursed by name only.
+
+describe("field paths", () => {
+  it("composes an object key and a list index the same way", () => {
+    expect(childPath(undefined, "cards")).toBe("cards");
+    expect(childPath("cards", 0)).toBe("cards.0");
+    expect(childPath("cards.0", "heading")).toBe("cards.0.heading");
+  });
+
+  it("round-trips a slot path to an entry path and back", () => {
+    expect(toEntryPath("cards.0.heading")).toBe("slots.cards.0.heading");
+    expect(toSlotPaths([toEntryPath("cards.0.heading")])).toEqual(["cards.0.heading"]);
+    // The container itself, both ways.
+    expect(toEntryPath("")).toBe("slots");
+    expect(toSlotPaths([toEntryPath("")])).toEqual([""]);
+  });
+
+  it("reads the innermost path at a focus target", () => {
+    const host = document.createElement("div");
+    host.innerHTML =
+      `<div data-field-path="cards"><div data-field-path="cards.0">` +
+      `<div data-field-path="cards.0.heading"><input></div></div></div>`;
+    // A nested field must report ITSELF, not the list it lives in — that is the whole
+    // reason one delegated listener can serve the entire form.
+    expect(fieldPathOfTarget(host.querySelector("input"))).toBe("cards.0.heading");
+    expect(fieldPathOfTarget(host.querySelector('[data-field-path="cards.0"]'))).toBe("cards.0");
+    expect(fieldPathOfTarget(document.createElement("input"))).toBeNull();
+    expect(fieldPathOfTarget(null)).toBeNull();
+  });
+});
+
+describe("FieldForm — every field knows its path", () => {
+  it("composes through object → list → object", () => {
+    const nested: Field[] = [
+      {
+        name: "page",
+        label: "Page",
+        widget: "object",
+        fields: [
+          {
+            name: "sections",
+            label: "Sections",
+            widget: "list",
+            fields: [
+              {
+                name: "meta",
+                label: "Meta",
+                widget: "object",
+                fields: [f("title")],
+              },
+            ],
+          },
+        ],
+      },
+    ];
+    const w = mountForm(nested, undefined, {
+      page: { sections: [{ meta: { title: "one" } }, { meta: { title: "two" } }] },
+    });
+    for (const path of [
+      "page",
+      "page.sections",
+      "page.sections.0",
+      "page.sections.0.meta",
+      "page.sections.0.meta.title",
+      "page.sections.1.meta.title",
+    ]) {
+      expect(w.find(`[data-field-path="${path}"]`).exists()).toBe(true);
+    }
+    // The stamp is on the field, so the value under it is the one being edited.
+    const input = w.find('[data-field-path="page.sections.1.meta.title"]').find("input");
+    expect((input.element as HTMLInputElement).value).toBe("two");
+  });
+});
+
+describe("TemplateEditor — focus reports an entry path", () => {
+  const template = {
+    name: "manifesto",
+    label: "Manifesto",
+    body: false,
+    fields: [
+      f("headline", "Hero"),
+      {
+        name: "cards",
+        label: "Cards",
+        widget: "list" as const,
+        group: "Doors",
+        fields: [f("heading")],
+      },
+    ],
+  };
+
+  function mountEditor() {
+    return mount(TemplateEditor, {
+      props: {
+        client: { loadText: async () => ({ text: "", sha: "x" }) } as never,
+        data: { preset: "manifesto", slots: { cards: [{ heading: "a" }, { heading: "b" }] } },
+        locale: "en",
+        templates: [template],
+        loading: false,
+      },
+    });
+  }
+
+  const focus = (w: ReturnType<typeof mountEditor>, path: string) =>
+    w.find(`[data-field-path="${path}"]`).find("input").trigger("focusin");
+
+  it("converts the focused field's path exactly once, on the way out", async () => {
+    vi.useFakeTimers();
+    try {
+      const w = mountEditor();
+      await focus(w, "cards.1.heading");
+      // Debounced: nothing has fired yet.
+      expect(w.emitted("focusField")).toBeUndefined();
+      vi.advanceTimersByTime(200);
+      expect(w.emitted("focusField")).toEqual([["slots.cards.1.heading"]]);
+    } finally {
+      vi.useRealTimers();
+    }
+  });
+
+  it("does not re-scroll for the field you are already in", async () => {
+    vi.useFakeTimers();
+    try {
+      const w = mountEditor();
+      await focus(w, "cards.0.heading");
+      vi.advanceTimersByTime(200);
+      await focus(w, "cards.0.heading"); // clicking back into the same input
+      vi.advanceTimersByTime(200);
+      expect(w.emitted("focusField")).toEqual([["slots.cards.0.heading"]]);
+    } finally {
+      vi.useRealTimers();
+    }
+  });
+
+  it("emits once for a run of fields tabbed through, not once each", async () => {
+    // Tabbing across a fieldset walks every field on the way; only where the person
+    // lands should move the preview.
+    vi.useFakeTimers();
+    try {
+      const w = mountEditor();
+      await focus(w, "headline");
+      vi.advanceTimersByTime(40);
+      await focus(w, "cards.0.heading");
+      vi.advanceTimersByTime(40);
+      await focus(w, "cards.1.heading");
+      vi.advanceTimersByTime(200);
+      expect(w.emitted("focusField")).toEqual([["slots.cards.1.heading"]]);
+    } finally {
+      vi.useRealTimers();
+    }
+  });
+
+  it("reports a top-level slot as a plain entry path", async () => {
+    vi.useFakeTimers();
+    try {
+      const w = mountEditor();
+      await focus(w, "headline");
+      vi.advanceTimersByTime(200);
+      expect(w.emitted("focusField")).toEqual([["slots.headline"]]);
+    } finally {
+      vi.useRealTimers();
+    }
+  });
+});
+
+describe("the real manifesto: the form's path is the preview's path", () => {
+  // The owner's exact complaint was "Item 2 → Step label" showing the wrong section.
+  // Both halves compose paths independently — the form walks the schema, the engine walks
+  // the template — so this asserts they land on the same string for the same value, on
+  // the REAL template and its REAL fields.json rather than a fixture.
+  const slots = {
+    headline: "Own your site",
+    steps: [{ label: "Ask", body: "…" }, { label: "Review", body: "…" }],
+    cards: [{ who: "Devs", body: "…" }],
+  };
+
+  it("agrees on a list item's field", () => {
+    const w = mount(FieldForm, {
+      props: {
+        fields: manifestoFields.fields as Field[],
+        data: { ...slots },
+        client,
+        locale: "en",
+        dense: true,
+      },
+    });
+    const marked = render(manifestoTemplate, slots, { markers: true });
+
+    for (const path of ["steps.1.label", "steps.0.label", "cards.0.who", "headline"]) {
+      expect(w.find(`[data-field-path="${path}"]`).exists()).toBe(true);
+      expect(marked).toContain(`data-lanza-field="${path}"`);
+    }
   });
 });

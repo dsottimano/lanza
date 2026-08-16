@@ -186,6 +186,15 @@ function onPreviewSelect(path: string): void {
   review.select(path);
 }
 
+// Focusing a field brings its region into view. This is the answer to "the form and
+// the preview don't line up": with 28 slots in a tall column, whatever the preview
+// happened to be showing beside them was unrelated to what you were typing.
+// scrollToField declines to move for a field the template doesn't place, so tabbing
+// through SEO fields leaves the page where it is rather than jumping to the top.
+function onFocusField(path: string): void {
+  previewRef.value?.scrollToField(path);
+}
+
 function onRevert(path: string): void {
   if (review.revert(path)) previewRef.value?.scrollToField(path);
 }
@@ -353,6 +362,7 @@ onMounted(async () => {
             :templates="templates"
             :loading="templatesLoading"
             :changed="review.changed.value"
+            @focus-field="onFocusField"
           />
           <!-- `body` is a RESERVED ROOT key, a sibling of the slots, exactly as the
                build assembles it (frontend/components/PageArticle.astro). Without it
@@ -481,6 +491,7 @@ onMounted(async () => {
             :templates="templates"
             :loading="templatesLoading"
             :changed="review.changed.value"
+            @focus-field="onFocusField"
             class="mb-4"
           />
           <details v-if="!loading && seoFields.length" class="card mb-4 p-4" open>

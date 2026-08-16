@@ -74,6 +74,11 @@ const props = defineProps<{
   changed?: readonly string[];
 }>();
 
+// Which field is being worked in, relative to `data`. Passed straight through from
+// FieldRows — one delegated listener down there answers for every field, including the
+// ones inside a collapsed group.
+const emit = defineEmits<{ focusField: [path: string] }>();
+
 provide(CLIENT_KEY, props.client);
 provide(LOCALE_KEY, props.locale);
 
@@ -98,10 +103,24 @@ function onToggle(section: FieldSection, e: Event): void {
 </script>
 
 <template>
-  <FieldRows v-if="flat" :fields="fields" :data="data" :dense="dense" :changed="changed" />
+  <FieldRows
+    v-if="flat"
+    :fields="fields"
+    :data="data"
+    :dense="dense"
+    :changed="changed"
+    @focus-field="emit('focusField', $event)"
+  />
   <div v-else class="flex flex-col gap-2">
     <template v-for="(s, i) in sections" :key="s.group ?? `ungrouped-${i}`">
-      <FieldRows v-if="s.group === null" :fields="s.fields" :data="data" :dense="dense" :changed="changed" />
+      <FieldRows
+        v-if="s.group === null"
+        :fields="s.fields"
+        :data="data"
+        :dense="dense"
+        :changed="changed"
+        @focus-field="emit('focusField', $event)"
+      />
       <details
         v-else
         class="field-group rounded-[var(--radius)] border border-[var(--border)] px-3 py-2"
@@ -120,7 +139,13 @@ function onToggle(section: FieldSection, e: Event): void {
           <span v-else class="shrink-0 font-normal text-zinc-400">{{ s.fields.length }}</span>
         </summary>
         <div class="mt-3">
-          <FieldRows :fields="s.fields" :data="data" :dense="dense" :changed="changed" />
+          <FieldRows
+            :fields="s.fields"
+            :data="data"
+            :dense="dense"
+            :changed="changed"
+            @focus-field="emit('focusField', $event)"
+          />
         </div>
       </details>
     </template>

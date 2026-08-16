@@ -9,7 +9,7 @@
 // when the form is actually wide enough — narrow side panels stay single-column.
 import type { Field } from "../schema";
 import FieldInput from "./FieldInput.vue";
-import { anyTouchesField } from "./field-paths";
+import { anyTouchesField, childPath, fieldPathOfTarget } from "./field-paths";
 
 const props = defineProps<{
   fields: Field[];
@@ -18,6 +18,19 @@ const props = defineProps<{
   // Paths RELATIVE TO `data` that a review reports as changed — see field-paths.ts.
   changed?: readonly string[];
 }>();
+
+// Which field the person is working in, so the preview can follow them. The path is
+// relative to `data`, like `changed`.
+const emit = defineEmits<{ focusField: [path: string] }>();
+
+// ONE delegated listener for the whole form, on `focusin` because it bubbles (`focus`
+// does not) and because the event lands on the <input>, not on the wrapper carrying the
+// path. `fieldPathOfTarget` walks up to the NEAREST path, so a field nested in a list
+// item reports `cards.0.heading` and not the `cards` it sits in.
+function onFocusIn(e: FocusEvent): void {
+  const path = fieldPathOfTarget(e.target);
+  if (path) emit("focusField", path);
+}
 
 // Widgets that need the full row even in the two-column grid.
 const WIDE = new Set(["text", "image", "object", "list", "relation"]);
@@ -30,7 +43,7 @@ const isChanged = (f: Field) => anyTouchesField(props.changed ?? [], f.name);
 </script>
 
 <template>
-  <div v-if="dense" class="field-grid">
+  <div v-if="dense" class="field-grid" @focusin="onFocusIn">
     <div class="field-grid__items">
       <div
         v-for="f in fields"
@@ -41,15 +54,16 @@ const isChanged = (f: Field) => anyTouchesField(props.changed ?? [], f.name);
         ]"
         :data-changed="isChanged(f) ? 'true' : undefined"
       >
-        <FieldInput :field="f" v-model="data[f.name]" />
+        <FieldInput :field="f" :path="childPath(undefined, f.name)" v-model="data[f.name]" />
       </div>
     </div>
   </div>
-  <div v-else class="flex flex-col">
+  <div v-else class="flex flex-col" @focusin="onFocusIn">
     <FieldInput
       v-for="f in fields"
       :key="f.name"
       :field="f"
+      :path="childPath(undefined, f.name)"
       v-model="data[f.name]"
     />
   </div>

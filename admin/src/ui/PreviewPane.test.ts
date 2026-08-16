@@ -8,6 +8,7 @@ import PreviewPane, {
   highlightCss,
   bodyForPreview,
   selectionForClick,
+  needsScroll,
 } from "./PreviewPane.vue";
 
 // The preview's job here is to map a rendered REGION back to the field that produced it.
@@ -327,5 +328,111 @@ describe("PreviewPane — the exposed highlight API", () => {
     // A field this preview cannot show must select nothing rather than throw on an
     // empty selector.
     expect(api(w).scrollToField("title")).toBe(false);
+  });
+});
+
+// ── Scrolling, now that FOCUS drives it ─────────────────────────────────────
+// scrollToField used to fire on one deliberate trigger (clicking a change row). It now
+// fires whenever the person moves between fields, which turns two previously harmless
+// behaviours into constant motion: scrolling to a region that is already on screen, and
+// animating it every time.
+
+describe("needsScroll", () => {
+  const H = 800; // frame height
+
+  it("leaves a region that is already comfortably in view", () => {
+    expect(needsScroll(300, 100, H)).toBe(false); // mid-frame
+    expect(needsScroll(30, 100, H)).toBe(false); // near the top, inside the margin
+  });
+
+  it("scrolls to a region that is off screen", () => {
+    expect(needsScroll(1200, 100, H)).toBe(true); // below the fold
+    expect(needsScroll(-500, 100, H)).toBe(true); // scrolled past
+  });
+
+  it("scrolls to a region only just poking in", () => {
+    // 10px of a 100px region visible at the bottom edge: technically on screen, not
+    // usefully so.
+    expect(needsScroll(H - 34, 100, H)).toBe(true);
+    expect(needsScroll(-90, 100, H)).toBe(true);
+  });
+
+  it("counts a region taller than the frame as seen when it fills it", () => {
+    // A hero that is 2000px tall can never be 60% inside an 800px frame, so it is judged
+    // against the frame instead — otherwise it would scroll forever.
+    expect(needsScroll(-200, 2000, H)).toBe(false);
+    // …but not when only its very end is showing.
+    expect(needsScroll(-1900, 2000, H)).toBe(true);
+  });
+
+  it("scrolls when the frame is too short to judge", () => {
+    expect(needsScroll(0, 100, 0)).toBe(true);
+    expect(needsScroll(0, 100, 40)).toBe(true);
+  });
+});
+
+describe("PreviewPane — scrollToField", () => {
+  /** Put a region at a known place in a frame of a known height. */
+  function place(doc: Document, selector: string, top: number, height: number, viewport = 800) {
+    const el = doc.querySelector(selector) as HTMLElement;
+    const scrolls: unknown[] = [];
+    el.getBoundingClientRect = () => ({ top, height, bottom: top + height }) as DOMRect;
+    el.scrollIntoView = (arg?: unknown) => void scrolls.push(arg);
+    Object.defineProperty(doc.documentElement, "clientHeight", { value: viewport, configurable: true });
+    return scrolls;
+  }
+
+  it("does not scroll to a region that is already in view", async () => {
+    const { w, doc } = await paintedPane();
+    const scrolls = place(doc, '[data-lanza-field="heading"]', 300, 100);
+    // Still true: the region EXISTS. "Found" and "moved" are different answers.
+    expect(api(w).scrollToField("slots.heading")).toBe(true);
+    expect(scrolls).toEqual([]);
+  });
+
+  it("scrolls to a region that is off screen", async () => {
+    const { w, doc } = await paintedPane();
+    const scrolls = place(doc, '[data-lanza-field="heading"]', 2400, 100);
+    expect(api(w).scrollToField("slots.heading")).toBe(true);
+    expect(scrolls).toHaveLength(1);
+    expect(scrolls[0]).toMatchObject({ block: "center" });
+  });
+
+  it("leaves the preview exactly where it is for a field the template does not place", async () => {
+    // A `title`, an SEO field, a slot this template ignores. Jumping to the top would
+    // lose the reader's place to tell them nothing.
+    const { w, doc } = await paintedPane();
+    const scrolls = place(doc, '[data-lanza-field="heading"]', 2400, 100);
+    expect(api(w).scrollToField("title")).toBe(false);
+    expect(api(w).scrollToField("slots.nowhere")).toBe(false);
+    expect(scrolls).toEqual([]);
+  });
+
+  it("honours prefers-reduced-motion", async () => {
+    const { w, doc } = await paintedPane();
+    const scrolls = place(doc, '[data-lanza-field="heading"]', 2400, 100);
+    const win = doc.defaultView as Window & typeof globalThis;
+    const real = win.matchMedia;
+    win.matchMedia = ((q: string) => ({ matches: q.includes("reduced-motion") })) as never;
+    try {
+      api(w).scrollToField("slots.heading");
+      expect(scrolls[0]).toMatchObject({ behavior: "auto" });
+    } finally {
+      win.matchMedia = real;
+    }
+  });
+
+  it("animates when motion is not restricted", async () => {
+    const { w, doc } = await paintedPane();
+    const scrolls = place(doc, '[data-lanza-field="heading"]', 2400, 100);
+    const win = doc.defaultView as Window & typeof globalThis;
+    const real = win.matchMedia;
+    win.matchMedia = ((_q: string) => ({ matches: false })) as never;
+    try {
+      api(w).scrollToField("slots.heading");
+      expect(scrolls[0]).toMatchObject({ behavior: "smooth" });
+    } finally {
+      win.matchMedia = real;
+    }
   });
 });
