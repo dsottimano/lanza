@@ -6,6 +6,7 @@ import {
   loadVersionState,
   setPinnedVersion,
   updateAvailable,
+  unpublishedSource,
   securityUpdateRequired,
   strandsOwner,
   isUnsafeVersion,
@@ -25,6 +26,8 @@ function state(
   return {
     live,
     staged,
+    // A tenant, not the release source — that case has its own describe block.
+    source: null,
     registry: { latest, critical, releases: [] },
     unmanaged: live === null && staged === null,
     offline: false,
@@ -302,5 +305,63 @@ describe("a pin that is not a release reads as unmanaged", () => {
     expect((await stateFor("^0.1.10")).live).toBe("0.1.10");
     // v1.0.0 used to parse to [0,0,0] and read as ancient — below every floor.
     expect((await stateFor("v1.0.0")).live).toBe("1.0.0");
+  });
+});
+
+// REPORTED FROM PRODUCTION, 2026-08-15. lanzacms.com told its own owner it "was
+// created before Lanza shipped its code as a package". It IS the package: it holds
+// no dependency on itself, which by pin alone looks exactly like a pre-package
+// fork. The name field is what separates them.
+describe("the repo that IS lanza-site", () => {
+  async function stateFor(pkg: Record<string, unknown>, latest = "0.1.11") {
+    const { client } = spyClient(pkg);
+    vi.stubGlobal(
+      "fetch",
+      async () =>
+        new Response(JSON.stringify({ "dist-tags": { latest }, versions: { [latest]: {} } }), {
+          status: 200,
+        }),
+    );
+    try {
+      return await loadVersionState(client);
+    } finally {
+      vi.unstubAllGlobals();
+    }
+  }
+
+  it("reads its own version instead of reporting itself unmanaged", async () => {
+    const s = await stateFor({ name: "lanza-site", version: "0.1.12" });
+    expect(s.source).toBe("0.1.12");
+    expect(s.unmanaged).toBe(false);
+    expect(s.live).toBe(null); // it follows no pin, and never will
+  });
+
+  it("says when the source is ahead of everything published", async () => {
+    // The useful question here: tenants pin releases, so unpublished source means
+    // every other site is on older code.
+    expect(unpublishedSource(await stateFor({ name: "lanza-site", version: "0.1.12" }))).toBe(true);
+    expect(unpublishedSource(await stateFor({ name: "lanza-site", version: "0.1.11" }))).toBe(false);
+    // Published newer than source: not "ahead", and not an update offer either.
+    expect(
+      unpublishedSource(await stateFor({ name: "lanza-site", version: "0.1.10" })),
+    ).toBe(false);
+  });
+
+  it("does not mistake a tenant for the source, whatever it calls itself", async () => {
+    // A tenant repo's package.json has its own name and version. Only the exact
+    // package name means "this is the release source".
+    const s = await stateFor({
+      name: "laperle-site",
+      version: "3.0.0",
+      dependencies: { "lanza-site": "0.1.11" },
+    });
+    expect(s.source).toBe(null);
+    expect(s.live).toBe("0.1.11");
+  });
+
+  it("a pre-package fork is still unmanaged, and says so", async () => {
+    const s = await stateFor({ name: "some-old-site", version: "1.0.0" });
+    expect(s.source).toBe(null);
+    expect(s.unmanaged).toBe(true);
   });
 });

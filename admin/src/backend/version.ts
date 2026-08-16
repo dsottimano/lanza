@@ -34,6 +34,12 @@ export interface VersionState {
   /** Version on the drafts branch — differs only when an update is staged. */
   staged: string | null;
   registry: RegistryInfo | null;
+  /**
+   * This repo IS `lanza-site` — its own `version`, not a pin. Releases are made
+   * FROM here, so there is nothing to update to; what matters instead is whether
+   * the source is ahead of what has been published (see `unpublishedSource`).
+   */
+  source: string | null;
   /** This repo has no lanza-site dependency: a pre-package fork, not updatable. */
   unmanaged: boolean;
   /** Registry unreachable (offline, npm down) — state is unknown, not "current". */
@@ -138,14 +144,33 @@ function pinnedVersion(pkg: Record<string, unknown>): string | null {
   return isVersion(cleaned) ? cleaned : null;
 }
 
-async function readPin(client: GitHubClient, ref: string): Promise<string | null> {
+/**
+ * The version a repo that IS `lanza-site` builds from — its own `version` field.
+ *
+ * This repo is where releases come from, so it holds no dependency on itself and
+ * every pin below reads null. That is indistinguishable, by pin alone, from a fork
+ * made before the package existed — and the two were in fact collapsed, so
+ * lanzacms.com told its owner it "was created before Lanza shipped its code as a
+ * package". It is the package. Read the name and the state stops being a guess.
+ */
+function sourceVersion(pkg: Record<string, unknown>): string | null {
+  if (pkg.name !== PACKAGE_NAME) return null;
+  const version = pkg.version;
+  return typeof version === "string" && isVersion(version) ? version : null;
+}
+
+/** Both readings of one package.json — a pin to follow, or being the thing itself. */
+async function readPin(
+  client: GitHubClient,
+  ref: string,
+): Promise<{ pin: string | null; source: string | null }> {
   try {
     const { data } = await client.loadJson("package.json", ref);
-    return pinnedVersion(data);
+    return { pin: pinnedVersion(data), source: sourceVersion(data) };
   } catch (e) {
     // A missing package.json means the same thing as a missing dependency here:
     // nothing to update. Anything else is a real failure worth surfacing.
-    if (e instanceof GitHubError && e.status === 404) return null;
+    if (e instanceof GitHubError && e.status === 404) return { pin: null, source: null };
     throw e;
   }
 }
@@ -175,10 +200,12 @@ export async function fetchRegistry(): Promise<RegistryInfo> {
 }
 
 export async function loadVersionState(client: GitHubClient): Promise<VersionState> {
-  const [live, staged] = await Promise.all([
+  const [production, working] = await Promise.all([
     readPin(client, REPO.productionBranch),
     readPin(client, REPO.branch),
   ]);
+  const live = production.pin;
+  const staged = working.pin;
   let registry: RegistryInfo | null = null;
   let offline = false;
   try {
@@ -186,7 +213,18 @@ export async function loadVersionState(client: GitHubClient): Promise<VersionSta
   } catch {
     offline = true;
   }
-  return { live, staged, registry, unmanaged: live === null && staged === null, offline };
+  // The live branch decides: it is what the deployed site actually builds from.
+  const source = production.source ?? working.source;
+  return {
+    live,
+    staged,
+    source,
+    registry,
+    // Being the source is not being unmanaged. One has nothing to update BECAUSE it
+    // is where updates come from; the other has no way to update at all.
+    unmanaged: live === null && staged === null && source === null,
+    offline,
+  };
 }
 
 /** True when a newer release than `current` exists. */
@@ -194,6 +232,19 @@ export function updateAvailable(state: VersionState): boolean {
   const current = state.staged ?? state.live;
   if (!current || !state.registry?.latest) return false;
   return compareVersions(state.registry.latest, current) > 0;
+}
+
+/**
+ * For the source repo: is its own version newer than anything published?
+ *
+ * That is the only "is there something to do" question this screen can answer here,
+ * and it is the useful one — a source site running 0.1.12 while the registry's
+ * newest is 0.1.11 means every tenant is on code older than this one, because a
+ * release is what carries it to them.
+ */
+export function unpublishedSource(state: VersionState): boolean {
+  if (!state.source || !state.registry?.latest) return false;
+  return compareVersions(state.source, state.registry.latest) > 0;
 }
 
 /** True when the running version is older than the `critical` floor. */

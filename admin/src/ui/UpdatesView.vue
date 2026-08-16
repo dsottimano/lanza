@@ -14,6 +14,7 @@ import {
   loadVersionState,
   setPinnedVersion,
   updateAvailable,
+  unpublishedSource,
   securityUpdateRequired,
   compareVersions,
   strandsOwner,
@@ -35,6 +36,10 @@ const otherPending = ref(0);
 const forced = ref<{ version: string; date: string | null } | null>(null);
 
 const current = computed(() => state.value?.staged ?? state.value?.live ?? null);
+// This repo IS lanza-site (the release source), so it follows no pin. Not the same
+// as unmanaged, and it must be checked FIRST — a source repo has no pin either.
+const source = computed(() => state.value?.source ?? null);
+const sourceAhead = computed(() => (state.value ? unpublishedSource(state.value) : false));
 const hasUpdate = computed(() => (state.value ? updateAvailable(state.value) : false));
 const insecure = computed(() => (state.value ? securityUpdateRequired(state.value) : false));
 // A pin on staging that production hasn't got yet: chosen but not yet live.
@@ -141,6 +146,32 @@ onMounted(refresh);
       </div>
 
       <p v-if="loading" class="text-sm text-zinc-500">Checking your version…</p>
+
+      <!-- This repo IS lanza-site. Checked before `unmanaged`, which it would
+           otherwise match: a source repo holds no pin either. -->
+      <div v-else-if="source" class="card p-6">
+        <p class="text-sm text-zinc-600">This site runs its own source</p>
+        <p class="font-mono text-2xl text-zinc-900">{{ source }}</p>
+        <p class="mt-3 text-sm text-zinc-600">
+          This repository <strong>is</strong> Lanza — releases are published from here, so there is
+          no version to move to. Every other site updates by pinning a release of it.
+        </p>
+
+        <p v-if="state?.offline" class="mt-3 text-sm text-zinc-500">
+          Couldn't reach the package registry, so the published version can't be checked right now.
+        </p>
+        <p v-else-if="sourceAhead" class="mt-3 text-sm text-amber-700">
+          Newest published release is
+          <span class="font-mono">{{ state?.registry?.latest }}</span
+          >, so this source is ahead of every site that pins one. Publishing a release is what
+          carries these changes to them.
+        </p>
+        <p v-else-if="state?.registry?.latest" class="mt-3 text-sm text-zinc-500">
+          Newest published release is
+          <span class="font-mono">{{ state?.registry?.latest }}</span
+          >.
+        </p>
+      </div>
 
       <!-- A repo generated before the package split: no dependency to bump. -->
       <div v-else-if="state?.unmanaged" class="card p-6">
