@@ -50,6 +50,18 @@ markdown on load and re-saves HTML.
    `docs/security-todo.md` §10 is the target design and §0 is the next work.
    `docs/keys-and-secrets.md` is the credential inventory (who holds what, blast
    radius, rotation); `docs/onboarding-workflow.md` is life-of-an-onboarding.
+   `docs/todos.md` is the running work list.
+
+6. **A change is a proposal — don't break the review surface.** An agent will make
+   most edits, so the CMS's job is showing what changed and letting the owner undo
+   it: `docs/review-surface.md` is authoritative. Three things it rests on, none
+   obvious from the code alone: the form and the render engine compose field paths
+   INDEPENDENTLY and must agree (`slots.cards.0.heading` — a test pins this against
+   the real manifesto template); preview markers are opt-in and preview-only, so
+   production output stays byte-identical; and a revert writes to the EDITOR, never
+   to GitHub, because undoing an agent must not itself be irreversible. Adding a
+   `startsWith("slots.")` anywhere outside the two documented conversion points is
+   how this quietly breaks.
 
 5. **Bot secrets via wrangler, never in the repo.** `BOT_TOKEN`, `BOT_INFO`,
    `WEBHOOK_SECRET`, `GITHUB_TOKEN` are `wrangler secret put`. The bot fails
@@ -64,6 +76,10 @@ markdown on load and re-saves HTML.
   (`CONTENT_DIR`), and `scripts/gen-redirects.mjs` together.
 - Changed the CMS (`admin/`)? → rebuild (`npm run build:admin`) and confirm `/admin`
   still loads; the deploy `build` script rebuilds it automatically.
+- Touched field paths, the template renderer, or the preview? → `docs/review-surface.md`
+  first. The form and the engine build paths independently and a drift between them
+  scrolls the preview to the wrong section — `FieldForm.test.ts` pins them together
+  against the real template.
 - Touched auth, a proxy allowlist, or an MCP tool that takes a path? → re-read
   `docs/security-model.md` §5 and run `npm test` (it carries the adversarial
   traversal/confinement cases — they assert refusal *and* that nothing was written).

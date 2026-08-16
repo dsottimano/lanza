@@ -14,6 +14,13 @@ migration and is unrelated to everything here.
 Nothing in this document has been fixed. The review found and verified the items;
 no code was changed.
 
+> **Note, 2026-08-15.** `admin/` changed substantially on this date — the review
+> surface landed (`docs/review-surface.md`) and the entry editor's header, locale
+> handling and slot form were reworked. This list predates all of it, so re-verify
+> a finding in `EditorView.vue`, `FieldForm.vue`, `PreviewPane.vue`,
+> `TemplateEditor.vue`, `Sidebar.vue` or `site-urls.ts` before fixing it: some may
+> be gone, and at least one item's surrounding code no longer looks the same.
+
 **Suggested order:** §1 (silent loss of the user's work) → §2 (silent breakage of
 the site build) → §3 (UI that says something false) → §4 (the rest).
 
