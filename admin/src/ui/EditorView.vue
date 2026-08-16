@@ -16,6 +16,7 @@ import FieldForm from "../fields/FieldForm.vue";
 import TemplateEditor from "./TemplateEditor.vue";
 import PreviewPane from "./PreviewPane.vue";
 import SlugField from "./SlugField.vue";
+import EntryLocaleBar from "./EntryLocaleBar.vue";
 import SaveButton from "./SaveButton.vue";
 import { GitHubClient } from "../backend/github";
 import { type FolderCollection, type Field } from "../schema";
@@ -23,7 +24,8 @@ import type { Locale } from "../backend/config";
 import { listTemplates, type TemplateInfo } from "../backend/templates";
 import { toEditorHtml } from "../backend/markdown";
 import { slugify } from "../backend/slug";
-import { site } from "../backend/site";
+import { entryPathFrame } from "../backend/site-urls";
+import { stemOf, takeTranslationSeed } from "../backend/translations";
 import { entryRoute } from "../router";
 import { reportError, clearError } from "../errors";
 import { useEntryEditor } from "./useEntryEditor";
@@ -46,10 +48,17 @@ const bodyHtml = ref("<p></p>");
 // ── slug / URL ────────────────────────────────────────────────────────────
 // The entry's slug is its filename (basename of `path`); "" for a new entry, which
 // derives from the title. Editing it renames the file on save (useEntryEditor).
-const originalSlug = props.path
-  ? props.path.replace(/\.md$/, "").split("/").pop()!
-  : "";
-const slug = ref(originalSlug);
+const originalSlug = stemOf(props.path);
+// A new entry started from the locale bar arrives with the source entry's stem in
+// the query. It has to keep it: translations are linked BY the shared filename, so a
+// different slug here means the two files are not the same entry to the build.
+const seededSlug = typeof route.query.slug === "string" ? route.query.slug : "";
+const slug = ref(originalSlug || seededSlug);
+// The stem the locale bar matches translations on: the entry as it stands on the
+// branch, deliberately NOT the slug being typed — a lookup per keystroke would be a
+// request per keystroke. A rename re-routes and remounts this editor, which is when
+// it refreshes.
+const entryStem = originalSlug || seededSlug;
 // "home" is the site root (→ `/`); renaming it would break the root, so it's locked.
 const isHome = computed(() => props.collection.name === "pages" && originalSlug === "home");
 const slugPlaceholder = computed(() => slugify(String(data.title ?? "")));
@@ -57,19 +66,32 @@ const slugPlaceholder = computed(() => slugify(String(data.title ?? "")));
 const effectiveSlug = computed(() =>
   slug.value.trim() ? slugify(slug.value) : slugPlaceholder.value,
 );
-// Public URL framing — only pages have a simple, derivable path. The default locale
-// sits at the root; others under /<locale>/.
-const isPages = computed(() => props.collection.name === "pages");
-const urlPrefix = computed(() =>
-  !isPages.value ? "" : props.locale === site.defaultLocale ? "/" : `/${props.locale}/`,
+// Public URL framing. The path rules (which collection sits where, which locales get
+// a /es prefix, and that "home" IS the root) live in ONE place — backend/site-urls,
+// the same module the list's View links use — so the line under the title shows the
+// address the entry will actually have, prefix and all, not a bare slug. A collection
+// with no public page has no frame: its slug is only a filename, and saying "URL"
+// about it would be a promise the site can't keep.
+const urlFrame = computed(() =>
+  entryPathFrame(
+    props.collection.name,
+    isHome.value ? originalSlug : effectiveSlug.value,
+    props.locale,
+  ),
 );
-const urlSuffix = computed(() => (isPages.value ? "/" : ""));
+const urlPrefix = computed(() => urlFrame.value?.prefix ?? "");
+const urlSuffix = computed(() => urlFrame.value?.suffix ?? "");
+const urlLabel = computed(() => (urlFrame.value ? "URL" : "Slug"));
 
 // Frontmatter lives in `data`; the body is the live editor HTML, read at save.
 // `dirty`/`markDirty` are the shared unsaved-changes signal (see useEntryEditor).
 const { data, loading, save, dirty, markDirty } = useEntryEditor(props, {
   onLoaded: (body, isNew) => {
     if (isNew) {
+      // Started from the locale bar? Take the parked shell — the template and its
+      // empty slots, never the source language's words (backend/translations.ts).
+      const shell = takeTranslationSeed(props.collection.name, props.locale, slug.value);
+      if (shell) Object.assign(data, shell);
       // Seed a publish date for collections that have one (posts).
       if (props.collection.fields.some((f) => f.name === "pubDate") && !data.pubDate) {
         data.pubDate = new Date().toISOString();
@@ -229,19 +251,29 @@ onMounted(async () => {
       @change="markDirty"
     >
       <div class="flex w-full max-w-[100rem] flex-col gap-6">
-        <!-- Title + editable URL/slug -->
+        <!-- Language, then title + editable URL/slug -->
         <div class="flex flex-col gap-2">
-          <input
-            v-model="data.title"
-            class="block w-full border-none bg-transparent font-serif text-4xl font-bold leading-tight tracking-tight text-zinc-900 outline-none placeholder:text-zinc-300"
-            :placeholder="`${collection.labelSingular} title`"
-            @input="markDirty"
+          <EntryLocaleBar
+            :client="client"
+            :collection="collection"
+            :locale="locale"
+            :slug="entryStem"
+            :data="data"
           />
+          <label class="block">
+            <span class="block text-xs uppercase tracking-wide text-zinc-400">Title</span>
+            <input
+              v-model="data.title"
+              class="mt-1 block w-full border-none bg-transparent font-serif text-4xl font-bold leading-tight tracking-tight text-zinc-900 outline-none placeholder:text-zinc-300"
+              :placeholder="`${collection.labelSingular} title`"
+              @input="markDirty"
+            />
+          </label>
           <SlugField
             v-if="isHome"
             model-value=""
-            prefix="/"
-            suffix=""
+            :prefix="urlPrefix"
+            :suffix="urlSuffix"
             :editable="false"
           />
           <SlugField
@@ -250,7 +282,7 @@ onMounted(async () => {
             :prefix="urlPrefix"
             :suffix="urlSuffix"
             :placeholder="slugPlaceholder"
-            :label="isPages ? 'URL' : 'Slug'"
+            :label="urlLabel"
           />
         </div>
 
@@ -311,18 +343,30 @@ onMounted(async () => {
               :editor="editorRef.editor"
               :on-link="editorRef.link"
             />
-            <input
-              v-model="data.title"
-              class="mx-auto block w-full max-w-[46rem] border-none bg-transparent font-serif text-5xl font-bold leading-tight tracking-tight text-zinc-900 outline-none placeholder:text-zinc-300"
-              :placeholder="`${collection.labelSingular} title`"
-              @input="markDirty"
-            />
+            <div class="mx-auto mb-3 w-full max-w-[46rem]">
+              <EntryLocaleBar
+                :client="client"
+                :collection="collection"
+                :locale="locale"
+                :slug="entryStem"
+                :data="data"
+              />
+            </div>
+            <label class="mx-auto block w-full max-w-[46rem]">
+              <span class="block text-xs uppercase tracking-wide text-zinc-400">Title</span>
+              <input
+                v-model="data.title"
+                class="mt-1 block w-full border-none bg-transparent font-serif text-5xl font-bold leading-tight tracking-tight text-zinc-900 outline-none placeholder:text-zinc-300"
+                :placeholder="`${collection.labelSingular} title`"
+                @input="markDirty"
+              />
+            </label>
             <div class="mx-auto mb-6 mt-2 w-full max-w-[46rem]" @input="markDirty">
               <SlugField
                 v-if="isHome"
                 model-value=""
-                prefix="/"
-                suffix=""
+                :prefix="urlPrefix"
+                :suffix="urlSuffix"
                 :editable="false"
               />
               <SlugField
@@ -331,7 +375,7 @@ onMounted(async () => {
                 :prefix="urlPrefix"
                 :suffix="urlSuffix"
                 :placeholder="slugPlaceholder"
-                :label="isPages ? 'URL' : 'Slug'"
+                :label="urlLabel"
               />
             </div>
             <Editor ref="editorRef" :initial-html="bodyHtml" :client="client" @change="markDirty" />

@@ -92,12 +92,52 @@ const ROUTES: Record<string, string> = {
   authors: "/author/",
 };
 
+// THE prefix rule for the whole CMS. Non-default locales are served under a
+// /<locale> prefix; the default locale sits at the root (astro-config.mjs sets
+// `prefixDefaultLocale: false`, which is what frontend/lib/i18n.ts `localeUrl`
+// resolves to on the build side). Anything in the admin that needs to show a public
+// path goes through here — a second copy of this rule is how /es/ silently
+// disappears from an editor's URL line.
+function localePrefix(locale: string): string {
+  return locale && locale !== site.defaultLocale ? `/${locale}` : "";
+}
+
+// The slug's own URL segment. "home" IS the locale root (frontend/pages/index.astro
+// and [locale]/index.astro build it, and [...slug].astro explicitly skips it), so it
+// contributes no segment — `/`, not `/home`, which does not exist.
+function urlSlug(collection: string, slugName: string): string {
+  return collection === "pages" && slugName === "home" ? "" : slugName;
+}
+
+/**
+ * An entry's site-relative public path, split around its slug so the editor can
+ * frame an EDITABLE slug with the real path either side of it. null when the
+ * collection has no public page.
+ */
+export function entryPathFrame(
+  collection: string,
+  slugName: string,
+  locale: string,
+): { prefix: string; suffix: string } | null {
+  const route = ROUTES[collection];
+  if (!route) return null;
+  return {
+    prefix: `${localePrefix(locale)}${route}`,
+    // Entry paths end in a slash; the locale root already has one in its prefix.
+    suffix: urlSlug(collection, slugName) ? "/" : "",
+  };
+}
+
+/** An entry's site-relative public path, or null if it has no public page. */
+export function entryPath(collection: string, slugName: string, locale: string): string | null {
+  const frame = entryPathFrame(collection, slugName, locale);
+  if (!frame) return null;
+  return `${frame.prefix}${urlSlug(collection, slugName)}${frame.suffix}`;
+}
+
 /** Absolute staging URL for one entry, or null if it has no public page. */
 export function entryUrl(collection: string, slugName: string, locale: string): string | null {
   const origin = stagingOrigin.value;
-  const route = ROUTES[collection];
-  if (!origin || !route) return null;
-  // Non-default locales are served under a /<locale> prefix; the default locale is not.
-  const prefix = locale && locale !== site.defaultLocale ? `/${locale}` : "";
-  return `${origin}${prefix}${route}${slugName}`;
+  const path = entryPath(collection, slugName, locale);
+  return origin && path ? `${origin}${path}` : null;
 }

@@ -63,7 +63,7 @@ import {
   type FolderCollection,
   type FileEntry,
 } from "./schema";
-import { listRoute, localeSwapRoute } from "./router";
+import { listRoute } from "./router";
 
 type Pane =
   | "list"
@@ -190,11 +190,6 @@ const editingPath = computed<string | null>(() => {
 function selectCollection(name: string) {
   router.push(listRoute(name, locale.value));
 }
-function setLocale(l: Locale) {
-  // Same screen, other language: swaps the :locale segment, so an open entry lands
-  // on its translation (same slug) rather than dropping you to the list.
-  router.push(localeSwapRoute(route, l));
-}
 function openSettings(file: FileEntry) {
   router.push(`/settings/${file.name}`);
 }
@@ -254,10 +249,8 @@ function onOnboarded() {
       :people-open="pane === 'people'"
       :is-owner="ownerView"
       :publish-open="pane === 'publish'"
-      :locale="locale"
       :help-open="pane === 'help'"
       @select="selectCollection"
-      @select-locale="setLocale"
       @open-settings="openSettings"
       @languages="openPanel('languages')"
       @header-footer="openPanel('header-footer')"

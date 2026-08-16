@@ -1,12 +1,13 @@
 <script setup lang="ts">
 // Generic entry list for any folder collection. Entries are listed by filename
 // (the slug); titles would need a per-file fetch, which isn't worth it here.
-import { ref, watch } from "vue";
+import { computed, ref, watch } from "vue";
 import { GitHubClient, type RepoFile } from "../backend/github";
 import { entryFolder, type FolderCollection } from "../schema";
 import type { Locale } from "../backend/config";
+import { site } from "../backend/site";
 import { reportError } from "../errors";
-import { entryRoute } from "../router";
+import { entryRoute, listRoute } from "../router";
 import { entryUrl } from "../backend/site-urls";
 
 const props = defineProps<{
@@ -40,6 +41,16 @@ async function load() {
 }
 
 watch(() => props.collection.name, load, { immediate: true });
+
+// Which language of THIS collection you are looking at. It lives here, next to the
+// list it scopes, for the same reason the entry editor's bar lives on the entry:
+// language is a property of the thing on screen, not a mode the whole CMS is in.
+// A shared collection (authors) has one set of files for every language, so it has
+// nothing to switch. No per-locale counts — that would cost a request per language
+// on every list load, to answer a question the list itself answers on arrival.
+const showLocales = computed(
+  () => site.locales.length > 1 && props.collection.localized === true,
+);
 </script>
 
 <template>
@@ -50,6 +61,23 @@ watch(() => props.collection.name, load, { immediate: true });
         <p v-if="!loading && !failed" class="mt-1 text-sm text-zinc-600">
           {{ entries.length }} {{ entries.length === 1 ? "entry" : "entries" }}
         </p>
+        <!-- Which language of this collection. Same idiom as the entry's own bar. -->
+        <div v-if="showLocales" class="mt-2.5 flex items-center gap-2 text-xs">
+          <span class="uppercase tracking-wide text-zinc-400">Language</span>
+          <div class="segment">
+            <router-link
+              v-for="l in site.locales"
+              :key="l.code"
+              class="segment-btn whitespace-nowrap px-2.5 text-center"
+              :class="{ 'segment-btn--active': l.code === locale }"
+              :title="`${collection.label} in ${l.label}`"
+              :aria-current="l.code === locale ? 'true' : undefined"
+              :to="listRoute(collection.name, l.code)"
+            >
+              {{ l.label }}
+            </router-link>
+          </div>
+        </div>
       </div>
       <router-link class="btn btn-primary" :to="entryRoute(collection.name, locale, 'new')">
         <span class="text-base leading-none">+</span>

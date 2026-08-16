@@ -6,8 +6,6 @@
 // force-shown whenever it holds the active pane so the user is never stranded.
 import { computed, reactive, watch } from "vue";
 import { COLLECTIONS, type FolderCollection, type FileEntry } from "../schema";
-import type { Locale } from "../backend/config";
-import { site } from "../backend/site";
 import { versionState, updateAvailable, securityUpdateRequired } from "../backend/version";
 
 // The running version sits in the footer permanently: "what am I on" should never
@@ -38,12 +36,10 @@ const props = defineProps<{
   // never briefly permissive while access is still loading.
   isOwner: boolean;
   publishOpen: boolean;
-  locale: Locale;
   helpOpen: boolean;
 }>();
 const emit = defineEmits<{
   (e: "select", name: string): void;
-  (e: "selectLocale", locale: Locale): void;
   (e: "openSettings", file: FileEntry): void;
   (e: "languages"): void;
   (e: "headerFooter"): void;
@@ -145,26 +141,8 @@ const itemActive = "nav-item--active";
       <span class="font-serif text-xl font-bold tracking-tight text-zinc-900">Lanza</span>
     </div>
 
-    <!-- Active editing language. Scopes localized collections to their per-locale
-         subfolder; switching resets to the list (App.setLocale). Hidden for a
-         single-language site. -->
-    <div v-if="site.locales.length > 1" class="flex-shrink-0 px-1.5">
-      <p class="mb-1 px-1 text-zinc-600" :class="groupLabel">Language</p>
-      <div class="segment">
-        <button
-          v-for="l in site.locales"
-          :key="l.code"
-          class="segment-btn"
-          :class="{ 'segment-btn--active': locale === l.code }"
-          @click="emit('selectLocale', l.code)"
-        >
-          {{ l.label }}
-        </button>
-      </div>
-    </div>
-
-    <!-- Scroll region: the groups. Brand + language above and Guide below stay
-         pinned; this is the only part that scrolls when content overflows. -->
+    <!-- Scroll region: the groups. The brand above and Guide below stay pinned;
+         this is the only part that scrolls when content overflows. -->
     <div class="rail-scroll -mr-1 min-h-0 flex-1 overflow-y-auto pr-1">
       <!-- Content -->
       <div class="rail-group">

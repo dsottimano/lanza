@@ -11,9 +11,10 @@
 //   #/settings/parts      → the Header & footer editor
 //   #/publish · #/help
 //
-// The language switch just swaps the `:locale` segment (see App.vue), so it lands on
-// the SAME entry in the other language — real links to real pages.
-import { createRouter, createWebHashHistory, type RouteLocationNormalized } from "vue-router";
+// Language is part of the URL, not a mode: the entry editor's locale bar
+// (ui/EntryLocaleBar.vue) navigates to the SAME entry's `:locale` in another
+// language, or to `.../new?slug=<stem>` to start one — real links to real pages.
+import { createRouter, createWebHashHistory } from "vue-router";
 
 // Panes render in App.vue, not here, so routes only need a placeholder component.
 const Blank = { render: () => null };
@@ -42,16 +43,4 @@ export function listRoute(collection: string, locale: string): string {
 /** Build the URL for editing (or creating, slug="new") an entry. */
 export function entryRoute(collection: string, locale: string, slug: string): string {
   return `/${collection}/${locale}/${slug}`;
-}
-
-/**
- * The same screen in a different locale — the language switcher's target. A list or
- * entry keeps its collection (and slug) and swaps the locale; anywhere else (settings,
- * publish, help) is locale-independent, so switching stays put.
- */
-export function localeSwapRoute(route: RouteLocationNormalized, locale: string): string {
-  const p = route.params as Record<string, string>;
-  if (route.name === "entry") return entryRoute(p.collection, locale, p.slug);
-  if (route.name === "list") return listRoute(p.collection, locale);
-  return route.fullPath; // settings/publish/help — no locale in the URL
 }
