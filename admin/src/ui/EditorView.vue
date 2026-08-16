@@ -302,8 +302,10 @@ onMounted(async () => {
       @change="markDirty"
     >
       <div class="flex w-full max-w-[100rem] flex-col gap-6">
-        <!-- Language, then title + editable URL/slug -->
-        <div class="flex flex-col gap-2">
+        <!-- Language, then title + editable URL/slug — in a card, like every other
+             panel on this screen. They used to float loose above the Template card,
+             which read as chrome rather than as the page's first two fields. -->
+        <div class="card flex flex-col gap-2 p-4">
           <EntryLocaleBar
             :client="client"
             :collection="collection"
@@ -312,10 +314,10 @@ onMounted(async () => {
             :data="data"
           />
           <label class="block">
-            <span class="block text-xs uppercase tracking-wide text-zinc-400">Title</span>
+            <span class="block text-xs font-semibold text-zinc-600">Title</span>
             <input
               v-model="data.title"
-              class="mt-1 block w-full border-none bg-transparent font-serif text-4xl font-bold leading-tight tracking-tight text-zinc-900 outline-none placeholder:text-zinc-300"
+              class="mt-1 block w-full border-none bg-transparent font-serif text-3xl font-bold leading-tight tracking-tight text-zinc-900 outline-none placeholder:text-zinc-300"
               :placeholder="`${collection.labelSingular} title`"
               @input="markDirty"
             />
@@ -337,8 +339,12 @@ onMounted(async () => {
           />
         </div>
 
-        <!-- Template fields | live preview -->
-        <div class="grid gap-8 lg:grid-cols-[26rem_minmax(0,1fr)]">
+        <!-- Template fields | live preview.
+             The form is the tall column and the preview is the reference, so the
+             preview STICKS: scrolling to a field three sections down used to carry
+             the rendered page off the top of the screen, leaving you editing blind.
+             Its own height, its own scroll. -->
+        <div class="grid items-start gap-6 lg:grid-cols-[26rem_minmax(0,1fr)]">
           <TemplateEditor
             class="min-w-0"
             :client="client"
@@ -354,7 +360,7 @@ onMounted(async () => {
                never given the body at all. -->
           <PreviewPane
             ref="previewRef"
-            class="min-w-0"
+            class="min-w-0 lg:sticky lg:top-20 lg:max-h-[calc(100vh-6rem)]"
             :client="client"
             :preset="(data.preset as string)"
             :slots="slotsData"
