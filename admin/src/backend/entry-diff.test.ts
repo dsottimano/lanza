@@ -1,5 +1,6 @@
 import { describe, it, expect } from "vitest";
-import { loadEntryDiff, changedPaths, BODY_FIELD, type FieldDiff } from "./entry-diff";
+import { reactive, isReactive } from "vue";
+import { loadEntryDiff, changedPaths, revertValue, BODY_FIELD, type FieldDiff } from "./entry-diff";
 import { GitHubError, type GitHubClient } from "./github";
 import { REPO } from "./config";
 
@@ -265,5 +266,224 @@ describe("changedPaths", () => {
   it("returns nothing for a path on neither branch", async () => {
     const { client } = spyClient({});
     expect(changedPaths(await loadEntryDiff(client, PATH))).toEqual([]);
+  });
+});
+
+// Putting ONE field back. Pure: the caller owns a Vue reactive `data` and applies
+// what this returns, so anything mutated in place here edits the page underneath
+// the reviewer.
+describe("revertValue", () => {
+  const row = (over: Partial<FieldDiff>): FieldDiff => ({
+    path: "title",
+    status: "changed",
+    live: "About",
+    staged: "About us",
+    ...over,
+  });
+
+  it("restores a leaf to the live value", () => {
+    const data = { title: "About us", draft: true };
+    const { data: next } = revertValue(data, "b", row({}));
+    expect(next).toEqual({ title: "About", draft: true });
+  });
+
+  it("restores a nested leaf and leaves its siblings alone", () => {
+    const data = { seo: { title: "T", description: "new" }, other: 1 };
+    const { data: next } = revertValue(
+      data,
+      "b",
+      row({ path: "seo.description", live: "old", staged: "new" }),
+    );
+    expect(next).toEqual({ seo: { title: "T", description: "old" }, other: 1 });
+  });
+
+  it("never mutates the input, at any depth", () => {
+    const data = { seo: { description: "new" }, list: [{ heading: "new" }] };
+    const before = JSON.stringify(data);
+    revertValue(data, "b", row({ path: "seo.description", live: "old", staged: "new" }));
+    revertValue(data, "b", row({ path: "list.0.heading", live: "old", staged: "new" }));
+    expect(JSON.stringify(data)).toBe(before);
+  });
+
+  it("restores an array item at its index", () => {
+    const data = { slots: { cards: [{ heading: "Uno" }, { heading: "Two" }] } };
+    const { data: next } = revertValue(
+      data,
+      "b",
+      row({ path: "slots.cards.0.heading", live: "One", staged: "Uno" }),
+    );
+    expect(next).toEqual({ slots: { cards: [{ heading: "One" }, { heading: "Two" }] } });
+  });
+
+  // The case the reviewer hits most on a template page: object → array → object.
+  it("restores a leaf nested in an array inside an object", () => {
+    const data = {
+      slots: { sections: [{ cards: [{ title: "a" }] }, { cards: [{ title: "wrong" }] }] },
+    };
+    const { data: next } = revertValue(
+      data,
+      "b",
+      row({ path: "slots.sections.1.cards.0.title", live: "right", staged: "wrong" }),
+    );
+    expect(next).toEqual({
+      slots: { sections: [{ cards: [{ title: "a" }] }, { cards: [{ title: "right" }] }] },
+    });
+  });
+
+  it("restores a whole container from an added/removed row", () => {
+    // An added/removed subtree is reported at its ROOT carrying the whole value,
+    // so reverting it puts the entire subtree back in one go.
+    const data = { slots: { cards: [{ heading: "new" }] } };
+    const live = { cards: [{ heading: "old" }, { heading: "also old" }] };
+    const { data: next } = revertValue(data, "b", row({ path: "slots", live, staged: data.slots }));
+    expect(next).toEqual({ slots: live });
+  });
+
+  describe("a field that isn't on the live site", () => {
+    it("removes the key an `added` row describes", () => {
+      const data = { title: "T", hero: "/x.jpg" };
+      const { data: next } = revertValue(
+        data,
+        "b",
+        row({ path: "hero", status: "added", live: undefined, staged: "/x.jpg" }),
+      );
+      expect(next).toEqual({ title: "T" });
+      expect("hero" in next).toBe(false); // gone, not set to undefined
+    });
+
+    // An `added` array index is ALWAYS a trailing one — the differ only reports it
+    // when i >= live.length — so splicing shifts no live item. A hole would be
+    // worse: it serializes as a `null` item and renders an empty card.
+    it("splices an added array item out instead of leaving a hole", () => {
+      const data = { cards: ["a", "b", "c"] };
+      const { data: next } = revertValue(
+        data,
+        "b",
+        row({ path: "cards.2", status: "added", live: undefined, staged: "c" }),
+      );
+      expect(next).toEqual({ cards: ["a", "b"] });
+    });
+
+    it("puts a `removed` key back", () => {
+      const data = { title: "T" };
+      const { data: next } = revertValue(
+        data,
+        "b",
+        row({ path: "subtitle", status: "removed", live: "Was here", staged: undefined }),
+      );
+      expect(next).toEqual({ title: "T", subtitle: "Was here" });
+    });
+
+    it("restores several removed array items to the live list, in either order", () => {
+      // Clamping the insert to the array's end is what makes this converge: the
+      // live list is [a,b,c] and staging kept only [a].
+      const b = row({ path: "cards.1", status: "removed", live: "b", staged: undefined });
+      const c = row({ path: "cards.2", status: "removed", live: "c", staged: undefined });
+
+      const forward = revertValue(revertValue({ cards: ["a"] }, "x", b).data, "x", c).data;
+      expect(forward).toEqual({ cards: ["a", "b", "c"] });
+
+      // Clicked bottom-up, an index-3-into-a-1-item-array assignment would have
+      // left holes; the clamp lands it at the end and the next revert slots in.
+      const backward = revertValue(revertValue({ cards: ["a"] }, "x", c).data, "x", b).data;
+      expect(backward).toEqual({ cards: ["a", "b", "c"] });
+    });
+  });
+
+  it("returns the live body and does not touch the data", () => {
+    const data = { title: "T" };
+    const result = revertValue(data, "<p>New.</p>", {
+      path: BODY_FIELD,
+      status: "changed",
+      live: "<p>Old.</p>",
+      staged: "<p>New.</p>",
+    });
+    expect(result.body).toBe("<p>Old.</p>");
+    expect(result.data).toBe(data); // same object — nothing about the fields moved
+  });
+
+  describe("a path that has moved on since the diff was taken", () => {
+    // Another revert, or another edit, can remove the container a row points into.
+    // Rebuilding it would write a field the reviewer never asked for.
+    it("returns the input unchanged rather than inventing the containers", () => {
+      const data = { title: "T" };
+      const result = revertValue(
+        data,
+        "b",
+        row({ path: "seo.description", live: "old", staged: "new" }),
+      );
+      expect(result.data).toBe(data);
+      expect("seo" in result.data).toBe(false);
+    });
+
+    it("returns the input unchanged for an array index that is gone", () => {
+      const data = { cards: ["a"] };
+      const result = revertValue(
+        data,
+        "b",
+        row({ path: "cards.4.heading", live: "old", staged: "new" }),
+      );
+      expect(result.data).toBe(data);
+    });
+
+    it("returns the input unchanged when an added key is already gone", () => {
+      const data = { title: "T" };
+      const result = revertValue(
+        data,
+        "b",
+        row({ path: "hero", status: "added", live: undefined, staged: "/x.jpg" }),
+      );
+      expect(result.data).toBe(data);
+    });
+
+    it("does nothing at all for an unchanged row", () => {
+      const data = { title: "T" };
+      const result = revertValue(data, "body", row({ status: "unchanged", live: "T", staged: "T" }));
+      expect(result.data).toBe(data);
+      expect(result.body).toBe("body");
+    });
+  });
+
+  // The diff is the reviewer's record of what production says. If the restored
+  // value were the SAME object, the next edit in the form would rewrite that record
+  // and they'd be reading their own edit back as the live site.
+  it("shares no reference with the live value it restored", () => {
+    const live = { cards: [{ heading: "One" }] };
+    const data = { slots: { cards: [{ heading: "Uno" }] } };
+    const { data: next } = revertValue(data, "b", row({ path: "slots", live, staged: data.slots }));
+
+    const restored = next.slots as { cards: { heading: string }[] };
+    expect(restored).not.toBe(live);
+    expect(restored.cards).not.toBe(live.cards);
+    expect(restored.cards[0]).not.toBe(live.cards[0]);
+
+    restored.cards[0].heading = "edited afterwards";
+    expect(live.cards[0].heading).toBe("One");
+  });
+
+  it("clones a restored Date rather than aliasing it", () => {
+    const live = new Date("2026-08-15T00:00:00Z");
+    const data = { publishDate: new Date("2026-08-16T00:00:00Z") };
+    const { data: next } = revertValue(
+      data,
+      "b",
+      row({ path: "publishDate", live, staged: data.publishDate }),
+    );
+    const restored = next.publishDate as Date;
+    expect(restored).not.toBe(live);
+    expect(restored.getTime()).toBe(live.getTime());
+  });
+
+  // The signature exists to work on the editor's reactive object, which
+  // structuredClone refuses outright (a Proxy has no structured-clone behaviour).
+  it("works on a Vue reactive object", () => {
+    const data = reactive({ seo: { description: "new" } }) as Record<string, unknown>;
+    const { data: next } = revertValue(
+      data,
+      "b",
+      row({ path: "seo.description", live: "old", staged: "new" }),
+    );
+    expect(next).toEqual({ seo: { description: "old" } });
+    expect(isReactive(next)).toBe(false); // a plain object for the caller to apply
   });
 });
