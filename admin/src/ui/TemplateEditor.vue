@@ -10,6 +10,7 @@
 // and mounts this instead.
 import { computed, ref, watch } from "vue";
 import FieldForm from "../fields/FieldForm.vue";
+import { toSlotPaths } from "../fields/field-paths";
 import SaveButton from "./SaveButton.vue";
 import { inputCls } from "../fields/styles";
 import type { GitHubClient } from "../backend/github";
@@ -26,6 +27,9 @@ const props = defineProps<{
   locale: Locale;
   templates: TemplateInfo[];
   loading: boolean;
+  // What a review reports as changed, as ENTRY paths (`slots.cards.0.heading`). Absent
+  // until the editor has a review to show, which is why nothing here requires it.
+  changed?: readonly string[];
 }>();
 
 const data = props.data;
@@ -35,6 +39,11 @@ const loading = computed(() => props.loading);
 
 const selected = computed(() => templates.value.find((t) => t.name === data.preset));
 const slotsData = computed(() => data.slots as Record<string, unknown>);
+
+// THE one place entry paths become slot paths. Below this line every path is relative to
+// the slots object the form edits, so nothing downstream has to know what `slots` is
+// called or strip a prefix of its own (fields/field-paths.ts).
+const changedSlots = computed(() => toSlotPaths(props.changed ?? []));
 
 // Empty select value clears the preset; picking one guarantees a slots object.
 const presetModel = computed<string>({
@@ -137,6 +146,7 @@ watch(
             :data="slotsData"
             :client="client"
             :locale="locale"
+            :changed="changedSlots"
             dense
           />
         </div>

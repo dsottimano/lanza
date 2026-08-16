@@ -42,6 +42,15 @@ export interface Field {
   required?: boolean; // default true; set false for optional fields
   hint?: string;
   default?: unknown;
+  // Optional heading this field is filed under. Fields sharing one render inside a
+  // collapsed disclosure (fields/FieldForm.vue), which is what keeps a 30-slot template
+  // from taking the whole editor and starving the live preview of width. The VALUE IS
+  // THE HEADING TEXT — there is no group registry to keep in sync.
+  //
+  // Omit it and nothing changes: an ungrouped field renders exactly where it does today,
+  // never collapsed. That is why this is safe to add — every existing fields.json and
+  // every collection in this file reads `undefined`.
+  group?: string;
   // select
   options?: string[];
   // number

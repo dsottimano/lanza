@@ -30,10 +30,20 @@ templates/<name>/
 - **`fields.json`** — declares the fields the CMS shows for this template:
   `{ "name", "label", "description", "body", "fields": [ … ] }`. Each entry in
   `fields` mirrors the CMS `Field` shape (`admin/src/schema.ts`): `name`, `label`,
-  `widget`, optional `required` (default true — set `false` for optional), and for
-  `list`/`object` widgets a nested `fields: [ … ]`. The top-level **`body`** flag
-  (default `false`) declares whether the template uses the page's rich body — see
-  "The main body" below.
+  `widget`, optional `required` (default true — set `false` for optional), optional
+  **`group`** (see below), and for `list`/`object` widgets a nested `fields: [ … ]`. The
+  top-level **`body`** flag (default `false`) declares whether the template uses the
+  page's rich body — see "The main body" below.
+
+**`group` — file a field under a heading.** A landing page has thirty slots, and a
+stack of thirty inputs leaves the live preview no width. Fields sharing a `group`
+render inside one collapsed disclosure in the CMS; the value **is** the heading text,
+so there is no registry to keep in sync. Group by what the reader sees — one group per
+section of the design (`templates/manifesto/fields.json` uses "Hero", "Live demo",
+"How it works", "Audience doors", "Ownership & cost", "Closing call to action").
+Omit it and the field renders loose and never collapses, exactly as before. Groups
+open themselves when a review reports a change inside them, so collapsing costs a
+reviewer nothing.
 
 Only `template.html` and the page's `slots` reach the render engine. `fields.json` is
 the authoring/CMS side — it tells the editor what to collect. Keep the field `name`s
