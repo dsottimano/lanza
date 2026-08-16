@@ -100,6 +100,18 @@ export async function loadEntryDiff(client: GitHubClient, path: string): Promise
 }
 
 /**
+ * Just the paths that differ, in report order — what the review UI hands the
+ * preview to highlight. Derived from `fields`, so it needs no separate notion of
+ * what counts as a change: `unchanged` is the only status that isn't one.
+ *
+ * A `new` entry returns every path (all `added`) and `absent` returns none, both
+ * of which fall out of the field list rather than being special-cased here.
+ */
+export function changedPaths(diff: EntryDiff): string[] {
+  return diff.fields.filter((f) => f.status !== "unchanged").map((f) => f.path);
+}
+
+/**
  * The field list for a pair of copies. A missing side is walked as an empty
  * record, so `new`/`deleted` fall out of the same walk as `added`/`removed` rows
  * rather than needing their own traversal.

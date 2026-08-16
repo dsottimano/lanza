@@ -1,5 +1,5 @@
 import { describe, it, expect } from "vitest";
-import { loadEntryDiff, BODY_FIELD, type FieldDiff } from "./entry-diff";
+import { loadEntryDiff, changedPaths, BODY_FIELD, type FieldDiff } from "./entry-diff";
 import { GitHubError, type GitHubClient } from "./github";
 import { REPO } from "./config";
 
@@ -33,9 +33,6 @@ function at(fields: FieldDiff[], path: string): FieldDiff | undefined {
   return fields.find((f) => f.path === path);
 }
 
-const changedPaths = (fields: FieldDiff[]) =>
-  fields.filter((f) => f.status !== "unchanged").map((f) => f.path);
-
 describe("loadEntryDiff", () => {
   it("reads the same path from production and staging", async () => {
     const { client, reads } = spyClient({ live: file("title: A"), staged: file("title: A") });
@@ -61,7 +58,7 @@ describe("loadEntryDiff", () => {
     });
     const diff = await loadEntryDiff(client, PATH);
     expect(diff.status).toBe("changed");
-    expect(changedPaths(diff.fields)).toEqual(["title"]);
+    expect(changedPaths(diff)).toEqual(["title"]);
     expect(at(diff.fields, "title")).toMatchObject({
       status: "changed",
       live: "About",
@@ -93,7 +90,7 @@ describe("loadEntryDiff", () => {
       staged: file("seo:\n  title: B\n  description: same"),
     });
     const diff = await loadEntryDiff(client, PATH);
-    expect(changedPaths(diff.fields)).toEqual(["seo.title"]);
+    expect(changedPaths(diff)).toEqual(["seo.title"]);
     expect(at(diff.fields, "seo.description")?.status).toBe("unchanged");
     // The container itself never gets a row of its own while it has leaves.
     expect(at(diff.fields, "seo")).toBeUndefined();
@@ -107,7 +104,7 @@ describe("loadEntryDiff", () => {
       file(`preset: manifesto\nslots:\n  cards:\n    - heading: One\n    - heading: ${second}`);
     const { client } = spyClient({ live: cards("Two"), staged: cards("Deux") });
     const diff = await loadEntryDiff(client, PATH);
-    expect(changedPaths(diff.fields)).toEqual(["slots.cards.1.heading"]);
+    expect(changedPaths(diff)).toEqual(["slots.cards.1.heading"]);
   });
 
   it("reports an appended list item as added and a dropped one as removed", async () => {
@@ -141,7 +138,7 @@ describe("loadEntryDiff", () => {
       staged: file("blocks:\n  - b\n  - a"),
     });
     const diff = await loadEntryDiff(client, PATH);
-    expect(changedPaths(diff.fields)).toEqual(["blocks.0", "blocks.1"]);
+    expect(changedPaths(diff)).toEqual(["blocks.0", "blocks.1"]);
     expect(at(diff.fields, "blocks.0")).toMatchObject({ live: "a", staged: "b" });
   });
 
@@ -152,7 +149,7 @@ describe("loadEntryDiff", () => {
     });
     const diff = await loadEntryDiff(client, PATH);
     expect(diff.status).toBe("changed");
-    expect(changedPaths(diff.fields)).toEqual([BODY_FIELD]);
+    expect(changedPaths(diff)).toEqual([BODY_FIELD]);
     expect(at(diff.fields, BODY_FIELD)).toMatchObject({
       live: "<p>Old prose.</p>",
       staged: "<p>New prose.</p>",
@@ -183,7 +180,7 @@ describe("loadEntryDiff", () => {
       staged: file("publishDate: 2026-08-16"),
     });
     const diff = await loadEntryDiff(moved.client, PATH);
-    expect(changedPaths(diff.fields)).toEqual(["publishDate"]);
+    expect(changedPaths(diff)).toEqual(["publishDate"]);
   });
 
   it("calls a page that was never published NEW, not wholly changed", async () => {
@@ -217,5 +214,56 @@ describe("loadEntryDiff", () => {
 
     const { client: staging } = spyClient({ live: file("title: About"), staged: 403 });
     await expect(loadEntryDiff(staging, PATH)).rejects.toThrow(GitHubError);
+  });
+});
+
+// What the review UI hands the preview to highlight, so a path that shouldn't be
+// in the list lights up a region nobody edited.
+describe("changedPaths", () => {
+  it("returns only the differing paths, in report order", async () => {
+    const { client } = spyClient({
+      live: file("title: About\nsubtitle: Old\nsame: keep", "<p>Old.</p>"),
+      staged: file("title: About us\nsame: keep\nhero: /x.jpg", "<p>New.</p>"),
+    });
+    const diff = await loadEntryDiff(client, PATH);
+    // Report order: live keys first (title, subtitle), then staging-only (hero),
+    // then the body — and `same` never appears.
+    expect(changedPaths(diff)).toEqual(["title", "subtitle", "hero", BODY_FIELD]);
+  });
+
+  it("returns nothing for an entry that is identical on both branches", async () => {
+    const raw = file("title: About\nseo:\n  description: d");
+    const { client } = spyClient({ live: raw, staged: raw });
+    const diff = await loadEntryDiff(client, PATH);
+    expect(diff.status).toBe("unchanged");
+    expect(changedPaths(diff)).toEqual([]);
+    // Not because the field list is empty — every field is there, just unchanged.
+    expect(diff.fields.length).toBe(3);
+  });
+
+  it("returns every path for a page that has never been published", async () => {
+    const { client } = spyClient({
+      staged: file("title: New\nslots:\n  cards:\n    - heading: One"),
+    });
+    const diff = await loadEntryDiff(client, PATH);
+    expect(diff.status).toBe("new");
+    expect(changedPaths(diff)).toEqual(diff.fields.map((f) => f.path));
+    // `slots` is reported ONCE, at the root of the subtree, carrying the whole
+    // value — an absent side has nothing to walk against, so there are no leaf
+    // paths to name. For a page that never existed the whole region is new
+    // anyway, which is exactly what the preview would highlight.
+    expect(changedPaths(diff)).toEqual(["title", "slots", BODY_FIELD]);
+    expect(at(diff.fields, "slots")?.staged).toEqual({ cards: [{ heading: "One" }] });
+  });
+
+  it("returns every path for a page staging deleted", async () => {
+    const { client } = spyClient({ live: file("title: Retired") });
+    const diff = await loadEntryDiff(client, PATH);
+    expect(changedPaths(diff)).toEqual(["title", BODY_FIELD]);
+  });
+
+  it("returns nothing for a path on neither branch", async () => {
+    const { client } = spyClient({});
+    expect(changedPaths(await loadEntryDiff(client, PATH))).toEqual([]);
   });
 });
