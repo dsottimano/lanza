@@ -20,6 +20,10 @@ type Scope = Record<string, unknown>;
 interface Frame {
   scope: Scope; // the object whose fields resolve by bare name
   index: number; // 0-based position in the enclosing {{#each}}
+  // Fully-qualified data path of this frame's scope from the root ("" at the root,
+  // `items.2` one {{#each}} down). Only used to build marker paths (see RenderOptions);
+  // it is computed only when markers are on, and is "" otherwise.
+  base: string;
 }
 
 // ── Emitting position ────────────────────────────────────────────────────────
@@ -76,6 +80,24 @@ interface Position {
   // broke out and installed a live handler. "Already-safe HTML" is a claim that only
   // means anything in a markup position.
   inTag: boolean;
+  // Preview markers only (never consulted when markers are off): this is a position
+  // where wrapping the value in a `<span>` produces a valid, visible HTML element.
+  //
+  // That is NARROWER than `!inTag`, and the difference is the whole point of the flag.
+  // Four positions have `inTag === false` and are still wrong to wrap:
+  //   <title>/<textarea>/<script>/<style>  raw text — a span there is literal text a
+  //                                        browser shows (or JS/CSS it chokes on). They
+  //                                        are `forbidden` too, but the value is "" then,
+  //                                        so the wrapper would be the ONLY thing emitted.
+  //   <!-- {{x}} -->                       inside a comment: inert, and unaddressable.
+  //   <!doctype … {{x}}>                   bogus comment — it ends at the FIRST `>`, so
+  //                                        the span's own `>` closes it and the rest of
+  //                                        the wrapper leaks as visible text.
+  //   <svg>…{{x}}                          foreign content — a `<span>` there is an
+  //                                        unknown SVG element, and it and its children
+  //                                        do not render at all.
+  // So it is set only for a true HTML text node, in the HTML namespace.
+  markable: boolean;
 }
 
 const TEXT_POSITION: Position = {
@@ -84,7 +106,11 @@ const TEXT_POSITION: Position = {
   unquoted: false,
   forbidden: false,
   inTag: false,
+  markable: false,
 };
+
+// A text node proper — the only position a preview marker is emitted in.
+const MARKABLE_TEXT_POSITION: Position = { ...TEXT_POSITION, markable: true };
 
 // Attributes whose value is fetched or navigated to. `srcset` and `ping` are here
 // because they are URL lists; `content` is not, because it is only a URL under
@@ -141,8 +167,12 @@ function positionOf(ctx: Ctx): Position {
   // inside a tag" — an unknown position must fail CLOSED, and TEXT_POSITION is the
   // least restrictive position there is, so it is exactly the wrong default.
   if (ctx.mode === "raw" || ctx.mode === "unknown") {
-    return { url: false, prefix: "", unquoted: false, forbidden: true, inTag: false };
+    return { url: false, prefix: "", unquoted: false, forbidden: true, inTag: false, markable: false };
   }
+  // Identical to TEXT_POSITION for every escaping decision; the only difference is that
+  // a marker may be emitted here. `maybe`/`comment`/`bogus` fall through to the plain
+  // TEXT_POSITION below — same escaping, no marker (see Position.markable).
+  if (ctx.mode === "text") return ctx.foreign > 0 ? TEXT_POSITION : MARKABLE_TEXT_POSITION;
   if (ctx.mode !== "tag") return TEXT_POSITION;
   const tail = ctx.tagText; // always begins with the `<` that opened this tag
 
@@ -216,7 +246,7 @@ function positionOf(ctx: Ctx): Position {
   // (`<a {{x}}>`). A value of `onmouseover=alert(1)` would become a live handler, so
   // treat it as unquoted — that escapes whitespace and `=`, which is exactly what
   // stops it forming a new attribute.
-  if (!inValue) return { url: false, prefix: "", unquoted: true, forbidden: false, inTag: true };
+  if (!inValue) return { url: false, prefix: "", unquoted: true, forbidden: false, inTag: true, markable: false };
 
   // An event handler is a JavaScript context and `style` is a CSS one. HTML escaping
   // is the wrong tool for both — entities decode before the JS/CSS parser runs — so
@@ -240,7 +270,7 @@ function positionOf(ctx: Ctx): Position {
     (tagName === "base" && attrName === "href") ||
     (tagName === "meta" && attrName === "content")
   ) {
-    return { url: false, prefix: "", unquoted: !quote, forbidden: true, inTag: true };
+    return { url: false, prefix: "", unquoted: !quote, forbidden: true, inTag: true, markable: false };
   }
 
   return {
@@ -249,6 +279,7 @@ function positionOf(ctx: Ctx): Position {
     unquoted: !quote,
     forbidden: false,
     inTag: true,
+    markable: false,
   };
 }
 
@@ -546,23 +577,26 @@ function parse(
 // Resolve a bare name from the top frame downward (first frame that owns the key
 // wins); @index/@number come from loop metadata, not data. Dotted paths walk into
 // the resolved root.
+//
+// Which frame owns a bare name: the first from the top down whose scope has the key.
+// Shared with the marker path builder so a marker can never name a different field than
+// the one that was rendered. -1 when no frame has it.
+function ownerFrame(head: string, stack: Frame[]): number {
+  for (let i = stack.length - 1; i >= 0; i--) {
+    const scope = stack[i].scope;
+    if (scope != null && typeof scope === "object" && head in (scope as Scope)) return i;
+  }
+  return -1;
+}
+
 function resolve(path: string, stack: Frame[]): unknown {
   const top = stack[stack.length - 1];
   if (path === "@index") return top ? top.index : undefined;
   if (path === "@number") return top ? String(top.index + 1).padStart(2, "0") : undefined;
   const parts = path.split(".");
-  const head = parts[0];
-  let value: unknown;
-  let found = false;
-  for (let i = stack.length - 1; i >= 0; i--) {
-    const scope = stack[i].scope;
-    if (scope != null && typeof scope === "object" && head in (scope as Scope)) {
-      value = (scope as Scope)[head];
-      found = true;
-      break;
-    }
-  }
-  if (!found) return undefined;
+  const owner = ownerFrame(parts[0], stack);
+  if (owner < 0) return undefined;
+  let value: unknown = stack[owner].scope[parts[0]];
   for (let i = 1; i < parts.length; i++) {
     if (value == null || typeof value !== "object") return undefined;
     value = (value as Scope)[parts[i]];
@@ -613,13 +647,49 @@ function urlValue(value: string, prefix: string): string {
   return isSafeUrl(prefix + value) ? value : "";
 }
 
-function renderNodes(nodes: Node[], stack: Frame[]): string {
+// ── Preview markers ─────────────────────────────────────────────────────────
+// Opt-in, and only ever for the CMS preview: they let it map a rendered region of the
+// page back to the slot that produced it. Off by default, and nothing below runs on the
+// production (Astro build) path.
+//
+// Two invariants, because this writes markup into a document whose safety was hard-won:
+//  1. The wrapper goes around the value AFTER stringify() has escaped it for its
+//     position, so it cannot change what the value is allowed to be. An escaped value
+//     cannot contain a `<` at all, so it cannot close the wrapper it sits in — a value
+//     of `</span>` renders as `&lt;/span&gt;` and stays inside.
+//  2. It is only emitted where `positionOf` says a span is valid and visible
+//     (Position.markable) — never inside a tag, a comment, raw text, or foreign content.
+//     Stamping the ENCLOSING element for an attribute slot would need an open-element
+//     stack, which this engine deliberately does not have, so attribute slots get no
+//     marker at all.
+
+/** The fully-qualified data path a placeholder resolved through, e.g. `items.2.caption`. */
+function qualify(path: string, stack: Frame[]): string | null {
+  if (path.startsWith("@")) return null; // loop metadata, not a field anyone can edit
+  // An unresolved name still gets a path: it is a slot the template declares and the
+  // data has not filled, which is exactly the empty region an editor wants to click.
+  // Attribute it to the innermost frame — inside an {{#each}} body a bare name belongs
+  // to the item.
+  const owner = ownerFrame(path.split(".")[0], stack);
+  const base = stack[owner < 0 ? stack.length - 1 : owner].base;
+  return base ? `${base}.${path}` : path;
+}
+
+function mark(html: string, path: string | null, pos: Position): string {
+  if (!pos.markable || path === null) return html;
+  // The path comes from template text, which is author-trusted but not necessarily
+  // attribute-safe (`{{ a"b }}` is a legal placeholder); escape it like any other value.
+  return `<span data-lanza-field="${escapeHtml(path)}">${html}</span>`;
+}
+
+function renderNodes(nodes: Node[], stack: Frame[], markers: boolean): string {
   let out = "";
   for (const node of nodes) {
     if (node.t === "text") {
       out += node.v;
     } else if (node.t === "var") {
-      out += stringify(resolve(node.path, stack), node.pos);
+      const value = stringify(resolve(node.path, stack), node.pos);
+      out += markers ? mark(value, qualify(node.path, stack), node.pos) : value;
     } else if (node.t === "raw") {
       const v = resolve(node.path, stack);
       if (v == null || typeof v === "object") continue;
@@ -629,15 +699,23 @@ function renderNodes(nodes: Node[], stack: Frame[]): string {
       // treated exactly like a var there. `<a {{{attrs}}}>` was otherwise a live
       // event-handler injection with no policy applied at all.
       const inMarkup = !node.pos.inTag;
+      // Deliberately NOT marked, even in a markup position: a raw value is emitted
+      // verbatim, so an unbalanced `</span>` inside it would close the wrapper and leave
+      // the rest of the value outside it — the one case invariant (1) above cannot cover,
+      // because nothing escaped this value. (It is also arbitrary block-level HTML — the
+      // page body — which a span is not a legal parent for.)
       out += inMarkup ? String(v) : stringify(v, node.pos);
     } else if (node.t === "if") {
-      if (truthy(resolve(node.path, stack))) out += renderNodes(node.body, stack);
+      if (truthy(resolve(node.path, stack))) out += renderNodes(node.body, stack, markers);
     } else {
       const items = resolve(node.path, stack);
       if (Array.isArray(items)) {
+        // The loop's own qualified path, so a repeated slot is addressable per item
+        // (`items.2.caption`). Computed once, and only when markers are on.
+        const base = markers ? qualify(node.path, stack) : null;
         items.forEach((item, index) => {
-          stack.push({ scope: item as Scope, index });
-          out += renderNodes(node.body, stack);
+          stack.push({ scope: item as Scope, index, base: base === null ? "" : `${base}.${index}` });
+          out += renderNodes(node.body, stack, markers);
           stack.pop();
         });
       }
@@ -646,7 +724,20 @@ function renderNodes(nodes: Node[], stack: Frame[]): string {
   return out;
 }
 
-export function render(template: string, data: Record<string, unknown>): string {
+export interface RenderOptions {
+  /**
+   * PREVIEW ONLY. Wrap each text-position value in
+   * `<span data-lanza-field="<path>">…</span>` so the CMS can map a rendered region back
+   * to the slot that produced it. Default false, and the production build never sets it:
+   * with it off the output is byte-identical to what this engine has always emitted.
+   *
+   * Only text-node slots are wrapped. A slot inside a tag (an attribute value) gets no
+   * marker — see the note above renderNodes.
+   */
+  markers?: boolean;
+}
+
+export function render(template: string, data: Record<string, unknown>, options: RenderOptions = {}): string {
   const { nodes } = parse(tokenize(template), 0, newCtx());
-  return renderNodes(nodes, [{ scope: data, index: 0 }]);
+  return renderNodes(nodes, [{ scope: data, index: 0, base: "" }], options.markers === true);
 }

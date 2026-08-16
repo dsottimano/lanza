@@ -496,3 +496,242 @@ test("the browser oracle agrees with the string assertions on the REAL templates
     );
   }
 });
+
+// ── Preview markers (render(…, { markers: true })) ───────────────────────────
+// Opt-in wrappers that let the CMS map a rendered region back to the slot that produced
+// it. They are PREVIEW-ONLY: the Astro build never passes the option, so the first test
+// here is the one that matters most — with the option off, byte-for-byte nothing moved.
+//
+// The rest exist because a marker writes markup into a document whose safety was won by
+// the twelve tests above. Two ways it could undo them: by letting a VALUE escape the
+// wrapper (it cannot — the wrapper goes around already-escaped output), and by emitting
+// a `<span>` somewhere a span is not an element. The second is the real work, because
+// `inTag === false` is NOT the same question as "is a span valid here".
+
+/** Every `data-lanza-field` in the output, as seen by a real parser, with its text. */
+function markedFields(html) {
+  const out = [];
+  const walk = (n) => {
+    const field = (n.attrs ?? []).find((a) => a.name === "data-lanza-field");
+    if (field) {
+      const text = (n.childNodes ?? []).map((c) => c.value ?? "").join("");
+      out.push([n.nodeName, field.value, text]);
+    }
+    for (const c of n.childNodes ?? []) walk(c);
+  };
+  walk(parseFragment(html));
+  return out;
+}
+
+test("markers OFF is byte-identical to what the engine has always emitted", () => {
+  // Pinned literals, not a comparison against another render() call: the point is that
+  // the PRODUCTION output did not move, and two runs of a changed engine would agree
+  // with each other while both being wrong.
+  const cases = [
+    [`<p>{{x}}</p>`, { x: "<b>&hi" }, "<p>&lt;b&gt;&amp;hi</p>"],
+    [`<a href="{{u}}">go</a>`, { u: "/about" }, `<a href="/about">go</a>`],
+    [`<a href="{{u}}">go</a>`, { u: "javascript:alert(1)" }, `<a href="#">go</a>`],
+    [`<div class={{c}}>x</div>`, { c: "a onmouseover=alert(1) b" }, `<div class=a&#32;onmouseover&#61;alert(1)&#32;b>x</div>`],
+    [`<div>{{{body}}}</div>`, { body: "<b>hi</b>" }, "<div><b>hi</b></div>"],
+    [`{{#each xs}}[{{v}}]{{/each}}`, { xs: [{ v: "a" }, { v: "b" }] }, "[a][b]"],
+    [`{{#each xs}}{{@number}}.{{v}} {{/each}}`, { xs: [{ v: "a" }, { v: "b" }] }, "01.a 02.b "],
+    [`{{#if on}}Y{{/if}}`, { on: false }, ""],
+    [`<title>{{x}}</title>`, { x: "T" }, "<title></title>"],
+    [`<p>Own your site / your words {{t}}</p>`, { t: "x" }, "<p>Own your site / your words x</p>"],
+  ];
+  for (const [tpl, data, expected] of cases) {
+    assert.equal(render(tpl, data), expected, tpl);
+    // …and the option object itself must not perturb anything when it says nothing.
+    assert.equal(render(tpl, data, {}), expected, tpl);
+    assert.equal(render(tpl, data, { markers: false }), expected, tpl);
+  }
+  // The REAL shipped templates, rendered both ways: the whole production surface.
+  const manifesto = readFileSync(`${REPO_ROOT}templates/manifesto/template.html`, "utf8");
+  const data = { headline: "Own your site", cta1: "Start", cta1Url: "/start", cards: [{ who: "Devs", cta: "Read", href: "/d" }] };
+  assert.equal(render(manifesto, data, {}), render(manifesto, data));
+  assert.ok(!render(manifesto, data).includes("data-lanza-field"));
+});
+
+test("markers ON wrap text slots, and only text slots", () => {
+  assert.equal(
+    render(`<p>{{x}}</p>`, { x: "hi" }, { markers: true }),
+    `<p><span data-lanza-field="x">hi</span></p>`,
+  );
+  // A dotted path keeps its shape, so the CMS can address the nested field.
+  assert.equal(
+    render(`<h1>{{meta.title}}</h1>`, { meta: { title: "T" } }, { markers: true }),
+    `<h1><span data-lanza-field="meta.title">T</span></h1>`,
+  );
+  // An empty/absent value still gets a marker: an empty region is exactly what an
+  // editor needs to be able to click.
+  assert.equal(render(`<p>{{gone}}</p>`, {}, { markers: true }), `<p><span data-lanza-field="gone"></span></p>`);
+  // Values are escaped exactly as before — the wrapper is around the ESCAPED output.
+  assert.equal(
+    render(`<p>{{x}}</p>`, { x: "<b>&" }, { markers: true }),
+    `<p><span data-lanza-field="x">&lt;b&gt;&amp;</span></p>`,
+  );
+});
+
+test("a slot inside a tag gets no marker — a span there would break the tag", () => {
+  // Stamping the enclosing element instead would need an open-element stack, which this
+  // engine deliberately does not have. Skipping is the whole policy.
+  for (const [tpl, data] of [
+    [`<a href="{{u}}">go</a>`, { u: "/ok" }], // URL attribute
+    [`<div title="{{t}}">x</div>`, { t: "T" }], // ordinary quoted attribute
+    [`<div class={{c}}>x</div>`, { c: "c" }], // unquoted
+    [`<a {{attrs}}>x</a>`, { attrs: "rel=next" }], // attribute-NAME position
+    [`<div onclick="{{h}}">x</div>`, { h: "f()" }], // forbidden: JS
+    [`<div style="{{s}}">x</div>`, { s: "color:red" }], // forbidden: CSS
+    [`<iframe srcdoc="{{d}}"></iframe>`, { d: "x" }], // forbidden: a whole document
+    [`<a {{n}}="{{v}}">x</a>`, { n: "rel", v: "next" }], // dynamic attribute name
+  ]) {
+    const html = render(tpl, data, { markers: true });
+    assert.ok(!html.includes("data-lanza-field"), `${tpl} -> ${html}`);
+    assert.equal(html, render(tpl, data), `${tpl} must render identically either way`);
+  }
+});
+
+test("a marker is never emitted where a <span> is not an element", () => {
+  // Each of these classifies with inTag === false, which is why the naive rule is wrong.
+  const cases = [
+    // Raw text: the browser SHOWS `<span …>` here (tab title, textarea box) or hands it
+    // to a JS/CSS parser. The value is already suppressed in these positions, so a
+    // marker would be the only thing emitted — a wrapper around nothing, made visible.
+    [`<title>{{x}}</title>`, "title"],
+    [`<textarea>{{x}}</textarea>`, "textarea"],
+    [`<script>var a={{x}}</script>`, "script"],
+    [`<style>.a{color:{{x}}}</style>`, "style"],
+    // A comment: inert markup, and no region for the CMS to map anything to.
+    [`<!-- {{x}} -->`, "comment"],
+    // A bogus comment ends at the FIRST `>`, which would be the span's own — the rest
+    // of the wrapper then leaks out as visible text.
+    [`<!doctype html {{x}}>`, "bogus"],
+    [`<?php {{x}} ?>`, "processing instruction"],
+    // `<` + a non-name char is text, but a span opening right after it changes what the
+    // parser is looking at.
+    [`<{{x}}`, "maybe-a-tag"],
+    // Foreign content: `<span>` inside SVG/MathML is an unknown element in that
+    // namespace — it and its children are not rendered at all, so the marker would make
+    // the previewed text DISAPPEAR.
+    [`<svg><text>{{x}}</text></svg>`, "svg"],
+    [`<svg><title>{{x}}</title></svg>`, "svg title (markup, not raw text)"],
+    [`<math><mi>{{x}}</mi></math>`, "mathml"],
+    // An unknown position (a block may have left us inside a tag) already fails closed.
+    [`{{#if a}}<a href="{{/if}}{{x}}">t</a>`, "unknown"],
+  ];
+  for (const [tpl, label] of cases) {
+    const html = render(tpl, { x: "V", a: 1 }, { markers: true });
+    assert.ok(!html.includes("data-lanza-field"), `${label}: ${html}`);
+    assert.equal(html, render(tpl, { x: "V", a: 1 }), `${label} must render identically either way`);
+  }
+  // …and the suppression is scoped, not sticky: once </svg> closes, text is text again.
+  assert.ok(render(`<svg></svg><p>{{x}}</p>`, { x: "V" }, { markers: true }).includes('data-lanza-field="x"'));
+});
+
+test("a value cannot escape the marker it is wrapped in", () => {
+  // The wrapper is emitted around the ALREADY-escaped output, so a value containing
+  // `</span>` has no `<` left to close anything with. Asserted through parse5 rather
+  // than against a string: the question is what the DOM ends up looking like.
+  for (const payload of [
+    "</span>",
+    "</span><img src=x onerror=alert(1)>",
+    `</span><script>alert(1)</script>`,
+    `x" data-lanza-field="other`,
+    `</span><a href="javascript:alert(1)">go</a>`,
+  ]) {
+    const html = render(`<p>{{x}}</p>`, { x: payload }, { markers: true });
+    assertBrowserSafe(html, payload);
+    assert.deepEqual(markedFields(html), [["span", "x", payload]], `${payload} -> ${html}`);
+  }
+  // The same payload through {{#each}}, where the path is built rather than literal.
+  const each = render(`{{#each xs}}<li>{{v}}</li>{{/each}}`, { xs: [{ v: `</span>"` }] }, { markers: true });
+  assert.deepEqual(markedFields(each), [["span", "xs.0.v", `</span>"`]]);
+});
+
+test("{{{raw}}} is not marked, in any position", () => {
+  // A raw value is emitted VERBATIM, so nothing stops an unbalanced `</span>` inside it
+  // from closing the wrapper and leaving the rest of the value outside — the one case
+  // the escaping invariant cannot cover. (It is also the page body: arbitrary
+  // block-level HTML, which a span is not a legal parent for.)
+  for (const [tpl, data] of [
+    [`<div>{{{body}}}</div>`, { body: "<p>hi</p>" }],
+    [`<div>{{{body}}}</div>`, { body: "</span><p>hi</p>" }],
+    [`<a href="{{{u}}}">go</a>`, { u: "javascript:alert(1)" }],
+    [`<div title="{{{t}}}">x</div>`, { t: '" onmouseover=alert(1) z="' }],
+  ]) {
+    const html = render(tpl, data, { markers: true });
+    assert.ok(!html.includes("data-lanza-field"), html);
+    assert.equal(html, render(tpl, data));
+  }
+});
+
+test("an {{#each}} slot is addressed by item index", () => {
+  assert.equal(
+    render(`{{#each items}}<li>{{caption}}</li>{{/each}}`, { items: [{ caption: "a" }, { caption: "b" }] }, { markers: true }),
+    `<li><span data-lanza-field="items.0.caption">a</span></li><li><span data-lanza-field="items.1.caption">b</span></li>`,
+  );
+  // Nested loops compose, so a slot two levels down is still uniquely addressable.
+  assert.equal(
+    render(`{{#each rows}}{{#each cells}}<i>{{v}}</i>{{/each}}{{/each}}`, { rows: [{ cells: [{ v: "a" }, { v: "b" }] }] }, { markers: true }),
+    `<i><span data-lanza-field="rows.0.cells.0.v">a</span></i><i><span data-lanza-field="rows.0.cells.1.v">b</span></i>`,
+  );
+  // A name that resolves in an OUTER scope must NOT be qualified with the loop index —
+  // `siteName` is one field, not one per row, and editing it through the wrong path
+  // would write into the array.
+  assert.equal(
+    render(`{{#each items}}<li>{{siteName}}</li>{{/each}}`, { siteName: "L", items: [{}, {}] }, { markers: true }),
+    `<li><span data-lanza-field="siteName">L</span></li><li><span data-lanza-field="siteName">L</span></li>`,
+  );
+  // A key the item does not have is still the item's slot — an empty region to click.
+  assert.deepEqual(
+    markedFields(render(`{{#each items}}<li>{{caption}}</li>{{/each}}`, { items: [{}] }, { markers: true })),
+    [["span", "items.0.caption", ""]],
+  );
+  // Loop METADATA is not a field: there is nothing to edit, so nothing is marked.
+  assert.equal(
+    render(`{{#each items}}<li>{{@number}} {{v}}</li>{{/each}}`, { items: [{ v: "a" }] }, { markers: true }),
+    `<li>01 <span data-lanza-field="items.0.v">a</span></li>`,
+  );
+});
+
+test("markers do not weaken a single safety verdict", () => {
+  // The full payload set from the tests above, re-run with markers on. A marker changes
+  // where a value SITS in the document, and the whole engine is about where a value sits.
+  const payload = "javascript:fetch('/admin/api/gh/contents/x',{method:'PUT'})";
+  for (const tpl of [
+    `<a href="{{ u }}">go</a>`,
+    `<a href='{{ u }}'>go</a>`,
+    `<a href={{ u }}>go</a>`,
+    `<a title="a>b" href="{{u}}">t</a>`,
+    `<a alt="a<b>c" href="{{u}}">t</a>`,
+    `<a/href="{{u}}">t</a>`,
+    `<!-- don't --><a href="{{u}}">t</a>`,
+    `<!-- x --!><a href="{{u}}">t</a>`,
+    `<<a href="{{u}}">x</a>`,
+    `<svg><title><a href="{{u}}">x</a></title></svg>`,
+  ]) {
+    const html = render(tpl, { u: payload }, { markers: true });
+    assertNoLiveScheme(html);
+    assertBrowserSafe(html, tpl);
+  }
+  for (const [tpl, data] of [
+    [`<div class={{c}}>x</div>`, { c: "a onmouseover=alert(1) b" }],
+    [`<a {{attrs}}>t</a>`, { attrs: "onmouseover=alert(1) x" }],
+    [`<iframe srcdoc="{{x}}"></iframe>`, { x: "<script>alert(1)</script>" }],
+    [`<base href="{{u}}">`, { u: "https://evil.example" }],
+    [`<a {{n}}="{{v}}">t</a>`, { n: "onclick", v: "alert(1)" }],
+    [`<script>var s=\`{{u}}\`</script>`, { u: "${alert(1)}" }],
+    [`<p>{{x}}</p>`, { x: "<script>alert(1)</script>" }],
+  ]) {
+    assertBrowserSafe(render(tpl, data, { markers: true }), tpl);
+  }
+  // The REAL templates, marked, read through the browser oracle.
+  const menu = [{ label: "Evil", url: "javascript:alert(1)" }, { label: "Ok", url: "/posts" }];
+  for (const part of ["header", "footer"]) {
+    const html = render(readFileSync(`${REPO_ROOT}templates/parts/${part}.html`, "utf8"), {
+      siteName: "L", homeUrl: "/", year: 2026, menuHeader: menu, menuFooter: menu,
+    }, { markers: true });
+    assertBrowserSafe(html, part);
+    assertNoLiveScheme(html);
+  }
+});
