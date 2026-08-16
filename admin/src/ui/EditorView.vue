@@ -346,6 +346,7 @@ onMounted(async () => {
             :locale="locale"
             :templates="templates"
             :loading="templatesLoading"
+            :changed="review.changed.value"
           />
           <!-- `body` is a RESERVED ROOT key, a sibling of the slots, exactly as the
                build assembles it (frontend/components/PageArticle.astro). Without it
@@ -473,6 +474,7 @@ onMounted(async () => {
             :locale="locale"
             :templates="templates"
             :loading="templatesLoading"
+            :changed="review.changed.value"
             class="mb-4"
           />
           <details v-if="!loading && seoFields.length" class="card mb-4 p-4" open>
