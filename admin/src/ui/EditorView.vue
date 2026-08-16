@@ -8,7 +8,7 @@
 //     canvas stays the centre of gravity with a details rail beside it.
 // Shared chrome (title, the Draft⟷Ready state, Save, the "N to publish" pending
 // count) lives in the header for both.
-import { computed, onMounted, ref, useTemplateRef } from "vue";
+import { computed, onMounted, ref, useTemplateRef, watchEffect } from "vue";
 import { useRouter, useRoute } from "vue-router";
 import Editor from "../editor/Editor.vue";
 import Toolbar from "../editor/Toolbar.vue";
@@ -17,6 +17,7 @@ import TemplateEditor from "./TemplateEditor.vue";
 import PreviewPane from "./PreviewPane.vue";
 import SlugField from "./SlugField.vue";
 import EntryLocaleBar from "./EntryLocaleBar.vue";
+import ChangeList from "./ChangeList.vue";
 import SaveButton from "./SaveButton.vue";
 import { GitHubClient } from "../backend/github";
 import { type FolderCollection, type Field } from "../schema";
@@ -29,6 +30,7 @@ import { stemOf, takeTranslationSeed } from "../backend/translations";
 import { entryRoute } from "../router";
 import { reportError, clearError } from "../errors";
 import { useEntryEditor } from "./useEntryEditor";
+import { useEntryReview } from "./useEntryReview";
 import { pendingCount, refreshPending } from "./staging";
 
 const props = defineProps<{
@@ -154,12 +156,60 @@ function goPublish() {
   router.push("/publish");
 }
 
+// ── review: what publishing this entry would change ─────────────────────────
+// Increasingly these are an AGENT's edits, so the owner's job is judging them
+// rather than typing them. The panel lists the changed fields; the preview shows
+// WHERE each one is. Selection runs both ways — click a row to find it on the page,
+// click the page to find it in the list.
+const previewRef = useTemplateRef<InstanceType<typeof PreviewPane>>("previewRef");
+
+const review = useEntryReview({
+  client: props.client,
+  path: () => props.path,
+  data,
+  getBody: () => editorRef.value?.getHTML() ?? bodyHtml.value,
+  setBody: (html) => {
+    bodyHtml.value = html;
+    // The canvas is a live TipTap instance when it is mounted; setting the ref alone
+    // would leave the editor showing the text it just replaced.
+    editorRef.value?.editor?.commands.setContent(html);
+  },
+  markDirty,
+});
+
+function onRowSelect(path: string): void {
+  review.select(path);
+  previewRef.value?.scrollToField(path);
+}
+
+function onPreviewSelect(path: string): void {
+  review.select(path);
+}
+
+function onRevert(path: string): void {
+  if (review.revert(path)) previewRef.value?.scrollToField(path);
+}
+
+// One highlighted region at a time once a row is picked; before that, every pending
+// change is lit, so opening an entry an agent edited SHOWS the edits rather than
+// requiring a click to discover them.
+watchEffect(() => {
+  const preview = previewRef.value;
+  if (!preview) return;
+  preview.highlight(review.selected.value ? [review.selected.value] : review.changed.value);
+});
+
 // Saving commits to staging → the "to publish" count changes; keep it honest.
 // A slug change renamed the file, so point the URL at the new slug (an existing
 // entry only — a brand-new entry stays on its route until the user navigates).
 function onSaved() {
   clearError();
   refreshPending(props.client);
+  // Re-take the diff: what is pending has just changed, and a stale report would
+  // offer to revert a field to a value that is no longer what the live site says.
+  // This is also what keeps array paths valid across two reverts (entry-diff notes
+  // the case where reverting one added item shifts another).
+  review.load();
   const saved = effectiveSlug.value;
   if (props.path && route.params.slug !== saved) {
     router.replace(entryRoute(props.collection.name, props.locale, saved));
@@ -168,6 +218,7 @@ function onSaved() {
 
 onMounted(async () => {
   refreshPending(props.client);
+  review.load();
   if (hasTemplate.value) {
     templatesLoading.value = true;
     try {
@@ -296,16 +347,32 @@ onMounted(async () => {
             :templates="templates"
             :loading="templatesLoading"
           />
+          <!-- `body` is a RESERVED ROOT key, a sibling of the slots, exactly as the
+               build assembles it (frontend/components/PageArticle.astro). Without it
+               a {{{ body }}} template previewed as an empty article — the preview was
+               never given the body at all. -->
           <PreviewPane
+            ref="previewRef"
             class="min-w-0"
             :client="client"
             :preset="(data.preset as string)"
             :slots="slotsData"
+            :body="bodyHtml"
+            @select="onPreviewSelect"
           />
         </div>
 
         <!-- Page vital info (single column) -->
         <div class="flex flex-col gap-4">
+          <!-- What publishing would change. Above the disclosures because it is the
+               first question about a page someone else — or something else — edited. -->
+          <ChangeList
+            v-if="review.hasChanges.value"
+            :diff="review.diff.value!"
+            :fields="collection.fields"
+            @select="onRowSelect"
+            @revert="onRevert"
+          />
           <details v-if="seoFields.length" class="card p-4">
             <summary class="cursor-pointer text-sm font-semibold text-zinc-900">
               SEO &amp; metadata
@@ -388,6 +455,17 @@ onMounted(async () => {
           @input="markDirty"
           @change="markDirty"
         >
+          <!-- Same panel as the templated shape, at the top of the rail: on a post,
+               "what would publishing change" is still the first question. There is no
+               preview here to point at, so selecting a row only marks it. -->
+          <ChangeList
+            v-if="review.hasChanges.value"
+            :diff="review.diff.value!"
+            :fields="collection.fields"
+            class="mb-4"
+            @select="onRowSelect"
+            @revert="onRevert"
+          />
           <TemplateEditor
             v-if="hasTemplate && !loading"
             :client="client"
