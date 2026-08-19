@@ -1,0 +1,41 @@
+<style>
+  /* Namespaced (.ev-*) because a template's <style> is emitted GLOBALLY, not scoped.
+     Colour and type come from the site's design tokens, so the Style layer (Settings →
+     Brand, or a style variant) restyles this template without touching its markup. */
+  .ev-detail { max-width: 44rem; margin: 0 auto; padding: 3rem 1.5rem 4rem; }
+  .ev-back { display: inline-block; margin-bottom: 2rem; font-size: .9rem; color: var(--muted); text-decoration: none; }
+  .ev-back:hover { color: var(--accent); }
+  .ev-kicker { font-size: .8rem; letter-spacing: .08em; text-transform: uppercase; color: var(--accent); margin: 0 0 .5rem; }
+  .ev-title { font-family: var(--font-heading); font-size: clamp(2rem, 5vw, 3rem); line-height: 1.1; margin: 0 0 1rem; color: var(--ink); }
+  .ev-meta { display: flex; flex-wrap: wrap; gap: 1.25rem; padding: 1rem 0; margin: 0 0 2rem; border-top: 1px solid var(--border); border-bottom: 1px solid var(--border); }
+  .ev-meta div { min-width: 8rem; }
+  .ev-meta dt { font-size: .72rem; letter-spacing: .06em; text-transform: uppercase; color: var(--muted); margin: 0 0 .2rem; }
+  .ev-meta dd { margin: 0; font-size: 1rem; color: var(--ink); }
+  .ev-hero { width: 100%; height: auto; border-radius: var(--radius); margin: 0 0 2rem; }
+  .ev-summary { font-size: 1.15rem; line-height: 1.6; color: var(--text-secondary); margin: 0 0 2rem; }
+  .ev-body { line-height: 1.7; color: var(--ink); }
+  .ev-cta { display: inline-block; margin-top: 2.5rem; padding: .85rem 1.6rem; background: var(--accent); color: var(--on-accent); border-radius: var(--radius); text-decoration: none; font-weight: 600; }
+  .ev-sold { margin-top: 2.5rem; padding: .85rem 1.6rem; border: 1px solid var(--border); border-radius: var(--radius); color: var(--muted); display: inline-block; }
+</style>
+
+<article class="ev-detail">
+  <a class="ev-back" href="{{ indexUrl }}">← All events</a>
+
+  {{#if kicker}}<p class="ev-kicker">{{ kicker }}</p>{{/if}}
+  <h1 class="ev-title">{{ title }}</h1>
+
+  <dl class="ev-meta">
+    {{#if startDate}}<div><dt>Date</dt><dd>{{ startDate }}</dd></div>{{/if}}
+    {{#if startTime}}<div><dt>Time</dt><dd>{{ startTime }}</dd></div>{{/if}}
+    {{#if venue}}<div><dt>Venue</dt><dd>{{ venue }}</dd></div>{{/if}}
+    {{#if price}}<div><dt>Price</dt><dd>{{ price }}</dd></div>{{/if}}
+  </dl>
+
+  {{#if featuredImage}}<img class="ev-hero" src="{{ featuredImage }}" alt="{{ title }}" />{{/if}}
+  {{#if summary}}<p class="ev-summary">{{ summary }}</p>{{/if}}
+
+  <div class="ev-body">{{{ body }}}</div>
+
+  {{#if ticketUrl}}<a class="ev-cta" href="{{ ticketUrl }}">{{ ticketLabel }}</a>{{/if}}
+  {{#if soldOut}}<p class="ev-sold">This event is sold out.</p>{{/if}}
+</article>

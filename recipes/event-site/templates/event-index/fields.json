@@ -1,0 +1,15 @@
+{
+  "name": "event-index",
+  "label": "Events (listing)",
+  "description": "The /events/ page: a heading, an intro, and every published event as a card. The cards come from the events themselves — only the heading and intro are edited here.",
+  "body": false,
+  "listing": {
+    "of": "events",
+    "item": ["title", "summary", "startDate", "startTime", "venue", "price", "soldOut"]
+  },
+  "fields": [
+    { "name": "heading", "label": "Page heading", "widget": "string", "default": "What's on" },
+    { "name": "intro", "label": "Intro paragraph", "widget": "text", "required": false },
+    { "name": "emptyText", "label": "Empty state", "widget": "string", "required": false, "default": "Nothing on the calendar just yet — check back soon.", "hint": "Shown when no events are published." }
+  ]
+}

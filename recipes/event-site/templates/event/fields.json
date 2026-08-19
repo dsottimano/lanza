@@ -1,0 +1,97 @@
+{
+  "name": "event",
+  "label": "Event (detail)",
+  "description": "One event: title, when/where, price, summary, the long description, and a ticket button.",
+  "body": true,
+  "fields": [
+    {
+      "name": "title",
+      "label": "Event name",
+      "widget": "string",
+      "group": "The basics"
+    },
+    {
+      "name": "kicker",
+      "label": "Eyebrow",
+      "widget": "string",
+      "group": "The basics",
+      "required": false,
+      "hint": "Small line above the title — e.g. \"Workshop\"."
+    },
+    {
+      "name": "summary",
+      "label": "Short summary",
+      "widget": "text",
+      "group": "The basics",
+      "required": false,
+      "hint": "One or two sentences. Also used on the listing page."
+    },
+    {
+      "name": "featuredImage",
+      "label": "Header image",
+      "widget": "image",
+      "group": "The basics",
+      "required": false
+    },
+    {
+      "name": "startDate",
+      "label": "Date",
+      "widget": "datetime",
+      "group": "When & where"
+    },
+    {
+      "name": "startTime",
+      "label": "Time",
+      "widget": "string",
+      "group": "When & where",
+      "required": false,
+      "hint": "Free text — \"7:30pm\", \"Doors 7pm\"."
+    },
+    {
+      "name": "venue",
+      "label": "Venue",
+      "widget": "string",
+      "group": "When & where",
+      "required": false
+    },
+    {
+      "name": "price",
+      "label": "Price",
+      "widget": "string",
+      "group": "Tickets",
+      "required": false,
+      "hint": "\"Free\", \"$20\", \"£15 / £10 conc.\""
+    },
+    {
+      "name": "ticketUrl",
+      "label": "Ticket link",
+      "widget": "string",
+      "group": "Tickets",
+      "required": false
+    },
+    {
+      "name": "ticketLabel",
+      "label": "Ticket button text",
+      "widget": "string",
+      "group": "Tickets",
+      "required": false,
+      "default": "Get tickets"
+    },
+    {
+      "name": "soldOut",
+      "label": "Sold out",
+      "widget": "boolean",
+      "group": "Tickets",
+      "required": false,
+      "default": false
+    },
+    {
+      "name": "draft",
+      "label": "Draft",
+      "widget": "boolean",
+      "group": "Publishing",
+      "required": false,
+      "default": true
+    }
+  ]
+}

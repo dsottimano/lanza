@@ -1,0 +1,61 @@
+{
+  "variants": [
+    {
+      "id": "ink-and-paper",
+      "label": "Ink & paper",
+      "note": "Printed programme. Warm stock, hard corners, a serif that has opinions.",
+      "brand": {
+        "colors": {
+          "bg": "#f4f1e8",
+          "surface": "#eae5d7",
+          "ink": "#1b1916",
+          "muted": "#6d665c",
+          "accent": "#9c3b21",
+          "border": "#ddd5c4"
+        },
+        "radius": "2px",
+        "motion": "on",
+        "fonts": { "heading": "fraunces", "body": "space-grotesk" },
+        "scheme": "light"
+      }
+    },
+    {
+      "id": "after-dark",
+      "label": "After dark",
+      "note": "Late shows and basements. High contrast, soft corners, everything glows a little.",
+      "brand": {
+        "colors": {
+          "bg": "#101014",
+          "surface": "#1a1a21",
+          "ink": "#ececf1",
+          "muted": "#9a9aa8",
+          "accent": "#7cf0c4",
+          "border": "#2b2b35"
+        },
+        "radius": "14px",
+        "motion": "on",
+        "fonts": { "heading": "space-grotesk", "body": "inter" },
+        "scheme": "dark"
+      }
+    },
+    {
+      "id": "sunday-market",
+      "label": "Sunday market",
+      "note": "Bright, friendly, unfussy. Reads well on a phone in daylight.",
+      "brand": {
+        "colors": {
+          "bg": "#fffdf8",
+          "surface": "#fdf3e3",
+          "ink": "#23201c",
+          "muted": "#7a7268",
+          "accent": "#e0632a",
+          "border": "#efe3cf"
+        },
+        "radius": "10px",
+        "motion": "on",
+        "fonts": { "heading": "poppins", "body": "inter" },
+        "scheme": "light"
+      }
+    }
+  ]
+}

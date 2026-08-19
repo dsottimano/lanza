@@ -1,0 +1,30 @@
+{
+  "name": "event-site",
+  "label": "Simple event site",
+  "description": "A listing of upcoming events at /events/ and a page per event. What someone means by \"I want a simple event site\".",
+  "contentTypes": [
+    {
+      "name": "events",
+      "label": "Events",
+      "labelSingular": "Event",
+      "folder": "content/events",
+      "localized": true,
+      "body": "rich",
+      "thumbnail": "featuredImage",
+      "fieldsFrom": "event",
+      "route": {
+        "base": "events",
+        "template": "event",
+        "list": {
+          "template": "event-index",
+          "sortBy": "startDate",
+          "order": "asc",
+          "slotsFrom": "event-index"
+        }
+      }
+    }
+  ],
+  "menu": [{ "label": "What's on", "url": "/events/" }],
+  "styles": ["ink-and-paper", "after-dark", "sunday-market"],
+  "seed": ["content/events/en/spring-open-studio.md", "content/events/en/late-night-listening.md", "content/events/en/makers-market.md"]
+}
