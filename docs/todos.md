@@ -12,66 +12,69 @@ Started 2026-08-15. Last restructured 2026-08-19.
 
 ---
 
-## ⏱ DEMO — 2026-08-19, ~17:30 local (Dave presents at ~17:30, written 14:32)
+## Where things stand, end of 2026-08-19
 
-**Read this first. It overrides the ordering below until the demo is done.**
+The demo happened. Everything below is the state a fresh session inherits.
 
-### What the demo is
+### What is live
 
-Someone connects an LLM to a Lanza site and builds a whole site by talking. **This
-already works** — it was done for real at 14:00 today (ChatGPT → `lanzacms.com/api/mcp`,
-brief: *"I run a violin repair shop in Toronto…"*). 16 tool calls, correct order,
-unprompted. See §1 below for the full write-up.
+- **`lanzacms.com`** is on `main` (`21f06aa`), deployed and verified. Its draft
+  (`staging`) is back to matching production: Dave reset it after the demo, so none
+  of the violin content survives anywhere.
+- **`lanza-site@0.1.13`** is published on npm. Tenants pin an exact version, so
+  nothing moves until someone bumps a repo. Dave runs `npm publish`; the machine is
+  not logged in for it.
+- **`dsottimano/lanza-template`** (the repo every new site is generated from) now
+  ships a homepage that tells a new owner how to connect ChatGPT or Claude over MCP,
+  gitignores the `frontend/` the build copies in, and pins `0.1.13`.
+- **`dsottimano/ai-panama`** is the live third-party test tenant, pinned `0.1.13`,
+  with an agent-written ASCII cat on its draft. Its MCP address is
+  `https://ai-panama-62d01b9d9611.pages.dev/api/mcp`.
 
-### The demo path that is PROVEN to work
+### The trap that cost the most time today, so it does not cost it twice
 
-1. ChatGPT → Settings → Connectors → custom connector →
-   `https://lanzacms.com/api/mcp`. **Sign out of GitHub first** and approve as
-   `dsottimano` — a stale `datadefine` session gives a bare 403 with no explanation.
-2. Give it a plain-English brief. Do NOT mention content types, templates or routes.
-3. It builds on the **draft** (`staging`). Show `https://staging.lanza.pages.dev/`.
-4. **DO NOT PUBLISH.** Publish merges the draft into the live product site. A demo
-   shop would go live on lanzacms.com.
+`0.1.12` **failed every tenant build** and no local check caught it. `lanza build`
+copies the package's `functions/` into the tenant repo root, and this morning's MCP
+work added `../../frontend/lib/*` imports to `mcp-core.ts`. That path resolves in
+this monorepo and does not resolve in a tenant, so esbuild failed, Cloudflare failed
+the BUILD, and the site kept serving its previous version silently. `0.1.13` copies
+`frontend/lib` alongside.
 
-### State right now (updated 15:40, after the pre-demo pass)
+**So: `npm test`, `lanza build` and even `wrangler pages functions build` run HERE
+prove nothing about a tenant.** The only real check is a tenant checkout:
 
-- `main` = `origin/main` = `e5b60eb`, pushed and deployed. Four changes landed since
-  the block above was written: the Discard button, two classifier fixes, and the one
-  that matters most below.
-- `staging` = `main` merged INTO the violin site (`7839488`), pushed. It keeps every
-  one of the LLM's 16 commits and now builds them against current code: 26 pages,
-  `check:site` clean, verified locally before pushing.
-- **What that fixed, and it was found by reading the deployed page:**
-  `https://staging.lanza.pages.dev/services/` was serving literally
-  `<!DOCTYPE html><main>…</main>` — no `<head>`, no title, no header or footer, and
-  no `<html style="--ink:…">`, so the agent's own CSS variables resolved to nothing.
-  The page "worked" and looked like an unstyled fragment. `CollectionList` and
-  `CollectionDetail` never wrapped in `Base.astro`; now they do, and the listing
-  takes its `<title>` from the content type's label ("Services · Lanza").
-- **Re-check the URL before presenting** — a Cloudflare build takes 4-6 min and the
-  push went out at ~15:40.
-- The live site is still untouched by any agent work. To wipe the draft and start
-  clean: the button below, or `git push origin main:staging --force`.
+```sh
+gh repo clone dsottimano/ai-panama /tmp/t && cd /tmp/t
+npm install && npm run build
+npx wrangler@3.114.17 pages functions build --outdir /tmp/tfn   # must compile
+```
 
-### Known rough edges, in demo terms
+And verify a deploy by the commit's check-run, never by the site responding, because
+a failed build leaves the previous version serving:
 
-- **Resetting the draft between runs is now a button.** PendingView → "Discard
-  everything", beside "Publish everything"; it names the files it will destroy and
-  then reloads. Deployed to `lanzacms.com/admin`. The terminal command still works.
-- **A fresh build takes ~4-6 min** on Cloudflare. Build the site BEFORE the demo and
-  show the result, or narrate the wait.
-- **"From From C$95"** — the agent wrote a template with a hardcoded `From ` prefix and
-  content that also starts with "From". Cosmetic, real, unfixed. If it shows, it is an
-  honest illustration of what the checker does NOT catch.
-- Do not demo `/admin` on the staging host, and do not run `/admin` under
-  `astro preview` — no Pages Functions there, so the CMS pastes a raw HTML 404 into a
-  modal (`cms-review-todo.md` 3.11). `npm run dev` is the local CMS.
+```sh
+gh api repos/<owner>/<repo>/commits/main/check-runs \
+  --jq '.check_runs[] | select(.name=="Cloudflare Pages") | .conclusion'
+```
 
-### If something breaks mid-demo
+### Two live lessons about drift
 
-The fallback that needs no network and no Cloudflare: `git checkout violin-preview`
-(local branch, `main` + violin content), `node bin/lanza.mjs build && npm run preview`
-→ the full site on `localhost:4321`.
+1. **Publishing conflicts when both branches touch one file.** `ai-panama` hit this:
+   its draft was cut at repo creation, `main` moved (new homepage, pin bumps), and
+   the agent's homepage edit could not merge. The conflict was a good thing, because
+   a blind merge would have reverted `package.json` to `0.1.10` and broken the build
+   again. A version bump alone touches only `package.json` and merges cleanly, so an
+   ordinary tenant does not hit this.
+2. **A draft never catches up on its own.** Still the open §0 item. The Discard
+   button is the manual fix and is deployed; the automatic catch-up is not built.
+
+### House style, as of today
+
+**No em dashes in anything a reader sees.** The whole site was swept: page content,
+SEO strings, marketing pages in both locales, legal, `llms.txt`, `site-system.json`
+and the CSS comments that travel inside a template. Source comments in `.astro` and
+`.ts` files keep theirs. `lanza-site` still ships `window.lanza — call lanza.help()`
+in `Seo.astro` on published tenants; that clears when `0.1.14` goes out.
 
 ---
 
@@ -90,20 +93,16 @@ the MCP `validate_site` tool are what tell it whether what it invented holds tog
 
 ---
 
-## Cold-start for the demo push (a fresh session picks up HERE)
+## Cold-start (a fresh session picks up HERE)
 
-Written 14:32, 2026-08-19. Order of work while the clock runs:
-
-1. ~~Finish "Discard all pending changes" in the CMS.~~ **DONE** (`63143de`) — the
-   button is in `PendingView.vue` beside "Publish everything", names what it will
-   destroy, reloads after. Three tests pin those three behaviours.
-2. ~~Code review this session's work.~~ **DONE, and it paid for itself.** What it
-   found is below; four fixes shipped, the rest is triaged and open.
-3. Anything from `Now`, starting with the open findings.
+Both items this section used to carry are done: the Discard button shipped
+(`63143de`) and the code review paid for itself (results below, five fixes shipped).
+Next work is the open review findings, then `Now`.
 
 Every change must keep the baseline green (commands below) AND the Pages Functions
-build compiling — that last one is not optional, it is what CI does and `npm test`
-does not prove it.
+build compiling. That last one is not optional, it is what CI does and `npm test`
+does not prove it. If the change touches anything under `functions/` or `bin/`, the
+tenant checkout above is a THIRD check that neither of the other two makes.
 
 ## Starting cold? Read these, in this order
 
