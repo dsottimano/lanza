@@ -103,7 +103,7 @@ test("initialize returns protocol + serverInfo", async () => {
 test("tools/list exposes the full surface", async () => {
   const r = await handleMessage({ jsonrpc: "2.0", id: 2, method: "tools/list" }, client());
   const names = r.result.tools.map((t) => t.name);
-  for (const n of ["get_site", "list_collections", "get_schema", "describe_site_system", "list_content", "read_content", "create_content", "update_content", "delete_content", "validate_site", "list_changes", "publish"])
+  for (const n of ["get_site", "list_collections", "get_schema", "describe_site_system", "write_template", "list_content", "read_content", "create_content", "update_content", "delete_content", "validate_site", "list_changes", "publish"])
     assert.ok(names.includes(n), `missing tool ${n}`);
   assert.equal(TOOL_LIST.length, names.length);
 });
@@ -527,4 +527,106 @@ test("validate_site names a route into a template that does not exist", async ()
   });
   const r = await callData("validate_site");
   assert.ok(r.problems.some((p) => p.code === "route-template-missing"));
+});
+
+// ---------------------------------------------------------------------------
+// write_template. Every refusal here asserts BOTH halves — the call failed AND the
+// repo is untouched — because a half-applied template (markup with no fields, or
+// fields with no markup) is broken in a way neither the owner nor the agent can see.
+// ---------------------------------------------------------------------------
+
+const callRaw = async (name, args) => await call(name, args, 91);
+const isError = (r) => r.result.isError === true;
+const errText = (r) => r.result.content[0].text;
+
+// A fresh object per call: write_template must not mutate what it is handed, and a
+// shared literal would hide it if it did.
+const goodFields = () => ({ fields: [{ name: "venue", label: "Venue", widget: "string" }] });
+
+test("write_template writes both files and fills in fields.json's name", async () => {
+  const gh = fakeGitHub({ "data/schema.json": SCHEMA });
+  const r = await callData("write_template", {
+    name: "event",
+    template_html: "<h1>{{ venue }}</h1>",
+    fields: goodFields(),
+  });
+  assert.deepEqual(r.written, ["templates/event/template.html", "templates/event/fields.json"]);
+  assert.equal(gh.files.get("templates/event/template.html"), "<h1>{{ venue }}</h1>");
+  // The folder is the authority: a mismatch renders "Unknown template" on a live URL.
+  assert.equal(JSON.parse(gh.files.get("templates/event/fields.json")).name, "event");
+});
+
+test("write_template refuses a misspelled placeholder and writes NOTHING", async () => {
+  const gh = fakeGitHub({ "data/schema.json": SCHEMA });
+  const before = gh.files.size;
+  const r = await callRaw("write_template", {
+    name: "event",
+    template_html: "<h1>{{ vneue }}</h1>",
+    fields: goodFields(),
+  });
+  assert.ok(isError(r));
+  assert.match(errText(r), /undeclared-slot/);
+  assert.equal(gh.files.size, before, "a refused write must leave the repo untouched");
+});
+
+test("write_template refuses markup a browser would act on, and writes NOTHING", async () => {
+  for (const html of [
+    `<h1>{{ venue }}</h1><script>fetch("/admin/api/gh")</script>`,
+    `<h1 onclick="x()">{{ venue }}</h1>`,
+    `<h1>{{ venue }}</h1><iframe src="/admin/"></iframe>`,
+  ]) {
+    const gh = fakeGitHub({ "data/schema.json": SCHEMA });
+    const before = gh.files.size;
+    const r = await callRaw("write_template", { name: "event", template_html: html, fields: goodFields() });
+    assert.ok(isError(r), `should refuse: ${html}`);
+    assert.match(errText(r), /template-(executes-js|embeds-document)/);
+    assert.equal(gh.files.size, before, "a refused write must leave the repo untouched");
+  }
+});
+
+test("write_template still accepts a template's own <style> and placeholders", async () => {
+  const gh = fakeGitHub({ "data/schema.json": SCHEMA });
+  const r = await callData("write_template", {
+    name: "event",
+    template_html: `<style>.ev{background:url(/i.png)}</style><a class="ev" href="{{ link }}">{{ venue }}</a>`,
+    fields: { fields: [...goodFields().fields, { name: "link", label: "Link", widget: "string" }] },
+  });
+  assert.equal(r.written.length, 2);
+  assert.ok(!("warnings" in r) || !r.warnings.some((w) => w.includes("template-")), r.warnings?.join());
+  assert.equal(gh.files.has("templates/event/template.html"), true);
+});
+
+test("write_template refuses a name that is not a single kebab segment", async () => {
+  for (const name of ["../evil", "Event", "a/b", "ev..t", ""]) {
+    const gh = fakeGitHub({ "data/schema.json": SCHEMA });
+    const before = gh.files.size;
+    const r = await callRaw("write_template", { name, template_html: "<p>{{ venue }}</p>", fields: goodFields() });
+    assert.ok(isError(r), `should refuse name ${JSON.stringify(name)}`);
+    assert.equal(gh.files.size, before);
+  }
+});
+
+test("write_template checks a listing against the collection it lists", async () => {
+  const gh = fakeGitHub({ "data/schema.json": SCHEMA });
+  const before = gh.files.size;
+  const r = await callRaw("write_template", {
+    name: "page-index",
+    position: "list",
+    template_html: "{{#each entries}}<a href={{url}}>{{ nosuchfield }}</a>{{/each}}",
+    fields: { fields: [], listing: { of: "pages", item: ["nosuchfield"] } },
+  });
+  assert.ok(isError(r));
+  assert.match(errText(r), /listing-unknown-field/);
+  assert.equal(gh.files.size, before);
+});
+
+test("write_template rejects a fields.json name that disagrees with the folder", async () => {
+  const gh = fakeGitHub({ "data/schema.json": SCHEMA });
+  const r = await callRaw("write_template", {
+    name: "event",
+    template_html: "<h1>{{ venue }}</h1>",
+    fields: { ...goodFields(), name: "different" },
+  });
+  assert.ok(isError(r));
+  assert.equal(gh.files.size, 1);
 });

@@ -225,6 +225,23 @@ export class ContentClient {
     return ((await res.json()) as { commit: { sha: string } }).commit.sha;
   }
 
+  // Write a raw text file to staging. `save()` above serializes frontmatter + body for
+  // a .md entry; a template.html or a fields.json is neither, and round-tripping one
+  // through the frontmatter serializer would corrupt it.
+  async saveText(path: string, text: string, message: string): Promise<string> {
+    const res = await this.gh(`contents/${encodePath(path)}`, {
+      method: "PUT",
+      body: JSON.stringify({
+        message,
+        content: encodeBase64(text),
+        branch: WORKING_BRANCH,
+        sha: await this.currentSha(path),
+      }),
+    });
+    if (!res.ok) throw await this.fail(res, `save ${path}`);
+    return ((await res.json()) as { commit: { sha: string } }).commit.sha;
+  }
+
   async remove(path: string, message: string): Promise<void> {
     const sha = await this.currentSha(path);
     if (!sha) throw new GitHubError(404, `Cannot delete ${path}: it does not exist on staging.`);

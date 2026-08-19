@@ -12,7 +12,13 @@ import { ContentClient, GitHubError, slugify, assertSafePath } from "./lanza-con
 import { BRANCH, WORKING_BRANCH } from "./gh-proxy";
 // The site-system checker, shared verbatim with `npm run check:site`. Plain .mjs and
 // dependency-free so it survives the Pages bundler — see its header.
-import { checkSite, siteSystemContract } from "./site-system.mjs";
+import {
+  checkSite,
+  checkTemplate,
+  siteSystemContract,
+  POSITIONS,
+  UNTRUSTED_AUTHOR_CODES,
+} from "./site-system.mjs";
 
 export const SERVER_INFO = { name: "lanza-cms", title: "Lanza CMS", version: "0.1.0" };
 export const SUPPORTED_PROTOCOL = "2025-06-18";
@@ -250,6 +256,29 @@ async function assertEntryPath(client: ContentClient, path: string): Promise<str
   return path;
 }
 
+// A template folder name. Identical to the pattern gen-routes.mjs enforces on
+// `route.template`, and for the same reason: it becomes a directory name and is
+// interpolated into generated code. Kept strict rather than merely safe — a name that
+// passes here but not there would produce a template no route can ever reference.
+const TEMPLATE_NAME = /^[a-z0-9]+(?:-[a-z0-9]+)*$/;
+
+// Every folder collection with its declared field names — what a LIST template's
+// `listing.item` is checked against. Read straight from schema.json rather than via
+// getCollections(), which drops the fields (it exists for path confinement).
+async function collectionFields(client: ContentClient): Promise<Map<string, Set<string>>> {
+  const raw = await client.readRaw("data/schema.json");
+  const schema = raw ? (JSON.parse(raw) as unknown) : [];
+  if (!Array.isArray(schema)) return new Map();
+  return new Map(
+    (schema as Array<{ name?: string; kind?: string; fields?: Array<{ name?: string }> }>)
+      .filter((c) => c.kind === "folder" && typeof c.name === "string")
+      .map((c) => [
+        c.name as string,
+        new Set((c.fields ?? []).map((f) => f.name).filter((n): n is string => typeof n === "string")),
+      ]),
+  );
+}
+
 export const TOOLS: ToolDef[] = [
   {
     name: "get_site",
@@ -410,6 +439,110 @@ export const TOOLS: ToolDef[] = [
     run: async (_args, client) => {
       const files = await client.pendingChanges();
       return { pending: files.length, files };
+    },
+  },
+  {
+    name: "write_template",
+    description:
+      "Create or replace a template — templates/<name>/template.html and fields.json — on " +
+      "the staging branch. A template is the markup for a page or a content type's " +
+      "entries; fields.json declares every editable spot in it. NOTHING IS WRITTEN unless " +
+      "the template passes the checker, and that refusal is the point: a misspelled " +
+      "{{placeholder}} renders as empty text with no error, so being refused is the only " +
+      "way to find out. Call describe_site_system first — it gives the widgets, the " +
+      "reserved names, what each position puts in scope, and the markup an agent-written " +
+      "template may not contain (no script, no event handlers, no iframes: the engine " +
+      "renders at build time, so listings, galleries and detail pages are structure and " +
+      "CSS). Replacing an existing template is allowed and is a reviewable, revertable " +
+      "change like any other. Not live until publish.",
+    inputSchema: obj(
+      {
+        name: str("Template folder name, lowercase kebab-case, e.g. 'property' or 'property-index'."),
+        template_html: str("The markup, with {{placeholders}} for every editable spot."),
+        fields: {
+          type: "object",
+          description:
+            'The fields.json body: {"name": "<same as name>", "fields": [{name,label,widget}, …]}. ' +
+            'Set "body": true to give the entry a rich-text canvas, and render it as {{{ body }}}. ' +
+            'A listing template also needs "listing": {"of": "<collection>", "item": [<field names>]}.',
+          additionalProperties: true,
+        },
+        position: str(
+          "Where this template is used: 'page' (a page's own slots), 'detail' (one entry of a " +
+            "collection — scope is its frontmatter), or 'list' (a collection's index). Decides " +
+            "what is in scope, so the same markup is correct in one and silently empty in another. " +
+            "Defaults to 'page'.",
+        ),
+      },
+      ["name", "template_html", "fields"],
+    ),
+    run: async (args, client, site) => {
+      const name = String(args.name);
+      if (!TEMPLATE_NAME.test(name)) {
+        throw new GitHubError(
+          400,
+          `Refusing template name "${name}": must be lowercase kebab-case, one segment ` +
+            "(it becomes a directory name and is compiled into a generated route).",
+        );
+      }
+      const position = args.position === undefined ? "page" : String(args.position);
+      if (!POSITIONS.has(position)) {
+        throw new GitHubError(400, `Unknown position "${position}". Use page, detail or list.`);
+      }
+      const html = String(args.template_html);
+      const given = (args.fields as Record<string, unknown>) ?? {};
+      // fields.json's `name` must match the folder — a page's `preset` names the FOLDER,
+      // and a mismatch renders "Unknown template" on a live URL. Filled in rather than
+      // refused when absent: it is not a decision the agent gets to make differently.
+      if (given.name !== undefined && given.name !== name) {
+        throw new GitHubError(
+          400,
+          `fields.json says name ${JSON.stringify(given.name)} but the template folder is "${name}". They must match.`,
+        );
+      }
+      // A copy, not a mutation of the caller's object — and `name` first, so the
+      // committed fields.json reads like a hand-written one.
+      const fields = { name, ...given };
+
+      const problems = checkTemplate({ name, html, fields, position }, {
+        collections: await collectionFields(client),
+      });
+      // Two independent reasons to refuse, reported together so one call fixes both.
+      const errors = problems.filter((p) => p.level === "error");
+      const unsafe = problems.filter((p) => UNTRUSTED_AUTHOR_CODES.has(p.code));
+      if (errors.length || unsafe.length) {
+        throw new GitHubError(
+          422,
+          `Refused — nothing was written. Fix these and call again:\n` +
+            [...errors, ...unsafe].map((p) => `  • [${p.code}] ${p.message}`).join("\n") +
+            (unsafe.length
+              ? "\nMarkup a browser would act on is refused from an agent because this site's " +
+                "origin also serves /admin: script in a template is CMS takeover, not bad content. " +
+                "A build-time template needs none of it."
+              : ""),
+        );
+      }
+
+      await client.ensureWorkingBranch();
+      const dir = `templates/${name}`;
+      await client.saveText(`${dir}/template.html`, html, `Write template ${name} via MCP`);
+      await client.saveText(
+        `${dir}/fields.json`,
+        `${JSON.stringify(fields, null, 2)}\n`,
+        `Write fields for template ${name} via MCP`,
+      );
+
+      const warnings = problems.filter((p) => p.level === "warning" && !UNTRUSTED_AUTHOR_CODES.has(p.code));
+      return {
+        written: [`${dir}/template.html`, `${dir}/fields.json`],
+        position,
+        ...(warnings.length ? { warnings: warnings.map((p) => `[${p.code}] ${p.message}`) } : {}),
+        next:
+          position === "page"
+            ? "Set a page's `preset` to this template name to use it."
+            : "Give a collection a `route` block naming this template so its entries get URLs.",
+        ...stagedNote(site),
+      };
     },
   },
   {

@@ -122,6 +122,7 @@ go live. New entries are written `draft: false` (visible once published); pass
 | `list_collections` | Collections (posts, pages, …): folder, localized?, has-body? |
 | `get_schema` | Full content model (`data/schema.json`). |
 | `describe_site_system` | How a site is COMPOSED: the layer model, what each template position puts in scope, the widgets, the reserved names, and every code the checker can report. No arguments, no reads — it serves `siteSystemContract()` from `functions/_lib/site-system.mjs`, the same constants the checker enforces. |
+| `write_template` | Create or replace `templates/<name>/{template.html,fields.json}` on staging. **Nothing is written unless the template passes the checker**, and unless its markup is safe from an untrusted author — no script, event handlers, `iframe`/`object`/`embed`, `<base>` or meta refresh. A `<style>` block and a `background-image: url()` are fine; templates are made of those. See §3 of `docs/security-model.md` for why the author decides the severity. |
 | `list_content` | List entry paths in a collection (+ locale). |
 | `read_content` | Read one entry's frontmatter + HTML body. |
 | `create_content` | Create a new entry on staging (slug from title). |
@@ -131,13 +132,14 @@ go live. New entries are written `draft: false` (visible once published); pass
 | `list_changes` | What's staged but not yet published. |
 | `publish` | Merge staging → main to go live. |
 
-### Why the last two exist
+### Why the site-system tools exist
 
-Everything above `describe_site_system` edits **content**. The site system — content
-types, templates, routes, styles — was reachable only from a checkout and a terminal,
-which is precisely the person who did not need a CMS. These two are the read half of
-closing that: an agent can learn the contract from the server instead of being assumed
-to have read `docs/site-system.md`, and then check its own work before handing back.
+Everything else edits **content**. The site system — content types, templates, routes,
+styles — was reachable only from a checkout and a terminal, which is precisely the
+person who did not need a CMS. `describe_site_system` lets an agent learn the contract
+from the server instead of being assumed to have read `docs/site-system.md`;
+`validate_site` lets it check its own work before handing back; `write_template` lets it
+actually build something, and refuses when what it built is wrong.
 
 They matter because Lanza's composition failures are **silent**. A misspelled
 `{{placeholder}}` renders as empty text and the build passes. An agent with no checker
