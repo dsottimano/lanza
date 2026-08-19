@@ -1,7 +1,7 @@
 {
   "name": "manifesto",
   "label": "Manifesto (landing)",
-  "description": "The flagship landing page — hero with a live ask→publish demo, a 5-step spine, three audience doors, cost tiles, and a closing call to action. Pair with the Landing template.",
+  "description": "The flagship landing page: hero with a live ask to publish demo, a 5-step spine, three audience doors, cost tiles, and a closing call to action. Pair with the Landing template.",
   "body": false,
   "fields": [
     { "name": "tag", "label": "Hero eyebrow", "widget": "string", "group": "Hero", "required": false },
@@ -11,11 +11,11 @@
     { "name": "cta1Url", "label": "Primary button URL", "widget": "string", "group": "Hero", "required": false },
     { "name": "cta2", "label": "Secondary button text", "widget": "string", "group": "Hero", "required": false },
     { "name": "cta2Url", "label": "Secondary button URL", "widget": "string", "group": "Hero", "required": false },
-    { "name": "demoYouWho", "label": "Demo — your name", "widget": "string", "group": "Live demo", "required": false },
-    { "name": "demoYou", "label": "Demo — your message", "widget": "text", "group": "Live demo", "required": false },
-    { "name": "demoAgentWho", "label": "Demo — agent name", "widget": "string", "group": "Live demo", "required": false },
-    { "name": "demoAgent", "label": "Demo — agent reply", "widget": "text", "group": "Live demo", "required": false },
-    { "name": "demoCaption", "label": "Demo — caption", "widget": "text", "group": "Live demo", "required": false },
+    { "name": "demoYouWho", "label": "Demo: your name", "widget": "string", "group": "Live demo", "required": false },
+    { "name": "demoYou", "label": "Demo: your message", "widget": "text", "group": "Live demo", "required": false },
+    { "name": "demoAgentWho", "label": "Demo: agent name", "widget": "string", "group": "Live demo", "required": false },
+    { "name": "demoAgent", "label": "Demo: agent reply", "widget": "text", "group": "Live demo", "required": false },
+    { "name": "demoCaption", "label": "Demo: caption", "widget": "text", "group": "Live demo", "required": false },
     { "name": "spineEyebrow", "label": "Spine eyebrow", "widget": "string", "group": "How it works", "required": false },
     { "name": "spineHeadline", "label": "Spine headline", "widget": "string", "group": "How it works", "required": false },
     {

@@ -26,15 +26,15 @@ const es = {
     ["Datos estructurados", "Cada página lleva JSON-LD (Article/WebPage) y metadatos Open Graph. Hechos legibles por máquina, sin scraping frágil.", null],
   ],
   editEyebrow: "Editar el sitio",
-  editHead: "El contenido es un repositorio de Git que puede manejar.",
-  editBody: "No hay base de datos ni API propietaria. El contenido son archivos Markdown/HTML en un repositorio de GitHub. El modelo de contenido — qué colecciones existen, sus campos y dónde viven los archivos — está declarado en admin/src/schema.ts. Para hacer un cambio: lea el esquema, edite los archivos correctos, haga un commit. Cloudflare Pages reconstruye y publica.",
+  editHead: "Conéctese por MCP y construya el sitio entero.",
+  editBody: "No hay base de datos ni API propietaria. El contenido son archivos Markdown y HTML en un repositorio de GitHub, y cada sitio expone un servidor MCP en /api/mcp. Desde ahí puede inventar tipos de contenido, escribir plantillas de página, crear las URLs y llenarlas. Todo se escribe en una rama borrador: nada es público hasta que la persona dueña publique.",
   editSteps: [
-    ["read", "schema.ts", "Descubra las colecciones, los campos y las rutas de carpeta."],
-    ["write", ".md / .html", "Edite o cree entradas conforme al esquema. draft: true las oculta."],
-    ["commit", "git push", "Guarde el cambio. El build estático hace el resto."],
+    ["connect", "/api/mcp", "Agregue el sitio como conector MCP. Inicia sesión con GitHub y el sitio verifica sus permisos sobre el repositorio."],
+    ["compose", "/site-system.json", "Lea el contrato: capas, tipos de contenido, plantillas, rutas y campos, con las reglas que un sitio debe cumplir."],
+    ["publish", "una llamada", "Valide lo que construyó, muestre el borrador y publique cuando le digan que sí. Cloudflare reconstruye."],
   ],
   linkHow: "Ver la cadena completa en Cómo funciona",
-  note: "Código abierto. El mismo modelo de contenido es suyo para conectar su propio agente.",
+  note: "Código abierto. Lea la implementación completa en GitHub y conecte su propio agente.",
 };
 
 const en = {
@@ -48,15 +48,15 @@ const en = {
     ["Structured data", "Every page ships JSON-LD (Article/WebPage) and Open Graph metadata. Machine-readable facts, no brittle scraping.", null],
   ],
   editEyebrow: "Editing the site",
-  editHead: "The content is a Git repository you can drive.",
-  editBody: "There's no database and no proprietary API. Content is Markdown/HTML files in a GitHub repository. The content model — which collections exist, their fields, and where files live — is declared in admin/src/schema.ts. To make a change: read the schema, edit the right files, commit. Cloudflare Pages rebuilds and publishes.",
+  editHead: "Connect over MCP and build the whole site.",
+  editBody: "There is no database and no proprietary API. Content is Markdown and HTML files in a GitHub repository, and every site exposes an MCP server at /api/mcp. From there you can invent content types, write page templates, create the URLs they render at, and fill them in. Every write lands on a draft branch, so nothing is public until the owner publishes it.",
   editSteps: [
-    ["read", "schema.ts", "Discover the collections, their fields, and folder paths."],
-    ["write", ".md / .html", "Edit or create entries that match the schema. draft: true hides them."],
-    ["commit", "git push", "Save the change. The static build does the rest."],
+    ["connect", "/api/mcp", "Add the site as an MCP connector. You sign in with GitHub, and the site checks your permission on the repository."],
+    ["compose", "/site-system.json", "Read the contract: layers, content types, templates, routes and fields, with the rules a site has to satisfy."],
+    ["publish", "one call", "Validate what you built, show the owner the draft, and publish when they say yes. Cloudflare rebuilds."],
   ],
   linkHow: "See the full chain on How it works",
-  note: "Open source. The same content model is yours to point your own agent at.",
+  note: "Open source. Read the whole implementation on GitHub and point your own agent at it.",
 };
 
 const t = isEn ? en : es;

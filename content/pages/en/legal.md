@@ -5,7 +5,7 @@ template: "default"
 description: "The terms of service and privacy policy for Lanza."
 seo:
   metaTitle: "Terms & Privacy"
-  metaDescription: "Terms of service and privacy policy for Lanza — what the service does, what it accesses on your GitHub and Cloudflare accounts, and how your data is handled."
+  metaDescription: "Terms of service and privacy policy for Lanza: what the service does, what it accesses on your GitHub and Cloudflare accounts, and how your data is handled."
   noindex: false
 ---
 <p><em>Last updated: July 10, 2026</em></p>
@@ -21,13 +21,13 @@ Lanza you agree to both. Questions? Email
 <p>Lanza is a content management tool that helps you build and publish a website
 you fully own. Your site's files live in <strong>your own GitHub repository</strong>,
 and your site is hosted on <strong>your own Cloudflare account</strong> (Cloudflare
-Pages). Lanza does not host your site or store a separate copy of your content — it
+Pages). Lanza does not host your site or store a separate copy of your content. It
 edits the files in your accounts on your behalf.</p>
 
 <h3>2. Your accounts</h3>
 <p>To use Lanza you connect your GitHub and Cloudflare accounts using their official
 sign-in (OAuth). When you connect them you grant Lanza permission to act on your
-behalf — to read and write the repository that holds your site, and to create and
+behalf, to read and write the repository that holds your site, and to create and
 deploy your website on Cloudflare Pages. You are responsible for your accounts,
 for keeping them secure, and for complying with
 <a href="https://docs.github.com/site-policy/github-terms/github-terms-of-service" rel="noopener" target="_blank">GitHub's terms</a>
@@ -39,7 +39,7 @@ settings.</p>
 <h3>3. Your content is yours</h3>
 <p>You own everything you create with Lanza. We claim no ownership of your content,
 your site, or your audience. Because your content is a plain folder of files in your
-own repository, you can take it and leave at any time — nothing is locked in.</p>
+own repository, you can take it and leave at any time. Nothing is locked in.</p>
 
 <h3>4. Acceptable use</h3>
 <p>Don't use Lanza to publish anything unlawful, or to abuse, attack, or overload
@@ -81,16 +81,16 @@ your site.</p>
 <h3>2. What we access, and why</h3>
 <p>When you connect your accounts, Lanza requests only the permissions it needs:</p>
 <ul>
-  <li><strong>GitHub</strong> — permission to read and write the repository that holds
+  <li><strong>GitHub</strong>: permission to read and write the repository that holds
   your site, so it can save your edits as commits.</li>
-  <li><strong>Cloudflare</strong> — permission to read your account and to create,
+  <li><strong>Cloudflare</strong>: permission to read your account and to create,
   read, and deploy Cloudflare Pages projects, so your site can be built and published.
   Lanza does not request access to your billing, DNS, or other Cloudflare services.</li>
 </ul>
 
 <h3>3. What we store</h3>
 <p>To act on your behalf during a session, Lanza holds the access tokens from GitHub
-and Cloudflare. These are kept in secure, server-side, HttpOnly cookies — they are not
+and Cloudflare. These are kept in secure, server-side, HttpOnly cookies. They are not
 exposed to your browser's scripts and are not shared with anyone. We do not store a
 separate copy of your website's content; your content lives only in your own GitHub
 repository and on your own Cloudflare account.</p>

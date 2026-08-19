@@ -60,15 +60,15 @@ export const GET: APIRoute = async ({ site }) => {
     `This is a Lanza site. Its pages are composed from templates, a content model ` +
       `and routes, and one rule holds them together: **a layer may only reference ` +
       `names the layer below it declares.** It is worth stating because the failures ` +
-      `are silent — a misspelled placeholder renders as empty text and the build passes.`,
+      `are silent: a misspelled placeholder renders as empty text and the build passes.`,
     ``,
-    `The full machine-readable contract — the layers, what each template position ` +
+    `The full machine-readable contract, covering the layers, what each template position ` +
       `puts in scope, the field widgets, the reserved names, and every way a site can ` +
-      `be silently wrong — is at ${origin}/site-system.json.`,
+      `be silently wrong, is at ${origin}/site-system.json.`,
     ``,
     `Content can be read and written over MCP at ${origin}/api/mcp (authenticated; ` +
       `writes land on a staging branch and are not public until published). The same ` +
-      `server exposes \`describe_site_system\` and \`validate_site\` — check a change ` +
+      `server exposes \`describe_site_system\` and \`validate_site\`, so you can check a change ` +
       `against the contract before publishing it.`,
   ];
 

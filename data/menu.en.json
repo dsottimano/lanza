@@ -2,14 +2,28 @@
   "locations": {
     "header": {
       "desktop": [
-        { "label": "Blog", "url": "/posts" }
+        {
+          "label": "Blog",
+          "url": "/posts"
+        },
+        {
+          "label": "GitHub",
+          "url": "https://github.com/dsottimano/lanza"
+        }
       ],
       "tablet": null,
       "mobile": null
     },
     "footer": {
       "desktop": [
-        { "label": "Terms & Privacy", "url": "/legal" }
+        {
+          "label": "Source on GitHub",
+          "url": "https://github.com/dsottimano/lanza"
+        },
+        {
+          "label": "Terms & Privacy",
+          "url": "/legal"
+        }
       ],
       "tablet": null,
       "mobile": null

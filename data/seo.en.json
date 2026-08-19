@@ -1,8 +1,8 @@
 {
   "siteName": "Lanza",
   "titleTemplate": "%s · Lanza",
-  "defaultTitle": "Lanza — Own your presence on the web",
-  "defaultDescription": "Most people rent their voice from social media and own nothing. Lanza gives you a real site you own outright — free on GitHub and Cloudflare, with no database or server to hack, edited by talking to an AI agent. You keep a copy of everything, so you can always leave. The anti-WordPress CMS.",
+  "defaultTitle": "Lanza: own your presence on the web",
+  "defaultDescription": "Most people rent their voice from social media and own nothing. Lanza gives you a real site you own outright, free on GitHub and Cloudflare, with no database or server to hack, edited by talking to an AI agent. You keep a copy of everything, so you can always leave. The anti-WordPress CMS.",
   "defaultOgImage": "",
   "locale": "en_US",
   "twitter": "",

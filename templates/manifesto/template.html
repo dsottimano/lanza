@@ -42,7 +42,7 @@
     margin: 0 0 2.4rem;
   }
 
-  /* the ↗ inline arrow — the launch mark, always accent */
+  /* the ↗ inline arrow, the launch mark, always accent */
   .lz-arrow {
     display: inline-block;
     margin-left: 0.4em;
@@ -161,7 +161,7 @@
 
   /* ── Spine: the life of an edit ───────────────────────────────────── */
   /* Five stages of a real sequence, so the row and the wire earn their place.
-     They were `repeat(5, 1fr)` at `gap: 0` — five ~200px columns of 0.9rem text
+     They were `repeat(5, 1fr)` at `gap: 0`, i.e. five ~200px columns of 0.9rem text
      touching each other, which is the densest thing on the page and the hardest
      to scan. Widened to a real gutter, and the count steps down before the
      columns get too narrow to read rather than at a phone breakpoint. */
@@ -291,7 +291,7 @@
     color: var(--ink);
     letter-spacing: -0.02em;
   }
-  /* The label under a 2.6rem number was 0.72rem mono — too small a step to read
+  /* The label under a 2.6rem number was 0.72rem mono, too small a step to read
      as a caption for it, so the pair scanned as one grey smudge. */
   .lz-tile__l { font-family: var(--font-mono); font-size: 0.8rem; letter-spacing: 0.03em; color: var(--text-secondary); line-height: 1.5; }
 
@@ -308,7 +308,7 @@
   }
   .lz-close__sub { font-size: 1.14rem; line-height: 1.6; color: var(--lz-onInk-dim); max-width: 46ch; margin: 0 auto 2rem; }
 
-  /* page-load reveal — one orchestrated moment, motion-safe only */
+  /* page-load reveal, one orchestrated moment, motion-safe only */
   @media (prefers-reduced-motion: no-preference) {
     .lz-hero__lede > *, .lz-demo {
       animation: lz-rise 640ms cubic-bezier(0.2, 0.7, 0.2, 1) both;
@@ -331,7 +331,7 @@
   /* ── Responsive ───────────────────────────────────────────────────── */
   /* The five stages stop being readable well before a phone: at ~1100px each
      column is under 190px and the body text breaks every three or four words.
-     Step down to three here — and drop the trajectory wire with it, because a
+     Step down to three here, and drop the trajectory wire with it, because a
      horizontal wire across a grid that now wraps would connect the wrong nodes.
      Declared BEFORE the 900px block so that one still wins below 900. */
   @media (max-width: 1180px) {

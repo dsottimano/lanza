@@ -24,7 +24,7 @@ const href = (path: string) => localeUrl(locale, path);
 const en = {
   tag: "ARCHITECTURE · THE WHOLE MACHINE",
   headline: "Every moving part, named.",
-  sub: "How it works is the story of an edit. This is the wiring behind it: what each piece is, who runs it, which secrets it holds, and how long they live. Nothing here is a diagram of an ideal — it is what the code does.",
+  sub: "How it works is the story of an edit. This is the wiring behind it: what each piece is, who runs it, which secrets it holds, and how long they live. Nothing here is a diagram of an ideal. It is what the code does.",
 
   partsEyebrow: "The parts",
   partsHead: "Six pieces. You own four of them.",
@@ -33,15 +33,15 @@ const en = {
   parts: [
     ["Your repository", "Markdown and HTML files on GitHub. The source of truth for every word on your site.", "You", "No"],
     ["Your site", "An Astro static build, served by Cloudflare Pages. Plain HTML by the time a visitor sees it.", "You", "No"],
-    ["Lanza, the CMS", "A Vue app at /admin. Static files — it has no backend of its own.", "You", "No"],
+    ["Lanza, the CMS", "A Vue app at /admin. Static files, with no backend of its own.", "You", "No"],
     ["lanza-site", "The npm package holding the render code and the site's server functions. You pin a version.", "You", "No"],
-    ["The broker", "connect.lanzacms.com — onboarding, login, and minting short-lived tokens.", "Lanza", "Yes — all of them"],
+    ["The broker", "connect.lanzacms.com, which handles onboarding, login, and minting short-lived tokens.", "Lanza", "Yes, all of them"],
     ["/api/mcp", "The endpoint an AI agent connects to in order to edit your site.", "You", "No"],
   ],
 
   editEyebrow: "Life of an edit",
   editHead: "Save writes to a branch. Publish is a merge.",
-  editIntro: "The CMS never writes to your live site. It writes to a staging branch, and publishing is an ordinary git merge — which is why every change is reversible and nothing is ever half-applied.",
+  editIntro: "The CMS never writes to your live site. It writes to a staging branch, and publishing is an ordinary git merge, which is why every change is reversible and nothing is ever half-applied.",
   editSteps: [
     { t: "You save", c: "PUT → staging", b: "The CMS commits to the staging branch through its own /admin/api/gh proxy. Your browser never holds a GitHub token: the proxy attaches one per request, scoped to this one repository, and it expires in about an hour." },
     { t: "You review", c: "staging.<project>.pages.dev", b: "Cloudflare builds the staging branch too, so there is a real URL showing exactly what you just wrote, before anyone else can see it." },
@@ -52,47 +52,47 @@ const en = {
 
   authEyebrow: "Signing in",
   authHead: "Two checks, and both are required.",
-  authIntro: "Your site holds no signing secret. It verifies with a public key baked into the package — which means the thing that proves who you are lives somewhere it cannot be stolen from you.",
+  authIntro: "Your site holds no signing secret. It verifies with a public key baked into the package, which means the thing that proves who you are lives somewhere it cannot be stolen from you.",
   authSteps: [
-    "You open /admin. It sends you to GitHub, asking for identity only — no repository scopes at all.",
+    "You open /admin. It sends you to GitHub, asking for identity only, with no repository scopes at all.",
     "GitHub returns to the broker, not to your site. The broker is the only place that holds the private key.",
     "The broker signs a session (RS256) naming your GitHub login, your site's origin, a one-shot nonce, and an expiry.",
-    "It posts that token back to your site in a form body — never in a URL, so it cannot land in history, a log, or a referrer header.",
+    "It posts that token back to your site in a form body, never in a URL, so it cannot land in history, a log, or a referrer header.",
     "Your site verifies the signature with the baked-in public key, then checks the audience is this site, the nonce matches the cookie it set, and the token has not expired.",
     "Then, separately, it checks your login against the site's owner list.",
   ],
   authCalloutHead: "Why the last step is its own step",
-  authCalloutBody: "The broker will sign a token for any GitHub user who logs in — that is what an identity provider does. So a valid signature proves someone authenticated; it does not prove they own this site. Authorization is a second, independent check, and it runs on both the login endpoint and every request to /admin. A signature-only gate would admit any GitHub account on earth.",
+  authCalloutBody: "The broker will sign a token for any GitHub user who logs in, which is what an identity provider does. So a valid signature proves someone authenticated; it does not prove they own this site. Authorization is a second, independent check, and it runs on both the login endpoint and every request to /admin. A signature-only gate would admit any GitHub account on earth.",
 
   keysEyebrow: "Blast radius",
   keysHead: "Nothing long-lived, nothing broadly scoped.",
   keysIntro: "The useful question about a credential is not whether it is encrypted. It is what an attacker reaches if they hold it, and for how long.",
   keysCols: ["Credential", "Reaches", "Lifetime"],
   keys: [
-    ["Your session cookie", "Your site's /admin only — HttpOnly, Secure, and scoped so it is never sent on public pages", "7 days"],
+    ["Your session cookie", "Your site's /admin only. HttpOnly, Secure, and scoped so it is never sent on public pages", "7 days"],
     ["The GitHub token behind a save", "One repository, contents only. Minted per request; never sent to the browser", "~1 hour"],
     ["An agent's access token", "The sites you ticked on the consent screen, and nothing else", "1 hour, refreshable"],
-    ["A token minted for one agent call", "Exactly one site — the audience is pinned to it", "5 minutes"],
-    ["Your site's own key material", "Nothing. It holds a public key and can only verify", "—"],
+    ["A token minted for one agent call", "Exactly one site. The audience is pinned to it", "5 minutes"],
+    ["Your site's own key material", "Nothing. It holds a public key and can only verify", "none"],
   ],
 
   agentEyebrow: "For agents",
   agentHead: "An agent edits your site the way you do.",
-  agentBody: "Your site exposes an MCP endpoint. An agent that connects to it goes through the same OAuth round-trip you do — authorization code with PKCE, discovery over the standard well-known documents, and a GitHub login for identity. If you own several Lanza sites, one consent screen asks which of them this agent may touch, and that choice is carried on the token itself; a tampered response can only narrow the grant, never widen it. The agent is given a token bound to one site's endpoint. It never receives a GitHub token, and there is no personal access token to create, paste, or leak.",
+  agentBody: "Your site exposes an MCP endpoint. An agent that connects to it goes through the same OAuth round-trip you do: authorization code with PKCE, discovery over the standard well-known documents, and a GitHub login for identity. If you own several Lanza sites, one consent screen asks which of them this agent may touch, and that choice is carried on the token itself; a tampered response can only narrow the grant, never widen it. The agent is given a token bound to one site's endpoint. It never receives a GitHub token, and there is no personal access token to create, paste, or leak.",
   agentLink: "Read the agent contract",
 
   costEyebrow: "What it costs to run",
   costHead: "Static sites are cheap because nothing is running.",
-  costBody: "Page views on Cloudflare Pages are unmetered — there is no per-visit cost and no traffic level at which your bill starts moving. There is no database to pay for and no server sitting idle, because there is no server. The only recurring cost is your domain name, which you buy from whoever you like and point wherever you like.",
+  costBody: "Page views on Cloudflare Pages are unmetered, so there is no per-visit cost and no traffic level at which your bill starts moving. There is no database to pay for and no server sitting idle, because there is no server. The only recurring cost is your domain name, which you buy from whoever you like and point wherever you like.",
   costTiles: [
     ["$0", "to build, host and serve"],
-    ["~$12", "a year for a domain — the only bill"],
+    ["~$12", "a year for a domain, the only bill"],
     ["0", "databases, servers, and things to patch"],
   ],
 
   ownEyebrow: "Updates, and leaving",
   ownHead: "You pin the version. You keep the files.",
-  ownBody: "Your site depends on a published package at a version you choose, so an improvement we ship does not change your site until you take it — from Settings, when it suits you. And the exit is not a feature we had to build: your content is already a folder of ordinary files in a repository you own. The broker is a convenience layered on top of a CMS that works without it — supply your own GitHub credentials and owner list and you can run the whole thing yourself, with us removed from the picture entirely.",
+  ownBody: "Your site depends on a published package at a version you choose, so an improvement we ship does not change your site until you take it, from Settings, when it suits you. And the exit is not a feature we had to build: your content is already a folder of ordinary files in a repository you own. The broker is a convenience layered on top of a CMS that works without it: supply your own GitHub credentials and owner list and you can run the whole thing yourself, with us removed from the picture entirely.",
 
   ctaHead: "Read the plain-language version.",
   ctaSub: "Same machine, told as a story instead of a diagram.",
@@ -102,7 +102,7 @@ const en = {
 const es = {
   tag: "ARQUITECTURA · LA MÁQUINA COMPLETA",
   headline: "Cada pieza, con su nombre.",
-  sub: "Cómo funciona cuenta la historia de un cambio. Esto es el cableado que hay detrás: qué es cada pieza, quién la opera, qué secretos guarda y cuánto duran. Nada aquí es el diagrama de un ideal — es lo que hace el código.",
+  sub: "Cómo funciona cuenta la historia de un cambio. Esto es el cableado que hay detrás: qué es cada pieza, quién la opera, qué secretos guarda y cuánto duran. Nada aquí es el diagrama de un ideal. Es lo que hace el código.",
 
   partsEyebrow: "Las piezas",
   partsHead: "Seis piezas. Cuatro son suyas.",
@@ -111,15 +111,15 @@ const es = {
   parts: [
     ["Su repositorio", "Archivos Markdown y HTML en GitHub. La fuente de la verdad de cada palabra de su sitio.", "Usted", "No"],
     ["Su sitio", "Un build estático de Astro, servido por Cloudflare Pages. HTML puro cuando llega al visitante.", "Usted", "No"],
-    ["Lanza, el CMS", "Una aplicación Vue en /admin. Archivos estáticos — no tiene backend propio.", "Usted", "No"],
+    ["Lanza, el CMS", "Una aplicación Vue en /admin. Archivos estáticos, sin backend propio.", "Usted", "No"],
     ["lanza-site", "El paquete npm con el código de render y las funciones del sitio. Usted fija la versión.", "Usted", "No"],
-    ["El intermediario", "connect.lanzacms.com — alta, inicio de sesión y emisión de tokens de vida corta.", "Lanza", "Sí — todos"],
+    ["El intermediario", "connect.lanzacms.com, que se encarga del alta, el inicio de sesión y la emisión de tokens de vida corta.", "Lanza", "Sí, todos"],
     ["/api/mcp", "El punto de conexión al que se conecta un agente de IA para editar su sitio.", "Usted", "No"],
   ],
 
   editEyebrow: "La vida de un cambio",
   editHead: "Guardar escribe en una rama. Publicar es una fusión.",
-  editIntro: "El CMS nunca escribe en su sitio en vivo. Escribe en una rama de preparación, y publicar es una fusión de git corriente — por eso todo cambio es reversible y nada queda aplicado a medias.",
+  editIntro: "El CMS nunca escribe en su sitio en vivo. Escribe en una rama de preparación, y publicar es una fusión de git corriente, y por eso todo cambio es reversible y nada queda aplicado a medias.",
   editSteps: [
     { t: "Usted guarda", c: "PUT → staging", b: "El CMS hace commit en la rama staging a través de su propio proxy /admin/api/gh. Su navegador nunca tiene un token de GitHub: el proxy adjunta uno por petición, limitado a este único repositorio, y caduca en aproximadamente una hora." },
     { t: "Usted revisa", c: "staging.<proyecto>.pages.dev", b: "Cloudflare también construye la rama de preparación, así que existe una URL real que muestra exactamente lo que acaba de escribir, antes de que nadie más pueda verlo." },
@@ -130,47 +130,47 @@ const es = {
 
   authEyebrow: "Iniciar sesión",
   authHead: "Dos comprobaciones, y ambas son obligatorias.",
-  authIntro: "Su sitio no guarda ninguna clave de firma. Verifica con una clave pública incluida en el paquete — es decir, lo que demuestra quién es usted vive en un lugar del que no se le puede robar.",
+  authIntro: "Su sitio no guarda ninguna clave de firma. Verifica con una clave pública incluida en el paquete, es decir que lo que demuestra quién es usted vive en un lugar del que no se le puede robar.",
   authSteps: [
-    "Usted abre /admin. Le envía a GitHub pidiendo solo identidad — sin ningún permiso sobre repositorios.",
+    "Usted abre /admin. Le envía a GitHub pidiendo solo identidad, sin ningún permiso sobre repositorios.",
     "GitHub vuelve al intermediario, no a su sitio. El intermediario es el único lugar que guarda la clave privada.",
     "El intermediario firma una sesión (RS256) que nombra su usuario de GitHub, el origen de su sitio, un nonce de un solo uso y una caducidad.",
-    "Envía ese token a su sitio en el cuerpo de un formulario — nunca en una URL, para que no acabe en el historial, en un registro ni en una cabecera de referencia.",
+    "Envía ese token a su sitio en el cuerpo de un formulario, nunca en una URL, para que no acabe en el historial, en un registro ni en una cabecera de referencia.",
     "Su sitio verifica la firma con la clave pública incluida, y luego comprueba que la audiencia es este sitio, que el nonce coincide con la cookie que puso y que el token no ha caducado.",
     "Y después, por separado, comprueba su usuario contra la lista de propietarios del sitio.",
   ],
   authCalloutHead: "Por qué el último paso es un paso aparte",
-  authCalloutBody: "El intermediario firmará un token para cualquier usuario de GitHub que inicie sesión — eso es lo que hace un proveedor de identidad. Así que una firma válida demuestra que alguien se autenticó; no demuestra que sea el dueño de este sitio. La autorización es una segunda comprobación independiente, y se ejecuta tanto en el inicio de sesión como en cada petición a /admin. Una puerta que solo mirase la firma admitiría a cualquier cuenta de GitHub del mundo.",
+  authCalloutBody: "El intermediario firmará un token para cualquier usuario de GitHub que inicie sesión, que es lo que hace un proveedor de identidad. Así que una firma válida demuestra que alguien se autenticó; no demuestra que sea el dueño de este sitio. La autorización es una segunda comprobación independiente, y se ejecuta tanto en el inicio de sesión como en cada petición a /admin. Una puerta que solo mirase la firma admitiría a cualquier cuenta de GitHub del mundo.",
 
   keysEyebrow: "Radio de impacto",
   keysHead: "Nada duradero, nada de alcance amplio.",
   keysIntro: "La pregunta útil sobre una credencial no es si está cifrada. Es hasta dónde llega quien la tenga, y durante cuánto tiempo.",
   keysCols: ["Credencial", "Hasta dónde llega", "Duración"],
   keys: [
-    ["Su cookie de sesión", "Solo el /admin de su sitio — HttpOnly, Secure y limitada para no viajar nunca en páginas públicas", "7 días"],
+    ["Su cookie de sesión", "Solo el /admin de su sitio. HttpOnly, Secure y limitada para no viajar nunca en páginas públicas", "7 días"],
     ["El token de GitHub tras un guardado", "Un repositorio, solo contenidos. Se emite por petición; nunca llega al navegador", "~1 hora"],
     ["El token de acceso de un agente", "Los sitios que usted marcó en la pantalla de consentimiento, y ninguno más", "1 hora, renovable"],
-    ["Un token emitido para una llamada de agente", "Exactamente un sitio — la audiencia queda fijada a él", "5 minutos"],
-    ["El material de clave de su propio sitio", "Nada. Guarda una clave pública y solo puede verificar", "—"],
+    ["Un token emitido para una llamada de agente", "Exactamente un sitio. La audiencia queda fijada a él", "5 minutos"],
+    ["El material de clave de su propio sitio", "Nada. Guarda una clave pública y solo puede verificar", "ninguna"],
   ],
 
   agentEyebrow: "Para agentes",
   agentHead: "Un agente edita su sitio igual que usted.",
-  agentBody: "Su sitio expone un punto de conexión MCP. Un agente que se conecte pasa por la misma ronda de OAuth que usted — código de autorización con PKCE, descubrimiento mediante los documentos estándar y un inicio de sesión de GitHub como identidad. Si tiene varios sitios Lanza, una pantalla de consentimiento pregunta cuáles puede tocar este agente, y esa elección viaja en el propio token; una respuesta manipulada solo puede restringir el permiso, nunca ampliarlo. Al agente se le entrega un token ligado al punto de conexión de un solo sitio. Nunca recibe un token de GitHub, y no hay ningún token personal que crear, pegar ni filtrar.",
+  agentBody: "Su sitio expone un punto de conexión MCP. Un agente que se conecte pasa por la misma ronda de OAuth que usted: código de autorización con PKCE, descubrimiento mediante los documentos estándar y un inicio de sesión de GitHub como identidad. Si tiene varios sitios Lanza, una pantalla de consentimiento pregunta cuáles puede tocar este agente, y esa elección viaja en el propio token; una respuesta manipulada solo puede restringir el permiso, nunca ampliarlo. Al agente se le entrega un token ligado al punto de conexión de un solo sitio. Nunca recibe un token de GitHub, y no hay ningún token personal que crear, pegar ni filtrar.",
   agentLink: "Leer el contrato para agentes",
 
   costEyebrow: "Lo que cuesta mantenerlo",
   costHead: "Los sitios estáticos son baratos porque no hay nada ejecutándose.",
-  costBody: "Las vistas de página en Cloudflare Pages no se miden — no hay coste por visita ni un nivel de tráfico a partir del cual su factura empiece a moverse. No hay base de datos que pagar ni servidor ocioso, porque no hay servidor. El único coste recurrente es su dominio, que compra a quien quiera y apunta a donde quiera.",
+  costBody: "Las vistas de página en Cloudflare Pages no se miden, así que no hay coste por visita ni un nivel de tráfico a partir del cual su factura empiece a moverse. No hay base de datos que pagar ni servidor ocioso, porque no hay servidor. El único coste recurrente es su dominio, que compra a quien quiera y apunta a donde quiera.",
   costTiles: [
     ["$0", "por construir, alojar y servir"],
-    ["~$12", "al año por un dominio — la única factura"],
+    ["~$12", "al año por un dominio, la única factura"],
     ["0", "bases de datos, servidores y cosas que parchear"],
   ],
 
   ownEyebrow: "Actualizaciones, y marcharse",
   ownHead: "Usted fija la versión. Usted se queda los archivos.",
-  ownBody: "Su sitio depende de un paquete publicado en la versión que usted elija, así que una mejora que publiquemos no cambia su sitio hasta que usted la tome — desde Ajustes, cuando le convenga. Y la salida no es una función que tuviéramos que construir: su contenido ya es una carpeta de archivos corrientes en un repositorio suyo. El intermediario es una comodidad añadida sobre un CMS que funciona sin él — ponga sus propias credenciales de GitHub y su lista de propietarios y puede operarlo entero usted mismo, con nosotros fuera del cuadro por completo.",
+  ownBody: "Su sitio depende de un paquete publicado en la versión que usted elija, así que una mejora que publiquemos no cambia su sitio hasta que usted la tome, desde Ajustes, cuando le convenga. Y la salida no es una función que tuviéramos que construir: su contenido ya es una carpeta de archivos corrientes en un repositorio suyo. El intermediario es una comodidad añadida sobre un CMS que funciona sin él: ponga sus propias credenciales de GitHub y su lista de propietarios y puede operarlo entero usted mismo, con nosotros fuera del cuadro por completo.",
 
   ctaHead: "Lea la versión en lenguaje llano.",
   ctaSub: "La misma máquina, contada como historia en vez de como diagrama.",
@@ -375,7 +375,7 @@ const t = isEn ? en : es;
   }
   .arc-lede { font-size: 1.1rem; line-height: 1.7; color: var(--text-secondary); max-width: 66ch; margin: 0 0 2rem; }
 
-  /* tables — wide content scrolls inside itself, never the page */
+  /* tables: wide content scrolls inside itself, never the page */
   .arc-scroll { overflow-x: auto; }
   .arc-table { width: 100%; border-collapse: collapse; min-width: 44rem; text-align: left; }
   .arc-table th,
