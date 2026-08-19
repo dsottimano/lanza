@@ -161,6 +161,46 @@ const redirectsPanel = computed(() => {
   const f = settingsFiles().find((x) => x.name === "redirects");
   return f ? `/settings/${f.name}` : null;
 });
+
+// ── Discard everything ──────────────────────────────────────────────────────
+// Publish's opposite, and it belongs beside it: both move the whole draft at
+// once, and an owner who can ship an agent's session must be able to throw it
+// away without a terminal. The write itself is GitHubClient.discardDraft() —
+// read its doc comment before changing anything here.
+const discarding = ref(false);
+
+/** The confirm NAMES what will be lost. `window.confirm` is the house pattern for
+ *  an irreversible act (ContentTypesView, SiteHealthView), but "are you sure?" is
+ *  not — the rows are already on screen, so the dialog lists them back. Capped
+ *  because a browser confirm doesn't scroll. */
+function discardSummary(): string {
+  const rows = changes.value.map((c) => `  • ${rowLabel(c)} — ${STATUS_WORD[c.status]}`);
+  const shown = rows.slice(0, 12);
+  const more = rows.length - shown.length;
+  const n = changes.value.length;
+  return (
+    `Throw away ${n} unpublished change${n === 1 ? "" : "s"}?\n\n` +
+    shown.join("\n") +
+    (more > 0 ? `\n  …and ${more} more` : "") +
+    `\n\nYour drafts go back to exactly what is published live. This cannot be undone.`
+  );
+}
+
+async function discardAll(): Promise<void> {
+  if (!changes.value.length || discarding.value) return;
+  if (!window.confirm(discardSummary())) return;
+  discarding.value = true;
+  try {
+    await props.client.discardDraft();
+    // Reload rather than clearing the list locally: the screen then lands on its
+    // own "Nothing waiting" state, from the server, so what it shows is true.
+    await load();
+  } catch (e) {
+    reportError(e, "Couldn't discard the draft.");
+  } finally {
+    discarding.value = false;
+  }
+}
 </script>
 
 <template>
@@ -169,11 +209,15 @@ const redirectsPanel = computed(() => {
       <button class="text-sm text-zinc-600 transition hover:text-zinc-900" @click="emit('back')">
         ← Back
       </button>
-      <!-- The only publish control on this screen, and it says what it does: there
-           is no per-row publish, so offering one would be a lie. -->
-      <router-link v-if="changes.length" class="btn btn-primary" to="/publish">
-        Publish everything
-      </router-link>
+      <!-- The two ends of one decision: ship the whole draft or throw the whole
+           draft away. The only publish control on this screen says what it does —
+           there is no per-row publish, so offering one would be a lie. -->
+      <div v-if="changes.length" class="flex items-center gap-2">
+        <button class="btn btn-ghost" :disabled="discarding" @click="discardAll">
+          {{ discarding ? "Discarding…" : "Discard everything" }}
+        </button>
+        <router-link class="btn btn-primary" to="/publish"> Publish everything </router-link>
+      </div>
     </header>
 
     <main class="mx-auto max-w-3xl px-6 pt-8 pb-24">

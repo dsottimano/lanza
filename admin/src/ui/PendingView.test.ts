@@ -224,3 +224,64 @@ describe("PendingView — reading order", () => {
     expect(rows[1]).toContain("es");
   });
 });
+
+describe("PendingView — discarding the whole draft", () => {
+  /** A client that counts compare() calls (so a reload is observable) and records
+   *  whether the destructive write actually happened. */
+  function discardClient(files: { filename: string; status: string }[]) {
+    const calls = { compare: 0, discard: 0 };
+    const client = {
+      compare: async () => {
+        calls.compare++;
+        // After the discard the branch matches production: nothing pending.
+        return { status: "ahead", files: calls.discard ? [] : files };
+      },
+      discardDraft: async () => {
+        calls.discard++;
+        return { sha: "abc123" };
+      },
+    } as unknown as GitHubClient;
+    return { client, calls };
+  }
+
+  async function mountDiscardable(files: { filename: string; status: string }[]) {
+    const { client, calls } = discardClient(files);
+    const w = mount(PendingView, { props: { client }, global: { plugins: [router] } });
+    await flushPromises();
+    const button = w.findAll("button").find((b) => b.text().includes("Discard everything"));
+    return { w, calls, button };
+  }
+
+  const ONE = [{ filename: "content/pages/en/about.md", status: "modified" }];
+
+  it("is not offered when there is nothing to discard", async () => {
+    const { button } = await mountDiscardable([]);
+    expect(button).toBeUndefined();
+  });
+
+  it("names what will be lost rather than asking 'are you sure?'", async () => {
+    let prompt = "";
+    window.confirm = (m?: string) => {
+      prompt = m ?? "";
+      return false;
+    };
+    const { button, calls } = await mountDiscardable(ONE);
+    await button!.trigger("click");
+    await flushPromises();
+    expect(prompt).toContain("about"); // the row itself, by name
+    expect(prompt).toContain("edited"); // and what happened to it
+    expect(prompt).toContain("cannot be undone");
+    // Declining leaves the draft alone — this is the irreversible one.
+    expect(calls.discard).toBe(0);
+  });
+
+  it("discards and reloads, so the screen shows the truth from the server", async () => {
+    window.confirm = () => true;
+    const { w, button, calls } = await mountDiscardable(ONE);
+    await button!.trigger("click");
+    await flushPromises();
+    expect(calls.discard).toBe(1);
+    expect(calls.compare).toBe(2); // mounted, then again after the write
+    expect(w.text()).toContain("Nothing waiting");
+  });
+});
