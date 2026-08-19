@@ -510,6 +510,37 @@ function declaredPaths(shape, prefix = "") {
   return out;
 }
 
+// ── Route names ──────────────────────────────────────────────────────────────
+// Shared with scripts/gen-routes.mjs, which is the last gate before these values land
+// in a directory name and in generated .astro code. Declared HERE so the MCP tool that
+// proposes a route refuses the same names the generator would die on — a route the CMS
+// happily stores and the build then rejects is a broken site nobody sees until deploy.
+
+/** A URL segment or template folder name: lowercase kebab, one segment. */
+export const ROUTE_SEGMENT = /^[a-z0-9]+(?:-[a-z0-9]+)*$/;
+
+/**
+ * Bases the hand-written routes already own. Generating over one produces two Astro
+ * pages for a single URL — a build error at best, a silently shadowed route at worst.
+ */
+export const RESERVED_ROUTE_BASES = new Set([
+  "posts",
+  "author",
+  "category",
+  "tag",
+  "admin",
+  "api",
+  "images",
+  "_astro",
+]);
+
+/**
+ * A collection name is emitted as a `const` binding and re-exported by name in the
+ * generated content config, so it must be a plain JS identifier.
+ * MIRROR of scripts/gen-content-config.mjs's COLLECTION_NAME_RE.
+ */
+export const COLLECTION_NAME = /^[A-Za-z_$][A-Za-z0-9_$]*$/;
+
 // ── The check registry ───────────────────────────────────────────────────────
 // Every problem code this system can report, and the SILENT failure it stands for.
 // It is a registry rather than a comment because three audiences need the same list:
@@ -932,6 +963,8 @@ export async function checkSite(io, opts = {}) {
 export default {
   LAYERS,
   checkSite,
+  ROUTE_SEGMENT,
+  RESERVED_ROUTE_BASES,
   checkTemplateSafety,
   UNTRUSTED_AUTHOR_CODES,
   WIDGETS,

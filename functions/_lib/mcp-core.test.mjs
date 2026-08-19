@@ -103,7 +103,7 @@ test("initialize returns protocol + serverInfo", async () => {
 test("tools/list exposes the full surface", async () => {
   const r = await handleMessage({ jsonrpc: "2.0", id: 2, method: "tools/list" }, client());
   const names = r.result.tools.map((t) => t.name);
-  for (const n of ["get_site", "list_collections", "get_schema", "describe_site_system", "write_template", "list_content", "read_content", "create_content", "update_content", "delete_content", "validate_site", "list_changes", "publish"])
+  for (const n of ["get_site", "list_collections", "get_schema", "describe_site_system", "write_template", "create_content_type", "list_content", "read_content", "create_content", "update_content", "delete_content", "validate_site", "list_changes", "publish"])
     assert.ok(names.includes(n), `missing tool ${n}`);
   assert.equal(TOOL_LIST.length, names.length);
 });
@@ -629,4 +629,118 @@ test("write_template rejects a fields.json name that disagrees with the folder",
   });
   assert.ok(isError(r));
   assert.equal(gh.files.size, 1);
+});
+
+// ---------------------------------------------------------------------------
+// create_content_type. The schema is compiled into code the build imports, so every
+// refusal asserts the file was not touched — a bad model that reaches data/schema.json
+// fails the tenant's DEPLOY, not this call.
+// ---------------------------------------------------------------------------
+
+const withTemplate = (extra = {}) => ({
+  "data/schema.json": SCHEMA,
+  "data/site.json": SITE,
+  "templates/property/template.html": "<h1>{{ address }}</h1><p>{{ price }}</p>",
+  "templates/property/fields.json": JSON.stringify({
+    name: "property",
+    fields: [
+      { name: "address", label: "Address", widget: "string" },
+      { name: "price", label: "Price", widget: "string" },
+    ],
+  }),
+  ...extra,
+});
+
+const schemaIn = (gh) => JSON.parse(gh.files.get("data/schema.json"));
+
+test("create_content_type derives its fields from the template, not from arguments", async () => {
+  const gh = fakeGitHub(withTemplate());
+  const r = await callData("create_content_type", {
+    name: "properties",
+    label: "Properties",
+    fieldsFrom: "property",
+    route: { base: "properties", template: "property" },
+  });
+  assert.deepEqual(r.fields, ["address", "price"], "fields come from templates/property/fields.json");
+  assert.equal(r.url, "/properties/");
+  const added = schemaIn(gh).find((c) => c.name === "properties");
+  // Derived, never accepted: this is what create_content builds a write path from.
+  assert.equal(added.folder, "content/properties");
+  assert.deepEqual(added.route, { base: "properties", template: "property" });
+});
+
+test("create_content_type refuses a route base a built-in route already owns", async () => {
+  for (const base of ["posts", "admin", "api", "_astro"]) {
+    const gh = fakeGitHub(withTemplate());
+    const before = gh.files.get("data/schema.json");
+    const r = await callRaw("create_content_type", {
+      name: "properties",
+      label: "Properties",
+      fieldsFrom: "property",
+      route: { base, template: "property" },
+    });
+    assert.ok(isError(r), `should refuse base ${base}`);
+    assert.equal(gh.files.get("data/schema.json"), before, "schema.json must be untouched");
+  }
+});
+
+test("create_content_type refuses a base that would collide with a locale prefix", async () => {
+  const gh = fakeGitHub(withTemplate());
+  const before = gh.files.get("data/schema.json");
+  const r = await callRaw("create_content_type", {
+    name: "properties",
+    label: "Properties",
+    fieldsFrom: "property",
+    route: { base: "es", template: "property" },
+  });
+  assert.ok(isError(r));
+  assert.equal(gh.files.get("data/schema.json"), before);
+});
+
+test("create_content_type refuses a name that is not a plain identifier", async () => {
+  for (const name of ["my-type", "2things", "a b", "x); evil()"]) {
+    const gh = fakeGitHub(withTemplate());
+    const before = gh.files.get("data/schema.json");
+    const r = await callRaw("create_content_type", { name, label: "X", fieldsFrom: "property" });
+    assert.ok(isError(r), `should refuse name ${JSON.stringify(name)}`);
+    assert.equal(gh.files.get("data/schema.json"), before);
+  }
+});
+
+test("create_content_type refuses a route into a template that does not exist", async () => {
+  const gh = fakeGitHub(withTemplate());
+  const before = gh.files.get("data/schema.json");
+  const r = await callRaw("create_content_type", {
+    name: "properties",
+    label: "Properties",
+    fieldsFrom: "property",
+    route: { base: "properties", template: "nosuchtemplate" },
+  });
+  assert.ok(isError(r));
+  assert.match(errText(r), /route-template-missing/);
+  assert.equal(gh.files.get("data/schema.json"), before, "a live URL rendering 'Unknown template' must not ship");
+});
+
+test("create_content_type never overwrites an existing collection", async () => {
+  const gh = fakeGitHub(withTemplate());
+  const before = gh.files.get("data/schema.json");
+  const r = await callRaw("create_content_type", { name: "pages", label: "Pages", fieldsFrom: "property" });
+  assert.ok(isError(r));
+  assert.equal(gh.files.get("data/schema.json"), before);
+});
+
+// `note` belongs to stagedNote(); a second key by that name would be spread away and
+// the one line that matters when a type has no URL would vanish. It did, once.
+test("create_content_type says so when a type has no URL", async () => {
+  const gh = fakeGitHub(withTemplate());
+  const r = await callData("create_content_type", { name: "properties", label: "Properties", fieldsFrom: "property" });
+  assert.match(r.next, /NO URL/);
+  assert.equal(schemaIn(gh).find((c) => c.name === "properties").route, undefined);
+});
+
+test("create_content_type requires the template to exist first", async () => {
+  const gh = fakeGitHub({ "data/schema.json": SCHEMA, "data/site.json": SITE });
+  const r = await callRaw("create_content_type", { name: "properties", label: "Properties", fieldsFrom: "property" });
+  assert.ok(isError(r));
+  assert.match(errText(r), /write_template/);
 });

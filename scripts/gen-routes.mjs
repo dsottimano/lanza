@@ -24,6 +24,7 @@
 import { readFileSync, writeFileSync, mkdirSync, rmSync, rmdirSync, existsSync, readdirSync } from "node:fs";
 import { fileURLToPath } from "node:url";
 import { join, dirname } from "node:path";
+import { ROUTE_SEGMENT, RESERVED_ROUTE_BASES } from "../functions/_lib/site-system.mjs";
 
 // Input is TENANT data; output is CODE inside this package's srcDir (frontend/).
 // Same split as gen-content-config.mjs — in the monorepo the two coincide.
@@ -33,13 +34,11 @@ const schemaPath = join(CWD, "data/schema.json");
 const pagesDir = join(PKG, "frontend/pages");
 const manifestPath = join(PKG, "frontend/pages/.generated-routes.json");
 
-// A URL segment / template folder name: lowercase kebab. No slashes, no dots, no
-// "..", nothing that escapes a directory or invents a path.
-const SEGMENT = /^[a-z0-9]+(?:-[a-z0-9]+)*$/;
-
-// Bases the hand-written routes already own. Generating over them would produce two
-// Astro pages for one URL — a build error at best, a silently shadowed route at worst.
-const RESERVED = new Set(["posts", "author", "category", "tag", "admin", "api", "images", "_astro"]);
+// The two name rules live in the checker, so the MCP tool that PROPOSES a route
+// refuses exactly what this generator would die on. A route the CMS stores happily
+// and the build then rejects is a broken site nobody sees until deploy.
+const SEGMENT = ROUTE_SEGMENT;
+const RESERVED = RESERVED_ROUTE_BASES;
 
 const die = (msg) => {
   console.error(`gen-routes: ${msg}`);

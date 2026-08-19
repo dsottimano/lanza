@@ -18,6 +18,9 @@ import {
   siteSystemContract,
   POSITIONS,
   UNTRUSTED_AUTHOR_CODES,
+  ROUTE_SEGMENT,
+  RESERVED_ROUTE_BASES,
+  COLLECTION_NAME,
 } from "./site-system.mjs";
 
 export const SERVER_INFO = { name: "lanza-cms", title: "Lanza CMS", version: "0.1.0" };
@@ -541,6 +544,187 @@ export const TOOLS: ToolDef[] = [
           position === "page"
             ? "Set a page's `preset` to this template name to use it."
             : "Give a collection a `route` block naming this template so its entries get URLs.",
+        ...stagedNote(site),
+      };
+    },
+  },
+  {
+    name: "create_content_type",
+    description:
+      "Add a content type (a folder collection) to the site's model, optionally with the " +
+      "URL its entries render at. This is what turns 'properties' or 'recipes' from an " +
+      "idea into something the CMS stores and the site publishes. Its FIELDS ARE NOT " +
+      "PASSED HERE: they are read from the detail template's fields.json, which is the " +
+      "one place they are declared — write_template first, then name it as fieldsFrom. " +
+      "Without a `route` the entries are stored and editable but render at no URL, which " +
+      "is almost never what is wanted. Nothing is written unless the whole model still " +
+      "checks out. Not live until publish.",
+    inputSchema: obj(
+      {
+        name: str("Collection name, a plain identifier, plural — e.g. 'properties'. Also names its content folder."),
+        label: str("Plural label shown in the CMS, e.g. 'Properties'."),
+        labelSingular: str("Singular label, e.g. 'Property'. Optional."),
+        fieldsFrom: str("Template folder whose fields.json declares this type's fields, e.g. 'property'."),
+        localized: { type: "boolean", description: "One subfolder of entries per locale. Defaults to false." },
+        body: str("'rich' to give entries an HTML body canvas, 'none' for frontmatter only. Defaults to 'none'."),
+        thumbnail: str("Field name to show as the entry thumbnail in the CMS, e.g. 'featuredImage'. Optional."),
+        route: {
+          type: "object",
+          description:
+            "Where entries render. { base: 'properties', template: 'property', " +
+            "list: { template: 'property-index', sortBy: 'price', order: 'asc' } }. " +
+            "Omit `list` for a detail page with no index.",
+          additionalProperties: true,
+        },
+      },
+      ["name", "label", "fieldsFrom"],
+    ),
+    run: async (args, client, site) => {
+      const name = String(args.name);
+      if (!COLLECTION_NAME.test(name)) {
+        throw new GitHubError(
+          400,
+          `Refusing collection name "${name}": must be a plain identifier (letters, digits, _ and $; ` +
+            "not starting with a digit). It is emitted as a binding in generated code.",
+        );
+      }
+
+      const raw = await client.readRaw("data/schema.json");
+      if (!raw) throw new GitHubError(404, "This site has no data/schema.json — it may not be a Lanza site.");
+      const schema = JSON.parse(raw) as unknown;
+      if (!Array.isArray(schema)) {
+        throw new GitHubError(500, "data/schema.json is not a collection array — this site's content model is malformed.");
+      }
+      const existing = schema as Array<Record<string, unknown>>;
+      if (existing.some((c) => c.name === name)) {
+        throw new GitHubError(
+          409,
+          `A collection named "${name}" already exists. Adding a type never overwrites one — ` +
+            "edit it in the CMS content-type editor, or pick another name.",
+        );
+      }
+
+      // The template's fields.json is the ONE declaration of this type's shape. Typing
+      // the fields again here is how the two drift, so they are not accepted as input.
+      const fieldsFrom = String(args.fieldsFrom);
+      if (!ROUTE_SEGMENT.test(fieldsFrom)) {
+        throw new GitHubError(400, `Refusing fieldsFrom "${fieldsFrom}": must be a lowercase kebab-case template folder name.`);
+      }
+      const declRaw = await client.readRaw(`templates/${fieldsFrom}/fields.json`);
+      if (!declRaw) {
+        throw new GitHubError(
+          404,
+          `No templates/${fieldsFrom}/fields.json. Call write_template to create the detail ` +
+            "template first — its fields are what this content type stores.",
+        );
+      }
+      const decl = JSON.parse(declRaw) as { fields?: unknown };
+      if (!Array.isArray(decl.fields)) {
+        throw new GitHubError(422, `templates/${fieldsFrom}/fields.json declares no "fields" array.`);
+      }
+
+      // The folder is DERIVED, never accepted. §3 of docs/security-model.md: schema.json
+      // is not a security boundary, and a collection's folder is what create_content
+      // builds a write path from. Deriving it puts every entry under content/ by
+      // construction instead of by validation.
+      const collection: Record<string, unknown> = {
+        kind: "folder",
+        name,
+        label: String(args.label),
+        ...(args.labelSingular ? { labelSingular: String(args.labelSingular) } : {}),
+        folder: `content/${name}`,
+        body: args.body === "rich" ? "rich" : "none",
+        ...(args.thumbnail ? { thumbnail: String(args.thumbnail) } : {}),
+        ...(args.localized ? { localized: true } : {}),
+        fields: decl.fields,
+      };
+
+      const route = args.route as
+        | { base?: unknown; template?: unknown; list?: { template?: unknown; sortBy?: unknown; order?: unknown } }
+        | undefined;
+      if (route) {
+        const base = String(route.base ?? "");
+        // Refuse exactly what gen-routes.mjs would die on. A route the CMS stores and
+        // the build then rejects is a broken site nobody sees until the deploy fails.
+        if (!ROUTE_SEGMENT.test(base)) {
+          throw new GitHubError(400, `Refusing route.base "${base}": must be lowercase kebab-case, one segment.`);
+        }
+        if (RESERVED_ROUTE_BASES.has(base)) {
+          throw new GitHubError(400, `route.base "${base}" is reserved by a built-in route and would shadow it.`);
+        }
+        const locales = (await readSiteFile(client)).locales;
+        if (locales.includes(base)) {
+          throw new GitHubError(400, `route.base "${base}" collides with the locale prefix of the same name.`);
+        }
+        const tpl = String(route.template ?? "");
+        if (!ROUTE_SEGMENT.test(tpl)) {
+          throw new GitHubError(400, `Refusing route.template "${tpl}": must be lowercase kebab-case.`);
+        }
+        const r: Record<string, unknown> = { base, template: tpl };
+        if (route.list) {
+          const listTpl = String(route.list.template ?? "");
+          if (!ROUTE_SEGMENT.test(listTpl)) {
+            throw new GitHubError(400, `Refusing route.list.template "${listTpl}": must be lowercase kebab-case.`);
+          }
+          const sortBy = route.list.sortBy === undefined ? "title" : String(route.list.sortBy);
+          if (!/^[A-Za-z_][A-Za-z0-9_]*$/.test(sortBy)) {
+            throw new GitHubError(400, `route.list.sortBy "${sortBy}" is not a field name.`);
+          }
+          r.list = { template: listTpl, sortBy, order: route.list.order === "desc" ? "desc" : "asc" };
+        }
+        collection.route = r;
+      }
+
+      // Check the model AS IT WOULD BE. The pending schema is fed to the same whole-site
+      // check `npm run check:site` runs, scoped to the templates this type references so
+      // the read cost stays bounded — a route into a template that does not exist, or a
+      // listing printing a field the type does not declare, both surface here.
+      const pending = [...existing, collection];
+      const touched = [
+        fieldsFrom,
+        ...(collection.route ? [String((collection.route as Record<string, unknown>).template)] : []),
+        ...(collection.route && (collection.route as Record<string, unknown>).list
+          ? [String(((collection.route as Record<string, unknown>).list as Record<string, unknown>).template)]
+          : []),
+      ];
+      const { problems } = await checkSite(
+        {
+          readText: (path: string) =>
+            path === "data/schema.json" ? JSON.stringify(pending) : client.readRaw(path),
+          listTemplates: async () =>
+            (await client.listAll("templates")).filter((i) => i.type === "dir").map((i) => i.name),
+        },
+        { only: [...new Set(touched)] },
+      );
+      const errors = problems.filter((p) => p.level === "error");
+      if (errors.length) {
+        throw new GitHubError(
+          422,
+          "Refused — data/schema.json was NOT changed. The model this would produce does not check out:\n" +
+            errors.map((p) => `  • [${p.code}] ${p.where}: ${p.message}`).join("\n"),
+        );
+      }
+
+      await client.ensureWorkingBranch();
+      await client.saveText(
+        "data/schema.json",
+        `${JSON.stringify(pending, null, 2)}\n`,
+        `Add content type ${name} via MCP`,
+      );
+
+      return {
+        created: name,
+        folder: collection.folder,
+        fieldsFrom,
+        fields: (decl.fields as Array<{ name?: string }>).map((f) => f.name),
+        ...(collection.route ? { url: `/${(collection.route as { base: string }).base}/` } : {}),
+        // `next`, not `note` — stagedNote() owns `note`, and spreading it after this
+        // would silently swallow the one line that matters when there is no route.
+        next: collection.route
+          ? `Entries render at /${(collection.route as { base: string }).base}/<slug>/. Create one with create_content.`
+          : "This type has NO URL: entries will be stored and editable but render nowhere. " +
+            "Write a detail template and add a `route` block to give them one.",
+        warnings: problems.filter((p) => p.level === "warning").map((p) => `[${p.code}] ${p.message}`),
         ...stagedNote(site),
       };
     },

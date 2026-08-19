@@ -64,12 +64,16 @@ there automatically — see `docs/mcp-server.md`).
 - [x] **`describe_site_system`** — serves `siteSystemContract()`: the layer model, the
       positions with what each puts in scope, the widgets, the reserved names, and every
       check code with the silent failure it stands for. No arguments, no reads.
-- [ ] **`write_template`** — create/replace `templates/<name>/{template.html,fields.json}`,
-      **refusing on any checker error**. The refusal is the feature: it is the only way an
-      agent finds out it typed `{{ vneue }}`, because the engine renders that as empty
-      text and says nothing.
-- [ ] **`create_content_type`** — a folder collection derived from a template's
-      `fields.json` (`fieldsFrom`), optionally with its `route`.
+- [x] **`write_template`** — refuses on any checker error AND on markup a browser would
+      act on (`UNTRUSTED_AUTHOR_CODES`). Both sets come back in one refusal. The safety
+      half is new and is the boundary change: a template is raw markup on the origin that
+      serves /admin, so `security-model.md` §3 now carries the reasoning and §5 the two
+      accepted limits.
+- [x] **`create_content_type`** — fields derived from the template's `fields.json`, folder
+      derived as `content/<name>` (never accepted — §3: schema.json must not become a
+      security boundary), route validated against the SAME rules `gen-routes.mjs` enforces,
+      which now live in the checker so the two cannot drift. The pending model is run
+      through `checkSite` before anything is written.
 - [ ] **`apply_recipe`** — the whole-site path. Takes a recipe (see item 3), validates it
       entire, writes nothing on failure.
 - [ ] **`list_styles` / `set_style`** — read `data/styles.json`, and write a chosen
@@ -89,10 +93,13 @@ Two constraints that will shape the build, both learned the hard way:
   `scripts/`: everything under `functions/` is bundled, `*.test.mjs` included. The
   orchestration the CLI used to own is now `checkSite()` with IO injected, so
   `npm run check:site` and `validate_site` cannot give different answers.
-- **`data/schema.json` is compiled into code the build imports.** `gen-content-config.mjs`
-  and `gen-routes.mjs` both treat it as untrusted for exactly that reason. An MCP tool
-  that writes it widens *who* can reach that position, so this needs a pass over
-  `docs/security-model.md` §5 before it ships — not after.
+- ~~**`data/schema.json` is compiled into code the build imports.**~~ Pass done, and it
+  came out better than expected: both generators already validate every value reaching a
+  code position (`gen-content-config.mjs`'s header records the real RCE that produced
+  that discipline — a field name in a computed-key position), and schema.json is already
+  writable by any editor session through `/admin/api/gh`. So an MCP writer adds a caller,
+  not a new capability class. The genuinely new boundary was **templates**, not the
+  schema — see `security-model.md` §3.
 
 ## 2. The contract has to be readable — in docs AND on the public site
 
