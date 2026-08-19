@@ -189,9 +189,12 @@ Honest list of what this does **not** do, so nobody assumes otherwise:
 
 - The CMS does not yet expose the `route` block or `/style-preview/` in its UI — both are
   edited as data (`data/schema.json`, `data/styles.json`) or written by a recipe.
-- There is no MCP tool for any of this. An agent connected over MCP can still only edit
-  content, not create a content type, a template or a route. That is the biggest remaining
-  gap between this system and the pitch.
+- An agent connected over MCP can now **read** this contract (`describe_site_system`) and
+  **check** a site against it (`validate_site`), but cannot yet **write** one: no tool
+  creates a content type, a template, a route or a style. That is the remaining gap
+  between this system and the pitch. `write_template` and `create_content_type` also need
+  a `docs/security-model.md` §5 pass first — `data/schema.json` is compiled into code the
+  build imports, so a tool that writes it widens who can reach that position.
 - Taxonomy-style routes for a custom type (an `/events/tag/<x>/` archive) are not
   generated; only the listing and the detail page are.
 - Recipes never delete. Applying one twice refuses rather than merging.

@@ -121,13 +121,31 @@ go live. New entries are written `draft: false` (visible once published); pass
 | `get_site` | Locales + default locale, `liveUrl`, `stagingUrl`, and the two branch names. `stagingUrl` is Cloudflare's branch alias (`staging.<project>.pages.dev`), derived from the request origin — **null on a custom domain**, where the alias stays on pages.dev under a project name the tenant can't learn (`PAGES_PROJECT` is opt-in). Null rather than a guess: a URL that 404s reads as "the write failed". |
 | `list_collections` | Collections (posts, pages, …): folder, localized?, has-body? |
 | `get_schema` | Full content model (`data/schema.json`). |
+| `describe_site_system` | How a site is COMPOSED: the layer model, what each template position puts in scope, the widgets, the reserved names, and every code the checker can report. No arguments, no reads — it serves `siteSystemContract()` from `functions/_lib/site-system.mjs`, the same constants the checker enforces. |
 | `list_content` | List entry paths in a collection (+ locale). |
 | `read_content` | Read one entry's frontmatter + HTML body. |
 | `create_content` | Create a new entry on staging (slug from title). |
 | `update_content` | Update an entry; frontmatter merged, body replaced if given. |
 | `delete_content` | Delete an entry on staging. |
+| `validate_site` | Run the cross-layer checker over the site's templates, fields and routes and return every problem. Read-only. Pass `template` to scope it to one folder. Reads at most **6** template folders per call — a Worker gets ~50 subrequests and each template costs two reads — and names what it skipped rather than reporting it clean. |
 | `list_changes` | What's staged but not yet published. |
 | `publish` | Merge staging → main to go live. |
+
+### Why the last two exist
+
+Everything above `describe_site_system` edits **content**. The site system — content
+types, templates, routes, styles — was reachable only from a checkout and a terminal,
+which is precisely the person who did not need a CMS. These two are the read half of
+closing that: an agent can learn the contract from the server instead of being assumed
+to have read `docs/site-system.md`, and then check its own work before handing back.
+
+They matter because Lanza's composition failures are **silent**. A misspelled
+`{{placeholder}}` renders as empty text and the build passes. An agent with no checker
+has no way to notice, and neither does the owner until the page is live.
+
+Both run `functions/_lib/site-system.mjs` — the same module `npm run check:site` runs,
+not a reimplementation of it. That is why the checker lives under `functions/` at all,
+and why it carries no dependencies: it has to survive the Pages bundler.
 
 ## Setup
 

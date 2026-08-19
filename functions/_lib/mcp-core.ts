@@ -10,6 +10,9 @@
 // `staging` branch; `publish` merges staging→main to go live.
 import { ContentClient, GitHubError, slugify, assertSafePath } from "./lanza-content";
 import { BRANCH, WORKING_BRANCH } from "./gh-proxy";
+// The site-system checker, shared verbatim with `npm run check:site`. Plain .mjs and
+// dependency-free so it survives the Pages bundler — see its header.
+import { checkSite, siteSystemContract } from "./site-system.mjs";
 
 export const SERVER_INFO = { name: "lanza-cms", title: "Lanza CMS", version: "0.1.0" };
 export const SUPPORTED_PROTOCOL = "2025-06-18";
@@ -280,6 +283,18 @@ export const TOOLS: ToolDef[] = [
     },
   },
   {
+    name: "describe_site_system",
+    description:
+      "Explain how a Lanza site is COMPOSED — the layer model, what each template position " +
+      "puts in scope, the field widgets the CMS can render, the reserved names, and every " +
+      "way a site can be silently wrong. Call this before writing a template, declaring " +
+      "fields, or giving a content type a URL. Lanza's composition failures do not raise " +
+      "errors: a misspelled placeholder renders as empty text and the build passes. Takes " +
+      "no arguments and reads nothing — it is the same data the checker enforces.",
+    inputSchema: obj({}),
+    run: async () => siteSystemContract(),
+  },
+  {
     name: "list_content",
     description:
       "List entries in a collection. For a localized collection pass a locale (defaults to the site's default locale). Returns file paths — pass a path to read_content, update_content, or delete_content.",
@@ -395,6 +410,53 @@ export const TOOLS: ToolDef[] = [
     run: async (_args, client) => {
       const files = await client.pendingChanges();
       return { pending: files.length, files };
+    },
+  },
+  {
+    name: "validate_site",
+    description:
+      "Check this site's templates, fields and routes against each other and return every " +
+      "problem found. Read-only. Run it after changing a template or the content model and " +
+      "BEFORE publish — the failures it reports are the ones that produce no error of their " +
+      "own: a placeholder that renders empty, a field the owner fills that appears nowhere, " +
+      "a route pointing at a template that does not exist. Pass `template` to check one " +
+      "folder instead of the whole site. Call describe_site_system for what each code means.",
+    inputSchema: obj(
+      { template: str("Check only this template folder, e.g. 'event'. Omit to check the whole site.") },
+      [],
+    ),
+    run: async (args, client) => {
+      const only = args.template === undefined ? undefined : [String(args.template)];
+      const { problems, templates, skipped } = await checkSite(
+        {
+          readText: (path: string) => client.readRaw(path),
+          listTemplates: async () =>
+            (await client.listAll("templates"))
+              .filter((i) => i.type === "dir")
+              .map((i) => i.name),
+        },
+        // A Worker gets ~50 subrequests per request and each template costs two reads
+        // (template.html + fields.json), each of which may miss on staging and retry
+        // against main. Six keeps the worst case comfortably inside that; anything
+        // left out is named in `skipped` rather than quietly treated as clean.
+        { maxTemplates: 6, only },
+      );
+      const errors = problems.filter((p) => p.level === "error");
+      return {
+        ok: errors.length === 0,
+        checked: templates,
+        ...(skipped.length
+          ? {
+              skipped,
+              skippedNote:
+                "Not checked — this call reads at most 6 template folders. Re-run with " +
+                "`template` set to each of these to cover them.",
+            }
+          : {}),
+        errors: errors.length,
+        warnings: problems.length - errors.length,
+        problems,
+      };
     },
   },
   {

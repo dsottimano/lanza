@@ -47,13 +47,18 @@ function fakeGitHub(seed = {}) {
     if (method === "GET" && path.startsWith("contents/")) {
       const p = path.replace(/^contents\//, "");
       if (files.has(p)) return res(200, { content: b64(files.get(p)), sha: `sha-${p}` });
-      // Directory listing: any file under `p/`.
-      const children = [...files.keys()].filter((k) => k.startsWith(`${p}/`) && !k.slice(p.length + 1).includes("/"));
-      if (children.length)
-        return res(
-          200,
-          children.map((k) => ({ type: "file", name: k.split("/").pop(), path: k })),
-        );
+      // Directory listing. Faithful to the Contents API: immediate children only,
+      // with `type: "dir"` for the ones that have children of their own — which is
+      // what validate_site enumerates templates/ by.
+      const under = [...files.keys()].filter((k) => k.startsWith(`${p}/`));
+      if (under.length) {
+        const kids = new Map();
+        for (const k of under) {
+          const [head, ...rest] = k.slice(p.length + 1).split("/");
+          if (!kids.has(head)) kids.set(head, { type: rest.length ? "dir" : "file", name: head, path: `${p}/${head}` });
+        }
+        return res(200, [...kids.values()]);
+      }
       return res(404, { message: "Not Found" });
     }
     if (method === "PUT" && path.startsWith("contents/")) {
@@ -98,7 +103,7 @@ test("initialize returns protocol + serverInfo", async () => {
 test("tools/list exposes the full surface", async () => {
   const r = await handleMessage({ jsonrpc: "2.0", id: 2, method: "tools/list" }, client());
   const names = r.result.tools.map((t) => t.name);
-  for (const n of ["get_site", "list_collections", "get_schema", "list_content", "read_content", "create_content", "update_content", "delete_content", "list_changes", "publish"])
+  for (const n of ["get_site", "list_collections", "get_schema", "describe_site_system", "list_content", "read_content", "create_content", "update_content", "delete_content", "validate_site", "list_changes", "publish"])
     assert.ok(names.includes(n), `missing tool ${n}`);
   assert.equal(TOOL_LIST.length, names.length);
 });
@@ -447,4 +452,79 @@ test("a null JSON-RPC message is -32600, not a crash", async () => {
   // and one bad element must not take down a whole batch
   const batch = await Promise.all([null, { jsonrpc: "2.0", id: 1, method: "ping" }].map((m) => handleMessage(m, client())));
   assert.equal(batch[1].result && typeof batch[1].result, "object");
+});
+
+// ---------------------------------------------------------------------------
+// The site system over MCP. The point of both tools is that an agent can learn the
+// composition contract and check its own work WITHOUT a checkout — until these
+// existed, every rule in docs/site-system.md was reachable only from a terminal.
+// ---------------------------------------------------------------------------
+
+const callData = async (name, args = {}) => toolData(await call(name, args, 90));
+
+test("describe_site_system serves the contract, without touching GitHub", async () => {
+  // No fakeGitHub(): any network call at all fails the test, which is the claim.
+  globalThis.fetch = async () => {
+    throw new Error("describe_site_system must not make a request");
+  };
+  const c = await callData("describe_site_system");
+  assert.match(c.rule, /may only reference names the layer below/);
+  assert.deepEqual(c.positions.map((p) => p.id).sort(), ["detail", "list", "page"]);
+  assert.ok(c.widgets.includes("slots"));
+  assert.ok(c.checks.some((k) => k.code === "undeclared-slot"));
+});
+
+// A site whose template misspells its own field — the canonical silent failure.
+const BROKEN_SITE = {
+  "data/schema.json": SCHEMA,
+  "templates/event/template.html": "<h1>{{ vneue }}</h1>",
+  "templates/event/fields.json": JSON.stringify({
+    name: "event",
+    fields: [{ name: "venue", label: "Venue", widget: "string" }],
+  }),
+};
+
+test("validate_site catches a misspelled placeholder", async () => {
+  fakeGitHub(BROKEN_SITE);
+  const r = await callData("validate_site");
+  assert.equal(r.ok, false);
+  assert.deepEqual(r.checked, ["event"]);
+  assert.ok(r.problems.some((p) => p.code === "undeclared-slot" && p.message.includes("vneue")));
+  // …and the other half of the same mistake: an input nobody prints.
+  assert.ok(r.problems.some((p) => p.code === "unused-field" && p.message.includes("venue")));
+});
+
+test("validate_site reports a clean site as ok", async () => {
+  fakeGitHub({
+    "data/schema.json": SCHEMA,
+    "templates/event/template.html": "<h1>{{ venue }}</h1>",
+    "templates/event/fields.json": JSON.stringify({
+      name: "event",
+      fields: [{ name: "venue", label: "Venue", widget: "string" }],
+    }),
+  });
+  const r = await callData("validate_site");
+  assert.equal(r.ok, true);
+  assert.deepEqual(r.problems, []);
+});
+
+test("validate_site scopes to one template", async () => {
+  fakeGitHub({
+    ...BROKEN_SITE,
+    "templates/other/template.html": "<p>{{ nope }}</p>",
+    "templates/other/fields.json": JSON.stringify({ name: "other", fields: [] }),
+  });
+  const r = await callData("validate_site", { template: "other" });
+  assert.deepEqual(r.checked, ["other"]);
+  assert.ok(r.problems.every((p) => !p.where.includes("event")));
+});
+
+test("validate_site names a route into a template that does not exist", async () => {
+  fakeGitHub({
+    "data/schema.json": JSON.stringify([
+      { kind: "folder", name: "events", folder: "content/events", fields: [], route: { base: "events", template: "event" } },
+    ]),
+  });
+  const r = await callData("validate_site");
+  assert.ok(r.problems.some((p) => p.code === "route-template-missing"));
 });

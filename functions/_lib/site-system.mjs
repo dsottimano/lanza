@@ -281,6 +281,14 @@ function ownerIndex(head, stack) {
   return -1;
 }
 
+/**
+ * One reported failure. Typed here (rather than inline) because the MCP tool and the
+ * CLI both filter on `level`, and `astro check` covers this file.
+ *
+ * @typedef {{ level: "error"|"warning", code: string, where: string, message: string }} Problem
+ */
+
+/** @type {(level: "error"|"warning", code: string, where: string, message: string) => Problem} */
 const problem = (level, code, where, message) => ({ level, code, where, message });
 
 /**
@@ -426,7 +434,8 @@ export const CHECKS = [
   { code: "listing-undeclared", level: "error", failure: "A list template with no `listing` block — nothing can check what {{#each entries}} prints." },
   { code: "listing-unknown-field", level: "error", failure: "A listing prints a field its collection does not declare." },
   { code: "listing-unknown-collection", level: "error", failure: "`listing.of` names a collection that does not exist." },
-  // Whole-site (scripts/validate-site.mjs — needs the filesystem, not just a template)
+  // Whole-site (checkSite — needs to read the repo, not just one template)
+  { code: "schema-invalid", level: "error", failure: "data/schema.json is not a JSON array of collections — the whole model is unreadable." },
   { code: "missing-template", level: "error", failure: "A template folder with no template.html." },
   { code: "missing-fields", level: "error", failure: "A template folder with no fields.json — the CMS would show no inputs." },
   { code: "route-template-missing", level: "error", failure: 'A live URL rendering "Unknown template".' },
@@ -668,8 +677,127 @@ export function checkPart(name, html) {
   return problems;
 }
 
+// ── The whole-site check ─────────────────────────────────────────────────────
+
+/**
+ * Check every layer of a site against every other one — the thing `npm run check:site`
+ * and the MCP `validate_site` tool both run.
+ *
+ * IO is injected rather than imported, for the reason this file has no dependencies:
+ * the CLI reads a working tree with node's fs, and the MCP server reads a GitHub
+ * branch over HTTP. Sharing the orchestration means the answer an agent gets from the
+ * server is the answer the CLI would give — a second implementation would be a second
+ * opinion, and there is only supposed to be one.
+ *
+ * @param {object} io
+ * @param {(path: string) => Promise<string|null>|string|null} io.readText
+ *   Repo-relative read. Null (not a throw) when the file does not exist.
+ * @param {() => Promise<string[]>|string[]} io.listTemplates
+ *   Every folder name under templates/, EXCLUDING `parts`.
+ * @param {object} [opts]
+ * @param {number} [opts.maxTemplates]
+ *   Read at most this many template folders. Exists because a Cloudflare Worker gets
+ *   ~50 subrequests per request and each template costs two reads; whatever is left
+ *   out comes back in `skipped` rather than being silently dropped.
+ * @param {string[]} [opts.only] Validate just these template folders.
+ * @returns {Promise<{problems: Problem[], templates: string[], skipped: string[]}>}
+ */
+export async function checkSite(io, opts = {}) {
+  const problems = [];
+  const readText = async (p) => (await io.readText(p)) ?? null;
+
+  // ── The model, and the routes that give it URLs.
+  let folders = [];
+  const schemaRaw = await readText("data/schema.json");
+  if (schemaRaw !== null) {
+    let schema;
+    try {
+      schema = JSON.parse(schemaRaw);
+    } catch (e) {
+      schema = null;
+      problems.push(problem("error", "schema-invalid", "data/schema.json", `Not valid JSON: ${e.message}`));
+    }
+    if (schema !== null && !Array.isArray(schema)) {
+      problems.push(
+        problem("error", "schema-invalid", "data/schema.json", "Expected an array of collections."),
+      );
+    } else if (Array.isArray(schema)) {
+      folders = schema.filter((c) => c && c.kind === "folder");
+    }
+  }
+
+  const world = {
+    collections: new Map(folders.map((c) => [c.name, new Set((c.fields || []).map((f) => f.name))])),
+  };
+
+  // A template's POSITION comes from the routes that reference it — never guessed,
+  // because the position decides what the engine puts in scope.
+  const position = new Map();
+  for (const c of folders) {
+    if (c.route?.template) position.set(c.route.template, "detail");
+    if (c.route?.list?.template) position.set(c.route.list.template, "list");
+  }
+
+  // ── Templates.
+  const all = (await io.listTemplates()).filter((n) => n !== "parts");
+  const wanted = opts.only ? all.filter((n) => opts.only.includes(n)) : all;
+  for (const name of opts.only || []) {
+    if (!all.includes(name)) {
+      problems.push(problem("error", "missing-template", `templates/${name}/`, "No such template folder."));
+    }
+  }
+  const limit = opts.maxTemplates ?? Infinity;
+  const templates = wanted.slice(0, limit);
+  const skipped = wanted.slice(limit);
+
+  for (const name of templates) {
+    const html = await readText(`templates/${name}/template.html`);
+    if (html === null) {
+      problems.push(problem("error", "missing-template", `templates/${name}/`, "No template.html."));
+      continue;
+    }
+    const fieldsRaw = await readText(`templates/${name}/fields.json`);
+    if (fieldsRaw === null) {
+      problems.push(
+        problem("error", "missing-fields", `templates/${name}/`, "No fields.json — the CMS would show no inputs for this template."),
+      );
+      continue;
+    }
+    let fields;
+    try {
+      fields = JSON.parse(fieldsRaw);
+    } catch (e) {
+      problems.push(problem("error", "bad-field", `templates/${name}/fields.json`, `Not valid JSON: ${e.message}`));
+      continue;
+    }
+    problems.push(...checkTemplate({ name, html, fields, position: position.get(name) }, world));
+  }
+
+  // ── Chrome. Parts have no fields.json; their contract is PART_DATA.
+  for (const part of ["header", "footer"]) {
+    const html = await readText(`templates/parts/${part}.html`);
+    if (html !== null) problems.push(...checkPart(part, html));
+  }
+
+  // ── Routes. Checked against the FULL listing, not the capped one: a route into a
+  // template we simply didn't read is not a missing template.
+  const exists = new Set(all);
+  for (const c of folders) {
+    for (const t of [c.route?.template, c.route?.list?.template].filter(Boolean)) {
+      if (!exists.has(t)) {
+        problems.push(
+          problem("error", "route-template-missing", "data/schema.json", `collection "${c.name}" routes to template "${t}", which does not exist.`),
+        );
+      }
+    }
+  }
+
+  return { problems, templates, skipped };
+}
+
 export default {
   LAYERS,
+  checkSite,
   WIDGETS,
   CHECKS,
   siteSystemContract,

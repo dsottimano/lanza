@@ -23,8 +23,8 @@ Started 2026-08-15. Last restructured 2026-08-19.
 Then prove the tree is healthy before changing anything:
 
 ```sh
-npm test            # 227 function + 313 admin, all green as of 43c03a1
-npm run check:site  # 2 template dirs, 0 errors, 0 warnings
+npm test            # 235 function + 313 admin, all green
+npm run check:site  # 1 template dir, 0 errors, 0 warnings
 node bin/lanza.mjs build   # 15 pages
 ```
 
@@ -61,10 +61,9 @@ The existing surface is `get_site`, `list_collections`, `get_schema`, `list_cont
 is a router with no tool definitions of its own, so a tool added to a tenant appears
 there automatically — see `docs/mcp-server.md`).
 
-- [ ] **`describe_site_system`** — return the layer model, the positions, the widget list
-      and the reserved names, so an agent learns the contract from the server instead of
-      being expected to have read a markdown file. `LAYERS`, `POSITIONS`, `WIDGETS`,
-      `PART_DATA` in `functions/_lib/site-system.mjs` are already exported as data for this.
+- [x] **`describe_site_system`** — serves `siteSystemContract()`: the layer model, the
+      positions with what each puts in scope, the widgets, the reserved names, and every
+      check code with the silent failure it stands for. No arguments, no reads.
 - [ ] **`write_template`** — create/replace `templates/<name>/{template.html,fields.json}`,
       **refusing on any checker error**. The refusal is the feature: it is the only way an
       agent finds out it typed `{{ vneue }}`, because the engine renders that as empty
@@ -75,16 +74,21 @@ there automatically — see `docs/mcp-server.md`).
       entire, writes nothing on failure.
 - [ ] **`list_styles` / `set_style`** — read `data/styles.json`, and write a chosen
       variant into `appearance.json`. Proposing styles must NOT publish one.
-- [ ] **`validate_site`** — run the checker and return findings. Cheap, read-only, and it
-      lets an agent verify its own work before handing back.
+- [x] **`validate_site`** — runs `checkSite()` over the repo and returns findings.
+      Read-only. `template: "<name>"` scopes it to one folder. It reads at most **6**
+      template folders per call (a Worker gets ~50 subrequests; each template costs two
+      reads) and names what it skipped. Lifting that cap wants one `git/trees?recursive=1`
+      call to learn which ref each file is on, so each read costs one subrequest instead
+      of two — worth doing when a real tenant has more than six templates.
 
 Two constraints that will shape the build, both learned the hard way:
 
-- **The checker has to run inside `functions/`.** It lives in `functions/_lib/site-system.mjs`
-  today. Cloudflare bundles all of `functions/` with an **older esbuild** than local, so
-  `npm test` passing proves nothing about the deploy — verify with
-  `npx wrangler@3.114.17 pages functions build --outdir /tmp/fnbuild` (CLAUDE.md).
-  Move it to `functions/_lib/` or import it from there, and keep it dependency-free.
+- ~~**The checker has to run inside `functions/`.**~~ Done — it is
+  `functions/_lib/site-system.mjs`, dependency-free, and the Pages build is verified
+  (`npx wrangler@3.114.17 pages functions build --outdir /tmp/fnbuild`). Its test stays in
+  `scripts/`: everything under `functions/` is bundled, `*.test.mjs` included. The
+  orchestration the CLI used to own is now `checkSite()` with IO injected, so
+  `npm run check:site` and `validate_site` cannot give different answers.
 - **`data/schema.json` is compiled into code the build imports.** `gen-content-config.mjs`
   and `gen-routes.mjs` both treat it as untrusted for exactly that reason. An MCP tool
   that writes it widens *who* can reach that position, so this needs a pass over

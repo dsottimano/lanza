@@ -147,6 +147,24 @@ export class ContentClient {
       .map((i) => i.path);
   }
 
+  // Every immediate child of `dir`, with its type — directories included.
+  // `list()` above filters to .md files, which is right for entries and useless for
+  // the site system: validating templates means enumerating templates/<name>/ DIRS.
+  // Falls back to main like readRaw, because templates/ may not have been touched on
+  // staging. Missing dir on both → [].
+  async listAll(dir: string): Promise<Array<{ type: string; name: string; path: string }>> {
+    for (const ref of [WORKING_BRANCH, BRANCH]) {
+      const res = await this.gh(`contents/${encodePath(dir)}?ref=${ref}`);
+      if (res.ok) {
+        const items = (await res.json()) as unknown;
+        // A file (not a directory) comes back as an object, not an array.
+        return Array.isArray(items) ? (items as Array<{ type: string; name: string; path: string }>) : [];
+      }
+      if (res.status !== 404) throw await this.fail(res, `list ${dir}`);
+    }
+    return [];
+  }
+
   // Read one entry (frontmatter + HTML body + sha) from staging.
   async read(path: string): Promise<Entry> {
     const res = await this.gh(`contents/${encodePath(path)}?ref=${WORKING_BRANCH}`);
