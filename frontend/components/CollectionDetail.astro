@@ -7,6 +7,7 @@
 // model as a page's slots — the template is author-trusted and emitted verbatim,
 // values are escaped.
 import type { CollectionEntry } from "astro:content";
+import Base from "../layouts/Base.astro";
 import HtmlTemplate from "./HtmlTemplate.astro";
 import { sanitizeBody } from "../lib/sanitize";
 import { assertSanitizedSafe } from "../lib/assert-rendered-safe";
@@ -25,8 +26,18 @@ const { entry, locale, template, base } = Astro.props;
 // Entry bodies are attacker-reachable (the bot commits HTML, an MCP agent writes
 // bodies), so the same sanitize-then-verify posture as PageArticle applies.
 const body = assertSanitizedSafe(sanitizeBody(entry.body ?? ""), `${base} entry body`);
+
+// Frontmatter is open-ended (the content type was invented in the CMS), so read the
+// two SEO fields defensively rather than assuming a shape.
+const data = entry.data as Record<string, unknown>;
+const text = (v: unknown): string | undefined => (typeof v === "string" && v.trim() ? v : undefined);
+const title = text(data.title) ?? base;
+const description = text(data.description);
+// Wrapped in Base for the same reason every other route is — see CollectionList.
 ---
 
-<main>
-  <HtmlTemplate name={template} data={detailScope(entry, base, locale, body)} />
-</main>
+<Base locale={locale} seo={{ title, description, ogType: "article" }}>
+  <main>
+    <HtmlTemplate name={template} data={detailScope(entry, base, locale, body)} />
+  </main>
+</Base>

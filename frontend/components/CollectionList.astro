@@ -2,6 +2,7 @@
 // The listing page for a routed collection (/events/), rendered through its list
 // template with `{{#each entries}}`. Called only by generated route files.
 import type { CollectionEntry } from "astro:content";
+import Base from "../layouts/Base.astro";
 import HtmlTemplate from "./HtmlTemplate.astro";
 import { listScope, type CollectionRoute } from "../lib/collection-routes";
 import type { Locale } from "../lib/i18n";
@@ -14,8 +15,23 @@ interface Props {
 }
 
 const { entries, locale, base, list } = Astro.props;
+
+// A listing has no entry of its own, so its <title> comes from the slots the content
+// type carries for exactly this purpose (see CollectionRoute.list.slots); the URL
+// segment is the last resort so the tag is never empty.
+const text = (v: unknown): string | undefined => (typeof v === "string" && v.trim() ? v : undefined);
+const slots = (list.slots ?? {}) as Record<string, unknown>;
+const title = text(slots.title) ?? text(slots.heading) ?? base;
+const description = text(slots.description) ?? text(slots.intro);
+// Wrapped in Base for the same reason every other route is: without it the page
+// ships as a bare <main> — no <head>, no title, no canonical, no header or footer,
+// and no <html style="--ink:…">, so the template's own var(--ink) resolves to nothing
+// and an agent-built section renders unstyled. check:site cannot see this; it was
+// found by reading the deployed page.
 ---
 
-<main>
-  <HtmlTemplate name={list.template} data={listScope(entries, base, locale, list)} />
-</main>
+<Base locale={locale} seo={{ title, description, ogType: "website" }}>
+  <main>
+    <HtmlTemplate name={list.template} data={listScope(entries, base, locale, list)} />
+  </main>
+</Base>
