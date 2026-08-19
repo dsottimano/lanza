@@ -91,10 +91,22 @@ content type with a `route`, and `/services/` 404'd on staging because
 `gen-routes.mjs` does not exist on that branch. Everything the agent did was right and
 none of it was visible. Merging `main` into a local branch built all 26 pages first try.
 
-Invisible to a pure-CMS tenant (staging is always main + pending edits). It bites any
-site where code reaches `main` directly — this repo, and **every tenant whose
-`lanza-site` version is bumped by the broker fan-out**, which is a commit to `main` no
-CMS edit ever sees.
+**Severity, corrected.** This is mostly specific to THIS repo, and the reason is worth
+stating plainly because it is easy to over-generalise (I did, on the day):
+
+- A **customer's** repo holds only their content. The program that renders it comes
+  from the `lanza-site` npm package, i.e. from `node_modules`, not from their branches.
+  So their `main` and `staging` always run the SAME program, and staging being "behind"
+  only means "missing some published text" — which is meaningless, since staging is
+  where the edits are being made. Staging works exactly as anyone would assume.
+- **This repo is the odd one out**: it is where Lanza itself is built, so it holds the
+  content AND the source code in the same place. Staging here is content plus a frozen
+  snapshot of the program from whenever the last publish was.
+
+The narrow case that DOES affect a customer: right after their pinned `lanza-site`
+version is bumped on `main`, their staging still has the old `package.json` and
+previews with the old program until the next publish. Real, worth fixing, nothing like
+what happened here.
 
 - [ ] Fast-forward `staging` to `main` whenever it is behind and has nothing pending.
       The gh-proxy already allows the PATCH (`git/refs/heads/<branch>`) — the CMS uses
