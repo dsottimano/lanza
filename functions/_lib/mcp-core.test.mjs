@@ -265,6 +265,74 @@ test("update_content merges frontmatter and preserves untouched keys", async () 
   assert.match(written, /<p>Body<\/p>/); // body preserved (not passed)
 });
 
+test("write_template refuses the name that would land in templates/parts/", async () => {
+  fakeGitHub({ "data/schema.json": SCHEMA });
+  const r = await handleMessage(
+    {
+      jsonrpc: "2.0",
+      id: 73,
+      method: "tools/call",
+      params: {
+        name: "write_template",
+        arguments: { name: "parts", template_html: "<p>{{ x }}</p>", fields: [{ name: "x", widget: "string" }] },
+      },
+    },
+    client(),
+  );
+  assert.match(JSON.stringify(r), /write_part/);
+});
+
+test("update_content merges a NESTED object instead of replacing it", async () => {
+  // The destructive case, and the natural one: an agent told "change the headline"
+  // sends the one slot it is changing. A shallow spread deleted the other 50 and the
+  // page rendered empty with a green build.
+  const gh = fakeGitHub({
+    "data/schema.json": SCHEMA,
+    "content/pages/en/home.md":
+      "---\ntitle: Home\nslots:\n  headline: Old\n  intro: keep me\n  ctaLabel: keep me too\n---\n\n<p>Body</p>\n",
+  });
+  await handleMessage(
+    {
+      jsonrpc: "2.0",
+      id: 71,
+      method: "tools/call",
+      params: {
+        name: "update_content",
+        arguments: { path: "content/pages/en/home.md", frontmatter: { slots: { headline: "New" } } },
+      },
+    },
+    client(),
+  );
+  const written = gh.files.get("content/pages/en/home.md");
+  assert.match(written, /headline: New/);
+  assert.match(written, /intro: keep me/);
+  assert.match(written, /ctaLabel: keep me too/);
+});
+
+test("update_content removes a key when it is set to null", async () => {
+  // Deep-merging costs the ability to clear a mapping by overwriting it, which a
+  // template switch wants. null is the escape hatch, and the tool says so.
+  const gh = fakeGitHub({
+    "data/schema.json": SCHEMA,
+    "content/pages/en/home.md": "---\ntitle: Home\nslots:\n  headline: Old\n  stale: gone\n---\n",
+  });
+  await handleMessage(
+    {
+      jsonrpc: "2.0",
+      id: 72,
+      method: "tools/call",
+      params: {
+        name: "update_content",
+        arguments: { path: "content/pages/en/home.md", frontmatter: { slots: { stale: null } } },
+      },
+    },
+    client(),
+  );
+  const written = gh.files.get("content/pages/en/home.md");
+  assert.match(written, /headline: Old/);
+  assert.doesNotMatch(written, /stale/);
+});
+
 test("list_content lists a localized folder", async () => {
   fakeGitHub({
     "data/site.json": SITE,

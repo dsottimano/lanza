@@ -10,8 +10,10 @@
 // `staging` branch; `publish` merges staging→main to go live.
 import { ContentClient, GitHubError, slugify, assertSafePath } from "./lanza-content";
 import { BRANCH, WORKING_BRANCH } from "./gh-proxy";
-// The site-system checker, shared verbatim with `npm run check:site`. Plain .mjs and
-// dependency-free so it survives the Pages bundler — see its header.
+// The site-system checker, shared verbatim with `npm run check:site`. Plain .mjs, and
+// it is NOT dependency-free any more — it pulls parse5 in through
+// dangerous-constructs.mjs, so a change here can break the Cloudflare BUILD without
+// failing a single test. Run `npx wrangler@3.114.17 pages functions build` (CLAUDE.md).
 // The render side owns what a brand value and a link may be, and these are the exact
 // predicates it applies. Imported, not re-stated: a writer that disagreed with the
 // renderer would accept settings that silently do nothing on the page.
@@ -224,6 +226,37 @@ async function resolveCollection(client: ContentClient, name: string): Promise<C
 // nest one subfolder per locale — matches the CMS's entryFolder()).
 function entryFolder(col: CollectionDef, locale: string): string {
   return col.localized ? `${col.folder}/${locale}` : col.folder;
+}
+
+/** A YAML mapping, as opposed to a list, a date or a scalar. */
+function isMapping(v: unknown): v is Record<string, unknown> {
+  return !!v && typeof v === "object" && !Array.isArray(v) && !(v instanceof Date);
+}
+
+/**
+ * Merge an update into existing frontmatter, one nested mapping at a time.
+ *
+ * A shallow spread was silently destructive: `slots` is one key holding the WHOLE
+ * page, so an agent told "change the hero headline" sends
+ * `{slots: {headline: "…"}}` — the natural reading of a tool that promises other keys
+ * are preserved — and every other slot on the page disappears. The build still
+ * passes; the page just renders empty. `seo` has the same shape and the same hazard.
+ *
+ * Merging costs the ability to CLEAR a mapping by overwriting it, which a template
+ * switch legitimately wants, so `null` removes a key. That is the only way to say
+ * "delete this" in JSON, and the tool description says so.
+ */
+function mergeFrontmatter(
+  current: Record<string, unknown>,
+  incoming: Record<string, unknown>,
+): Record<string, unknown> {
+  const out: Record<string, unknown> = { ...current };
+  for (const [k, v] of Object.entries(incoming)) {
+    if (v === null) delete out[k];
+    else if (isMapping(v) && isMapping(out[k])) out[k] = mergeFrontmatter(out[k] as Record<string, unknown>, v);
+    else out[k] = v;
+  }
+  return out;
 }
 
 // A locale code is interpolated straight into a write path, so it is untrusted
@@ -554,13 +587,14 @@ export const TOOLS: ToolDef[] = [
   {
     name: "update_content",
     description:
-      'Update an existing entry on staging. Frontmatter keys you pass are merged into the existing frontmatter (others are preserved); body_html, if given, replaces the body. Not live until publish. To make a draft public, pass frontmatter {"draft": false}.',
+      'Update an existing entry on staging. Frontmatter keys you pass are merged into the existing frontmatter (others are preserved), and a NESTED object merges key by key too — sending {"slots": {"heading": "x"}} changes that one slot and leaves the rest. Pass null to remove a key. body_html, if given, replaces the body. Not live until publish. To make a draft public, pass frontmatter {"draft": false}.',
     inputSchema: obj(
       {
         path: str("Repo path of the entry to update (from list_content)."),
         frontmatter: {
           type: "object",
-          description: "Frontmatter fields to set/override. Merged into the existing frontmatter.",
+          description:
+            "Frontmatter fields to set/override. Merged into the existing frontmatter, nested objects included. null removes a key.",
           additionalProperties: true,
         },
         body_html: str("New HTML body. Omit to leave the body unchanged."),
@@ -570,7 +604,7 @@ export const TOOLS: ToolDef[] = [
     run: async (args, client, site) => {
       const path = await assertEntryPath(client, String(args.path));
       const current = await client.read(path);
-      const merged = { ...current.data, ...((args.frontmatter as Record<string, unknown>) ?? {}) };
+      const merged = mergeFrontmatter(current.data, (args.frontmatter as Record<string, unknown>) ?? {});
       const body = args.body_html !== undefined ? String(args.body_html) : current.body;
       const commit = await client.save(path, merged, body, `Update ${path} via MCP`);
       return { updated: path, commit, ...stagedNote(site) };
@@ -641,6 +675,15 @@ export const TOOLS: ToolDef[] = [
           400,
           `Refusing template name "${name}": must be lowercase kebab-case, one segment ` +
             "(it becomes a directory name and is compiled into a generated route).",
+        );
+      }
+      // "parts" passes the name test and IS a real directory — the header/footer one.
+      // Writing there drops a template.html beside the site chrome, and checkSite
+      // filters `parts` out of the template list, so validate_site would never see it.
+      if (name === "parts") {
+        throw new GitHubError(
+          400,
+          'Refusing template name "parts": templates/parts/ holds the site header and footer. Use write_part for those.',
         );
       }
       const position = args.position === undefined ? "page" : String(args.position);
