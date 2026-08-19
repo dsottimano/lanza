@@ -1,0 +1,115 @@
+---
+// STYLE VARIANTS, side by side, before anything goes live.
+//
+// The gap: an agent could set the brand, but only by CHANGING it — the owner saw one
+// look at a time and had to imagine the alternatives. Choosing needs comparison.
+//
+// This route exists only when the tenant has a `data/styles.json`. No file, no pages —
+// getStaticPaths returns nothing, so a site that never asked for it is byte-identical.
+// That is why the glob is conditional rather than a plain import: an absent file must
+// not be a build error.
+//
+// Each variant is rendered as a SPECIMEN, not as a screenshot of the real page: the
+// same tokens (resolveBrand) the live site would use, applied inline to one card, so
+// the comparison is truthful about type, colour, corner and contrast without pretending
+// to be a page it is not. Picking one writes `brand` into data/appearance.json — an
+// ordinary reviewable change, per docs/review-surface.md.
+import Base from "../../layouts/Base.astro";
+import { resolveBrand, type BrandConfig } from "../../lib/appearance";
+import { DEFAULT_LOCALE } from "../../lib/i18n";
+
+interface Variant {
+  id: string;
+  label: string;
+  note?: string;
+  brand: BrandConfig;
+}
+
+const found = import.meta.glob<{ variants?: Variant[] }>("/data/styles.json", { eager: true });
+const styles = Object.values(found)[0];
+const variants: Variant[] = styles?.variants ?? [];
+
+export function getStaticPaths() {
+  const found = import.meta.glob<{ variants?: Variant[] }>("/data/styles.json", { eager: true });
+  const styles = Object.values(found)[0] as { variants?: Variant[] } | undefined;
+  return (styles?.variants ?? []).length ? [{ params: { variant: undefined } }] : [];
+}
+
+// One Google-Fonts request covering every variant's faces, so the specimens render in
+// their real type rather than silently falling back to the current site font.
+const fontHrefs = [...new Set(variants.map((v) => resolveBrand({ brand: v.brand }).fontHref).filter(Boolean))];
+---
+
+<Base
+  locale={DEFAULT_LOCALE}
+  seo={{ title: "Style options", description: "Compare style options before publishing.", noindex: true }}
+>
+  {/* Base exposes no head slot, so the variant faces load via @import in an inline
+      style block — each in its own block, because @import must lead a stylesheet. */}
+  {fontHrefs.map((href) => <style is:inline set:html={`@import url("${href}");`} />)}
+
+  <main class="sp">
+    <header class="sp-head">
+      <h1>Style options</h1>
+      <p>
+        {variants.length} looks, same content. Each specimen uses the exact design tokens the live
+        site would use. Nothing here is published — choosing one is a normal change you can review
+        and undo.
+      </p>
+    </header>
+
+    <div class="sp-grid">
+      {
+        variants.map((v) => {
+          const b = resolveBrand({ brand: v.brand });
+          return (
+            <section class="sp-card" style={b.styleVars}>
+              <div class="sp-swatches">
+                {(["bg", "surface", "ink", "muted", "accent", "border"] as const).map((k) => (
+                  <span class="sp-dot" style={`background:${v.brand.colors?.[k] ?? "transparent"}`} title={k} />
+                ))}
+              </div>
+              <p class="sp-kicker">Upcoming</p>
+              <h2 class="sp-title">Late Night Listening</h2>
+              <p class="sp-body">
+                One record, start to finish, in the dark, on a very good pair of speakers. No support
+                act and no talking.
+              </p>
+              <a class="sp-btn" href="#">Book a seat</a>
+              <footer class="sp-foot">
+                <strong>{v.label}</strong>
+                {v.note && <span> — {v.note}</span>}
+                <code>{v.id}</code>
+              </footer>
+            </section>
+          );
+        })
+      }
+    </div>
+  </main>
+</Base>
+
+<style>
+  .sp { max-width: 72rem; margin: 0 auto; padding: 3rem 1.5rem 4rem; }
+  .sp-head { max-width: 40rem; margin: 0 0 2.5rem; }
+  .sp-grid { display: grid; gap: 1.5rem; grid-template-columns: repeat(auto-fit, minmax(19rem, 1fr)); }
+
+  /* Every declaration below reads a custom property, so the inline styleVars on each
+     card are what actually paint it — the same mechanism Base.astro uses on <html>. */
+  .sp-card {
+    padding: 1.75rem;
+    background: var(--bg);
+    color: var(--ink);
+    border: 1px solid var(--border);
+    border-radius: var(--radius);
+    font-family: var(--font-prose);
+  }
+  .sp-swatches { display: flex; gap: .35rem; margin-bottom: 1.25rem; }
+  .sp-dot { width: 1.1rem; height: 1.1rem; border-radius: 50%; border: 1px solid rgb(0 0 0 / .15); }
+  .sp-kicker { font-size: .75rem; letter-spacing: .08em; text-transform: uppercase; color: var(--accent); margin: 0 0 .4rem; }
+  .sp-title { font-family: var(--font-heading); font-size: 1.6rem; line-height: 1.15; margin: 0 0 .6rem; color: var(--ink); }
+  .sp-body { margin: 0 0 1.25rem; line-height: 1.6; color: var(--muted); }
+  .sp-btn { display: inline-block; padding: .7rem 1.3rem; background: var(--accent); color: var(--on-accent, #fff); border-radius: var(--radius); text-decoration: none; font-weight: 600; }
+  .sp-foot { margin-top: 1.5rem; padding-top: 1rem; border-top: 1px solid var(--border); font-size: .85rem; color: var(--muted); }
+  .sp-foot code { display: block; margin-top: .3rem; opacity: .7; }
+</style>
