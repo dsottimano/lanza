@@ -401,6 +401,37 @@ export class GitHubClient {
     return { merged: res !== null };
   }
 
+  /**
+   * Throw the whole draft away: point the working branch back at production.
+   *
+   * The opposite of publish(), and the only other operation that moves a branch
+   * wholesale. It exists because without it the sole way to undo a draft is
+   * `git push origin main:staging --force` from a terminal — so an owner could not
+   * discard an agent's entire session without a developer, which is the person this
+   * product exists to remove.
+   *
+   * `force: true` is REQUIRED and is the whole point: the working branch has commits
+   * production does not, so this is never a fast-forward. It is destructive and it is
+   * a deliberate exception to the rule in docs/review-surface.md that a revert writes
+   * to the editor and never to GitHub — that rule protects against an automatic undo
+   * being irreversible, and this is the opposite, a human explicitly choosing to
+   * discard. Callers MUST name what is being lost before calling.
+   *
+   * Doubles as the fix for a working branch that has fallen BEHIND production (this
+   * repo's staging was 51 commits behind on 2026-08-19, so its previews built new
+   * content against old code). Reset-to-live and catch-up-to-live are one operation.
+   */
+  async discardDraft(): Promise<{ sha: string }> {
+    const prod = (await this.req(`/git/ref/heads/${REPO.productionBranch}`)) as {
+      object: { sha: string };
+    };
+    await this.req(`/git/refs/heads/${REPO.branch}`, {
+      method: "PATCH",
+      body: JSON.stringify({ sha: prod.object.sha, force: true }),
+    });
+    return { sha: prod.object.sha };
+  }
+
   // ── Read-only history/diff endpoints (used by theme revert) ──────────────
 
   /** List commits on the branch, newest first (one page). `path` narrows to commits

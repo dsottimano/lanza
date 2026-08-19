@@ -83,11 +83,12 @@ the MCP `validate_site` tool are what tell it whether what it invented holds tog
 
 Written 14:32, 2026-08-19. Order of work while the clock runs:
 
-1. **Build "Discard all pending changes" in the CMS.** §0 has the design. Highest
-   demo value: it is what lets Dave reset the draft between runs without a terminal,
-   and it is the same button that fixes a stale draft. Contained: `PendingView.vue`
-   plus one method in `admin/src/backend/github.ts`. The proxy already allows
-   `PATCH git/refs/heads/<branch>` — no security change.
+1. **Finish "Discard all pending changes" in the CMS.** §0 has the full design and
+   the exact remaining steps. The backend half (`GitHubClient.discardDraft()`) is
+   already committed, tested and unused — only `PendingView.vue` remains. Highest demo
+   value: it is what lets Dave reset the draft between runs without a terminal, and it
+   is the same button that fixes a stale draft. Rebuild the CMS afterwards
+   (`npm run build:admin`) and confirm `/admin` still loads — CLAUDE.md's rule.
 2. **Code review this session's work.** Nine feature commits landed today
    (`6c9f3bc..`), ten new MCP tools, a new safety classifier, parse5 into the Worker
    bundle. None of it has had a second pass.
@@ -178,22 +179,40 @@ version is bumped on `main`, their staging still has the old `package.json` and
 previews with the old program until the next publish. Real, worth fixing, nothing like
 what happened here.
 
-- [ ] **"Discard all pending changes" belongs in the CMS.** Today the only way to throw
-      away a draft is `git push origin main:staging --force` from a terminal, which
-      means the owner cannot undo an agent's whole session without a developer. Publish
-      is a button; its opposite must be too. They are the two ends of one decision and
-      belong side by side in `PendingView`.
-      - The capability already exists: `functions/_lib/gh-proxy.ts` allows
-        `PATCH git/refs/heads/<branch>` for both branches, so this is a UI + backend
-        call, not a proxy change.
-      - It is DESTRUCTIVE and it is a GitHub write, which is a deliberate exception to
-        `docs/review-surface.md`'s rule that a revert writes to the editor and never to
-        GitHub. That rule exists so undoing an agent is not itself irreversible; this is
-        the opposite case — a human explicitly choosing to throw work away. It must name
-        exactly what will be lost (the file list, as `list_changes` already returns) and
-        confirm, not just say "are you sure?".
-      - Same operation, second use: when staging is BEHIND and has nothing pending,
-        this is also the fix below. Reset-to-live and catch-up-to-live are one button.
+- [ ] **"Discard all pending changes" in the CMS — HALF DONE, finish this first.**
+      Today the only other way to throw a draft away is
+      `git push origin main:staging --force` from a terminal, so an owner cannot undo an
+      agent's whole session without a developer — the person this product exists to
+      remove. Publish is a button; its opposite must be too.
+
+      **Done and committed:** `GitHubClient.discardDraft()` in
+      `admin/src/backend/github.ts` — reads production's head and force-updates the
+      working branch to it. Tested green, type-checks, no caller yet. The doc comment on
+      it carries the reasoning; read that before changing it.
+
+      **Still to do — the UI, in `admin/src/ui/PendingView.vue`:**
+      - A "Discard everything" control in the header, beside "Publish everything". Those
+        two are the ends of one decision and belong together. `changes` is already
+        loaded on that screen, so the file list needs no new request.
+      - The confirm must **name what will be lost** — the rows already rendered — not
+        ask "are you sure?". `window.confirm` with a listed summary matches the existing
+        pattern (`ContentTypesView.vue:142`, `SiteHealthView.vue:80`); a bare confirm
+        does not meet the bar for something irreversible.
+      - Afterwards, re-run `load()` so the screen lands on its own "Nothing waiting"
+        state rather than showing rows that no longer exist.
+      - Hide it when `nothingWaiting` — there is nothing to discard.
+      - Errors go through `reportError` like the rest of the screen.
+
+      **Why it is safe to build:** `functions/_lib/gh-proxy.ts` already allows
+      `PATCH git/refs/heads/<branch>` on both branches, so no proxy or security change
+      is involved. It IS a destructive GitHub write, and a deliberate exception to
+      `docs/review-surface.md`'s rule that a revert writes to the editor and never to
+      GitHub — that rule stops an automatic undo being irreversible; this is the
+      opposite, a human choosing to discard.
+
+      **Second use, same button:** when the working branch is BEHIND production and has
+      nothing pending, `discardDraft()` is also the catch-up fix. Reset-to-live and
+      catch-up-to-live are one operation.
 - [ ] Fast-forward `staging` to `main` whenever it is behind and has nothing pending.
       The gh-proxy already allows the PATCH (`git/refs/heads/<branch>`) — the CMS uses
       it to fast-forward after a commit, so the capability is there and unused for this.
