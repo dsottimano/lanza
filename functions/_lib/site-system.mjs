@@ -22,7 +22,9 @@
 // That imposes two rules on this file, both of which break the DEPLOY (not the tests)
 // when violated, because Pages builds with an older esbuild than the local one:
 //
-//   * no dependencies, and no node builtins — it must run in the Workers runtime;
+//   * no node builtins, and no dependency that is not pure JS — it must run in the
+//     Workers runtime. It imports exactly one thing: ./dangerous-constructs.mjs, and
+//     through it parse5 (a direct, exact-pinned, pure-JS dep). Verified bundling.
 //   * no import attributes (`with { type: "json" }`) anywhere.
 //
 // Its test deliberately stays at scripts/site-system.test.mjs: everything under
@@ -38,6 +40,8 @@
 // Ordered bottom-up. Each layer names the artifact that declares it and what the
 // layer above is allowed to reference. This list is the doc (docs/site-system.md)
 // in machine-readable form; the checks below are its enforcement.
+import { dangerousConstructs } from "./dangerous-constructs.mjs";
+
 export const LAYERS = [
   {
     id: "style",
@@ -167,6 +171,115 @@ export const PART_DATA = {
     locales: ["code", "url", "active", "inactive", "sep"],
   },
 };
+
+// ── Template safety ──────────────────────────────────────────────────────────
+// A template is raw markup emitted with `set:html` (HtmlTemplate.astro, Base.astro).
+// Nothing sanitizes it — unlike a post body, which goes through frontend/lib/sanitize.ts.
+// That was always fine, because the template author was a human with repo write access
+// who could have committed the same markup directly.
+//
+// An agent authoring templates over MCP breaks that assumption. It may be acting on
+// prompt-injected input, and the origin it would get JS on is the same origin that
+// serves /admin and carries the session cookie — so a script in a template is not
+// "bad content", it is CMS takeover the next time the owner is signed in.
+//
+// So findings are CLASSIFIED rather than listed: the same construct is fine from a
+// human and refused from an agent, and the two callers need different answers.
+// `checkTemplate` reports them all as WARNINGS — a human's own markup must never fail
+// their build (the lesson assert-rendered-safe.ts is built around) — and the MCP
+// `write_template` tool refuses on the subset named in UNTRUSTED_AUTHOR_CODES.
+//
+// What is deliberately NOT flagged: a <style> block, and a background-image url() in a
+// style attribute. Templates are MADE of those. Flagging them would fire on every
+// template that exists, and a check that fires on everything is a check nobody reads.
+const SAFETY = [
+  {
+    code: "template-executes-js",
+    matches: (d) =>
+      d.kind === "handler" ||
+      d.kind === "script-text" ||
+      d.kind === "srcdoc" ||
+      d.kind === "url-scheme" ||
+      (d.kind === "element" && d.tag === "script"),
+    why:
+      "runs JavaScript on this site's origin — the same origin that serves /admin and " +
+      "carries the editor's session cookie",
+  },
+  {
+    code: "template-embeds-document",
+    matches: (d) => d.kind === "element" && ["iframe", "frame", "object", "embed"].includes(d.tag),
+    why:
+      "embeds another document. A same-origin frame is the documented sandbox escape " +
+      "(see frontend/lib/sanitize.ts); a third-party one needs the sandbox policy that " +
+      "file already works out, which templates do not inherit",
+  },
+  {
+    code: "template-redirects-visitor",
+    matches: (d) => d.kind === "base" || d.kind === "meta-refresh",
+    why: "sends every visitor to this page somewhere else, or retargets every relative URL on it",
+  },
+  {
+    code: "template-loads-remote",
+    matches: (d) => d.kind === "element" && ["form", "link"].includes(d.tag),
+    why:
+      "fetches from, or posts to, somewhere off this site. Legitimate for a contact form " +
+      "or a webfont, so it is reported and not refused — read it in the diff",
+  },
+];
+
+/**
+ * Codes an UNTRUSTED author (an agent over MCP) may not produce. `template-loads-remote`
+ * is deliberately absent: a contact form posting to a form service and a linked webfont
+ * are ordinary, and the review surface (docs/review-surface.md) is the control for them.
+ * Recorded as an accepted risk in docs/security-model.md §5.
+ */
+export const UNTRUSTED_AUTHOR_CODES = new Set([
+  "template-executes-js",
+  "template-embeds-document",
+  "template-redirects-visitor",
+]);
+
+/**
+ * Markup in `html` that a browser would act on, as checker problems.
+ *
+ * Parsed, never grepped. `<scr<script>ipt>`, an encoded handler, a construct hidden in
+ * a comment or an unclosed attribute — a regex loses all of those to the WHATWG
+ * tokenizer, which is exactly the history recorded in dangerous-constructs.mjs.
+ *
+ * @param {string} html
+ * @param {string} where
+ * @returns {Problem[]}
+ */
+export function checkTemplateSafety(html, where) {
+  const problems = [];
+  // A TEMPLATE is not rendered HTML: `href="{{ url }}"` is not a URL yet, and judging it
+  // as one flags every link in every template — which is how a safety check gets turned
+  // off. So substitute an inert value first, exactly as assert-rendered-safe.ts does for
+  // its control render. Root-relative, because that is what these placeholders resolve
+  // to, and a bare word in an href is (correctly) treated as suspicious.
+  //
+  // The substitution is deliberately NOT scheme-shaped, so `href="javascript:{{x}}"`
+  // still reads as `javascript:/…` and is still caught. What a VALUE does at render time
+  // is a separate check with its own backstop (renderChecked).
+  const inert = html.replace(/\{\{\{[^}]*\}\}\}|\{\{[^}]*\}\}/g, "/lanzasafeplaceholder");
+  for (const d of dangerousConstructs(inert)) {
+    // SVG sprite references (`<use href="#icon">`) are ordinary; a hostile URL on one
+    // is already caught as `url-scheme` by the walk itself.
+    if (d.kind === "element" && d.tag === "use") continue;
+    const rule = SAFETY.find((r) => r.matches(d));
+    if (!rule) continue; // <style>, background-image url() — what templates are made of
+    problems.push(
+      problem(
+        "warning",
+        rule.code,
+        where,
+        `${d.detail} ${rule.why}. Safe from a human with repo access; refused from an ` +
+          `agent over MCP, which may be acting on injected input.`,
+      ),
+    );
+  }
+  return problems;
+}
 
 // ── Template grammar (ENGINE-MIRROR) ─────────────────────────────────────────
 // Mirrors tokenize() + parse() in frontend/lib/template-render.ts. We keep only what
@@ -434,6 +547,11 @@ export const CHECKS = [
   { code: "listing-undeclared", level: "error", failure: "A list template with no `listing` block — nothing can check what {{#each entries}} prints." },
   { code: "listing-unknown-field", level: "error", failure: "A listing prints a field its collection does not declare." },
   { code: "listing-unknown-collection", level: "error", failure: "`listing.of` names a collection that does not exist." },
+  // Template safety — who wrote it decides the severity (see checkTemplateSafety)
+  { code: "template-executes-js", level: "warning", failure: "A template runs JS on the origin that serves /admin and carries the session cookie." },
+  { code: "template-embeds-document", level: "warning", failure: "A template embeds another document; a same-origin frame is the sandbox escape." },
+  { code: "template-redirects-visitor", level: "warning", failure: "A <base> or meta refresh sends every visitor elsewhere." },
+  { code: "template-loads-remote", level: "warning", failure: "A form or stylesheet reaching off-site. Legitimate, but worth reading in the diff." },
   // Whole-site (checkSite — needs to read the repo, not just one template)
   { code: "schema-invalid", level: "error", failure: "data/schema.json is not a JSON array of collections — the whole model is unreadable." },
   { code: "missing-template", level: "error", failure: "A template folder with no template.html." },
@@ -472,6 +590,18 @@ export function siteSystemContract() {
       partData: PART_DATA,
     },
     checks: CHECKS,
+    // Named explicitly: an agent that knows this up front writes an acceptable template
+    // the first time, instead of discovering the rule by being refused.
+    untrustedAuthorRefusals: {
+      codes: [...UNTRUSTED_AUTHOR_CODES],
+      why:
+        "A template is emitted as raw markup — nothing sanitizes it, unlike a post body. " +
+        "Its origin also serves /admin and carries the editor's session cookie, so script " +
+        "in a template is CMS takeover rather than bad content. A human with repo access " +
+        "may write these; an agent writing over MCP may not, because it can be acting on " +
+        "injected input. Templates need none of it: the engine renders at BUILD time, so " +
+        "listings, galleries, filters and detail pages are structure and CSS.",
+    },
     notes: [
       "`template` and `preset` are different things. `template` is the layout variant; " +
         "`preset` names the folder under templates/, and fields.json's `name` must match it.",
@@ -620,6 +750,8 @@ export function checkTemplate(t, world) {
   const ctx = { problems, used: new Set(), where: `${where}template.html`, inEach: false };
   walkRefs(nodes, [root], "", ctx);
 
+  problems.push(...checkTemplateSafety(t.html, `${where}template.html`));
+
   // body:true must actually interpolate the body, and vice versa. A mismatch is not
   // fatal (the page renders) but it means the CMS shows a writing canvas whose text
   // appears nowhere — or hides one the template is asking for.
@@ -674,6 +806,8 @@ export function checkPart(name, html) {
   const shape = shapeOfPartData();
   const ctx = { problems, used: new Set(), where, inEach: false };
   walkRefs(nodes, [{ ...shape, path: "" }], "", ctx);
+  // Parts are templates too, and an agent can write them.
+  problems.push(...checkTemplateSafety(html, where));
   return problems;
 }
 
@@ -798,6 +932,8 @@ export async function checkSite(io, opts = {}) {
 export default {
   LAYERS,
   checkSite,
+  checkTemplateSafety,
+  UNTRUSTED_AUTHOR_CODES,
   WIDGETS,
   CHECKS,
   siteSystemContract,

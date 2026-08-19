@@ -286,6 +286,51 @@ workflow then calling `publish`), and `astro.config.mjs`.
 `create_content` refuses to overwrite an existing path — it is a create, not an
 upsert. Two titles that slugify alike would otherwise destroy an entry silently.
 
+### A template is not content, and an agent writing one is a boundary change
+
+Post and page **bodies** are sanitized (`frontend/lib/sanitize.ts`), and
+`assertSanitizedSafe()` checks the sanitizer's own output with a real parser. So an
+MCP agent writing a body cannot get script onto the site.
+
+A **template** has neither. It is raw markup emitted with `set:html`
+(`HtmlTemplate.astro`, `Base.astro`) and nothing sanitizes it — correctly, because a
+template's whole job is to carry markup and CSS, and because its author was a human
+with repo write access who could commit the same bytes directly. `assert-rendered-safe.ts`
+is built on exactly that assumption: it flags only what a *value* introduced, and
+deliberately ignores `<script>` or `onclick` written by the author.
+
+`write_template` makes the author an agent, which may be acting on prompt-injected
+input. The origin it would get JS on is the one that serves `/admin` and carries the
+session cookie — `Path=/admin` does not help, because a script on any public page can
+`fetch("/admin/api/gh", …)` with the cookie attached, and `crossOriginBlocked()` passes
+a same-origin request. **So script in an agent-written template is CMS takeover, not bad
+content.**
+
+The control is `checkTemplateSafety()` (`functions/_lib/site-system.mjs`), and three
+properties of it are the reason it is trustworthy rather than a wish:
+
+1. **It parses, it does not grep.** It runs `dangerousConstructs()` — the same parse5
+   walk `assert-rendered-safe.ts` uses — because that file exists precisely because
+   hand-rolled HTML matching lost to a real tokenizer five review rounds running. A
+   regex would both miss `<svg><script>` and falsely refuse `<scr<script>ipt>`, which
+   is a bogus element a browser never executes.
+2. **Severity depends on the author, not the markup.** The checker reports every finding
+   as a WARNING, so a human's own template never fails their build; the MCP tool refuses
+   on the subset in `UNTRUSTED_AUTHOR_CODES`. Same file, different author, different
+   answer — which is the actual distinction.
+3. **The refusal costs nothing real.** The template engine renders at BUILD time, so
+   listings, galleries, filters and detail pages are structure and CSS. Every template
+   in this repo and in `recipes/event-site` contains no `<script>`, `<iframe>`,
+   `<object>`, `<embed>`, `on*=` handler or `javascript:` URL — checked, not assumed.
+
+Refused from an agent: `template-executes-js` (script element or text, event handler,
+`javascript:`/`data:` URL, `srcdoc`), `template-embeds-document`
+(`iframe`/`frame`/`object`/`embed`), `template-redirects-visitor` (`<base>`, meta
+refresh). Reported but allowed: `template-loads-remote` — see §5.
+
+Not flagged at all, because templates are made of them: a `<style>` block, and a
+`background-image: url()` in a style attribute.
+
 ---
 
 ## 4. Deployment requirements this model imposes
@@ -322,6 +367,22 @@ because a custom domain is not a function of the repo.
 Real, reviewed, not currently fixed. Listed so they are decisions rather than
 oversights.
 
+- **An agent-written template may carry a `<form>` or a `<link>` that reaches off-site.**
+  `template-loads-remote` is reported and not refused, because a contact form posting to
+  a form service and a linked webfont are both ordinary on a static site — and a
+  real-estate or catalogue site wants the former. The residual risk is a phishing form
+  served from the owner's own domain, or a stylesheet fetch that leaks visitor IPs to a
+  third party. The control is the review surface (`docs/review-surface.md`): a template
+  write is a proposal the owner sees as a diff and can revert. Revisit if a recipe ever
+  needs neither.
+- **A blocklist is a claim about the future.** `checkTemplateSafety()` enumerates the
+  constructs known to matter today. It parses rather than greps, so the usual evasions
+  do not apply, but a construct nobody has thought of is not covered by definition — the
+  same honest limit `assert-rendered-safe.ts` states about itself ("we fixed the last one"
+  is not evidence there is no next one). The public CSP (`public/_headers`) already
+  carries `object-src 'none'; base-uri 'none'` as defence in depth; a `script-src` would
+  close this properly and is not currently possible, because it would have to account for
+  whatever a tenant's own theme loads.
 - **Refresh tokens are 30-day bearers with no reuse detection.** Rotation is
   single-use (a replay 400s), but nothing invalidates the live chain when a replay is
   seen, so a thief and the legitimate client race silently rather than the theft being

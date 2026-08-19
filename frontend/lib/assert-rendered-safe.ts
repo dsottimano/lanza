@@ -30,78 +30,20 @@
 // an `onclick` that appeared because of a VALUE appears in only one.
 import { parseFragment } from "parse5";
 import { render } from "./template-render";
+// The walk itself now lives under functions/, because the site-system checker needs
+// the same answer about an AGENT-written template — and a second implementation of
+// "what would a browser act on" is the last thing this file's history recommends.
+// That module reads the findings ABSOLUTELY (an agent-written template has no trusted
+// author); this file diffs two renders and reports only what a VALUE introduced.
+import { dangerousConstructs, URL_ATTRS } from "../../functions/_lib/dangerous-constructs.mjs";
 
-// Schemes a URL attribute may carry. Mirrors ./url.ts — kept separate on purpose: this
-// is an independent check, and sharing the predicate would let one bug hide both.
-const SAFE_URL = /^(?:https?:|mailto:|tel:|#|\/(?![/\\]))/i;
-
-// Elements that fetch code, embed a document, or send data somewhere. Their mere
-// APPEARANCE due to a value is the finding — the URL they carry may be perfectly
-// well-formed https.
-const LOADS_OR_SENDS = new Set(["script", "iframe", "object", "embed", "form", "link", "use", "frame"]);
-
-const URL_ATTRS = new Set([
-  "href",
-  "xlink:href",
-  "src",
-  "srcset",
-  "action",
-  "formaction",
-  "poster",
-  "cite",
-  "background",
-  "ping",
-  "data",
-  "longdesc",
-]);
+export { URL_ATTRS };
 
 interface Node {
   nodeName: string;
   attrs?: Array<{ name: string; value: string }>;
   childNodes?: Node[];
   value?: string;
-}
-
-/**
- * Everything in this HTML that a browser would treat as dangerous, as a set of stable
- * strings. Comparable between two renders of the same template.
- */
-function dangerousConstructs(html: string): Set<string> {
-  const found = new Set<string>();
-  const walk = (n: Node): void => {
-    for (const a of n.attrs ?? []) {
-      const name = a.name.toLowerCase();
-      // A URL parser strips these anywhere in a URL, so strip before judging.
-      const v = (a.value ?? "").replace(/[\t\n\r]/g, "").trim();
-      if (!v) continue;
-      if (name.startsWith("on")) found.add(`handler:${name}=${v}`);
-      else if (name === "srcdoc") found.add(`srcdoc=${v}`);
-      else if (name === "style" && /url\(|expression|@import/i.test(v)) found.add(`style=${v}`);
-      else if (n.nodeName === "base" && name === "href") found.add(`base=${v}`);
-      else if (n.nodeName === "meta" && name === "content" && /url\s*=/i.test(v)) found.add(`refresh=${v}`);
-      else if (URL_ATTRS.has(name) && !SAFE_URL.test(v)) found.add(`url:${name}=${v}`);
-    }
-    if (n.nodeName === "script" || n.nodeName === "style") {
-      const text = n.childNodes?.[0]?.value ?? "";
-      if (text.trim()) found.add(`${n.nodeName}-text:${text}`);
-    }
-    // The ELEMENT itself, not just its attribute value. A URL allowlist cannot catch
-    // `<script src="https://evil.example/x.js">` — https is a perfectly good scheme;
-    // the problem is that a script element exists at all because of a value. Same for
-    // an iframe, an object/embed, a form that posts elsewhere, or a stylesheet link.
-    // Safe to flag broadly because this is DIFFED against the control render: the
-    // template author's own `<script src="cdn…">` appears in both and is ignored.
-    if (LOADS_OR_SENDS.has(n.nodeName)) {
-      const key = (n.attrs ?? [])
-        .filter((a) => ["src", "href", "data", "action", "srcdoc"].includes(a.name.toLowerCase()))
-        .map((a) => `${a.name.toLowerCase()}=${a.value}`)
-        .join("|");
-      found.add(`element:${n.nodeName}[${key}]`);
-    }
-    for (const c of n.childNodes ?? []) walk(c);
-  };
-  walk(parseFragment(html) as unknown as Node);
-  return found;
 }
 
 // Stands in for every value, so the control render exercises the same template with
@@ -195,8 +137,10 @@ export function renderChecked(template: string, data: Record<string, unknown>, w
   // this whole sweep kept finding. The control render is the same pure function on the
   // same template, so if it throws while the real one succeeded, something is genuinely
   // wrong and failing the build is the correct outcome.
-  const control = dangerousConstructs(render(template, inertData(data)));
-  const introduced = [...dangerousConstructs(html)].filter((d) => !control.has(d));
+  const control = new Set(dangerousConstructs(render(template, inertData(data))).map((d) => d.key));
+  const introduced = dangerousConstructs(html)
+    .filter((d) => !control.has(d.key))
+    .map((d) => d.key);
 
   if (introduced.length) {
     throw new Error(

@@ -20,6 +20,8 @@ import {
   parseTemplate,
   shapeOfFields,
   CHECKS,
+  checkTemplateSafety,
+  UNTRUSTED_AUTHOR_CODES,
   POSITIONS,
   WIDGETS,
   siteSystemContract,
@@ -275,5 +277,75 @@ describe("the published contract matches the enforced one", () => {
     assert.equal(c.checks.length, CHECKS.length);
     // Serving it means it has to survive JSON — a Set or a Map here would publish `{}`.
     assert.deepEqual(JSON.parse(JSON.stringify(c)), c);
+  });
+});
+
+// A template is raw markup emitted with `set:html` — nothing sanitizes it, unlike a post
+// body. That was fine while the author was a human with repo write access. An agent
+// authoring over MCP may be acting on injected input, and the origin it would get JS on
+// is the one that serves /admin. These pin BOTH directions, and the second matters more:
+// a safety check that fires on ordinary markup is a safety check that gets switched off.
+describe("template safety", () => {
+  const codesOf = (html) => [...new Set(checkTemplateSafety(html, "t").map((p) => p.code))];
+  const refused = (html) => codesOf(html).some((c) => UNTRUSTED_AUTHOR_CODES.has(c));
+
+  const REFUSE = [
+    ["a script element", `<script>alert(1)</script>`, "template-executes-js"],
+    ["an event handler", `<img src=x onerror=alert(1)>`, "template-executes-js"],
+    ["a javascript: URL", `<a href="javascript:alert(1)">x</a>`, "template-executes-js"],
+    // The scheme check has to be case-insensitive; a browser's is.
+    ["a javascript: URL in mixed case", `<a HREF="JaVaScRiPt:alert(1)">x</a>`, "template-executes-js"],
+    // Same-origin framing is the documented sandbox escape — see sanitize.ts.
+    ["a same-origin iframe", `<iframe src="/admin/"></iframe>`, "template-embeds-document"],
+    ["a script smuggled through srcdoc", `<iframe srcdoc="&lt;script&gt;x()&lt;/script&gt;"></iframe>`, "template-executes-js"],
+    ["a meta refresh", `<meta http-equiv="refresh" content="0;url=https://evil.example">`, "template-redirects-visitor"],
+    ["a <base> retarget", `<base href="https://evil.example/">`, "template-redirects-visitor"],
+    // Two things a regex over the source would miss and a parser does not.
+    ["a script inside <svg>", `<svg><script>alert(1)</script></svg>`, "template-executes-js"],
+    ["a script after a bogus comment close", `<!-- --!><script>alert(1)</script>`, "template-executes-js"],
+  ];
+
+  for (const [name, html, code] of REFUSE) {
+    test(`refuses ${name}`, () => {
+      assert.ok(codesOf(html).includes(code), `expected ${code}, got: ${codesOf(html).join(", ") || "nothing"}`);
+      assert.ok(refused(html), `${name} must be refused from an untrusted author`);
+    });
+  }
+
+  // Everything a real template is MADE of. A false positive here would refuse an
+  // agent's perfectly good work, or fail a human's `check:site --strict`.
+  const ALLOW = [
+    ["a <style> block", `<style>.card{color:red;background:url(/i.png)}</style>`],
+    ["a background-image style attribute", `<div style="background:url(/img/x.png)">a</div>`],
+    ["an SVG sprite reference", `<svg><use href="#icon"/></svg>`],
+    ["a placeholder in an href", `<a href="{{ url }}">{{ label }}</a>`],
+    ["a placeholder inside a loop", `{{#each cards}}<a href="/p/{{slug}}">{{ heading }}</a>{{/each}}`],
+    ["a placeholder in an img src", `<img src="{{ image }}" alt="{{ alt }}">`],
+    ["the body slot", `<article>{{{ body }}}</article>`],
+    // parse5 agrees with a browser here: this is a bogus element named `scr<script`,
+    // not a script, so nothing executes. A regex for `<script` would refuse it.
+    ["a bogus nested tag name", `<scr<script>ipt>alert(1)</script>`],
+  ];
+
+  for (const [name, html] of ALLOW) {
+    test(`allows ${name}`, () => {
+      assert.deepEqual(checkTemplateSafety(html, "t"), [], `${name} must not be flagged`);
+    });
+  }
+
+  test("a remote form is reported but NOT refused", () => {
+    const html = `<form action="https://forms.example/x"><input name="email"></form>`;
+    assert.deepEqual(codesOf(html), ["template-loads-remote"]);
+    assert.equal(refused(html), false, "a contact form posting to a form service is ordinary");
+  });
+
+  test("a placeholder cannot launder a scheme", () => {
+    // The inert substitution must not make `javascript:` look safe.
+    assert.ok(refused(`<a href="javascript:{{ x }}">go</a>`));
+  });
+
+  test("every refusal code is a code the registry documents", () => {
+    const registered = new Set(CHECKS.map((c) => c.code));
+    for (const c of UNTRUSTED_AUTHOR_CODES) assert.ok(registered.has(c), `${c} missing from CHECKS`);
   });
 });
