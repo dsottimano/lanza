@@ -214,6 +214,17 @@ const SAFETY = [
       "file already works out, which templates do not inherit",
   },
   {
+    // NOT a safety finding and deliberately not refused: a relative URL cannot reach
+    // code or another origin. It is here because it is SILENT — the link resolves
+    // against the page's own directory, so `href="about"` on /services/violin-setup/
+    // points at a URL that does not exist, and nothing else in the system says so.
+    code: "template-relative-url",
+    matches: (d) => d.kind === "url-relative",
+    why:
+      "is relative, so it resolves against each page's own address rather than the " +
+      "site root — write it as `/about` (a dead link is the usual result)",
+  },
+  {
     code: "template-redirects-visitor",
     matches: (d) => d.kind === "base" || d.kind === "meta-refresh",
     why: "sends every visitor to this page somewhere else, or retargets every relative URL on it",
@@ -583,6 +594,7 @@ export const CHECKS = [
   { code: "template-embeds-document", level: "warning", failure: "A template embeds another document; a same-origin frame is the sandbox escape." },
   { code: "template-redirects-visitor", level: "warning", failure: "A <base> or meta refresh sends every visitor elsewhere." },
   { code: "template-loads-remote", level: "warning", failure: "A form or stylesheet reaching off-site. Legitimate, but worth reading in the diff." },
+  { code: "template-relative-url", level: "warning", failure: "A link or image path that is relative, so it resolves against each page's own address — usually a dead link." },
   // Whole-site (checkSite — needs to read the repo, not just one template)
   { code: "schema-invalid", level: "error", failure: "data/schema.json is not a JSON array of collections — the whole model is unreadable." },
   { code: "missing-template", level: "error", failure: "A template folder with no template.html." },

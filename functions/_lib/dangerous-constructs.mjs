@@ -69,7 +69,7 @@ export const URL_ATTRS = new Set([
 
 /**
  * @typedef {{ nodeName: string, attrs?: Array<{name: string, value: string}>,
- *             childNodes?: Node[], value?: string }} Node
+ *             childNodes?: Node[], content?: Node, value?: string }} Node
  */
 
 /**
@@ -99,7 +99,19 @@ export function dangerousConstructs(html) {
       } else if (n.nodeName === "meta" && name === "content" && /url\s*=/i.test(v)) {
         found.push({ key: `refresh=${v}`, kind: "meta-refresh", detail: `<meta content="${v}">`, tag: n.nodeName });
       } else if (URL_ATTRS.has(name) && !SAFE_URL.test(v)) {
-        found.push({ key: `url:${name}=${v}`, kind: "url-scheme", detail: `${name}="${v}"`, tag: n.nodeName });
+        // Two different problems wear the same failed test, and conflating them was
+        // telling an agent that `<a href="about">` "runs JavaScript on this origin".
+        // A value carrying a SCHEME (or a protocol-relative `//host`) can reach code
+        // or another origin; a bare relative path cannot do either — it is merely a
+        // dead link, because a page at /services/x/ resolves it to /services/x/about.
+        // `key` is unchanged on purpose: assert-rendered-safe.ts set-diffs on it.
+        const reaches = /^[a-z][a-z0-9+.-]*:/i.test(v) || v.startsWith("//") || v.startsWith("\\\\");
+        found.push({
+          key: `url:${name}=${v}`,
+          kind: reaches ? "url-scheme" : "url-relative",
+          detail: `${name}="${v}"`,
+          tag: n.nodeName,
+        });
       }
     }
     if (n.nodeName === "script" || n.nodeName === "style") {
@@ -129,6 +141,13 @@ export function dangerousConstructs(html) {
       });
     }
     for (const c of n.childNodes ?? []) walk(c);
+    // parse5 hangs a <template>'s children off `content`, NOT childNodes, so a walk
+    // that only follows childNodes sees an EMPTY <template> and reports nothing —
+    // `<template><script>…</script></template>` came back clean. The content is inert
+    // until something clones it, so this is not a live hole today; it is flagged
+    // because "a real parser has structure a hand-rolled walk forgets" is the exact
+    // failure this file exists to stop, and forgetting one is the same bug.
+    if (n.content) walk(/** @type {Node} */ (n.content));
   };
   walk(/** @type {Node} */ (/** @type {unknown} */ (parseFragment(html))));
   return found;

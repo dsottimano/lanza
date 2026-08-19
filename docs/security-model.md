@@ -326,7 +326,16 @@ properties of it are the reason it is trustworthy rather than a wish:
 Refused from an agent: `template-executes-js` (script element or text, event handler,
 `javascript:`/`data:` URL, `srcdoc`), `template-embeds-document`
 (`iframe`/`frame`/`object`/`embed`), `template-redirects-visitor` (`<base>`, meta
-refresh). Reported but allowed: `template-loads-remote` — see §5.
+refresh). Reported but allowed: `template-loads-remote` — see §5 — and
+`template-relative-url`.
+
+`template-relative-url` was split out of `template-executes-js` on 2026-08-19. A URL
+attribute that fails the safe-scheme test is two different problems wearing one test: a
+value carrying a scheme (or a protocol-relative `//host`) can reach code or another
+origin, while a bare `href="about"` can do neither — it is a dead link, because the page
+at `/services/x/` resolves it against its own directory. Refusing the second one told an
+agent that a relative link "runs JavaScript on this origin", which is false and is the
+kind of wrong error message that teaches a model to work around a check.
 
 Not flagged at all, because templates are made of them: a `<style>` block, and a
 `background-image: url()` in a style attribute.

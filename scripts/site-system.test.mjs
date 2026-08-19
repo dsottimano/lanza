@@ -339,6 +339,27 @@ describe("template safety", () => {
     assert.equal(refused(html), false, "a contact form posting to a form service is ordinary");
   });
 
+  test("a relative URL is reported but NOT refused", () => {
+    // It cannot reach code or another origin, so refusing it would be a lie about
+    // why. It is still reported, because a page at /services/x/ resolves `about`
+    // against its OWN directory and nothing else in the system notices the dead link.
+    const html = `<a href="about">x</a><img src="images/hero.jpg">`;
+    assert.deepEqual(codesOf(html), ["template-relative-url"]);
+    assert.equal(refused(html), false);
+  });
+
+  test("a protocol-relative URL is still refused", () => {
+    // `//host/x` is not relative — it inherits the scheme and reaches another origin.
+    assert.ok(refused(`<img src="//evil.example/x.png">`));
+  });
+
+  test("a construct hidden inside <template> is refused", () => {
+    // parse5 hangs a <template>'s children off `content`, not childNodes, so a walk
+    // that follows only childNodes saw an EMPTY element and passed this.
+    assert.ok(refused(`<template><script>alert(1)</script></template>`));
+    assert.ok(refused(`<template><img src=x onerror=alert(1)></template>`));
+  });
+
   test("a placeholder cannot launder a scheme", () => {
     // The inert substitution must not make `javascript:` look safe.
     assert.ok(refused(`<a href="javascript:{{ x }}">go</a>`));
