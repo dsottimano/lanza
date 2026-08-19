@@ -39,6 +39,29 @@ focus-follow.
 
 ---
 
+## Open — the site system (new, 2026-08-18)
+
+`docs/site-system.md` is the contract; `npm run check:site` enforces it. Shipped on
+branch `site-system`: the cross-layer checker, generic collection routing
+(`collection.route` → generated `.astro`), recipes, and `/style-preview/`.
+
+- [ ] **No MCP tool reaches any of it.** A connected agent can still only edit content —
+      not create a content type, a template, a route or a style set. This is the biggest
+      gap between the system and the pitch, and it is the obvious next build:
+      `create_content_type`, `write_template`, `apply_recipe`, `list_styles`.
+- [ ] **The CMS does not expose `route` or the style variants.** Both are edited as data
+      (`data/schema.json`, `data/styles.json`) or written by a recipe. The content-type
+      editor needs a route panel; Settings → Brand needs a "compare options" entry.
+- [ ] **No taxonomy routes for custom types** — `/events/tag/<x>/` is not generated, only
+      the listing and the detail page.
+- [ ] **Recipes never delete, and re-applying refuses rather than merging.** Fine for now;
+      an "update this recipe" path is a real feature, not a flag.
+- [ ] **`recipes/` is not in package.json `files`,** so tenants do not receive the
+      event-site recipe on install. Deliberate — adding it changes what a release ships,
+      and that is Dave's call.
+- [ ] Pre-existing, unrelated: `astro check` reports one error in `Base.astro:36`
+      (`appearance.json`'s `brand.scheme` widens to `string`). Predates this work.
+
 ## Open — the review surface
 
 - [ ] **Clicking a preview region does not focus the field.** Selection highlights
