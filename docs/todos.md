@@ -33,20 +33,31 @@ unprompted. See §1 below for the full write-up.
 4. **DO NOT PUBLISH.** Publish merges the draft into the live product site. A demo
    shop would go live on lanzacms.com.
 
-### State right now
+### State right now (updated 15:40, after the pre-demo pass)
 
-- `staging` = `main` + the violin site, and it renders:
-  `https://staging.lanza.pages.dev/services/` ✅ (verified by reading the page)
-- `main` and the live site are untouched by any of today's agent work.
-- `main` is ahead of `origin/main` by a few docs commits — push them.
-- The violin content is still sitting in the draft. To wipe it and start clean:
-  `git push origin main:staging --force`
+- `main` = `origin/main` = `e5b60eb`, pushed and deployed. Four changes landed since
+  the block above was written: the Discard button, two classifier fixes, and the one
+  that matters most below.
+- `staging` = `main` merged INTO the violin site (`7839488`), pushed. It keeps every
+  one of the LLM's 16 commits and now builds them against current code: 26 pages,
+  `check:site` clean, verified locally before pushing.
+- **What that fixed, and it was found by reading the deployed page:**
+  `https://staging.lanza.pages.dev/services/` was serving literally
+  `<!DOCTYPE html><main>…</main>` — no `<head>`, no title, no header or footer, and
+  no `<html style="--ink:…">`, so the agent's own CSS variables resolved to nothing.
+  The page "worked" and looked like an unstyled fragment. `CollectionList` and
+  `CollectionDetail` never wrapped in `Base.astro`; now they do, and the listing
+  takes its `<title>` from the content type's label ("Services · Lanza").
+- **Re-check the URL before presenting** — a Cloudflare build takes 4-6 min and the
+  push went out at ~15:40.
+- The live site is still untouched by any agent work. To wipe the draft and start
+  clean: the button below, or `git push origin main:staging --force`.
 
 ### Known rough edges, in demo terms
 
-- **Between runs the draft has to be reset by hand** (the command above). There is no
-  button — that is the top item in §0. If time allows, build it; it is the single
-  most demo-relevant gap.
+- **Resetting the draft between runs is now a button.** PendingView → "Discard
+  everything", beside "Publish everything"; it names the files it will destroy and
+  then reloads. Deployed to `lanzacms.com/admin`. The terminal command still works.
 - **A fresh build takes ~4-6 min** on Cloudflare. Build the site BEFORE the demo and
   show the result, or narrate the wait.
 - **"From From C$95"** — the agent wrote a template with a hardcoded `From ` prefix and
@@ -83,16 +94,12 @@ the MCP `validate_site` tool are what tell it whether what it invented holds tog
 
 Written 14:32, 2026-08-19. Order of work while the clock runs:
 
-1. **Finish "Discard all pending changes" in the CMS.** §0 has the full design and
-   the exact remaining steps. The backend half (`GitHubClient.discardDraft()`) is
-   already committed, tested and unused — only `PendingView.vue` remains. Highest demo
-   value: it is what lets Dave reset the draft between runs without a terminal, and it
-   is the same button that fixes a stale draft. Rebuild the CMS afterwards
-   (`npm run build:admin`) and confirm `/admin` still loads — CLAUDE.md's rule.
-2. **Code review this session's work.** Nine feature commits landed today
-   (`6c9f3bc..`), ten new MCP tools, a new safety classifier, parse5 into the Worker
-   bundle. None of it has had a second pass.
-3. Only then, anything from `Now`.
+1. ~~Finish "Discard all pending changes" in the CMS.~~ **DONE** (`63143de`) — the
+   button is in `PendingView.vue` beside "Publish everything", names what it will
+   destroy, reloads after. Three tests pin those three behaviours.
+2. ~~Code review this session's work.~~ **DONE, and it paid for itself.** What it
+   found is below; four fixes shipped, the rest is triaged and open.
+3. Anything from `Now`, starting with the open findings.
 
 Every change must keep the baseline green (commands below) AND the Pages Functions
 build compiling — that last one is not optional, it is what CI does and `npm test`
@@ -131,6 +138,69 @@ Traps that have already cost time:
   `scripts/apply-recipe.mjs --into <tmpdir>`.
 - **Don't build a recipe library.** See the paragraph at the top. `recipes/event-site` is
   a worked example that proves the machinery runs; it is not the product.
+
+---
+
+## Code review, 2026-08-19 (pre-demo pass)
+
+Scope: the nine feature commits of 2026-08-19 (`6c9f3bc..`), reviewed in two passes
+plus a read of the deployed page. **Shipped fixes:**
+
+- `5193de7` — a routed collection rendered as a bare `<main>` with no `Base.astro`
+  wrapper. The full story is in the DEMO block above; it is the most valuable thing
+  this review found and no test could have found it. Every test passed, `check:site`
+  reported 0 errors, the build reported success, and the page was broken.
+- `e5b60eb` — a listing's `<title>` was its URL segment ("services"), because a
+  listing owns no entry and agents hardcode the heading in the template rather than
+  declaring slots. Now falls back to the content type's label.
+- `bee080c` — two in the agent-template safety classifier: parse5 hangs a
+  `<template>`'s children off `content`, not `childNodes`, so
+  `<template><script>…</script></template>` passed `write_template` (inert, so not a
+  live hole); and a *relative* URL was refused as `template-executes-js`, telling an
+  agent that `<a href="about">` "runs JavaScript on this origin". Split into
+  `template-relative-url` — reported, not refused.
+- `ad3228c` — `main` tracked generated routes for a `services` collection its own
+  schema never declared, so every local build produced a spurious diff.
+
+**Open, in severity order.** None of these blocks the demo; the first two are the
+same class as the bug above — the checker says clean and the page is wrong.
+
+- [ ] **`checkSite` never reads `content/**`,** the top layer of its own stack. An
+      entry missing a required frontmatter field fails the ENTIRE Astro build
+      (`InvalidContentEntryDataError`, nothing deploys) with `check:site` clean.
+      "From From C$95" is the same family: nothing compares a template's static text
+      to the values entries actually carry.
+- [ ] **`checkTemplate` checks a `detail` template against the wrong layer.** It
+      layers `DETAIL_RESERVED` onto the template's own `fields.json`, but the runtime
+      scope is the ENTRY'S FRONTMATTER (`detailScope`). Renaming a collection field in
+      `data/schema.json` leaves the detail template reported clean while its whole
+      block silently empties — and `position: "detail"` is the one the doc calls
+      easiest to get wrong.
+- [ ] **`checkSite` never validates `route.base`,** though the same file exports the
+      rules (`ROUTE_SEGMENT`, `RESERVED_ROUTE_BASES`) that `gen-routes.mjs` and
+      `mcp-core.ts` consume. `base: "es"` passes the checker, then `gen-routes.mjs`
+      `die()`s and the whole build fails — Cloudflare keeps serving the old version.
+      `gen-routes.mjs` also carries a THIRD rule (locale-prefix collision) that exists
+      in neither the checker nor `mcp-core`, so `create_content_type` would accept it.
+- [ ] **A listing with `listing.item` but no `listing.of` is checked not at all** —
+      `listing-unknown-collection` only fires when `of` is truthy and
+      `listing-unknown-field` only when the collection resolves. Nothing asserts that
+      `listing.of` is the collection whose `route.list.template` names this template,
+      so a listing can validate against a different collection than it renders.
+- [ ] **`gen-routes.mjs` detail routes disagree with `entryUrl` for a non-localized
+      collection whose files sit under a locale folder** — `params: { slug: entry.id }`
+      builds `/events/en/x/` while every listing link points at `/events/x/`. NOT
+      reachable over MCP (`create_content` writes non-localized entries flat), so it
+      needs someone to flip `localized: true → false` on a type that already has
+      content, or to place files by hand.
+- [ ] `RESERVED_ROUTE_BASES` omits `style-preview`, which is a real route
+      (`frontend/pages/style-preview/[...variant].astro`). The list is hand-maintained
+      rather than derived from `frontend/pages/` — that is the actual defect.
+- [ ] A new content type's `draft` field, where one is declared with `default: true`,
+      means an entry written without the key is hidden from the production build.
+      `create_content` writes `draft: false` explicitly and `create_content_type`
+      declares no draft field at all, so the MCP path is safe — this bites a
+      hand-authored `fields.json`.
 
 ---
 
