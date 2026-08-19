@@ -85,7 +85,11 @@ function routeOf(collection) {
     }
     list = { template: r.list.template, sortBy, order: r.list.order === "desc" ? "desc" : "asc", slots };
   }
-  return { base: r.base, template: r.template, list, localized: collection.localized === true, name: collection.name };
+  // The type's own label rides along so a LISTING has a real <title>: it owns no
+  // entry, and most listings carry no slots at all (an agent hardcodes the heading in
+  // the template), which left the tab reading "services" instead of "Services".
+  const label = typeof collection.label === "string" && collection.label.trim() ? collection.label : collection.name;
+  return { base: r.base, template: r.template, list, localized: collection.localized === true, name: collection.name, label };
 }
 
 const lit = (v) => JSON.stringify(v);
@@ -155,7 +159,7 @@ const all = await routeEntries(${lit(r.name)});
 const entries = ${r.localized ? `splitEntries(all).root.map(({ entry }) => entry)` : `all`};
 ---
 
-<CollectionList entries={entries} locale={DEFAULT_LOCALE} base=${lit(r.base)} list={${jsExpr(r.list)}} />
+<CollectionList entries={entries} locale={DEFAULT_LOCALE} base=${lit(r.base)} label=${lit(r.label)} list={${jsExpr(r.list)}} />
 `;
 }
 
@@ -176,7 +180,7 @@ export async function getStaticPaths() {
 const { locale, entries } = Astro.props;
 ---
 
-<CollectionList entries={entries} locale={locale} base=${lit(r.base)} list={${jsExpr(r.list)}} />
+<CollectionList entries={entries} locale={locale} base=${lit(r.base)} label=${lit(r.label)} list={${jsExpr(r.list)}} />
 `;
 }
 

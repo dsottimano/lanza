@@ -11,17 +11,20 @@ interface Props {
   entries: CollectionEntry<"posts">[];
   locale: Locale;
   base: string;
+  /** The content type's own label, from data/schema.json — the listing's <title>
+   *  when it declares no slots of its own. */
+  label?: string;
   list: NonNullable<CollectionRoute["list"]>;
 }
 
-const { entries, locale, base, list } = Astro.props;
+const { entries, locale, base, label, list } = Astro.props;
 
 // A listing has no entry of its own, so its <title> comes from the slots the content
 // type carries for exactly this purpose (see CollectionRoute.list.slots); the URL
 // segment is the last resort so the tag is never empty.
 const text = (v: unknown): string | undefined => (typeof v === "string" && v.trim() ? v : undefined);
 const slots = (list.slots ?? {}) as Record<string, unknown>;
-const title = text(slots.title) ?? text(slots.heading) ?? base;
+const title = text(slots.title) ?? text(slots.heading) ?? text(label) ?? base;
 const description = text(slots.description) ?? text(slots.intro);
 // Wrapped in Base for the same reason every other route is: without it the page
 // ships as a bare <main> — no <head>, no title, no canonical, no header or footer,
