@@ -136,7 +136,7 @@ export const POSITION_INFO = {
     note: 'Also gets `body` when fields.json sets "body": true.',
   },
   detail: {
-    scope: "one entry's FRONTMATTER — the collection's fields, not the template's slots",
+    scope: "one entry's FRONTMATTER: the collection's fields, not the template's slots",
     reserved: DETAIL_RESERVED,
     note: "Derived from a collection's `route.template`; never guessed.",
   },
@@ -146,7 +146,7 @@ export const POSITION_INFO = {
     note:
       "Each item inside {{#each entries}} also gets " +
       LIST_ITEM_RESERVED.map((n) => `\`${n}\``).join(" and ") +
-      ". `isEmpty` exists because the engine has no {{else}} — an empty state needs " +
+      ". `isEmpty` exists because the engine has no {{else}}, an empty state needs " +
       "a second, opposite {{#if}}.",
   },
 };
@@ -202,7 +202,7 @@ const SAFETY = [
       d.kind === "url-scheme" ||
       (d.kind === "element" && d.tag === "script"),
     why:
-      "runs JavaScript on this site's origin — the same origin that serves /admin and " +
+      "runs JavaScript on this site's origin, the same origin that serves /admin and " +
       "carries the editor's session cookie",
   },
   {
@@ -222,7 +222,7 @@ const SAFETY = [
     matches: (d) => d.kind === "url-relative",
     why:
       "is relative, so it resolves against each page's own address rather than the " +
-      "site root — write it as `/about` (a dead link is the usual result)",
+      "site root, write it as `/about` (a dead link is the usual result)",
   },
   {
     code: "template-redirects-visitor",
@@ -234,7 +234,7 @@ const SAFETY = [
     matches: (d) => d.kind === "element" && ["form", "link"].includes(d.tag),
     why:
       "fetches from, or posts to, somewhere off this site. Legitimate for a contact form " +
-      "or a webfont, so it is reported and not refused — read it in the diff",
+      "or a webfont, so it is reported and not refused. Read it in the diff",
   },
 ];
 
@@ -455,7 +455,7 @@ function walkRefs(nodes, stack, path, ctx) {
           "error",
           "undeclared-slot",
           ctx.where,
-          `{{ ${n.path} }} resolves to nothing — no enclosing scope declares "${head}". ` +
+          `{{ ${n.path} }} resolves to nothing, no enclosing scope declares "${head}". ` +
             `Add it to fields.json, or fix the spelling. The engine renders it as empty text.`,
         ),
       );
@@ -476,7 +476,7 @@ function walkRefs(nodes, stack, path, ctx) {
             "error",
             "undeclared-slot",
             ctx.where,
-            `{{ ${n.path} }} — "${parts.slice(0, i).join(".")}" declares no "${parts[i]}".`,
+            `{{ ${n.path} }}, "${parts.slice(0, i).join(".")}" declares no "${parts[i]}".`,
           ),
         );
         break;
@@ -494,7 +494,7 @@ function walkRefs(nodes, stack, path, ctx) {
             "error",
             "each-over-scalar",
             ctx.where,
-            `{{#each ${n.path} }} — "${head}" is not a list of objects. Declare it as a ` +
+            `{{#each ${n.path} }}, "${head}" is not a list of objects. Declare it as a ` +
               `"list" widget with nested "fields"; the engine cannot print a bare string item.`,
           ),
         );
@@ -563,30 +563,30 @@ export const COLLECTION_NAME = /^[A-Za-z_$][A-Za-z0-9_$]*$/;
 // wants to know: what the page does when the check is ignored.
 export const CHECKS = [
   // Template grammar
-  { code: "unclosed-block", level: "error", failure: "{{#each}}/{{#if}} is never closed — the engine drops everything after it." },
+  { code: "unclosed-block", level: "error", failure: "{{#each}}/{{#if}} is never closed: the engine drops everything after it." },
   { code: "stray-close", level: "error", failure: "A {{/each}} or {{/if}} that closes nothing." },
   { code: "unknown-loop-var", level: "error", failure: "An @name the engine does not supply (only @index and @number exist)." },
   { code: "loop-var-outside-each", level: "error", failure: "@index/@number used outside a loop, where they are undefined." },
   // Cross-layer references
-  { code: "undeclared-slot", level: "error", failure: "A placeholder no enclosing scope declares — renders as empty text, silently." },
-  { code: "each-over-scalar", level: "error", failure: "{{#each}} over something that is not a list of objects — renders nothing." },
+  { code: "undeclared-slot", level: "error", failure: "A placeholder no enclosing scope declares: renders as empty text, silently." },
+  { code: "each-over-scalar", level: "error", failure: "{{#each}} over something that is not a list of objects: renders nothing." },
   { code: "unused-field", level: "warning", failure: "An input the owner fills that appears in no template." },
   // The body slot
-  { code: "body-used-undeclared", level: "error", failure: '{{{ body }}} without "body": true — the CMS hides the canvas, so it is always empty.' },
-  { code: "body-declared-unused", level: "warning", failure: '"body": true with no {{{ body }}} — a writing canvas whose text goes nowhere.' },
+  { code: "body-used-undeclared", level: "error", failure: '{{{ body }}} without "body": true, the CMS hides the canvas, so it is always empty.' },
+  { code: "body-declared-unused", level: "warning", failure: '"body": true with no {{{ body }}}, a writing canvas whose text goes nowhere.' },
   { code: "raw-non-body", level: "error", failure: "A triple-brace on anything but `body` emits user input UNESCAPED." },
   // fields.json structure
   { code: "bad-field", level: "error", failure: "A fields.json entry is not an object." },
   { code: "bad-field-name", level: "error", failure: "A field name that is not a usable identifier." },
-  { code: "duplicate-field", level: "error", failure: "Two fields share a name — one of them can never be addressed." },
+  { code: "duplicate-field", level: "error", failure: "Two fields share a name: one of them can never be addressed." },
   { code: "unknown-widget", level: "error", failure: "A widget the CMS renders no input for." },
-  { code: "missing-label", level: "warning", failure: "No label — the CMS shows the raw field name." },
+  { code: "missing-label", level: "warning", failure: "No label: the CMS shows the raw field name." },
   { code: "select-without-options", level: "error", failure: "A select with nothing to select." },
   { code: "object-without-fields", level: "error", failure: "An object widget with no nested shape." },
   { code: "template-name-mismatch", level: "error", failure: "fields.json `name` disagrees with the folder. A page's `preset` names the FOLDER." },
   { code: "bad-position", level: "error", failure: "A position outside page/detail/list." },
   // Listings
-  { code: "listing-undeclared", level: "error", failure: "A list template with no `listing` block — nothing can check what {{#each entries}} prints." },
+  { code: "listing-undeclared", level: "error", failure: "A list template with no `listing` block: nothing can check what {{#each entries}} prints." },
   { code: "listing-unknown-field", level: "error", failure: "A listing prints a field its collection does not declare." },
   { code: "listing-unknown-collection", level: "error", failure: "`listing.of` names a collection that does not exist." },
   // Template safety — who wrote it decides the severity (see checkTemplateSafety)
@@ -594,11 +594,11 @@ export const CHECKS = [
   { code: "template-embeds-document", level: "warning", failure: "A template embeds another document; a same-origin frame is the sandbox escape." },
   { code: "template-redirects-visitor", level: "warning", failure: "A <base> or meta refresh sends every visitor elsewhere." },
   { code: "template-loads-remote", level: "warning", failure: "A form or stylesheet reaching off-site. Legitimate, but worth reading in the diff." },
-  { code: "template-relative-url", level: "warning", failure: "A link or image path that is relative, so it resolves against each page's own address — usually a dead link." },
+  { code: "template-relative-url", level: "warning", failure: "A link or image path that is relative, so it resolves against each page's own address, usually a dead link." },
   // Whole-site (checkSite — needs to read the repo, not just one template)
-  { code: "schema-invalid", level: "error", failure: "data/schema.json is not a JSON array of collections — the whole model is unreadable." },
+  { code: "schema-invalid", level: "error", failure: "data/schema.json is not a JSON array of collections: the whole model is unreadable." },
   { code: "missing-template", level: "error", failure: "A template folder with no template.html." },
-  { code: "missing-fields", level: "error", failure: "A template folder with no fields.json — the CMS would show no inputs." },
+  { code: "missing-fields", level: "error", failure: "A template folder with no fields.json: the CMS would show no inputs." },
   { code: "route-template-missing", level: "error", failure: 'A live URL rendering "Unknown template".' },
 ];
 
@@ -638,7 +638,7 @@ export function siteSystemContract() {
     untrustedAuthorRefusals: {
       codes: [...UNTRUSTED_AUTHOR_CODES],
       why:
-        "A template is emitted as raw markup — nothing sanitizes it, unlike a post body. " +
+        "A template is emitted as raw markup and nothing sanitizes it, unlike a post body. " +
         "Its origin also serves /admin and carries the editor's session cookie, so script " +
         "in a template is CMS takeover rather than bad content. A human with repo access " +
         "may write these; an agent writing over MCP may not, because it can be acting on " +
@@ -651,7 +651,7 @@ export function siteSystemContract() {
       "A template's <style> is emitted globally, not scoped. Namespace every class.",
       "Fields are declared ONCE, in the detail template's fields.json; the collection is " +
         "derived from it. Typing them twice is how they drift.",
-      "Parts (templates/parts/*.html) have no fields.json — their scope is `reserved.partData`.",
+      "Parts (templates/parts/*.html) have no fields.json: their scope is `reserved.partData`.",
     ],
   };
 }
@@ -681,11 +681,11 @@ export function checkFieldsJson(fields, where) {
       seen.add(at);
       if (!WIDGETS.has(f.widget)) {
         problems.push(
-          problem("error", "unknown-widget", where, `"${at}" has widget "${f.widget}" — the CMS renders no input for it.`),
+          problem("error", "unknown-widget", where, `"${at}" has widget "${f.widget}", the CMS renders no input for it.`),
         );
       }
       if (typeof f.label !== "string" || !f.label.trim()) {
-        problems.push(problem("warning", "missing-label", where, `"${at}" has no label — the CMS shows the raw name.`));
+        problems.push(problem("warning", "missing-label", where, `"${at}" has no label, the CMS shows the raw name.`));
       }
       if (f.widget === "select" && !(Array.isArray(f.options) && f.options.length)) {
         problems.push(problem("error", "select-without-options", where, `"${at}" is a select with no options.`));
@@ -729,7 +729,7 @@ export function checkTemplate(t, world) {
   const { nodes, unclosed } = parseTemplate(t.html);
   for (const u of unclosed) {
     problems.push(
-      problem("error", "unclosed-block", `${where}template.html`, `${u} is never closed — the engine drops everything after it.`),
+      problem("error", "unclosed-block", `${where}template.html`, `${u} is never closed, the engine drops everything after it.`),
     );
   }
 
@@ -751,7 +751,7 @@ export function checkTemplate(t, world) {
           "error",
           "listing-undeclared",
           `${where}fields.json`,
-          `A listing template must declare "listing": { "of": "<collection>", "item": [<field names>] } — ` +
+          `A listing template must declare "listing": { "of": "<collection>", "item": [<field names>] }, ` +
             `otherwise nothing can check what {{#each entries}} may print.`,
         ),
       );
@@ -801,12 +801,12 @@ export function checkTemplate(t, world) {
   const rawBody = JSON.stringify(nodes).includes('"t":"raw","path":"body"');
   if (usesBody && !rawBody) {
     problems.push(
-      problem("warning", "body-declared-unused", where, `fields.json sets "body": true but the template never renders {{{ body }}} — the CMS shows a writing canvas that goes nowhere.`),
+      problem("warning", "body-declared-unused", where, `fields.json sets "body": true but the template never renders {{{ body }}}, the CMS shows a writing canvas that goes nowhere.`),
     );
   }
   if (!usesBody && rawBody) {
     problems.push(
-      problem("error", "body-used-undeclared", where, `The template renders {{{ body }}} but fields.json does not set "body": true — the CMS hides the writing canvas, so it is always empty.`),
+      problem("error", "body-used-undeclared", where, `The template renders {{{ body }}} but fields.json does not set "body": true, the CMS hides the writing canvas, so it is always empty.`),
     );
   }
 
@@ -831,7 +831,7 @@ export function checkTemplate(t, world) {
   collectRaw(nodes);
   for (const p of rawPaths) {
     problems.push(
-      problem("error", "raw-non-body", `${where}template.html`, `{{{ ${p} }}} emits a slot value UNESCAPED. Only {{{ body }}} is safe — it is sanitized upstream. Use {{ ${p} }}.`),
+      problem("error", "raw-non-body", `${where}template.html`, `{{{ ${p} }}} emits a slot value UNESCAPED. Only {{{ body }}} is safe, it is sanitized upstream. Use {{ ${p} }}.`),
     );
   }
 
@@ -936,7 +936,7 @@ export async function checkSite(io, opts = {}) {
     const fieldsRaw = await readText(`templates/${name}/fields.json`);
     if (fieldsRaw === null) {
       problems.push(
-        problem("error", "missing-fields", `templates/${name}/`, "No fields.json — the CMS would show no inputs for this template."),
+        problem("error", "missing-fields", `templates/${name}/`, "No fields.json, the CMS would show no inputs for this template."),
       );
       continue;
     }
