@@ -34,11 +34,56 @@ const es = {
     { t: "El borde global lo sirve", code: "300+ ciudades · en caché", b: "Su sitio sale desde la red de Cloudflare, cerca de cada visitante. Las vistas de página no se miden, así que es rápido en todas partes y gratis." },
     { t: "Google y los agentes lo encuentran", code: "sitemap.xml · llms.txt", b: "Es un sitio real en la web abierta, con URLs reales, datos estructurados y un contrato para agentes. Se puede descubrir por diseño." },
   ],
+  stackEyebrow: "La pila, con sus nombres",
+  stackHead: "Cuatro herramientas corrientes, cada una en lo suyo.",
+  stackIntro: "Aquí no se inventó nada. Astro renderiza, Git recuerda, Cloudflare sirve y un pequeño intermediario guarda los secretos para que su sitio no tenga que guardarlos. Lo que hace Lanza es conectarlas y luego apartarse.",
+  stack: [
+    {
+      k: "astro build",
+      t: "Astro lo renderiza",
+      b: "Astro compila los componentes a HTML por adelantado y no envía ningún framework al navegador. El código de render no está en su repositorio: vive en el paquete npm lanza-site, y el srcDir de Astro apunta ahí dentro. Su repositorio guarda palabras, datos y plantillas. Las plantillas son HTML corriente con {{marcadores}}, y por eso un agente puede escribir una y una persona todavía puede leerla.",
+    },
+    {
+      k: "git push origin main",
+      t: "Git lo recuerda",
+      b: "Cada página es un archivo. Cada guardado es un commit en la rama de preparación, y publicar es una fusión hacia main. Ese es todo el modelo de publicación. No hay base de datos, así que no hay nada que migrar, nada que respaldar y ninguna función de exportación que construir: git clone es la exportación y git revert es el deshacer.",
+    },
+    {
+      k: "push → build → borde",
+      t: "Cloudflare Pages lo sirve",
+      b: "Pages observa el repositorio, ejecuta el build en cada push y sirve el resultado desde unas 300 ciudades. Las vistas de página no se miden, así que el tráfico nunca mueve la factura. Las vistas previas por rama son lo que hace real la preparación: su borrador tiene su propia URL, construida por la misma tubería que producción. Un puñado de Pages Functions cubre lo que no puede ser estático: la puerta de /admin, el proxy de GitHub y /api/mcp. Toda ruta pública sigue siendo estática y cacheada.",
+    },
+    {
+      k: "connect.lanzacms.com",
+      t: "El intermediario guarda los secretos",
+      b: "Su sitio es un inquilino, y un inquilino no guarda ninguna clave privada: lleva una clave pública y solo puede verificar. El intermediario es la otra mitad. Gestiona el alta, firma una sesión RS256 de vida corta que nombra su usuario de GitHub y el origen de su sitio, y emite un token de GitHub por guardado, limitado a un repositorio y válido cerca de una hora. Su sitio comprueba la firma y luego comprueba, por separado, que esa persona es propietaria: una firma válida demuestra que alguien inició sesión, no que el sitio sea suyo.",
+    },
+  ],
+
+  repoEyebrow: "Lo que posee de verdad",
+  repoHead: "Un repositorio delgado y una versión que usted fija.",
+  repoBody: "Esto es un sitio Lanza entero. El código llega como dependencia en la versión que usted elija, así que nada de lo que publiquemos toca su sitio hasta que usted lo tome.",
+  repoTree: [
+    ["su-sitio/", ""],
+    ["  package.json", "lanza-site, fijado a una versión exacta"],
+    ["  astro.config.mjs", "export default lanzaConfig()"],
+    ["  lanza.config.json", "{ owner, name }"],
+    ["  content/", "sus palabras: entradas, páginas, autores, etiquetas"],
+    ["  data/", "site.json, schema.json, appearance.json"],
+    ["  templates/", "plantillas de página: HTML con {{marcadores}}"],
+    ["  public/images/", "lo que usted suba"],
+  ],
+  repoNote: "npm install && lanza build produce el mismo sitio estático que construye Cloudflare. Clónelo, ejecútelo, lléveselo a otra parte: nada de ese árbol nos necesita.",
+
   devEyebrow: "Para desarrolladores",
   devHead: "Es suyo hasta el último archivo.",
   devBody: "Astro + Git + Cloudflare Pages, todo en el plan gratuito. Sin base de datos que administrar, sin runtime que mantener. Sáltese el asistente de connect.lanzacms.com por completo: bifúrquelo, alójelo usted mismo, conecte su propio agente al mismo modelo de contenido. Nada aquí le retiene.",
   devLink: "Leer el contrato para agentes",
   devLinkArch: "Ver la arquitectura completa",
+  colEyebrow: "Colofón",
+  colHead: "Construido con orgullo con Claude Code.",
+  colBody: "Lanza se hizo así a propósito. El CMS, el motor de render, esta página y el sitio que la rodea se construyeron con Claude Code: un agente trabajando en el mismo repositorio, con los mismos commits y las mismas revisiones que usaría un programador. Una herramienta para editar un sitio hablando con un agente debería estar construida hablando con un agente. Y la prueba es pública: el historial entero está en el repositorio, con los errores incluidos.",
+  colLink: "Ver el repositorio",
   ctaHead: "¿Listo para lanzar?",
   ctaSub: "Vea lo que cuesta y empiece en unos 30 minutos.",
   cta: "Empezar",
@@ -56,11 +101,56 @@ const en = {
     { t: "The global edge serves it", code: "300+ cities · cached", b: "Your site goes out from Cloudflare's network, close to every visitor. Page views are unmetered, so it is fast everywhere, and free." },
     { t: "Google and agents find it", code: "sitemap.xml · llms.txt", b: "It's a real site on the open web, with real URLs, structured data, and a contract for agents. Discoverable by design." },
   ],
+  stackEyebrow: "The stack, named",
+  stackHead: "Four ordinary tools, each doing its own job.",
+  stackIntro: "Nothing here was invented. Astro renders, Git remembers, Cloudflare serves, and one small broker holds the secrets so your site never has to. What Lanza does is wire them together and then get out of the way.",
+  stack: [
+    {
+      k: "astro build",
+      t: "Astro renders it",
+      b: "Astro compiles components to HTML ahead of time and ships no framework to the browser. The rendering code is not in your repository: it lives in the lanza-site npm package, and Astro's srcDir points into it. Your repo holds words, data and templates. The templates are ordinary HTML with {{placeholders}}, which is what lets an agent write one and a person still read it.",
+    },
+    {
+      k: "git push origin main",
+      t: "Git remembers it",
+      b: "Every page is a file. Every save is a commit on the staging branch, and publishing is a merge into main. That is the entire publishing model. There is no database, so there is nothing to migrate, nothing to back up and no export feature to build: git clone is the export, and git revert is the undo.",
+    },
+    {
+      k: "push → build → edge",
+      t: "Cloudflare Pages serves it",
+      b: "Pages watches the repository, runs the build on every push, and serves the result from around 300 cities. Page views are unmetered, so traffic never moves the bill. Branch previews are what make staging real: your draft gets its own URL, built by the same pipeline as production. A handful of Pages Functions cover what cannot be static: the /admin gate, the GitHub proxy and /api/mcp. Every public route stays static and cached.",
+    },
+    {
+      k: "connect.lanzacms.com",
+      t: "The broker holds the secrets",
+      b: "Your site is a tenant, and a tenant holds no private key: it ships with a public one and can only verify. The broker is the other half. It runs onboarding, signs a short-lived RS256 session naming your GitHub login and your site's origin, and mints a GitHub token per save, scoped to one repository and good for about an hour. Your site checks the signature, then checks separately that the person is an owner: a valid signature proves someone signed in, not that the site is theirs.",
+    },
+  ],
+
+  repoEyebrow: "What you actually own",
+  repoHead: "A thin repository, and a version you pin.",
+  repoBody: "This is a whole Lanza site. The code arrives as a dependency at a version you choose, so nothing we publish reaches your site until you take it.",
+  repoTree: [
+    ["your-site/", ""],
+    ["  package.json", "lanza-site, pinned to an exact version"],
+    ["  astro.config.mjs", "export default lanzaConfig()"],
+    ["  lanza.config.json", "{ owner, name }"],
+    ["  content/", "your words: posts, pages, authors, tags"],
+    ["  data/", "site.json, schema.json, appearance.json"],
+    ["  templates/", "page templates: HTML with {{placeholders}}"],
+    ["  public/images/", "anything you upload"],
+  ],
+  repoNote: "npm install && lanza build produces the same static site Cloudflare builds. Clone it, run it, take it somewhere else; nothing in that tree needs us.",
+
   devEyebrow: "For developers",
   devHead: "Yours down to the last file.",
   devBody: "Astro + Git + Cloudflare Pages, all on the free tier. No database to run, no runtime to keep alive. Skip the connect.lanzacms.com wizard entirely: fork it, self-host it, point your own agent at the same content model. Nothing here holds you in.",
   devLink: "Read the agent contract",
   devLinkArch: "See the full architecture",
+  colEyebrow: "Colophon",
+  colHead: "Proudly built with Claude Code.",
+  colBody: "Lanza was made this way on purpose. The CMS, the render engine, this page and the site around it were built with Claude Code: an agent working in the same repository, through the same commits and the same reviews a developer would use. A tool for editing a site by talking to an agent ought to be built by talking to an agent. And the proof is public: the whole history is in the repository, mistakes included.",
+  colLink: "Browse the repository",
   ctaHead: "Ready to launch?",
   ctaSub: "See what it costs and start in about 30 minutes.",
   cta: "Start your site",
@@ -107,6 +197,42 @@ const t = isEn ? en : es;
     </ol>
   </div>
 
+  <!-- the stack, named: what each ordinary tool is doing here -->
+  <section class="hiw-sec">
+    <div class="hiw-wrap">
+      <span class="hiw-sec__eyebrow">{t.stackEyebrow}</span>
+      <h2 class="hiw-sec__h2">{t.stackHead}</h2>
+      <p class="hiw-sec__lede">{t.stackIntro}</p>
+      <div class="hiw-cards">
+        {t.stack.map((s) => (
+          <article class="hiw-card">
+            <code class="hiw-card__k">{s.k}</code>
+            <h3 class="hiw-card__t">{s.t}</h3>
+            <p class="hiw-card__b">{s.b}</p>
+          </article>
+        ))}
+      </div>
+    </div>
+  </section>
+
+  <!-- the tenant repo, as a tree -->
+  <section class="hiw-sec hiw-sec--alt">
+    <div class="hiw-wrap">
+      <span class="hiw-sec__eyebrow">{t.repoEyebrow}</span>
+      <h2 class="hiw-sec__h2">{t.repoHead}</h2>
+      <p class="hiw-sec__lede">{t.repoBody}</p>
+      <div class="hiw-tree">
+        {t.repoTree.map(([p, c]) => (
+          <div class="hiw-tree__row">
+            <span class="hiw-tree__p">{p}</span>
+            <span class="hiw-tree__c">{c}</span>
+          </div>
+        ))}
+      </div>
+      <p class="hiw-tree__note">{t.repoNote}</p>
+    </div>
+  </section>
+
   <!-- developer / agent callout -->
   <section class="hiw-band">
     <div class="hiw-wrap">
@@ -116,6 +242,18 @@ const t = isEn ? en : es;
       <p class="hiw-links">
         <a class="hiw-link" href={href("architecture/")}>{t.devLinkArch}<span class="hiw-arrow" aria-hidden="true">↗</span></a>
         <a class="hiw-link" href={href("agents/")}>{t.devLink}<span class="hiw-arrow" aria-hidden="true">↗</span></a>
+      </p>
+    </div>
+  </section>
+
+  <!-- colophon: who built this, and with what -->
+  <section class="hiw-sec hiw-colophon">
+    <div class="hiw-wrap hiw-wrap--narrow">
+      <span class="hiw-sec__eyebrow">{t.colEyebrow}</span>
+      <h2 class="hiw-sec__h2">{t.colHead}</h2>
+      <p class="hiw-sec__lede hiw-sec__lede--last">{t.colBody}</p>
+      <p class="hiw-links">
+        <a class="hiw-link hiw-link--ink" href="https://github.com/dsottimano/lanza" rel="noopener">{t.colLink}<span class="hiw-arrow" aria-hidden="true">↗</span></a>
       </p>
     </div>
   </section>
@@ -286,8 +424,80 @@ const t = isEn ? en : es;
   }
   .hiw-panel__b { font-size: 1.08rem; line-height: 1.65; color: var(--text-secondary); max-width: 44ch; margin: 0; }
 
+  /* light sections (the stack, the repo tree, the colophon) — the dark band below
+     owns .hiw-eyebrow/.hiw-h2/.hiw-lede, so these carry their own light-ground set
+     rather than fighting it with modifiers. */
+  .hiw-sec { padding: clamp(3.5rem, 8vw, 5.5rem) 0; }
+  .hiw-sec--alt { background: var(--surface); }
+  .hiw-sec__eyebrow {
+    display: inline-block;
+    font-family: var(--font-mono);
+    font-size: 0.7rem;
+    letter-spacing: 0.22em;
+    text-transform: uppercase;
+    color: var(--accent);
+    margin-bottom: 1.1rem;
+  }
+  .hiw-sec__h2 {
+    font-family: var(--font-heading);
+    font-weight: 600;
+    font-size: clamp(1.8rem, 3.8vw, 2.8rem);
+    line-height: 1.06;
+    letter-spacing: -0.02em;
+    margin: 0 0 1.1rem;
+    max-width: 22ch;
+  }
+  .hiw-sec__lede { font-size: 1.12rem; line-height: 1.7; color: var(--text-secondary); max-width: 64ch; margin: 0 0 2.4rem; }
+  .hiw-sec__lede--last { margin-bottom: 1.6rem; }
+
+  /* stack cards — hairline grid, one rule shared between cells */
+  .hiw-cards {
+    display: grid;
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+    gap: 1px;
+    background: var(--rule);
+    border: 1px solid var(--rule);
+  }
+  .hiw-card { background: var(--bg); padding: clamp(1.4rem, 2.6vw, 2.1rem); }
+  .hiw-card__k {
+    display: inline-block;
+    font-family: var(--font-mono);
+    font-size: 0.72rem;
+    letter-spacing: 0.06em;
+    color: var(--accent);
+    margin-bottom: 0.9rem;
+  }
+  .hiw-card__t {
+    font-family: var(--font-heading);
+    font-weight: 600;
+    font-size: 1.3rem;
+    line-height: 1.15;
+    letter-spacing: -0.01em;
+    margin: 0 0 0.7rem;
+  }
+  .hiw-card__b { font-size: 1rem; line-height: 1.7; color: var(--text-secondary); margin: 0; }
+
+  /* repo tree */
+  .hiw-tree {
+    font-family: var(--font-mono);
+    font-size: 0.82rem;
+    line-height: 1.95;
+    background: var(--bg);
+    border: 1px solid var(--rule);
+    padding: clamp(1.1rem, 2.4vw, 1.8rem);
+    overflow-x: auto;
+  }
+  .hiw-tree__row { display: grid; grid-template-columns: 22ch 1fr; gap: 1.5rem; min-width: 44rem; }
+  .hiw-tree__p { white-space: pre; color: var(--ink); }
+  .hiw-tree__c { color: var(--muted); }
+  .hiw-tree__note { font-size: 1rem; line-height: 1.7; color: var(--text-secondary); max-width: 60ch; margin: 1.4rem 0 0; }
+
+  /* colophon */
+  .hiw-colophon { border-top: 1px solid var(--rule); }
+  .hiw-link--ink { color: var(--accent); }
+
   /* developer band */
-  .hiw-band { background: var(--ink-deep); color: #f3f1ea; padding: clamp(3.5rem, 8vw, 6rem) 0; margin-top: clamp(2rem, 5vw, 4rem); }
+  .hiw-band { background: var(--ink-deep); color: #f3f1ea; padding: clamp(3.5rem, 8vw, 6rem) 0; }
   .hiw-eyebrow { display: inline-block; font-family: var(--font-mono); font-size: 0.7rem; letter-spacing: 0.22em; text-transform: uppercase; color: var(--accent-bright); margin-bottom: 1.1rem; }
   .hiw-h2 { font-family: var(--font-heading); font-weight: 600; font-size: clamp(1.9rem, 4vw, 3rem); line-height: 1.06; letter-spacing: -0.02em; color: #fff; margin: 0 0 1.2rem; max-width: 20ch; }
   .hiw-lede { font-size: 1.14rem; line-height: 1.7; color: #a8a199; max-width: 60ch; margin: 0 0 1.6rem; }
@@ -329,5 +539,6 @@ const t = isEn ? en : es;
     .hiw-stage { display: none; }
     .hiw-panel { min-height: 0; padding: 1.6rem 0; }
     .hiw-panel:last-child { min-height: 0; }
+    .hiw-cards { grid-template-columns: 1fr; }
   }
 </style>
