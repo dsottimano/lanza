@@ -122,15 +122,4 @@ const authors = defineCollection({
   }),
 });
 
-const services = defineCollection({
-  loader: glob({ pattern: "**/*.{md,mdx}", base: "./content/services" }),
-  schema: z.object({
-    "title": z.string(),
-    "price": z.string(),
-    "turnaround": z.string(),
-    "summary": z.string(),
-    "recommendedFor": z.string(),
-  }),
-});
-
-export const collections = { posts, pages, categories, tags, authors, services };
+export const collections = { posts, pages, categories, tags, authors };
