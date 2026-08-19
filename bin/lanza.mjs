@@ -78,5 +78,15 @@ if (mode === "build") {
   if (realpathSync(PKG_ROOT) !== realpathSync(process.cwd())) {
     const pkgFns = join(PKG_ROOT, "functions");
     if (existsSync(pkgFns)) cpSync(pkgFns, join(process.cwd(), "functions"), { recursive: true });
+
+    // functions/_lib/mcp-core.ts imports `../../frontend/lib/*` — the render side's
+    // own predicates for what a brand value and a link may be, imported rather than
+    // restated so the writer cannot drift from the renderer. In the monorepo that
+    // path resolves at the repo root; copied into a TENANT root it does not, because
+    // the tenant has no frontend/. Cloudflare then fails the whole build and keeps
+    // serving the previous version — silently, which is how this shipped in 0.1.12
+    // and broke every tenant that bumped to it. So the lib comes along.
+    const pkgLib = join(PKG_ROOT, "frontend", "lib");
+    if (existsSync(pkgLib)) cpSync(pkgLib, join(process.cwd(), "frontend", "lib"), { recursive: true });
   }
 }
