@@ -12,6 +12,36 @@ Started 2026-08-15. Last restructured 2026-08-19.
 
 ---
 
+## Starting cold? Read these, in this order
+
+1. `CLAUDE.md` — project rules. Rule 7 is the site system, rule 6 the review surface,
+   rule 4 the CMS + security posture.
+2. `docs/site-system.md` — the composition contract. **The code wins over the doc**;
+   `scripts/site-system.mjs` is the enforcement.
+3. This file's `Now` section (below). It is three items and they are in priority order.
+
+Then prove the tree is healthy before changing anything:
+
+```sh
+npm test            # 227 function + 313 admin, all green as of 43c03a1
+npm run check:site  # 2 template dirs, 0 errors, 0 warnings
+node bin/lanza.mjs build   # 15 pages
+```
+
+Traps that have already cost time:
+
+- **`astro check` reports 1 pre-existing error** at `Base.astro:36` (`appearance.json`'s
+  `brand.scheme` widens to `string`). It is not yours. Don't chase it.
+- **The CMS commits to GitHub, not to your checkout.** `git fetch` before assuming your
+  `main` is current — live edits to `content/` land upstream while you work.
+- **Anything under `functions/` is bundled by Cloudflare with an older esbuild**, so
+  `npm test` passing proves nothing about the deploy. Check it the way CI will:
+  `npx wrangler@3.114.17 pages functions build --outdir /tmp/fnbuild`.
+- **Never add a content type to this repo's `data/schema.json` to try something out** —
+  it is lanzacms.com's own model. Use `scripts/apply-recipe.mjs --into <tmpdir>`.
+
+---
+
 # Now
 
 Three items. They are here together because each one, on its own, is the reason the site
