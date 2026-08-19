@@ -141,6 +141,11 @@ const itemActive = "nav-item--active";
   <nav class="rail-glass sticky top-3 m-3 flex h-[calc(100vh-1.5rem)] w-60 flex-shrink-0 flex-col gap-3 rounded-3xl px-3 py-4">
     <div class="flex-shrink-0 px-2.5 pt-1">
       <span class="font-serif text-xl font-bold tracking-tight text-zinc-900">Lanza</span>
+      <!-- Same badge the public site carries. Someone editing their live site
+           should be told what stage the software is at, in the software. -->
+      <span
+        class="ml-1.5 rounded-full border border-[var(--border)] px-1.5 py-0.5 align-middle font-mono text-[0.55rem] uppercase tracking-[0.18em] text-zinc-500"
+      >beta</span>
     </div>
 
     <!-- Scroll region: the groups. The brand above and Guide below stay pinned;

@@ -1,6 +1,7 @@
 <header class="{{ headerClass }}">
   <div class="bar">
-    <a class="brand" href="{{ homeUrl }}" aria-label="{{ siteName }}">
+    <div class="brand-lockup">
+      <a class="brand" href="{{ homeUrl }}" aria-label="{{ siteName }}">
       <svg class="wordmark" viewBox="-16 24 812 232" role="img" aria-label="{{ siteName }}" xmlns="http://www.w3.org/2000/svg">
         <g fill="currentColor">
           <path d="M 14.04,240 H 48.62 V 47.86 H 14.04 Z"/>
@@ -14,7 +15,9 @@
           <path d="M80 48 L80 20 L52 20"/>
         </g>
       </svg>
-    </a>
+      </a>
+      <span class="beta">beta</span>
+    </div>
     <nav class="site-nav">
       {{#each menuHeader}}<a href="{{ url }}">{{ label }}</a>{{/each}}
       {{#if showSwitcher}}

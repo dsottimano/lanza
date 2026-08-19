@@ -4,7 +4,7 @@ draft: false
 template: landing
 preset: manifesto
 slots:
-  tag: SU PRESENCIA EN LA WEB · EN PROPIEDAD
+  tag: BETA · SU PRESENCIA EN LA WEB · EN PROPIEDAD
   headline: Sea dueño de su presencia en la web.
   sub: 'Puede publicar en redes sociales todo el día y no ser dueño de nada. Sus textos y su audiencia desaparecen el día que la plataforma decida. Lanza le da un sitio de verdad: una carpeta de archivos en GitHub, alojada gratis por Cloudflare, y que se edita hablando con ChatGPT o Claude. Usted conserva una copia de todo.'
   cta1: Empezar

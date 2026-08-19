@@ -480,6 +480,31 @@ h4 {
   width: auto;
 }
 .brand .wordmark__arrow { stroke: var(--accent); }
+/* Beta badge. The product is real and running, and saying so plainly on every
+   page is cheaper than answering the question one visitor at a time. Sits beside
+   the wordmark rather than inside the link, so a screen reader reads it as its own
+   thing instead of it being swallowed by the brand's aria-label. */
+.brand-lockup {
+  display: inline-flex;
+  align-items: baseline;
+  gap: 0.55rem;
+}
+.beta {
+  font-family: var(--font-mono);
+  font-size: 0.6rem;
+  letter-spacing: 0.18em;
+  text-transform: uppercase;
+  color: var(--accent);
+  border: 1px solid color-mix(in srgb, var(--accent) 45%, transparent);
+  border-radius: 999px;
+  padding: 0.12rem 0.42rem;
+  line-height: 1;
+  white-space: nowrap;
+}
+.beta--quiet {
+  color: var(--muted);
+  border-color: var(--rule);
+}
 .site-nav a {
   font-family: var(--font-mono);
   font-size: 0.7rem;
