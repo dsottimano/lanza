@@ -12,6 +12,58 @@ Started 2026-08-15. Last restructured 2026-08-19.
 
 ---
 
+## ⏱ DEMO — 2026-08-19, ~17:30 local (Dave presents at ~17:30, written 14:32)
+
+**Read this first. It overrides the ordering below until the demo is done.**
+
+### What the demo is
+
+Someone connects an LLM to a Lanza site and builds a whole site by talking. **This
+already works** — it was done for real at 14:00 today (ChatGPT → `lanzacms.com/api/mcp`,
+brief: *"I run a violin repair shop in Toronto…"*). 16 tool calls, correct order,
+unprompted. See §1 below for the full write-up.
+
+### The demo path that is PROVEN to work
+
+1. ChatGPT → Settings → Connectors → custom connector →
+   `https://lanzacms.com/api/mcp`. **Sign out of GitHub first** and approve as
+   `dsottimano` — a stale `datadefine` session gives a bare 403 with no explanation.
+2. Give it a plain-English brief. Do NOT mention content types, templates or routes.
+3. It builds on the **draft** (`staging`). Show `https://staging.lanza.pages.dev/`.
+4. **DO NOT PUBLISH.** Publish merges the draft into the live product site. A demo
+   shop would go live on lanzacms.com.
+
+### State right now
+
+- `staging` = `main` + the violin site, and it renders:
+  `https://staging.lanza.pages.dev/services/` ✅ (verified by reading the page)
+- `main` and the live site are untouched by any of today's agent work.
+- `main` is ahead of `origin/main` by a few docs commits — push them.
+- The violin content is still sitting in the draft. To wipe it and start clean:
+  `git push origin main:staging --force`
+
+### Known rough edges, in demo terms
+
+- **Between runs the draft has to be reset by hand** (the command above). There is no
+  button — that is the top item in §0. If time allows, build it; it is the single
+  most demo-relevant gap.
+- **A fresh build takes ~4-6 min** on Cloudflare. Build the site BEFORE the demo and
+  show the result, or narrate the wait.
+- **"From From C$95"** — the agent wrote a template with a hardcoded `From ` prefix and
+  content that also starts with "From". Cosmetic, real, unfixed. If it shows, it is an
+  honest illustration of what the checker does NOT catch.
+- Do not demo `/admin` on the staging host, and do not run `/admin` under
+  `astro preview` — no Pages Functions there, so the CMS pastes a raw HTML 404 into a
+  modal (`cms-review-todo.md` 3.11). `npm run dev` is the local CMS.
+
+### If something breaks mid-demo
+
+The fallback that needs no network and no Cloudflare: `git checkout violin-preview`
+(local branch, `main` + violin content), `node bin/lanza.mjs build && npm run preview`
+→ the full site on `localhost:4321`.
+
+---
+
 ## What this product is, in one paragraph
 
 Someone onboards — broker, Cloudflare, GitHub — then opens ChatGPT or Claude or Grok,
@@ -26,6 +78,24 @@ the failure mode is building a library of prefabricated site types instead. Dave
 the MCP `validate_site` tool are what tell it whether what it invented holds together.
 
 ---
+
+## Cold-start for the demo push (a fresh session picks up HERE)
+
+Written 14:32, 2026-08-19. Order of work while the clock runs:
+
+1. **Build "Discard all pending changes" in the CMS.** §0 has the design. Highest
+   demo value: it is what lets Dave reset the draft between runs without a terminal,
+   and it is the same button that fixes a stale draft. Contained: `PendingView.vue`
+   plus one method in `admin/src/backend/github.ts`. The proxy already allows
+   `PATCH git/refs/heads/<branch>` — no security change.
+2. **Code review this session's work.** Nine feature commits landed today
+   (`6c9f3bc..`), ten new MCP tools, a new safety classifier, parse5 into the Worker
+   bundle. None of it has had a second pass.
+3. Only then, anything from `Now`.
+
+Every change must keep the baseline green (commands below) AND the Pages Functions
+build compiling — that last one is not optional, it is what CI does and `npm test`
+does not prove it.
 
 ## Starting cold? Read these, in this order
 
