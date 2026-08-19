@@ -108,6 +108,22 @@ version is bumped on `main`, their staging still has the old `package.json` and
 previews with the old program until the next publish. Real, worth fixing, nothing like
 what happened here.
 
+- [ ] **"Discard all pending changes" belongs in the CMS.** Today the only way to throw
+      away a draft is `git push origin main:staging --force` from a terminal, which
+      means the owner cannot undo an agent's whole session without a developer. Publish
+      is a button; its opposite must be too. They are the two ends of one decision and
+      belong side by side in `PendingView`.
+      - The capability already exists: `functions/_lib/gh-proxy.ts` allows
+        `PATCH git/refs/heads/<branch>` for both branches, so this is a UI + backend
+        call, not a proxy change.
+      - It is DESTRUCTIVE and it is a GitHub write, which is a deliberate exception to
+        `docs/review-surface.md`'s rule that a revert writes to the editor and never to
+        GitHub. That rule exists so undoing an agent is not itself irreversible; this is
+        the opposite case — a human explicitly choosing to throw work away. It must name
+        exactly what will be lost (the file list, as `list_changes` already returns) and
+        confirm, not just say "are you sure?".
+      - Same operation, second use: when staging is BEHIND and has nothing pending,
+        this is also the fix below. Reset-to-live and catch-up-to-live are one button.
 - [ ] Fast-forward `staging` to `main` whenever it is behind and has nothing pending.
       The gh-proxy already allows the PATCH (`git/refs/heads/<branch>`) — the CMS uses
       it to fast-forward after a commit, so the capability is there and unused for this.
