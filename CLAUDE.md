@@ -63,6 +63,16 @@ markdown on load and re-saves HTML.
    `startsWith("slots.")` anywhere outside the two documented conversion points is
    how this quietly breaks.
 
+7. **A whole site is composed, not improvised.** `docs/site-system.md` is the
+   composition contract an agent follows to build a site from a brief ("a simple event
+   site" → content types, templates, fields, routes, style options). Its one rule is
+   that a layer may only reference names the layer below declares, and the reason it is
+   written down is that every violation is SILENT — a misspelled `{{placeholder}}`
+   renders empty, a routeless content type stores entries at no URL. `npm run check:site`
+   enforces it; `scripts/site-system.mjs` mirrors the engine's own grammar and there is a
+   test pinning the two together. A content type reaches the web only via its `route`
+   block (`scripts/gen-routes.mjs` generates the `.astro`) — never a hand-written page.
+
 5. **Bot secrets via wrangler, never in the repo.** `BOT_TOKEN`, `BOT_INFO`,
    `WEBHOOK_SECRET`, `GITHUB_TOKEN` are `wrangler secret put`. The bot fails
    closed (webhook secret + chat allowlist required). See `bot/README.md`.
@@ -76,6 +86,9 @@ markdown on load and re-saves HTML.
   (`CONTENT_DIR`), and `scripts/gen-redirects.mjs` together.
 - Changed the CMS (`admin/`)? → rebuild (`npm run build:admin`) and confirm `/admin`
   still loads; the deploy `build` script rebuilds it automatically.
+- Added a content type, a template, or a route? → `docs/site-system.md`, then
+  `npm run check:site`. Field names are declared ONCE (in the template's `fields.json`)
+  and the collection is derived — typing them twice is how they drift.
 - Touched field paths, the template renderer, or the preview? → `docs/review-surface.md`
   first. The form and the engine build paths independently and a drift between them
   scrolls the preview to the wrong section — `FieldForm.test.ts` pins them together

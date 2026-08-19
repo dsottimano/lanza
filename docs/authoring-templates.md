@@ -107,8 +107,10 @@ page.
   print a bare string item (a plain string list has no name to reference).
 - **No partials (`{{> …}}`), no helpers, no inline expressions/operators, no comments
   (`{{! …}}`).**
-- **No triple-mustache (`{{{ … }}}`).** All values are escaped; there is no raw-HTML
-  interpolation. If a field must carry markup, that is a design change, not a syntax one.
+- **No raw interpolation of a SLOT.** `{{{ … }}}` exists, but only for the reserved
+  `body` (see "The main body") — it is already sanitized. Every slot value is escaped;
+  if a slot must carry markup, that is a design change, not a syntax one. The checker
+  reports `raw-non-body` for any other use.
 - Interpolating an **object or array** with `{{ x }}` yields an empty string (it will not
   print `[object Object]`). Only render leaf values.
 
@@ -163,7 +165,8 @@ slots, it's computed system data that `Base.astro` passes in:
 | `{{ siteName }}` · `{{ year }}` · `{{ homeUrl }}` | site identity |
 | `{{#each menuHeader}}` / `{{#each menuFooter}}` | the menu (Settings → Menu); items expose `{{ label }}` + `{{ url }}` |
 | `{{#each locales}}` | the language switcher; each item has `{{ code }}`, `{{ url }}`, `{{ active }}`, `{{ inactive }}`, `{{ sep }}` |
-| `{{#if showNav}}` | false on `landing` pages (drops the nav) |
+| `{{#if showSwitcher}}` | true when the site has more than one locale (guards the language switcher) |
+| `{{ headerClass }}` · `{{ footerClass }}` | `site-header` / `site-footer`, plus ` landing` on landing pages — how a part drops its nav |
 
 Edit `header.html` / `footer.html` to restructure the chrome; the **menu links** stay
 editable in the CMS (Settings → Menu). To move the language switcher (say, to the
