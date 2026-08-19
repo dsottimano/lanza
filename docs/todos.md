@@ -3,12 +3,27 @@
 The running work list. Deeper lists live in their own files and are linked from here
 rather than copied — `security-todo.md` (the auth migration, phase by phase),
 `cms-review-todo.md` (~25 verified defects in `admin/`), `site-system.md` (the
-composition contract itself).
+composition contract itself), `mcp-server.md` (the tool surface).
 
 **Ordering:** `Now` is what is actually next and why. Everything under `Open` is real
 but unscheduled. The shipped log is at the bottom — it is context, not work.
 
 Started 2026-08-15. Last restructured 2026-08-19.
+
+---
+
+## What this product is, in one paragraph
+
+Someone onboards — broker, Cloudflare, GitHub — then opens ChatGPT or Claude or Grok,
+connects this site's MCP server, and **talks**. The LLM works out what content types the
+site needs, invents them, creates the URLs, writes the page templates and their input
+fields, sets the look, shows the owner a staging URL, and the owner says yes. Read that
+again before planning anything: it is the test every capability is judged against, and
+the failure mode is building a library of prefabricated site types instead. Dave,
+2026-08-19: *"I'm using recipes and real estate as examples, not prefabricated."*
+
+`docs/site-system.md` is the grammar the LLM composes against; `npm run check:site` and
+the MCP `validate_site` tool are what tell it whether what it invented holds together.
 
 ---
 
@@ -18,14 +33,16 @@ Started 2026-08-15. Last restructured 2026-08-19.
    rule 4 the CMS + security posture.
 2. `docs/site-system.md` — the composition contract. **The code wins over the doc**;
    `functions/_lib/site-system.mjs` is the enforcement.
-3. This file's `Now` section (below). It is three items and they are in priority order.
+3. `docs/mcp-server.md` — the 20 tools, and which ones exist to close the gap above.
+4. This file's `Now` section (below). Three items, in priority order.
 
 Then prove the tree is healthy before changing anything:
 
 ```sh
-npm test            # 235 function + 313 admin, all green
+npm test            # 291 function + 313 admin, all green
 npm run check:site  # 1 template dir, 0 errors, 0 warnings
 node bin/lanza.mjs build   # 15 pages + /llms.txt + /site-system.json
+npx wrangler@3.114.17 pages functions build --outdir /tmp/fnbuild   # must compile
 ```
 
 Traps that have already cost time:
@@ -35,140 +52,83 @@ Traps that have already cost time:
 - **The CMS commits to GitHub, not to your checkout.** `git fetch` before assuming your
   `main` is current — live edits to `content/` land upstream while you work.
 - **Anything under `functions/` is bundled by Cloudflare with an older esbuild**, so
-  `npm test` passing proves nothing about the deploy. Check it the way CI will:
-  `npx wrangler@3.114.17 pages functions build --outdir /tmp/fnbuild`.
+  `npm test` passing proves nothing about the deploy. That now includes the site-system
+  checker and parse5. Check it the way CI will (command above).
 - **Never add a content type to this repo's `data/schema.json` to try something out** —
-  it is lanzacms.com's own model. Use `scripts/apply-recipe.mjs --into <tmpdir>`.
+  it is lanzacms.com's own model. Drive the MCP tools in a test instead
+  (`functions/_lib/mcp-core.test.mjs` has a fake GitHub), or use
+  `scripts/apply-recipe.mjs --into <tmpdir>`.
+- **Don't build a recipe library.** See the paragraph at the top. `recipes/event-site` is
+  a worked example that proves the machinery runs; it is not the product.
 
 ---
 
 # Now
 
-Three items. They are here together because each one, on its own, is the reason the site
-system is not yet the thing it claims to be.
+Three items. The tool surface is complete enough that an LLM can build a site end to end
+(there is a test that does it), so these are the three things standing between "the tests
+pass" and "someone actually did this".
 
-## 1. The MCP surface — CRITICAL
+## 1. Drive it with a REAL LLM against a REAL site — CRITICAL
 
-**An agent connected over MCP can edit content and nothing else.** It cannot create a
-content type, write a template, declare a route, or offer a style. So the entire system
-shipped on `site-system` is reachable only by someone with a checkout and a terminal —
-which is precisely the person who did not need it. Everything else in this file is
-secondary to closing that.
+**Everything shipped so far is proven by tests that call the tool functions directly.**
+That proves the mechanics. It does not prove the *ergonomics*, and the ergonomics are the
+product: a tool description is the only contract a cold model gets, and there is no
+evidence yet that a model reads `describe_site_system` and then does the right thing.
 
-The existing surface is `get_site`, `list_collections`, `get_schema`, `list_content`,
-`read_content`, `create_content`, `update_content`, `delete_content`, `list_changes`,
-`publish` (`functions/_lib/mcp-core.ts`; the broker at `lanza-broker/functions/api/mcp.ts`
-is a router with no tool definitions of its own, so a tool added to a tenant appears
-there automatically — see `docs/mcp-server.md`).
+This is the highest-value unknown on the list, and it is the one most likely to be wrong.
 
-- [x] **`describe_site_system`** — serves `siteSystemContract()`: the layer model, the
-      positions with what each puts in scope, the widgets, the reserved names, and every
-      check code with the silent failure it stands for. No arguments, no reads.
-- [x] **`write_template`** — refuses on any checker error AND on markup a browser would
-      act on (`UNTRUSTED_AUTHOR_CODES`). Both sets come back in one refusal. The safety
-      half is new and is the boundary change: a template is raw markup on the origin that
-      serves /admin, so `security-model.md` §3 now carries the reasoning and §5 the two
-      accepted limits.
-- [x] **`create_content_type`** — fields derived from the template's `fields.json`, folder
-      derived as `content/<name>` (never accepted — §3: schema.json must not become a
-      security boundary), route validated against the SAME rules `gen-routes.mjs` enforces,
-      which now live in the checker so the two cannot drift. The pending model is run
-      through `checkSite` before anything is written.
-- [ ] **`apply_recipe`** — DEPRIORITIZED. Dave, 2026-08-19: "I'm using recipes and real
-      estate as examples, not prefabricated." The product is an LLM INVENTING the model in
-      conversation, not picking from a library. The per-call tools cover that flow; a
-      recipe applier is only worth building if a genuine atomic multi-step need appears.
-- [x] **Settings over MCP** — superseded `list_styles`/`set_style`, which were about
-      picking from canned variants. `get_settings` / `set_brand` / `set_menu` / `set_seo`
-      let an LLM set the look directly: colours, radius, fonts, scheme, the nav, the site
-      name. Paths are DERIVED from a fixed map, never read out of `data/schema.json`
-      (§3: it must not become a security boundary). `set_brand` REFUSES what
-      `resolveBrand` would silently drop — `validateBrand` shares its constants.
-- [x] **`write_part`** — the header/footer chrome, checked against `PART_DATA`.
-- [x] **`update_content_type`** — the "no, call them Workshops" half. Labels, route, and
-      re-deriving fields after the template changed. Not `name`: that is a migration.
-- [x] **`validate_site`** — runs `checkSite()` over the repo and returns findings.
-      Read-only. `template: "<name>"` scopes it to one folder. It reads at most **6**
-      template folders per call (a Worker gets ~50 subrequests; each template costs two
-      reads) and names what it skipped. Lifting that cap wants one `git/trees?recursive=1`
-      call to learn which ref each file is on, so each read costs one subrequest instead
-      of two — worth doing when a real tenant has more than six templates.
+- [ ] Connect a real client (Claude / ChatGPT / Grok) to a **datadefine-owned** test site —
+      `dmg` or `mcp-test`, never `lanzacms.com` and never a customer. A 403 on lanzacms.com
+      is the gate working, not a bug.
+- [ ] Give it a one-line brief in a shape nobody has tried ("a site for my violin repair
+      shop") and watch where it goes wrong. Expect the failures to be in the DESCRIPTIONS,
+      not the logic: a tool it never calls, a field it invents, an order it gets wrong.
+- [ ] **Write down every wrong turn before fixing any of them.** The instinct will be to
+      patch the first one; the pattern across all of them is the finding.
+- [ ] Known-weak spots to watch specifically:
+      - Does it call `describe_site_system` at all, or guess?
+      - Does it work out the template → content-type order without being told? (The order
+        is forced: a type's fields come FROM its detail template, and its route NAMES its
+        listing template. `write_template` defers `listing-unknown-collection` for exactly
+        this reason.)
+      - Does it ever call `validate_site` unprompted?
+      - Does it know a page needs `preset` + `slots`? See item 3.
 
-Two constraints that will shape the build, both learned the hard way:
+## 2. Media — an agent cannot put a picture on the site
 
-- ~~**The checker has to run inside `functions/`.**~~ Done — it is
-  `functions/_lib/site-system.mjs`, dependency-free, and the Pages build is verified
-  (`npx wrangler@3.114.17 pages functions build --outdir /tmp/fnbuild`). Its test stays in
-  `scripts/`: everything under `functions/` is bundled, `*.test.mjs` included. The
-  orchestration the CLI used to own is now `checkSite()` with IO injected, so
-  `npm run check:site` and `validate_site` cannot give different answers.
-- ~~**`data/schema.json` is compiled into code the build imports.**~~ Pass done, and it
-  came out better than expected: both generators already validate every value reaching a
-  code position (`gen-content-config.mjs`'s header records the real RCE that produced
-  that discipline — a field name in a computed-key position), and schema.json is already
-  writable by any editor session through `/admin/api/gh`. So an MCP writer adds a caller,
-  not a new capability class. The genuinely new boundary was **templates**, not the
-  schema — see `security-model.md` §3.
+A violin shop, a pottery studio and a restaurant all need photographs, and there is **no
+upload tool**. An LLM can reference a URL it was given and nothing else. The CMS uploads
+to `public/images/uploads` and serves them as static assets.
 
-## 2. The contract has to be readable — in docs AND on the public site
+- [ ] **`upload_media`** — write a binary to `public/images/uploads/<name>` on staging and
+      return the path. GitHub's Contents API takes base64, so the transport is the easy
+      half.
+- [ ] The hard half is **where the bytes come from**. An MCP client cannot hand over a
+      local file, so the realistic inputs are a URL to fetch (server-side fetch from a
+      Worker — needs a size cap, a content-type allowlist and a think about SSRF) or
+      base64 in the tool call (bounded by the client's own message limits).
+- [ ] Whatever it accepts, the path is **derived**, never passed: `public/images/uploads/`
+      plus a slugged filename plus an extension from a fixed allowlist. Same posture as
+      the settings paths — see `security-model.md` §3.
+- [ ] Changing the media path breaks every existing image reference. Don't make it
+      configurable.
 
-`docs/site-system.md` is written, and it is invisible: it is one file in a repo, and the
-audience is agents operating a site they were pointed at ten seconds ago.
+## 3. The home page — composable, but undocumented
 
-- [x] **`/llms.txt` carries it.** A "How this site is built" section (the one rule, the
-      contract URL, the MCP endpoint and the two checking tools) plus a "Content types"
-      section generated from the tenant's own `data/schema.json` — name, route base, and
-      declared fields.
-- [x] **`/site-system.json`** — `frontend/pages/site-system.json.ts`, serving
-      `siteSystemContract()`. Built once: `describe_site_system` returns the same object.
-      Minified for the same reason the MCP layer minifies (the reader pays per token).
-- [ ] **A public page on lanzacms.com.** A fixed page (`frontend/lib/fixed-pages.ts`,
-      gated by `PRODUCT_ONLY` so tenant sites do not serve our marketing) explaining how
-      an agent builds a Lanza site. `/agents/` is the natural neighbour and may be the
-      right home rather than a new slug — decide before building a second page that says
-      an overlapping thing.
-- [x] **Linked from the repo.** `README.md` has a "Building a whole site" section and
-      `docs/authoring-templates.md` opens by pointing at it.
-- [~] Keep the doc and the code honest about each other. Half done: `CHECKS` is now the
-      registry of every problem code, and a test scans the checker's source both ways —
-      an emitted code missing from `CHECKS` fails, and so does a documented code nothing
-      emits. The prose tables in `site-system.md` are still hand-maintained.
+An LLM can create a page entry whose `preset` names a template folder and whose `slots`
+carry the values, and it works. Nothing tells it that. `describe_site_system` explains
+positions and widgets but never says how a *page* reaches a template.
 
-## 3. Recipes beyond events — the format is unproven
-
-**`event-site` was an example, not the requirement.** The system has to produce a real
-estate site, a shop catalogue, a restaurant, a portfolio. One worked example proves the
-machinery runs; it does not prove the *format* is general, and a format that only fits
-events is a demo.
-
-- [ ] **Write a second and third recipe in genuinely different shapes** — `real-estate`
-      (listings with galleries, price, status, an agent to contact) and `catalogue`
-      (products with variants, price, an external buy link). Expect them to break the
-      format. That is the point of writing them.
-- [ ] **Known gaps the event recipe never exercised**, each likely to surface immediately:
-      - **Relations between types.** A property has an agent; a product has a category.
-        The `relation` widget exists in the model but nothing renders the far side — a
-        detail template cannot currently print the related entry's fields.
-      - **Filtering and sorting a listing** beyond one `sortBy` field. Real estate is
-        unusable without "3+ bedrooms, under X".
-      - **Pagination.** Forty events is fine; four hundred products is not.
-      - **Galleries.** A `list` of images has no template idiom yet.
-      - **Money and number formatting.** `price` is a free-text string today, which is
-        honest for events and wrong for a catalogue.
-      - **Taxonomy routes for custom types** (`/properties/neighbourhood/<x>/`). Only the
-        listing and the detail page are generated.
-- [ ] **Be explicit that a shop is a catalogue, not a checkout.** Lanza is static on
-      Cloudflare's free tier (Rule 1). Ecommerce here means a catalogue plus an external
-      payment link. Say so in the recipe's description rather than letting someone
-      discover it after building one.
-- [ ] **The real goal is authoring, not picking.** A library of canned recipes is a
-      stopgap; the system works when an agent *writes* a recipe from a brief and the
-      checker tells it whether the thing it invented is coherent. The recipe format is
-      the agent's output format, so it has to be simple enough to write from scratch and
-      strict enough to be wrong out loud.
-- [ ] **`recipes/` is not in `package.json` `files`,** so tenants receive no recipes on
-      install. Deliberate — it changes what a release ships. Decide once there is more
-      than one recipe worth shipping.
+- [ ] Say it in `describe_site_system`: a page is an entry in `pages` with
+      `preset: "<template folder>"` and `slots: { … }`, and `template` is a different
+      thing (the layout variant — `default` / `full-width` / `landing`). The two names are
+      near-synonyms and an agent reliably guesses wrong; this is already in
+      `site-system.md`'s Traps and needs to be in the served contract.
+- [ ] Consider a worked example in the contract — the smallest page template plus the
+      `create_content` call that fills it. An example is worth more than a rule here.
+- [ ] Check whether `create_content` needs to say it too. Its description covers
+      frontmatter generically and never mentions `preset`.
 
 ---
 
@@ -180,26 +140,39 @@ events is a demo.
    not be done while unable to use its replacement.
 2. **Publish `0.1.12`** — read "Before publishing" below first. Tenants are on `0.1.11`
    and have none of this work.
-3. **Merge `site-system`.** Five feature commits plus docs, unpushed, tests green. It
-   touches no auth and no `functions/`, so it is independent of phase 4.
+3. ~~Merge `site-system`.~~ Merged to `main` at `eeb504b`. Everything since is on `main`
+   and unpushed — `git log origin/main..main` is the honest list.
 
 ---
 
 # Open — the site system
 
-`docs/site-system.md` is the contract; `npm run check:site` enforces it.
+`docs/site-system.md` is the contract; `npm run check:site` and MCP `validate_site` both
+enforce it, from the same module.
 
-- [ ] **The CMS does not expose `route` or the style variants.** Both are edited as data
-      (`data/schema.json`, `data/styles.json`) or written by a recipe. The content-type
-      editor needs a route panel; Settings → Brand needs a "compare options" entry.
-- [ ] **Recipes never delete, and re-applying refuses rather than merging.** Fine for now;
-      an "update this recipe" path is a real feature, not a flag.
-- [ ] **The style specimen is one card.** It is honest, but a whole-page preview under a
-      variant would be more convincing. Blocked on nothing except deciding whether it is
-      worth generating N copies of a real page.
+- [ ] **Nothing can DELETE.** No tool removes a content type, a template or an entry-less
+      collection, and `update_content_type` will not rename `name` (that is a migration —
+      the folder and every built URL derive from it). An LLM that gets the model wrong
+      twice leaves debris. Deletion is destructive and revert-shaped, so design it against
+      `docs/review-surface.md` before building it.
+- [ ] **A site cannot become multilingual over MCP.** `data/site.json` (locales, default
+      locale) is not in the Settings collection and no tool touches it. Adding a locale
+      restructures routing and hreflang for the whole site, so it is a real feature.
+- [ ] **Taxonomy routes for custom types** (`/properties/neighbourhood/<x>/`) are not
+      generated — only the listing and the detail page are.
+- [ ] **The CMS does not expose `route`.** The content-type editor needs a route panel;
+      right now a route is only reachable as data or through MCP.
+- [ ] **Filtering, sorting and pagination.** A listing takes one `sortBy`. Forty entries
+      is fine; four hundred is not, and "3+ bedrooms under X" is not expressible at all.
+      This is the first thing a real catalogue will hit.
+- [ ] **Relations between types render nowhere.** The `relation` widget exists in the model
+      and a detail template cannot print the related entry's fields.
+- [ ] **Galleries have no template idiom.** A `list` of images works, but nothing shows the
+      shape an agent should reach for.
+- [ ] `recipes/` is not in `package.json` `files`, so tenants receive none. Deliberate, and
+      per the framing at the top of this file, likely to stay that way.
 - [ ] Pre-existing, unrelated: `astro check` reports one error at `Base.astro:36`
       (`appearance.json`'s `brand.scheme` widens to `string` through the JSON import).
-      Predates the site-system work.
 
 # Open — the review surface
 
@@ -241,11 +214,18 @@ The inventory is done. Three tiers, in order:
         catalog instead.
       - `COLOR_TOKENS`, `RADIUS_OPTIONS`, `PRESETS` (`brand.ts`) are fixed enums; a
         seventh colour token needs a code change.
-      - Newly relevant: `site-system.mjs` now mirrors `admin/src/schema.ts`'s `Widget`
-        union and `Base.astro`'s `partData`. Two more MIRROR comments, same disease.
+      - Newly relevant: `site-system.mjs` mirrors `admin/src/schema.ts`'s `Widget` union
+        and `Base.astro`'s `partData`, and `COLLECTION_NAME` mirrors
+        `gen-content-config.mjs`. Three more MIRROR comments, same disease. (The route
+        rules went the other way and are now shared — `gen-routes.mjs` imports them.
+        That is the pattern to copy.)
+      - `set_brand` made this worse in a useful way: `FONT_CATALOG` is now the list an
+        MCP client is TOLD is valid, so a fourth copy drifting is now visible to a
+        stranger's agent, not just to us.
 - [ ] **Dead config**: `data/appearance.json`'s `theme` and `logo` are unreachable from
       the UI — `schema.json` still declares them but the sidebar filters that entry out.
-      Either wire them or delete the declaration.
+      `set_brand` now writes `logo`, so it is half-alive: reachable by an agent and not by
+      a person. Wire it or drop it, but stop leaving it in between.
 - [ ] **Do NOT expose**: the gh-proxy allowlist, `adminLogin`/`owner` (self-promotion),
       branch names (they live in two files with no shared source), media paths (changing
       them breaks every existing image reference).
@@ -290,16 +270,62 @@ proxies at once**.
       locked out of their own CMS.
 - [ ] Every tenant editor is signed out at once by the release and needs one device code.
       That should land with working invite UI, not before it.
-- [ ] New: the release now also ships `gen-routes.mjs` and the two collection-route
-      components. They are additive — a tenant with no `route` block generates nothing and
-      builds byte-identically (verified) — but that is the claim to re-check on the first
-      tenant build after release.
+- [ ] New: the release also ships `gen-routes.mjs` and the two collection-route
+      components. Additive — a tenant with no `route` block generates nothing and builds
+      byte-identically (verified) — but that is the claim to re-check on the first tenant
+      build after release.
+- [ ] New: `functions/` now carries the site-system checker **and parse5**, so the Worker
+      bundle went 221K → 524K. Well inside Cloudflare's limits, but it is the first time a
+      dependency entered that bundle; re-verify with the `wrangler pages functions build`
+      command in the cold-start block before releasing.
+- [ ] New: the MCP surface went from 10 tools to 20, and six of them WRITE outside
+      `content/` (templates, parts, `data/schema.json`, the settings files). Every one is
+      confined by a derived path rather than a validated one; `security-model.md` §3 is
+      the record. Re-read it before a release that widens the surface again.
 
 ---
 
 # Shipped
 
-## 2026-08-18 — the site system (branch `site-system`, unpushed)
+## 2026-08-19 — the site system, reachable without a checkout
+
+Nine commits on `main`, unpushed. The site system existed but was operable only by
+someone with a terminal — which is precisely the person who did not need a CMS. This
+closed that.
+
+- **The checker moved to `functions/_lib/site-system.mjs`** so the MCP server runs the
+  same code `npm run check:site` does. `checkSite()` takes injected IO — the CLI hands it
+  `fs`, the server hands it a GitHub branch — because a second implementation would be a
+  second opinion.
+- **The contract became data.** `CHECKS` (every problem code with the silent failure it
+  stands for) and `siteSystemContract()`, served at **`/site-system.json`** and by
+  `describe_site_system`, from the same constants the checker enforces. A test scans the
+  source both ways so the published list cannot rot.
+- **`/llms.txt` says what the site IS** — the one rule, the contract URL, the MCP
+  endpoint, and a "Content types" section generated from the tenant's own `schema.json`.
+- **Ten new MCP tools**, taking the surface from 10 to 20: `describe_site_system`,
+  `validate_site`, `write_template`, `write_part`, `create_content_type`,
+  `update_content_type`, `get_settings`, `set_brand`, `set_menu`, `set_seo`.
+  Settings was not a gap but a blind spot — `getCollections()` drops every folderless
+  collection, so no `kind: "files"` entry was reachable at all.
+- **Template safety, classified.** A template is raw markup emitted with `set:html` on the
+  origin that serves `/admin`, and `assert-rendered-safe.ts` was built on its author being
+  a trusted human. `checkTemplateSafety()` PARSES (reusing `dangerousConstructs()`, never
+  a regex) and severity depends on the AUTHOR: warnings for a human, refusal for an agent.
+  `security-model.md` §3 carries the reasoning, §5 the two accepted limits.
+- **Two end-to-end tests** in `mcp-core.test.mjs` — a real-estate site and a pottery
+  studio, both invented from nothing through the tools, the second including the owner
+  changing their mind and publishing. If they stop passing, the pitch is not true.
+
+Three bugs the tests caught before shipping, all of the same kind — something failing
+silently: a false positive on `href="{{ url }}"` (not a URL yet), `write_template`
+mutating the caller's object, and a `note` key collision that swallowed the "this type
+has no URL" warning.
+
+**Deprioritized here:** `apply_recipe` and per-vertical recipes. See the framing at the
+top of this file.
+
+## 2026-08-18 — the site system (merged to `main` at `eeb504b`)
 
 The composition contract for agent-built sites. `docs/site-system.md` is authoritative.
 
