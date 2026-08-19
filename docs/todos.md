@@ -69,6 +69,47 @@ Three items. The tool surface is complete enough that an LLM can build a site en
 (there is a test that does it), so these are the three things standing between "the tests
 pass" and "someone actually did this".
 
+## 0. `staging` drifts behind `main` forever — FOUND LIVE, BLOCKS THE REVIEW SURFACE
+
+Found 2026-08-19 on the first real-LLM run. `staging` on this repo is **51 commits
+behind `main`**, branched at `b841cd9` (2026-08-16, a CMS publish). None of those 51
+commits touched `content/` or `data/` — they are all hand/agent development.
+
+The mechanism, and it is in BOTH implementations:
+
+- `publish` merges **staging → main**. One direction, and only on publish.
+- **Nothing ever merges main → staging.** `ensureWorkingBranch()` returns the moment
+  the branch exists — `functions/_lib/lanza-content.ts` and
+  `admin/src/backend/github.ts:370` are the same three lines.
+- So staging freezes at the last publish and falls behind by exactly the amount of
+  non-CMS development.
+
+**Why it matters more than it looks.** The staging preview is the review surface — "a
+change is a proposal you can look at before it goes live" (Rule 6). Staging builds new
+CONTENT against OLD CODE. On the run that found this, an agent correctly created a
+content type with a `route`, and `/services/` 404'd on staging because
+`gen-routes.mjs` does not exist on that branch. Everything the agent did was right and
+none of it was visible. Merging `main` into a local branch built all 26 pages first try.
+
+Invisible to a pure-CMS tenant (staging is always main + pending edits). It bites any
+site where code reaches `main` directly — this repo, and **every tenant whose
+`lanza-site` version is bumped by the broker fan-out**, which is a commit to `main` no
+CMS edit ever sees.
+
+- [ ] Fast-forward `staging` to `main` whenever it is behind and has nothing pending.
+      The gh-proxy already allows the PATCH (`git/refs/heads/<branch>`) — the CMS uses
+      it to fast-forward after a commit, so the capability is there and unused for this.
+- [ ] Decide what happens when staging is behind AND has pending edits: a merge can
+      conflict, and a conflict during "open the CMS" is the worst possible moment.
+      Probably merge main→staging and surface the conflict the way `publish` already
+      does, rather than silently leaving it stale.
+- [ ] Whatever the fix, `stagedNote()` in `mcp-core.ts` currently promises "a
+      Cloudflare build takes about 4-6 minutes, so the page will still show the old
+      content until then. That delay is normal and is not a failed write." That text
+      exists to PREVENT false bug hunts and on this run it caused one — the agent
+      repeated it faithfully about a URL that could never work. It must not claim the
+      page will appear unless staging can actually render it.
+
 ## 1. Drive it with a REAL LLM against a REAL site — CRITICAL
 
 **Everything shipped so far is proven by tests that call the tool functions directly.**
@@ -78,9 +119,31 @@ evidence yet that a model reads `describe_site_system` and then does the right t
 
 This is the highest-value unknown on the list, and it is the one most likely to be wrong.
 
-- [ ] Connect a real client (Claude / ChatGPT / Grok) to a **datadefine-owned** test site —
-      `dmg` or `mcp-test`, never `lanzacms.com` and never a customer. A 403 on lanzacms.com
-      is the gate working, not a bug.
+**First run done, 2026-08-19 — ChatGPT against `lanzacms.com` (signed in as the owner,
+so no 403). Brief: "I run a violin repair shop in Toronto. I want a page for each
+service I offer — with the price and how long it takes — and a page listing them all."**
+
+It worked. 16 commits on `staging`, unprompted, in the order the system requires:
+`write_template` (detail) → `create_content_type` → `write_template` (index) →
+**`update_content_type`** to attach the listing → 9 entries → `set_menu`. It found the
+forced ordering on its own, including the deferred-listing workaround. `check:site`
+came back clean on its output — 3 template dirs, 0 errors, 0 warnings — and the build
+produced 26 pages. It namespaced every CSS class, which is a documented trap it could
+only have got from the contract.
+
+What went wrong, none of it the agent's fault:
+
+- [x] `staging` is 51 commits behind `main`, so none of it rendered. See §0 above.
+- [ ] **"From From C$95"** — the detail template hardcodes a `From ` prefix and the
+      seeded content also starts with "From". The agent wrote both halves and never saw
+      the result. Nothing catches this: it is not a contract violation, it is a thing
+      only a rendered page shows. The lesson is that `validate_site` proves coherence,
+      not that the page reads correctly — and an agent with no way to SEE its output
+      will keep making this class of mistake. Worth asking whether a tool should return
+      rendered text for one entry.
+- [ ] It never mentioned a home page, so item 3 below is still untested.
+- [ ] Re-run against a **datadefine-owned** site once §0 is fixed, to exercise the
+      third-party path rather than the owner path.
 - [ ] Give it a one-line brief in a shape nobody has tried ("a site for my violin repair
       shop") and watch where it goes wrong. Expect the failures to be in the DESCRIPTIONS,
       not the logic: a tool it never calls, a field it invents, an order it gets wrong.

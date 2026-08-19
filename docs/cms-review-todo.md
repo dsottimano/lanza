@@ -209,6 +209,17 @@ Cheap to fix, and each one has already cost someone a wrong decision.
 
 ---
 
+- [ ] **3.11 An HTML error response is rendered into the UI as text.** Found live,
+      2026-08-19: `/admin` served by `astro preview` (which does not run
+      `functions/`, so `/admin/api/gh/*` 404s with `Content-Type: text/html`)
+      pasted the site's entire 404 document — head, inline CSS, the wordmark SVG
+      path data — into a modal. Nothing checks the content type before treating a
+      response body as an error message. Not preview-only: the same thing happens
+      in production any time the proxy 404s, a login redirect returns HTML, or
+      Cloudflare serves an error page. The fix is one guard at the fetch boundary —
+      if the response is not JSON, say "the API returned an HTML error page
+      (HTTP <status>)" and log the body rather than displaying it.
+
 ## 4. Correctness, lower severity
 
 - [ ] **4.1 Theme revert silently truncates at GitHub's 300-file cap.**

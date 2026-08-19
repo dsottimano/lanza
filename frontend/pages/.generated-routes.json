@@ -1,3 +1,8 @@
 {
-  "files": []
+  "files": [
+    "[locale]/services/[...slug].astro",
+    "[locale]/services/index.astro",
+    "services/[...slug].astro",
+    "services/index.astro"
+  ]
 }
