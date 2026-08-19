@@ -34,6 +34,7 @@
     "prepack": "npm run build:admin",
     "preview": "astro preview",
     "check": "astro check",
+    "check:site": "node scripts/validate-site.mjs",
     "test:functions": "node --experimental-strip-types --loader ./functions/_lib/ts-resolve.mjs --test functions/_lib/*.test.mjs scripts/*.test.mjs",
     "test": "npm run test:functions && npm --prefix admin test"
   },

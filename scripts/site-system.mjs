@@ -1,0 +1,548 @@
+// The SITE SYSTEM — the composition rules that make an agent-built site coherent,
+// expressed as code so they are checkable instead of remembered.
+//
+// WHY THIS EXISTS: a person says "I want a simple event site" and an agent has to
+// produce a content type, its form fields, a page template, a route and a look —
+// five artifacts in four files that only work if they agree with each other. Nothing
+// enforced that agreement. A misspelled {{placeholder}} renders empty, a field nobody
+// interpolates is dead UI, a collection with no route stores content at no URL, and
+// every one of those failures is SILENT: the build passes and the page is just wrong.
+//
+// So the model is a stack of layers, and the single invariant is:
+//
+//   A layer may only reference names the layer BELOW it declares.
+//
+// Everything in this file is one of those cross-layer checks. It is pure (no fs) so
+// the CLI (validate-site.mjs), the test suite and — later — the CMS can all run it.
+//
+// ⚠️  The template grammar below MIRRORS frontend/lib/template-render.ts. A checker
+// that disagrees with the engine is worse than no checker: it either blesses a broken
+// page or blocks a working one. The mirrored parts are marked ENGINE-MIRROR and there
+// is a test (site-system.test.mjs) that renders the real manifesto template through
+// the real engine and asserts this file reports it clean.
+
+// ── The layers ───────────────────────────────────────────────────────────────
+// Ordered bottom-up. Each layer names the artifact that declares it and what the
+// layer above is allowed to reference. This list is the doc (docs/site-system.md)
+// in machine-readable form; the checks below are its enforcement.
+export const LAYERS = [
+  {
+    id: "style",
+    label: "Style",
+    declares: "design tokens (colour, radius, motion, type)",
+    artifact: "data/appearance.json + data/styles.json",
+  },
+  {
+    id: "chrome",
+    label: "Chrome",
+    declares: "header/footer parts",
+    artifact: "templates/parts/*.html",
+  },
+  {
+    id: "template",
+    label: "Templates",
+    declares: "page regions + the slots that fill them",
+    artifact: "templates/<name>/{template.html,fields.json}",
+  },
+  {
+    id: "model",
+    label: "Content model",
+    declares: "collections and their frontmatter fields",
+    artifact: "data/schema.json",
+  },
+  {
+    id: "route",
+    label: "Routes",
+    declares: "the URL a collection's entries render at",
+    artifact: "data/schema.json (collection.route) → generated .astro",
+  },
+  {
+    id: "content",
+    label: "Content",
+    declares: "entries",
+    artifact: "content/**/*.md",
+  },
+];
+
+// Widgets the CMS can render. MIRROR of the `Widget` union in admin/src/schema.ts —
+// an unknown widget is an error because FieldInput.vue would render nothing at all.
+export const WIDGETS = new Set([
+  "string",
+  "text",
+  "datetime",
+  "boolean",
+  "number",
+  "image",
+  "select",
+  "relation",
+  "object",
+  "list",
+  "preset",
+  "slots",
+]);
+
+// Widgets that carry a nested shape, and how the shape is reached.
+const NESTS_VIA_FIELDS = new Set(["object", "list"]);
+
+// Names the engine supplies itself inside an {{#each}} — never declared in fields.json.
+export const LOOP_VARS = new Set(["@index", "@number"]);
+
+// The reserved top-level slot: the page's sanitized rich body, injected by the build
+// when fields.json sets "body": true. Interpolated as {{{ body }}} (triple-brace —
+// it is already-sanitized HTML).
+export const BODY_SLOT = "body";
+
+// A template is used in one of three POSITIONS, and the position decides what the
+// engine puts in scope beyond the template's own declared fields. Getting this wrong
+// is the difference between "renders empty forever" and "works", so it is declared
+// rather than inferred.
+//
+//   page   — a page's freeform `slots` (frontend/components/PageArticle.astro)
+//   detail — one entry of a routed collection; scope is its FRONTMATTER + url/slug
+//            (frontend/lib/collection-routes.ts detailScope)
+//   list   — a routed collection's listing; scope is the listing slots + `entries`
+//            (collection-routes.ts listScope)
+export const POSITIONS = new Set(["page", "detail", "list"]);
+
+/** Names collection-routes.ts adds to a DETAIL template's scope. */
+export const DETAIL_RESERVED = ["url", "slug", "indexUrl"];
+/** Names collection-routes.ts adds to a LIST template's scope, besides `entries`. */
+export const LIST_RESERVED = ["count", "isEmpty"];
+/** Names listScope adds to every item inside {{#each entries}}. */
+export const LIST_ITEM_RESERVED = ["url", "slug"];
+
+// Fields that exist to CONTROL publishing rather than to be printed. A template is
+// not expected to interpolate them, so they are exempt from the unused-field warning —
+// otherwise every content type nags about `draft` forever and the warning gets ignored,
+// which is how a real dead field slips through.
+export const PUBLISHING_FIELDS = new Set(["draft", "seo", "template", "preset", "slots"]);
+
+// The data Base.astro passes to templates/parts/*.html. Parts have NO fields.json —
+// their contract is this object, so it is declared here instead.
+//
+// ⚠️  MIRROR: frontend/layouts/Base.astro `partData`. Edit both together.
+export const PART_DATA = {
+  scalars: ["homeUrl", "siteName", "year", "headerClass", "footerClass", "showSwitcher"],
+  lists: {
+    menuHeader: ["label", "url"],
+    menuFooter: ["label", "url"],
+    locales: ["code", "url", "active", "inactive", "sep"],
+  },
+};
+
+// ── Template grammar (ENGINE-MIRROR) ─────────────────────────────────────────
+// Mirrors tokenize() + parse() in frontend/lib/template-render.ts. We keep only what
+// a static check needs — block structure and reference paths — and drop the HTML
+// position tracking, which exists for escaping decisions the checker does not make.
+
+/** ENGINE-MIRROR of tokenize(): triple-brace first so {{{x}}} isn't mis-split. */
+function tokenize(src) {
+  return src.split(/(\{\{\{[^}]*\}\}\}|\{\{[^}]*\}\})/);
+}
+
+/**
+ * Parse a template into nodes: {t:"var"|"raw", path} | {t:"each"|"if", path, body}.
+ * Returns `{nodes, unclosed}` — an unterminated block is its own error (the engine
+ * silently swallows the rest of the page).
+ */
+export function parseTemplate(src) {
+  const tokens = tokenize(src);
+  const unclosed = [];
+  const walk = (i, stop) => {
+    const nodes = [];
+    while (i < tokens.length) {
+      const tok = tokens[i];
+      const raw = /^\{\{\{\s*(.*?)\s*\}\}\}$/.exec(tok);
+      if (raw) {
+        nodes.push({ t: "raw", path: raw[1].trim() });
+        i++;
+        continue;
+      }
+      const m = /^\{\{\s*(.*?)\s*\}\}$/.exec(tok);
+      if (!m) {
+        i++;
+        continue;
+      }
+      const inner = m[1];
+      if (stop && inner.replace(/\s+/g, "") === stop) return { nodes, next: i + 1, closed: true };
+      const each = /^#each\s+(.+)$/.exec(inner);
+      const iff = /^#if\s+(.+)$/.exec(inner);
+      if (each || iff) {
+        const kind = each ? "each" : "if";
+        const inner2 = walk(i + 1, each ? "/each" : "/if");
+        if (!inner2.closed) unclosed.push(`{{#${kind} ${(each || iff)[1].trim()}}}`);
+        nodes.push({ t: kind, path: (each || iff)[1].trim(), body: inner2.nodes });
+        i = inner2.next;
+        continue;
+      }
+      // A stray {{/each}} / {{/if}} with no opener: record it, don't crash.
+      if (/^\//.test(inner)) {
+        nodes.push({ t: "stray", path: inner });
+        i++;
+        continue;
+      }
+      nodes.push({ t: "var", path: inner.trim() });
+      i++;
+    }
+    return { nodes, next: i, closed: !stop };
+  };
+  const { nodes } = walk(0, undefined);
+  return { nodes, unclosed };
+}
+
+// ── Declared shapes ──────────────────────────────────────────────────────────
+
+/**
+ * Turn a fields.json `fields` array into a scope: the set of names declared at this
+ * level, plus the nested scope each list/object opens. Mirrors how the CMS stores
+ * slots, which is what the engine reads.
+ */
+export function shapeOfFields(fields) {
+  const names = new Set();
+  const children = new Map();
+  for (const f of fields || []) {
+    if (!f || typeof f.name !== "string") continue;
+    names.add(f.name);
+    if (NESTS_VIA_FIELDS.has(f.widget) && Array.isArray(f.fields)) {
+      children.set(f.name, shapeOfFields(f.fields));
+    }
+    // list-of-variants (`types`): an item's shape is the union of every variant's
+    // fields, because the template cannot know which variant it holds.
+    if (f.widget === "list" && Array.isArray(f.types)) {
+      const merged = { names: new Set(["type"]), children: new Map() };
+      for (const v of f.types) {
+        const sub = shapeOfFields(v?.fields);
+        for (const n of sub.names) merged.names.add(n);
+        for (const [k, c] of sub.children) merged.children.set(k, c);
+      }
+      children.set(f.name, merged);
+    }
+  }
+  return { names, children };
+}
+
+/** The scope a part gets (PART_DATA), in the same shape as shapeOfFields(). */
+export function shapeOfPartData() {
+  const names = new Set(PART_DATA.scalars);
+  const children = new Map();
+  for (const [list, item] of Object.entries(PART_DATA.lists)) {
+    names.add(list);
+    children.set(list, { names: new Set(item), children: new Map() });
+  }
+  return { names, children };
+}
+
+// ── Reference checking ───────────────────────────────────────────────────────
+
+/**
+ * ENGINE-MIRROR of ownerFrame(): resolve a bare head name from the innermost scope
+ * outward. Returns the owning scope's index, or -1.
+ */
+function ownerIndex(head, stack) {
+  for (let i = stack.length - 1; i >= 0; i--) if (stack[i].names.has(head)) return i;
+  return -1;
+}
+
+const problem = (level, code, where, message) => ({ level, code, where, message });
+
+/**
+ * Walk a parsed template against a declared shape, reporting every reference that
+ * cannot resolve and collecting every declared name that IS used.
+ *
+ * `used` is keyed by fully-qualified declaration path ("cards", "cards.heading") so
+ * the caller can report fields the template never interpolates.
+ */
+function walkRefs(nodes, stack, path, ctx) {
+  for (const n of nodes) {
+    if (n.t === "stray") {
+      ctx.problems.push(
+        problem("error", "stray-close", ctx.where, `{{${n.path}}} closes a block that was never opened.`),
+      );
+      continue;
+    }
+    const head = n.path.split(".")[0];
+
+    // Loop vars are engine-supplied and only exist inside an {{#each}}.
+    if (LOOP_VARS.has(n.path)) {
+      if (!ctx.inEach) {
+        ctx.problems.push(
+          problem("error", "loop-var-outside-each", ctx.where, `{{ ${n.path} }} is only defined inside {{#each}}.`),
+        );
+      }
+      continue;
+    }
+    if (n.path.startsWith("@")) {
+      ctx.problems.push(
+        problem("error", "unknown-loop-var", ctx.where, `{{ ${n.path} }} is not an engine variable (@index, @number).`),
+      );
+      continue;
+    }
+
+    const owner = ownerIndex(head, stack);
+    if (owner < 0) {
+      ctx.problems.push(
+        problem(
+          "error",
+          "undeclared-slot",
+          ctx.where,
+          `{{ ${n.path} }} resolves to nothing — no enclosing scope declares "${head}". ` +
+            `Add it to fields.json, or fix the spelling. The engine renders it as empty text.`,
+        ),
+      );
+      continue;
+    }
+
+    // Mark the whole dotted chain used, walking the declared children as we go.
+    const parts = n.path.split(".");
+    let scope = stack[owner];
+    let qualified = stack[owner].path ? `${stack[owner].path}.${parts[0]}` : parts[0];
+    ctx.used.add(qualified);
+    for (let i = 1; i < parts.length; i++) {
+      const child = scope.children.get(parts[i - 1]);
+      if (!child) break; // a dotted walk into an undeclared shape; not statically knowable
+      if (!child.names.has(parts[i])) {
+        ctx.problems.push(
+          problem(
+            "error",
+            "undeclared-slot",
+            ctx.where,
+            `{{ ${n.path} }} — "${parts.slice(0, i).join(".")}" declares no "${parts[i]}".`,
+          ),
+        );
+        break;
+      }
+      qualified = `${qualified}.${parts[i]}`;
+      ctx.used.add(qualified);
+      scope = child;
+    }
+
+    if (n.t === "each") {
+      const child = stack[owner].children.get(head);
+      if (!child) {
+        ctx.problems.push(
+          problem(
+            "error",
+            "each-over-scalar",
+            ctx.where,
+            `{{#each ${n.path} }} — "${head}" is not a list of objects. Declare it as a ` +
+              `"list" widget with nested "fields"; the engine cannot print a bare string item.`,
+          ),
+        );
+        walkRefs(n.body, stack, path, { ...ctx, inEach: true });
+      } else {
+        const frame = { ...child, path: qualified };
+        walkRefs(n.body, [...stack, frame], qualified, { ...ctx, inEach: true });
+      }
+      continue;
+    }
+    if (n.t === "if") walkRefs(n.body, stack, path, ctx);
+  }
+}
+
+/** Every declared name, fully qualified — used to find fields nothing interpolates. */
+function declaredPaths(shape, prefix = "") {
+  const out = [];
+  for (const name of shape.names) {
+    const q = prefix ? `${prefix}.${name}` : name;
+    out.push(q);
+    const child = shape.children.get(name);
+    if (child) out.push(...declaredPaths(child, q));
+  }
+  return out;
+}
+
+// ── Layer checks ─────────────────────────────────────────────────────────────
+
+/** Structural validation of one fields.json (before it is compared to any markup). */
+export function checkFieldsJson(fields, where) {
+  const problems = [];
+  const seen = new Set();
+  const walk = (list, prefix) => {
+    for (const f of list || []) {
+      if (!f || typeof f !== "object") {
+        problems.push(problem("error", "bad-field", where, `A field entry is not an object.`));
+        continue;
+      }
+      const at = prefix ? `${prefix}.${f.name}` : f.name;
+      if (typeof f.name !== "string" || !/^[A-Za-z_][A-Za-z0-9_]*$/.test(f.name)) {
+        problems.push(
+          problem("error", "bad-field-name", where, `Field name ${JSON.stringify(f.name)} is not a usable identifier.`),
+        );
+        continue;
+      }
+      if (seen.has(at)) {
+        problems.push(problem("error", "duplicate-field", where, `Two fields are both named "${at}".`));
+      }
+      seen.add(at);
+      if (!WIDGETS.has(f.widget)) {
+        problems.push(
+          problem("error", "unknown-widget", where, `"${at}" has widget "${f.widget}" — the CMS renders no input for it.`),
+        );
+      }
+      if (typeof f.label !== "string" || !f.label.trim()) {
+        problems.push(problem("warning", "missing-label", where, `"${at}" has no label — the CMS shows the raw name.`));
+      }
+      if (f.widget === "select" && !(Array.isArray(f.options) && f.options.length)) {
+        problems.push(problem("error", "select-without-options", where, `"${at}" is a select with no options.`));
+      }
+      if (f.widget === "object" && !Array.isArray(f.fields)) {
+        problems.push(problem("error", "object-without-fields", where, `"${at}" is an object with no nested fields.`));
+      }
+      if (Array.isArray(f.fields)) walk(f.fields, at);
+      if (Array.isArray(f.types)) for (const v of f.types) walk(v?.fields, at);
+    }
+  };
+  walk(fields, "");
+  return problems;
+}
+
+/**
+ * The core cross-layer check: a template's markup against its declared fields.
+ *
+ * @param {object} t - {name, html, fields, position} where `fields` is the parsed
+ *   fields.json and `position` is one of POSITIONS (default "page"). The position
+ *   decides which engine-supplied names are in scope — see POSITIONS.
+ * @param {object} [world] - {collections: Map<name, Set<fieldName>>} so a listing's
+ *   declared item fields can be checked against the collection it lists.
+ */
+export function checkTemplate(t, world) {
+  const where = `templates/${t.name}/`;
+  const problems = [];
+  const decl = t.fields || {};
+  const position = t.position || (decl.listing ? "list" : "page");
+  if (!POSITIONS.has(position)) {
+    problems.push(problem("error", "bad-position", where, `Unknown template position "${position}".`));
+  }
+
+  if (decl.name && decl.name !== t.name) {
+    problems.push(
+      problem("error", "template-name-mismatch", where, `fields.json says name "${decl.name}" but the folder is "${t.name}". A page's preset names the FOLDER.`),
+    );
+  }
+  problems.push(...checkFieldsJson(decl.fields, `${where}fields.json`));
+
+  const { nodes, unclosed } = parseTemplate(t.html);
+  for (const u of unclosed) {
+    problems.push(
+      problem("error", "unclosed-block", `${where}template.html`, `${u} is never closed — the engine drops everything after it.`),
+    );
+  }
+
+  const shape = shapeOfFields(decl.fields);
+  // The body slot exists at top level only when the template opts in.
+  const usesBody = decl.body === true;
+
+  // Engine-supplied names for this position, layered on top of the declared fields.
+  const extra = new Set(usesBody ? [BODY_SLOT] : []);
+  const extraChildren = new Map();
+  if (position === "detail") for (const n of DETAIL_RESERVED) extra.add(n);
+  if (position === "list") {
+    for (const n of LIST_RESERVED) extra.add(n);
+    const listing = decl.listing || {};
+    const item = Array.isArray(listing.item) ? listing.item : [];
+    if (!Array.isArray(listing.item)) {
+      problems.push(
+        problem(
+          "error",
+          "listing-undeclared",
+          `${where}fields.json`,
+          `A listing template must declare "listing": { "of": "<collection>", "item": [<field names>] } — ` +
+            `otherwise nothing can check what {{#each entries}} may print.`,
+        ),
+      );
+    }
+    extra.add("entries");
+    extraChildren.set("entries", {
+      names: new Set([...item, ...LIST_ITEM_RESERVED]),
+      children: new Map(),
+    });
+
+    // The item fields must actually exist on the collection being listed.
+    const known = world?.collections?.get(listing.of);
+    if (known) {
+      for (const f of item) {
+        if (!known.has(f)) {
+          problems.push(
+            problem(
+              "error",
+              "listing-unknown-field",
+              `${where}fields.json`,
+              `listing.item names "${f}", which collection "${listing.of}" does not declare.`,
+            ),
+          );
+        }
+      }
+    } else if (listing.of && world?.collections) {
+      problems.push(
+        problem("error", "listing-unknown-collection", `${where}fields.json`, `listing.of names collection "${listing.of}", which does not exist.`),
+      );
+    }
+  }
+
+  const root = {
+    names: new Set([...shape.names, ...extra]),
+    children: new Map([...shape.children, ...extraChildren]),
+    path: "",
+  };
+
+  const ctx = { problems, used: new Set(), where: `${where}template.html`, inEach: false };
+  walkRefs(nodes, [root], "", ctx);
+
+  // body:true must actually interpolate the body, and vice versa. A mismatch is not
+  // fatal (the page renders) but it means the CMS shows a writing canvas whose text
+  // appears nowhere — or hides one the template is asking for.
+  const rawBody = JSON.stringify(nodes).includes('"t":"raw","path":"body"');
+  if (usesBody && !rawBody) {
+    problems.push(
+      problem("warning", "body-declared-unused", where, `fields.json sets "body": true but the template never renders {{{ body }}} — the CMS shows a writing canvas that goes nowhere.`),
+    );
+  }
+  if (!usesBody && rawBody) {
+    problems.push(
+      problem("error", "body-used-undeclared", where, `The template renders {{{ body }}} but fields.json does not set "body": true — the CMS hides the writing canvas, so it is always empty.`),
+    );
+  }
+
+  // Declared but never interpolated: dead inputs the owner will fill for nothing.
+  for (const p of declaredPaths(shape)) {
+    if (PUBLISHING_FIELDS.has(p)) continue;
+    if (!ctx.used.has(p)) {
+      problems.push(
+        problem("warning", "unused-field", `${where}fields.json`, `"${p}" is collected by the CMS but never appears in template.html.`),
+      );
+    }
+  }
+
+  // A triple-brace anywhere but `body` emits unescaped user input.
+  const rawPaths = [];
+  const collectRaw = (ns) => {
+    for (const n of ns) {
+      if (n.t === "raw" && n.path !== BODY_SLOT) rawPaths.push(n.path);
+      if (n.body) collectRaw(n.body);
+    }
+  };
+  collectRaw(nodes);
+  for (const p of rawPaths) {
+    problems.push(
+      problem("error", "raw-non-body", `${where}template.html`, `{{{ ${p} }}} emits a slot value UNESCAPED. Only {{{ body }}} is safe — it is sanitized upstream. Use {{ ${p} }}.`),
+    );
+  }
+
+  return problems;
+}
+
+/** A header/footer part against the data Base.astro actually supplies. */
+export function checkPart(name, html) {
+  const where = `templates/parts/${name}.html`;
+  const problems = [];
+  const { nodes, unclosed } = parseTemplate(html);
+  for (const u of unclosed) {
+    problems.push(problem("error", "unclosed-block", where, `${u} is never closed.`));
+  }
+  const shape = shapeOfPartData();
+  const ctx = { problems, used: new Set(), where, inEach: false };
+  walkRefs(nodes, [{ ...shape, path: "" }], "", ctx);
+  return problems;
+}
+
+export default { LAYERS, WIDGETS, parseTemplate, shapeOfFields, checkTemplate, checkPart, checkFieldsJson };

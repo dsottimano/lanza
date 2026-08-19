@@ -1,0 +1,226 @@
+// The site-system checker, pinned two ways:
+//
+//  1. It must not cry wolf. The REAL manifesto template + the REAL parts must come
+//     back clean, because a checker with false positives gets switched off.
+//  2. It must agree with the ENGINE. For each failure it reports, the same template
+//     is rendered through frontend/lib/template-render.ts and asserted to actually
+//     misbehave (empty output, dropped tail). A checker that disagrees with the
+//     engine either blesses a broken page or blocks a working one — both worse than
+//     no checker at all.
+import { test, describe } from "node:test";
+import assert from "node:assert/strict";
+import { readFileSync } from "node:fs";
+import { fileURLToPath } from "node:url";
+import { join, dirname } from "node:path";
+
+import { checkTemplate, checkPart, checkFieldsJson, parseTemplate, shapeOfFields } from "./site-system.mjs";
+import { render } from "../frontend/lib/template-render.ts";
+
+const ROOT = join(dirname(fileURLToPath(import.meta.url)), "..");
+const read = (p) => readFileSync(join(ROOT, p), "utf8");
+const readJson = (p) => JSON.parse(read(p));
+
+const errors = (ps) => ps.filter((p) => p.level === "error");
+const codes = (ps) => ps.map((p) => p.code);
+
+describe("no false positives on the real site", () => {
+  test("the manifesto template is clean", () => {
+    const problems = checkTemplate({
+      name: "manifesto",
+      html: read("templates/manifesto/template.html"),
+      fields: readJson("templates/manifesto/fields.json"),
+    });
+    assert.deepEqual(problems, [], `real template reported: ${JSON.stringify(problems, null, 2)}`);
+  });
+
+  for (const part of ["header", "footer"]) {
+    test(`the ${part} part is clean`, () => {
+      const problems = checkPart(part, read(`templates/parts/${part}.html`));
+      assert.deepEqual(problems, [], `real part reported: ${JSON.stringify(problems, null, 2)}`);
+    });
+  }
+});
+
+describe("scope resolution mirrors the engine", () => {
+  // The manifesto uses {{ body }} and {{ cta }} INSIDE {{#each}} blocks, where they
+  // are an item's own fields — a flat name check would call both undeclared. This is
+  // the case that makes the checker non-trivial, so it is pinned directly.
+  const html = `{{#each steps}}<p>{{ body }}</p>{{/each}}`;
+  const fields = {
+    name: "t",
+    fields: [{ name: "steps", label: "Steps", widget: "list", fields: [{ name: "body", label: "Body", widget: "text" }] }],
+  };
+
+  test("an item field is not reported as undeclared", () => {
+    assert.deepEqual(checkTemplate({ name: "t", html, fields }), []);
+  });
+
+  test("and the engine really does resolve it", () => {
+    const out = render(html, { steps: [{ body: "hello" }] });
+    assert.match(out, /hello/);
+  });
+
+  test("an outer slot still resolves from inside a loop (innermost-out)", () => {
+    const t = `{{#each steps}}<p>{{ siteTag }}</p>{{/each}}`;
+    const f = {
+      name: "t",
+      fields: [
+        { name: "siteTag", label: "Tag", widget: "string" },
+        { name: "steps", label: "Steps", widget: "list", fields: [{ name: "x", label: "X", widget: "string" }] },
+      ],
+    };
+    assert.deepEqual(errors(checkTemplate({ name: "t", html: t, fields: f })), []);
+    assert.match(render(t, { siteTag: "OUTER", steps: [{ x: "1" }] }), /OUTER/);
+  });
+});
+
+describe("catches what silently renders wrong", () => {
+  test("a misspelled placeholder is an error, and the engine renders it empty", () => {
+    const html = `<h1>{{ headlne }}</h1>`;
+    const fields = { name: "t", fields: [{ name: "headline", label: "Headline", widget: "string" }] };
+    const problems = checkTemplate({ name: "t", html, fields });
+    assert.ok(codes(problems).includes("undeclared-slot"));
+    // The engine's behaviour is exactly why this must be caught statically:
+    assert.equal(render(html, { headline: "Real headline" }), "<h1></h1>");
+  });
+
+  test("{{#each}} over a scalar is an error, and the engine renders nothing", () => {
+    const html = `{{#each tags}}<li>{{ label }}</li>{{/each}}`;
+    const fields = { name: "t", fields: [{ name: "tags", label: "Tags", widget: "string" }] };
+    assert.ok(codes(checkTemplate({ name: "t", html, fields })).includes("each-over-scalar"));
+    assert.equal(render(html, { tags: "a,b" }), "");
+  });
+
+  test("an unclosed block is an error, and the engine drops the rest of the page", () => {
+    const html = `<p>before</p>{{#if flag}}<p>inside</p><footer>after</footer>`;
+    const fields = { name: "t", fields: [{ name: "flag", label: "Flag", widget: "boolean" }] };
+    assert.ok(codes(checkTemplate({ name: "t", html, fields })).includes("unclosed-block"));
+    const out = render(html, { flag: false });
+    assert.match(out, /before/);
+    assert.doesNotMatch(out, /after/, "the tail really is swallowed");
+  });
+
+  test("a loop variable outside a loop is an error", () => {
+    const problems = checkTemplate({ name: "t", html: `<p>{{ @number }}</p>`, fields: { name: "t", fields: [] } });
+    assert.ok(codes(problems).includes("loop-var-outside-each"));
+  });
+
+  test("{{ @index }} inside a loop is fine", () => {
+    const fields = { name: "t", fields: [{ name: "rows", label: "Rows", widget: "list", fields: [{ name: "v", label: "V", widget: "string" }] }] };
+    assert.deepEqual(errors(checkTemplate({ name: "t", html: `{{#each rows}}{{ @index }}{{ v }}{{/each}}`, fields })), []);
+  });
+
+  test("a stray close tag is an error", () => {
+    assert.ok(codes(checkTemplate({ name: "t", html: `<p>x</p>{{/each}}`, fields: { name: "t", fields: [] } })).includes("stray-close"));
+  });
+});
+
+describe("the body slot", () => {
+  test("{{{ body }}} without body:true is an error", () => {
+    const problems = checkTemplate({ name: "t", html: `<article>{{{ body }}}</article>`, fields: { name: "t", body: false, fields: [] } });
+    assert.ok(codes(problems).includes("body-used-undeclared"));
+  });
+
+  test("body:true without {{{ body }}} is a warning", () => {
+    const problems = checkTemplate({ name: "t", html: `<article>nothing</article>`, fields: { name: "t", body: true, fields: [] } });
+    assert.ok(codes(problems).includes("body-declared-unused"));
+    assert.equal(errors(problems).length, 0, "a canvas that goes nowhere is wrong, not fatal");
+  });
+
+  test("the matched pair is clean", () => {
+    assert.deepEqual(checkTemplate({ name: "t", html: `<article>{{{ body }}}</article>`, fields: { name: "t", body: true, fields: [] } }), []);
+  });
+
+  test("a triple-brace on any other slot is an error — it emits unescaped input", () => {
+    const problems = checkTemplate({
+      name: "t",
+      html: `<div>{{{ intro }}}</div>`,
+      fields: { name: "t", fields: [{ name: "intro", label: "Intro", widget: "text" }] },
+    });
+    assert.ok(codes(problems).includes("raw-non-body"));
+  });
+});
+
+describe("dead inputs", () => {
+  test("a declared field the template never uses is a warning", () => {
+    const problems = checkTemplate({
+      name: "t",
+      html: `<h1>{{ headline }}</h1>`,
+      fields: {
+        name: "t",
+        fields: [
+          { name: "headline", label: "Headline", widget: "string" },
+          { name: "subhead", label: "Subhead", widget: "string" },
+        ],
+      },
+    });
+    const unused = problems.filter((p) => p.code === "unused-field");
+    assert.equal(unused.length, 1);
+    assert.match(unused[0].message, /subhead/);
+  });
+});
+
+describe("fields.json structure", () => {
+  test("an unknown widget is an error", () => {
+    assert.ok(codes(checkFieldsJson([{ name: "a", label: "A", widget: "richtext" }], "x")).includes("unknown-widget"));
+  });
+
+  test("a select with no options is an error", () => {
+    assert.ok(codes(checkFieldsJson([{ name: "a", label: "A", widget: "select" }], "x")).includes("select-without-options"));
+  });
+
+  test("duplicate field names are an error", () => {
+    const ps = checkFieldsJson(
+      [
+        { name: "a", label: "A", widget: "string" },
+        { name: "a", label: "A again", widget: "string" },
+      ],
+      "x",
+    );
+    assert.ok(codes(ps).includes("duplicate-field"));
+  });
+
+  test("a folder/name mismatch is an error — a page's preset names the folder", () => {
+    const problems = checkTemplate({ name: "events", html: ``, fields: { name: "event-list", fields: [] } });
+    assert.ok(codes(problems).includes("template-name-mismatch"));
+  });
+});
+
+describe("parts are checked against Base.astro's data, not fields.json", () => {
+  test("showNav — which the docs wrongly advertise — is reported", () => {
+    // docs/authoring-templates.md lists {{#if showNav}}; Base.astro supplies
+    // `showSwitcher`. An agent following the doc writes a guard that is false forever.
+    const problems = checkPart("header", `{{#if showNav}}<nav>x</nav>{{/if}}`);
+    assert.ok(codes(problems).includes("undeclared-slot"));
+  });
+
+  test("the real part data resolves", () => {
+    const html = `{{ siteName }}{{#each menuHeader}}<a href="{{ url }}">{{ label }}</a>{{/each}}`;
+    assert.deepEqual(checkPart("header", html), []);
+  });
+});
+
+describe("shapeOfFields", () => {
+  test("a list of variants exposes the union of every variant's fields plus `type`", () => {
+    const shape = shapeOfFields([
+      {
+        name: "blocks",
+        label: "Blocks",
+        widget: "list",
+        types: [
+          { name: "hero", label: "Hero", fields: [{ name: "heading", label: "H", widget: "string" }] },
+          { name: "text", label: "Text", fields: [{ name: "body", label: "B", widget: "text" }] },
+        ],
+      },
+    ]);
+    const item = shape.children.get("blocks");
+    assert.deepEqual([...item.names].sort(), ["body", "heading", "type"]);
+  });
+});
+
+describe("parseTemplate", () => {
+  test("reports every unclosed block", () => {
+    const { unclosed } = parseTemplate(`{{#each a}}{{#if b}}`);
+    assert.equal(unclosed.length, 2);
+  });
+});
