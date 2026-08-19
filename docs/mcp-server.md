@@ -130,10 +130,26 @@ go live. New entries are written `draft: false` (visible once published); pass
 | `update_content` | Update an entry; frontmatter merged, body replaced if given. |
 | `delete_content` | Delete an entry on staging. |
 | `validate_site` | Run the cross-layer checker over the site's templates, fields and routes and return every problem. Read-only. Pass `template` to scope it to one folder. Reads at most **6** template folders per call — a Worker gets ~50 subrequests and each template costs two reads — and names what it skipped rather than reporting it clean. |
+| `update_content_type` | Change an existing type: its labels, its route, or re-read its fields after you edited the template. Not its `name` — that is what its folder and existing URLs are built from, so changing it is a migration, not an edit. |
+| `write_part` | Write the header or footer. A part has **no fields.json** — its scope is `PART_DATA` (site name, home URL, the menus, the language switcher, the year), so a name off that list is refused rather than rendering as empty text. |
+| `get_settings` | Brand, menus and SEO defaults in one call, plus the font ids and colour slots that are actually valid. |
+| `set_brand` | Colours, corner radius, fonts, motion, light/dark. Merges. An unknown font or a non-hex colour is **refused, not ignored** — `resolveBrand` silently drops what it does not recognise, which is right for rendering an old site and wrong for a writer. |
+| `set_menu` | Header/footer navigation for one locale. Replaces the list you pass. URLs go through `frontend/lib/url.ts` — the one safe-URL policy — because HTML-escaping does not stop `javascript:` in an `href`. |
+| `set_seo` | Site name, tagline, title template, share image, per locale. |
 | `list_changes` | What's staged but not yet published. |
 | `publish` | Merge staging → main to go live. |
 
 ### Why the site-system tools exist
+
+The target is that someone onboards, opens ChatGPT / Claude / Grok, connects this
+server, and *talks* — the model gets invented in the conversation, the checker says
+whether it holds together, and the owner looks at a staging URL and says yes. Not a
+recipe library: `docs/site-system.md` is the grammar, and the tools are what make it
+reachable without a checkout.
+
+`functions/_lib/mcp-core.test.mjs` drives exactly that flow end to end (a pottery
+studio, invented from nothing, including the owner changing their mind about a name).
+If that test stops passing, the pitch is not true any more.
 
 Everything else edits **content**. The site system — content types, templates, routes,
 styles — was reachable only from a checkout and a terminal, which is precisely the

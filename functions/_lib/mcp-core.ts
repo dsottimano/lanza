@@ -12,8 +12,14 @@ import { ContentClient, GitHubError, slugify, assertSafePath } from "./lanza-con
 import { BRANCH, WORKING_BRANCH } from "./gh-proxy";
 // The site-system checker, shared verbatim with `npm run check:site`. Plain .mjs and
 // dependency-free so it survives the Pages bundler — see its header.
+// The render side owns what a brand value and a link may be, and these are the exact
+// predicates it applies. Imported, not re-stated: a writer that disagreed with the
+// renderer would accept settings that silently do nothing on the page.
+import { validateBrand, FONT_CATALOG, type BrandConfig } from "../../frontend/lib/appearance";
+import { isSafeUrl } from "../../frontend/lib/url";
 import {
   checkSite,
+  checkPart,
   checkTemplate,
   siteSystemContract,
   POSITIONS,
@@ -280,6 +286,155 @@ async function collectionFields(client: ContentClient): Promise<Map<string, Set<
         new Set((c.fields ?? []).map((f) => f.name).filter((n): n is string => typeof n === "string")),
       ]),
   );
+}
+
+
+// ── Settings (the `kind: "files"` collections) ───────────────────────────────
+// Brand, menu and SEO defaults are what turn "a site that works" into "the site they
+// asked for", and until now MCP could not touch any of them — getCollections() drops
+// every folderless collection, so Settings was a blind spot.
+//
+// Paths are DERIVED from a fixed map, never read out of data/schema.json. §3 of
+// docs/security-model.md: schema.json is not a security boundary and must not become
+// one, and a `files` entry pointing at `.github/workflows/x.json` would otherwise turn
+// "change the menu" into "write CI config".
+const SETTINGS_FILES = {
+  brand: { base: "data/appearance", localized: false },
+  menu: { base: "data/menu", localized: true },
+  seo: { base: "data/seo", localized: true },
+} as const;
+
+type SettingName = keyof typeof SETTINGS_FILES;
+
+async function settingPath(client: ContentClient, name: SettingName, rawLocale: unknown): Promise<string> {
+  const spec = SETTINGS_FILES[name];
+  if (!spec.localized) return `${spec.base}.json`;
+  // resolveLocale confines this to a locale the site declares — the same guard the
+  // entry tools use, and for the same reason: it is interpolated into a write path.
+  return `${spec.base}.${await resolveLocale(client, rawLocale)}.json`;
+}
+
+async function readSetting(client: ContentClient, path: string): Promise<Record<string, unknown>> {
+  const raw = await client.readRaw(path);
+  if (!raw) return {};
+  const parsed = JSON.parse(raw) as unknown;
+  return parsed && typeof parsed === "object" && !Array.isArray(parsed)
+    ? (parsed as Record<string, unknown>)
+    : {};
+}
+
+const writeSetting = (client: ContentClient, path: string, value: unknown, what: string) =>
+  client.saveText(path, `${JSON.stringify(value, null, 2)}\n`, `Set ${what} via MCP`);
+
+/**
+ * Menu items, checked against the ONE safe-URL policy (frontend/lib/url.ts).
+ *
+ * HTML-escaping does not help here: the parser decodes entities before the URL is
+ * parsed, so `javascript&#58;alert(1)` in an href still runs — on the origin that
+ * serves /admin. The renderer already neutralizes an unsafe URL to `#`, so this is not
+ * the only guard; it exists so the agent is TOLD, instead of shipping a menu whose
+ * links silently go nowhere. Mirrors what the CMS refuses to save (admin/src/backend/menu.ts).
+ */
+function menuItems(raw: unknown, where: string): Array<{ label: string; url: string }> {
+  if (raw === undefined) return [];
+  if (!Array.isArray(raw)) throw new GitHubError(400, `${where} must be an array of { label, url }.`);
+  return raw.map((item, i) => {
+    const it = (item ?? {}) as { label?: unknown; url?: unknown };
+    const label = String(it.label ?? "").trim();
+    const url = String(it.url ?? "").trim();
+    if (!label) throw new GitHubError(400, `${where}[${i}] has no label.`);
+    if (!isSafeUrl(url)) {
+      throw new GitHubError(
+        400,
+        `${where}[${i}] url ${JSON.stringify(url)} is not a link this site will render. ` +
+          "Use a root-relative path (/properties/), an absolute http(s) URL, mailto:, tel:, or #anchor.",
+      );
+    }
+    return { label, url };
+  });
+}
+
+
+/**
+ * Validate a `route` block exactly as scripts/gen-routes.mjs would, and normalize it.
+ *
+ * The generator is the last gate before these values land in a directory name and in
+ * generated .astro code, and it DIES rather than skipping — so a route the CMS stores
+ * happily and the build then rejects is a broken site nobody sees until the deploy
+ * fails. The name rules are imported from the checker, which gen-routes.mjs also imports.
+ */
+async function normalizeRoute(client: ContentClient, raw: unknown): Promise<Record<string, unknown>> {
+  const route = (raw ?? {}) as {
+    base?: unknown;
+    template?: unknown;
+    list?: { template?: unknown; sortBy?: unknown; order?: unknown } | null;
+  };
+  const base = String(route.base ?? "");
+  if (!ROUTE_SEGMENT.test(base)) {
+    throw new GitHubError(400, `Refusing route.base "${base}": must be lowercase kebab-case, one segment.`);
+  }
+  if (RESERVED_ROUTE_BASES.has(base)) {
+    throw new GitHubError(400, `route.base "${base}" is reserved by a built-in route and would shadow it.`);
+  }
+  if ((await readSiteFile(client)).locales.includes(base)) {
+    throw new GitHubError(400, `route.base "${base}" collides with the locale prefix of the same name.`);
+  }
+  const tpl = String(route.template ?? "");
+  if (!ROUTE_SEGMENT.test(tpl)) {
+    throw new GitHubError(400, `Refusing route.template "${tpl}": must be lowercase kebab-case.`);
+  }
+  const out: Record<string, unknown> = { base, template: tpl };
+  if (route.list) {
+    const listTpl = String(route.list.template ?? "");
+    if (!ROUTE_SEGMENT.test(listTpl)) {
+      throw new GitHubError(400, `Refusing route.list.template "${listTpl}": must be lowercase kebab-case.`);
+    }
+    const sortBy = route.list.sortBy === undefined ? "title" : String(route.list.sortBy);
+    if (!/^[A-Za-z_][A-Za-z0-9_]*$/.test(sortBy)) {
+      throw new GitHubError(400, `route.list.sortBy "${sortBy}" is not a field name.`);
+    }
+    out.list = { template: listTpl, sortBy, order: route.list.order === "desc" ? "desc" : "asc" };
+  }
+  return out;
+}
+
+/** The template folders a collection's route references, for scoping a check. */
+function routeTemplates(collection: Record<string, unknown>): string[] {
+  const route = collection.route as { template?: unknown; list?: { template?: unknown } } | undefined;
+  if (!route) return [];
+  return [String(route.template ?? ""), ...(route.list ? [String(route.list.template ?? "")] : [])].filter(Boolean);
+}
+
+/**
+ * Run the whole-site check against the model AS IT WOULD BE, and throw if it does not
+ * hold. Scoped to the templates the change touches so the read cost stays bounded.
+ *
+ * The pending schema is injected rather than committed first: schema.json is compiled
+ * into code `astro build` imports, so a model that does not check out does not fail this
+ * CALL, it fails the tenant's DEPLOY. Returns the warnings, which are worth reporting.
+ */
+async function checkPendingModel(
+  client: ContentClient,
+  pending: unknown[],
+  touched: string[],
+): Promise<Array<{ level: string; code: string; where: string; message: string }>> {
+  const { problems } = await checkSite(
+    {
+      readText: (path: string) => (path === "data/schema.json" ? JSON.stringify(pending) : client.readRaw(path)),
+      listTemplates: async () =>
+        (await client.listAll("templates")).filter((i) => i.type === "dir").map((i) => i.name),
+    },
+    { only: [...new Set(touched.filter(Boolean))] },
+  );
+  const errors = problems.filter((p) => p.level === "error");
+  if (errors.length) {
+    throw new GitHubError(
+      422,
+      "Refused — data/schema.json was NOT changed. The model this would produce does not check out:\n" +
+        errors.map((p) => `  • [${p.code}] ${p.where}: ${p.message}`).join("\n"),
+    );
+  }
+  return problems;
 }
 
 export const TOOLS: ToolDef[] = [
@@ -562,6 +717,152 @@ export const TOOLS: ToolDef[] = [
     },
   },
   {
+    name: "update_content_type",
+    description:
+      "Change a content type that already exists — rename what it is CALLED, give it a URL " +
+      "it did not have, point it at a different template, or re-read its fields after you " +
+      "edited that template. This is the tool for 'no, call them Listings' and for adding a " +
+      "listing page once you have written one. It does NOT rename the type's identifier or " +
+      "move its entries: `name` is what its content folder is called and what URLs are " +
+      "already built from, so changing it is a migration, not an edit. Nothing is written " +
+      "unless the whole model still checks out. Not live until publish.",
+    inputSchema: obj(
+      {
+        name: str("The existing collection to change, e.g. 'properties'."),
+        label: str("New plural label shown in the CMS, e.g. 'Listings'."),
+        labelSingular: str("New singular label, e.g. 'Listing'."),
+        fieldsFrom: str(
+          "Re-read the fields from this template's fields.json. Call this after write_template " +
+            "adds or removes a field — the type's fields are a COPY, and go stale otherwise.",
+        ),
+        route: {
+          type: "object",
+          description:
+            "Replace the route: { base, template, list: { template, sortBy, order } }. " +
+            "Pass it to give an unrouted type its URLs, or to add a listing page.",
+          additionalProperties: true,
+        },
+        body: str("'rich' to give entries an HTML body canvas, 'none' for frontmatter only."),
+        thumbnail: str("Field name to show as the entry thumbnail in the CMS."),
+      },
+      ["name"],
+    ),
+    run: async (args, client, site) => {
+      const name = String(args.name);
+      const raw = await client.readRaw("data/schema.json");
+      if (!raw) throw new GitHubError(404, "This site has no data/schema.json — it may not be a Lanza site.");
+      const schema = JSON.parse(raw) as unknown;
+      if (!Array.isArray(schema)) {
+        throw new GitHubError(500, "data/schema.json is not a collection array — this site's content model is malformed.");
+      }
+      const existing = schema as Array<Record<string, unknown>>;
+      const index = existing.findIndex((c) => c.name === name);
+      if (index < 0) {
+        throw new GitHubError(404, `No collection named "${name}". Call list_collections to see what exists.`);
+      }
+      const current = existing[index];
+      if (current.kind !== "folder") {
+        throw new GitHubError(400, `"${name}" is not a content type — it is a settings collection. Use set_brand / set_menu / set_seo.`);
+      }
+
+      const updated: Record<string, unknown> = { ...current };
+      if (args.label !== undefined) updated.label = String(args.label);
+      if (args.labelSingular !== undefined) updated.labelSingular = String(args.labelSingular);
+      if (args.body !== undefined) updated.body = args.body === "rich" ? "rich" : "none";
+      if (args.thumbnail !== undefined) updated.thumbnail = String(args.thumbnail);
+
+      // Re-deriving from the template is the whole point: the collection's fields are a
+      // COPY of the template's fields.json, so editing the template leaves them stale and
+      // the CMS stops offering an input the page prints. See "Declare once".
+      let fieldsFrom: string | undefined;
+      if (args.fieldsFrom !== undefined) {
+        fieldsFrom = String(args.fieldsFrom);
+        if (!ROUTE_SEGMENT.test(fieldsFrom)) {
+          throw new GitHubError(400, `Refusing fieldsFrom "${fieldsFrom}": must be a lowercase kebab-case template folder name.`);
+        }
+        const declRaw = await client.readRaw(`templates/${fieldsFrom}/fields.json`);
+        if (!declRaw) throw new GitHubError(404, `No templates/${fieldsFrom}/fields.json.`);
+        const decl = JSON.parse(declRaw) as { fields?: unknown };
+        if (!Array.isArray(decl.fields)) {
+          throw new GitHubError(422, `templates/${fieldsFrom}/fields.json declares no "fields" array.`);
+        }
+        updated.fields = decl.fields;
+      }
+
+      if (args.route !== undefined) updated.route = await normalizeRoute(client, args.route);
+
+      const pending = existing.map((c, i) => (i === index ? updated : c));
+      const problems = await checkPendingModel(client, pending, [
+        ...(fieldsFrom ? [fieldsFrom] : []),
+        ...routeTemplates(updated),
+      ]);
+
+      await client.ensureWorkingBranch();
+      await client.saveText("data/schema.json", `${JSON.stringify(pending, null, 2)}\n`, `Update content type ${name} via MCP`);
+
+      const route = updated.route as { base?: string } | undefined;
+      return {
+        updated: name,
+        label: updated.label,
+        fields: (updated.fields as Array<{ name?: string }>).map((f) => f.name),
+        ...(route ? { url: `/${route.base}/` } : {}),
+        warnings: problems.filter((p) => p.level === "warning").map((p) => `[${p.code}] ${p.message}`),
+        ...stagedNote(site),
+      };
+    },
+  },
+  {
+    name: "write_part",
+    description:
+      "Write the site's header or footer — the chrome that wraps every page. A part is " +
+      "NOT a template: it has no fields.json, because its data is not free-form page slots " +
+      "but computed site data. What is in scope is fixed and is listed as " +
+      "`reserved.partData` by describe_site_system — the site name, the home URL, the menus " +
+      "you set with set_menu, the language switcher, the year. Anything else renders as " +
+      "empty text, so a name that is not on that list is refused. Same markup rules as " +
+      "write_template: structure and CSS, no script. Not live until publish.",
+    inputSchema: obj(
+      {
+        name: str("'header' or 'footer'."),
+        template_html: str(
+          "The markup. Loop the menu with {{#each menuHeader}}<a href=\"{{ url }}\">{{ label }}</a>{{/each}} " +
+            "(or menuFooter), and see describe_site_system for every name in scope.",
+        ),
+      },
+      ["name", "template_html"],
+    ),
+    run: async (args, client, site) => {
+      const name = String(args.name);
+      if (name !== "header" && name !== "footer") {
+        throw new GitHubError(400, `Refusing part "${name}": a site has exactly two, "header" and "footer".`);
+      }
+      const html = String(args.template_html);
+      // checkPart resolves against PART_DATA — the contract Base.astro actually supplies —
+      // and runs the same safety classification write_template does.
+      const problems = checkPart(name, html);
+      const errors = problems.filter((p) => p.level === "error");
+      const unsafe = problems.filter((p) => UNTRUSTED_AUTHOR_CODES.has(p.code));
+      if (errors.length || unsafe.length) {
+        throw new GitHubError(
+          422,
+          "Refused — nothing was written. Fix these and call again:\n" +
+            [...errors, ...unsafe].map((p) => `  • [${p.code}] ${p.message}`).join("\n") +
+            "\nCall describe_site_system and read `reserved.partData` for every name a part may use.",
+        );
+      }
+
+      await client.ensureWorkingBranch();
+      const path = `templates/parts/${name}.html`;
+      await client.saveText(path, html, `Write ${name} part via MCP`);
+      const warnings = problems.filter((p) => p.level === "warning" && !UNTRUSTED_AUTHOR_CODES.has(p.code));
+      return {
+        written: path,
+        ...(warnings.length ? { warnings: warnings.map((p) => `[${p.code}] ${p.message}`) } : {}),
+        ...stagedNote(site),
+      };
+    },
+  },
+  {
     name: "create_content_type",
     description:
       "Add a content type (a folder collection) to the site's model, optionally with the " +
@@ -652,71 +953,10 @@ export const TOOLS: ToolDef[] = [
         fields: decl.fields,
       };
 
-      const route = args.route as
-        | { base?: unknown; template?: unknown; list?: { template?: unknown; sortBy?: unknown; order?: unknown } }
-        | undefined;
-      if (route) {
-        const base = String(route.base ?? "");
-        // Refuse exactly what gen-routes.mjs would die on. A route the CMS stores and
-        // the build then rejects is a broken site nobody sees until the deploy fails.
-        if (!ROUTE_SEGMENT.test(base)) {
-          throw new GitHubError(400, `Refusing route.base "${base}": must be lowercase kebab-case, one segment.`);
-        }
-        if (RESERVED_ROUTE_BASES.has(base)) {
-          throw new GitHubError(400, `route.base "${base}" is reserved by a built-in route and would shadow it.`);
-        }
-        const locales = (await readSiteFile(client)).locales;
-        if (locales.includes(base)) {
-          throw new GitHubError(400, `route.base "${base}" collides with the locale prefix of the same name.`);
-        }
-        const tpl = String(route.template ?? "");
-        if (!ROUTE_SEGMENT.test(tpl)) {
-          throw new GitHubError(400, `Refusing route.template "${tpl}": must be lowercase kebab-case.`);
-        }
-        const r: Record<string, unknown> = { base, template: tpl };
-        if (route.list) {
-          const listTpl = String(route.list.template ?? "");
-          if (!ROUTE_SEGMENT.test(listTpl)) {
-            throw new GitHubError(400, `Refusing route.list.template "${listTpl}": must be lowercase kebab-case.`);
-          }
-          const sortBy = route.list.sortBy === undefined ? "title" : String(route.list.sortBy);
-          if (!/^[A-Za-z_][A-Za-z0-9_]*$/.test(sortBy)) {
-            throw new GitHubError(400, `route.list.sortBy "${sortBy}" is not a field name.`);
-          }
-          r.list = { template: listTpl, sortBy, order: route.list.order === "desc" ? "desc" : "asc" };
-        }
-        collection.route = r;
-      }
+      if (args.route) collection.route = await normalizeRoute(client, args.route);
 
-      // Check the model AS IT WOULD BE. The pending schema is fed to the same whole-site
-      // check `npm run check:site` runs, scoped to the templates this type references so
-      // the read cost stays bounded — a route into a template that does not exist, or a
-      // listing printing a field the type does not declare, both surface here.
       const pending = [...existing, collection];
-      const touched = [
-        fieldsFrom,
-        ...(collection.route ? [String((collection.route as Record<string, unknown>).template)] : []),
-        ...(collection.route && (collection.route as Record<string, unknown>).list
-          ? [String(((collection.route as Record<string, unknown>).list as Record<string, unknown>).template)]
-          : []),
-      ];
-      const { problems } = await checkSite(
-        {
-          readText: (path: string) =>
-            path === "data/schema.json" ? JSON.stringify(pending) : client.readRaw(path),
-          listTemplates: async () =>
-            (await client.listAll("templates")).filter((i) => i.type === "dir").map((i) => i.name),
-        },
-        { only: [...new Set(touched)] },
-      );
-      const errors = problems.filter((p) => p.level === "error");
-      if (errors.length) {
-        throw new GitHubError(
-          422,
-          "Refused — data/schema.json was NOT changed. The model this would produce does not check out:\n" +
-            errors.map((p) => `  • [${p.code}] ${p.where}: ${p.message}`).join("\n"),
-        );
-      }
+      const problems = await checkPendingModel(client, pending, [fieldsFrom, ...routeTemplates(collection)]);
 
       await client.ensureWorkingBranch();
       await client.saveText(
@@ -740,6 +980,195 @@ export const TOOLS: ToolDef[] = [
         warnings: problems.filter((p) => p.level === "warning").map((p) => `[${p.code}] ${p.message}`),
         ...stagedNote(site),
       };
+    },
+  },
+  {
+    name: "get_settings",
+    description:
+      "Read everything that decides how this site LOOKS and reads: the brand (colours, " +
+      "corner radius, fonts, light/dark), the header and footer menus, and the SEO " +
+      "defaults including the site name and tagline. Call before changing any of them — " +
+      "the setters replace what you pass and keep the rest, so you need to know what is " +
+      "there. Also returns the font ids and brand colour slots that are actually valid.",
+    inputSchema: obj({ locale: str("Locale for the menu and SEO defaults. Optional; defaults to the site default.") }, []),
+    run: async (args, client) => {
+      const locale = await resolveLocale(client, args.locale);
+      const [appearance, menu, seo] = await Promise.all([
+        readSetting(client, await settingPath(client, "brand", locale)),
+        readSetting(client, await settingPath(client, "menu", locale)),
+        readSetting(client, await settingPath(client, "seo", locale)),
+      ]);
+      const locations = (menu.locations ?? {}) as Record<string, { desktop?: unknown }>;
+      return {
+        locale,
+        brand: appearance.brand ?? {},
+        logo: appearance.logo ?? "",
+        menu: {
+          header: locations.header?.desktop ?? [],
+          footer: locations.footer?.desktop ?? [],
+        },
+        seo,
+        // The valid values, so a setter is never a guess-and-get-refused round trip.
+        available: {
+          fonts: Object.keys(FONT_CATALOG),
+          colors: ["bg", "surface", "ink", "muted", "accent", "border"],
+          schemes: ["auto", "light", "dark"],
+        },
+      };
+    },
+  },
+  {
+    name: "set_brand",
+    description:
+      "Set how the site looks: colours, corner radius, fonts, motion, and whether it is " +
+      "pinned light or dark. Merges into the existing brand — pass only what you are " +
+      "changing. Colours are hex; fonts are ids from get_settings.available.fonts (an " +
+      "unknown one is REFUSED, not ignored, because a font that silently does nothing " +
+      "looks like the tool worked). This is the layer under everything else: it applies " +
+      "to every page, including ones you have not written yet. Not live until publish.",
+    inputSchema: obj(
+      {
+        colors: {
+          type: "object",
+          description:
+            "Hex colours by role: bg (page), surface (cards), ink (text), muted (secondary " +
+            "text), accent (links/buttons), border. e.g. {\"accent\": \"#1c6b53\"}.",
+          additionalProperties: true,
+        },
+        radius: str('Corner radius as a plain length: "0px" for sharp, "10px", "18px" for soft.'),
+        fonts: {
+          type: "object",
+          description: 'Font ids: {"heading": "fraunces", "body": "inter"}. See get_settings.',
+          additionalProperties: true,
+        },
+        scheme: str('"auto" follows the visitor\'s OS setting (default), or pin "light" / "dark".'),
+        motion: str('"on" enables hover/press feedback, "off" disables it.'),
+        logo: str("Path or URL of the logo image. Optional."),
+      },
+      [],
+    ),
+    run: async (args, client, site) => {
+      const path = await settingPath(client, "brand", undefined);
+      const current = await readSetting(client, path);
+      const brand: BrandConfig = {
+        ...((current.brand as BrandConfig) ?? {}),
+        ...(args.colors ? { colors: { ...((current.brand as BrandConfig)?.colors ?? {}), ...(args.colors as object) } } : {}),
+        ...(args.radius !== undefined ? { radius: String(args.radius) } : {}),
+        ...(args.fonts ? { fonts: { ...((current.brand as BrandConfig)?.fonts ?? {}), ...(args.fonts as object) } } : {}),
+        ...(args.scheme !== undefined ? { scheme: args.scheme as BrandConfig["scheme"] } : {}),
+        ...(args.motion !== undefined ? { motion: args.motion as BrandConfig["motion"] } : {}),
+      };
+      // Refuse rather than let resolveBrand quietly drop it — see validateBrand.
+      const bad = validateBrand(brand);
+      if (args.logo !== undefined && String(args.logo) && !isSafeUrl(String(args.logo))) {
+        bad.push(`logo ${JSON.stringify(args.logo)} is not a usable image URL.`);
+      }
+      if (bad.length) {
+        throw new GitHubError(400, `Refused — nothing was changed:\n${bad.map((b) => `  • ${b}`).join("\n")}`);
+      }
+
+      await client.ensureWorkingBranch();
+      const next = { ...current, brand, ...(args.logo !== undefined ? { logo: String(args.logo) } : {}) };
+      await writeSetting(client, path, next, "brand");
+      return { brand, ...stagedNote(site) };
+    },
+  },
+  {
+    name: "set_menu",
+    description:
+      "Set the header and/or footer navigation for one locale. Pass the WHOLE list for a " +
+      "location — it replaces that list, so include the items you want to keep (get_settings " +
+      "shows them). A section you created with create_content_type has no nav link until you " +
+      "add one here. URLs must be root-relative (/properties/), absolute http(s), mailto:, " +
+      "tel: or #anchor; anything else is refused, because the site renders it as a dead link. " +
+      "Not live until publish.",
+    inputSchema: obj(
+      {
+        header: {
+          type: "array",
+          description: 'Header items in order: [{"label": "Properties", "url": "/properties/"}]. Omit to leave unchanged.',
+          items: { type: "object", additionalProperties: true },
+        },
+        footer: {
+          type: "array",
+          description: "Footer items in order. Omit to leave unchanged.",
+          items: { type: "object", additionalProperties: true },
+        },
+        locale: str("Locale to set the menu for. Optional; defaults to the site default."),
+      },
+      [],
+    ),
+    run: async (args, client, site) => {
+      if (args.header === undefined && args.footer === undefined) {
+        throw new GitHubError(400, "Nothing to set — pass `header`, `footer`, or both.");
+      }
+      const locale = await resolveLocale(client, args.locale);
+      const path = await settingPath(client, "menu", locale);
+      const current = await readSetting(client, path);
+      const locations = { ...((current.locations as Record<string, unknown>) ?? {}) };
+
+      for (const loc of ["header", "footer"] as const) {
+        if (args[loc] === undefined) continue;
+        const existing = (locations[loc] ?? {}) as Record<string, unknown>;
+        // Only `desktop` is set. tablet/mobile are a responsive override the CMS owns
+        // and null means "inherit desktop" — replacing them here would silently discard
+        // a per-device menu the owner configured by hand.
+        locations[loc] = { tablet: null, mobile: null, ...existing, desktop: menuItems(args[loc], loc) };
+      }
+
+      await client.ensureWorkingBranch();
+      await writeSetting(client, path, { ...current, locations }, `${locale} menu`);
+      return {
+        locale,
+        header: (locations.header as { desktop?: unknown } | undefined)?.desktop ?? [],
+        footer: (locations.footer as { desktop?: unknown } | undefined)?.desktop ?? [],
+        ...stagedNote(site),
+      };
+    },
+  },
+  {
+    name: "set_seo",
+    description:
+      "Set the site's name, tagline and search/social defaults for one locale — what shows " +
+      "in a browser tab, in Google, and when the site is shared. `siteName` is also the " +
+      "name in the site's own header. Merges into what is there; pass only what you are " +
+      "changing. Not live until publish.",
+    inputSchema: obj(
+      {
+        siteName: str("The site's name, e.g. 'Bonaparte Properties'. Also used by the header."),
+        titleTemplate: str("How a page title is framed, with %s for the page's own title, e.g. '%s · Bonaparte'."),
+        defaultTitle: str("Title for the home page and anything without its own."),
+        defaultDescription: str("One-sentence description used when a page has none."),
+        defaultOgImage: str("Image shown when a page is shared. Path or absolute URL."),
+        twitter: str("Site @handle. Optional."),
+        locale: str("Locale to set these for. Optional; defaults to the site default."),
+      },
+      [],
+    ),
+    run: async (args, client, site) => {
+      const locale = await resolveLocale(client, args.locale);
+      const path = await settingPath(client, "seo", locale);
+      const current = await readSetting(client, path);
+
+      const next = { ...current };
+      for (const k of ["siteName", "titleTemplate", "defaultTitle", "defaultDescription", "twitter"]) {
+        if (args[k] !== undefined) next[k] = String(args[k]);
+      }
+      if (args.defaultOgImage !== undefined) {
+        const img = String(args.defaultOgImage);
+        if (img && !isSafeUrl(img)) {
+          throw new GitHubError(400, `defaultOgImage ${JSON.stringify(img)} is not a usable image URL. Nothing was changed.`);
+        }
+        next.defaultOgImage = img;
+      }
+      if (Object.keys(next).length === Object.keys(current).length &&
+          Object.entries(next).every(([k, v]) => current[k] === v)) {
+        throw new GitHubError(400, "Nothing to set — pass at least one field to change.");
+      }
+
+      await client.ensureWorkingBranch();
+      await writeSetting(client, path, next, `${locale} SEO defaults`);
+      return { locale, seo: next, ...stagedNote(site) };
     },
   },
   {

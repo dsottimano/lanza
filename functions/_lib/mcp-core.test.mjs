@@ -103,7 +103,7 @@ test("initialize returns protocol + serverInfo", async () => {
 test("tools/list exposes the full surface", async () => {
   const r = await handleMessage({ jsonrpc: "2.0", id: 2, method: "tools/list" }, client());
   const names = r.result.tools.map((t) => t.name);
-  for (const n of ["get_site", "list_collections", "get_schema", "describe_site_system", "write_template", "create_content_type", "list_content", "read_content", "create_content", "update_content", "delete_content", "validate_site", "list_changes", "publish"])
+  for (const n of ["get_site", "list_collections", "get_schema", "describe_site_system", "write_template", "create_content_type", "update_content_type", "write_part", "get_settings", "set_brand", "set_menu", "set_seo", "list_content", "read_content", "create_content", "update_content", "delete_content", "validate_site", "list_changes", "publish"])
     assert.ok(names.includes(n), `missing tool ${n}`);
   assert.equal(TOOL_LIST.length, names.length);
 });
@@ -864,4 +864,363 @@ test("a hijacked agent cannot turn that same flow into CMS takeover", async () =
   assert.ok(isError(r));
   assert.match(errText(r), /template-executes-js/);
   assert.deepEqual([...gh.files.keys()].sort(), [...before.keys()].sort(), "nothing may be written");
+});
+
+// ---------------------------------------------------------------------------
+// Settings. Brand, menu and SEO are what turn "a site that works" into "the site they
+// asked for", and MCP could not touch any of them — every `kind: "files"` collection
+// is folderless, so getCollections() dropped the lot.
+// ---------------------------------------------------------------------------
+
+const settingsSite = (extra = {}) => fakeGitHub({
+  "data/schema.json": SCHEMA,
+  "data/site.json": SITE,
+  "data/appearance.json": JSON.stringify({ theme: "freehold", logo: "", brand: { scheme: "light" } }),
+  "data/menu.en.json": JSON.stringify({
+    locations: {
+      header: { desktop: [{ label: "Blog", url: "/posts" }], tablet: null, mobile: [{ label: "Blog", url: "/posts" }] },
+      footer: { desktop: [], tablet: null, mobile: null },
+    },
+  }),
+  "data/seo.en.json": JSON.stringify({ siteName: "Old", defaultDescription: "Old desc", twitter: "@old" }),
+  ...extra,
+});
+
+test("get_settings returns brand, menu, seo and the values that are actually valid", async () => {
+  settingsSite();
+  const r = await callData("get_settings");
+  assert.equal(r.brand.scheme, "light");
+  assert.deepEqual(r.menu.header, [{ label: "Blog", url: "/posts" }]);
+  assert.equal(r.seo.siteName, "Old");
+  // So a setter is never a guess-and-get-refused round trip.
+  assert.ok(r.available.fonts.length > 1);
+  assert.ok(r.available.colors.includes("accent"));
+});
+
+test("set_brand merges and keeps what it was not given", async () => {
+  const gh = settingsSite();
+  const r = await callData("set_brand", { colors: { accent: "#1c6b53" }, radius: "0px", fonts: { heading: "fraunces" } });
+  assert.equal(r.brand.accent, undefined);
+  assert.equal(r.brand.colors.accent, "#1c6b53");
+  assert.equal(r.brand.scheme, "light", "an untouched field survives");
+  const written = JSON.parse(gh.files.get("data/appearance.json"));
+  assert.equal(written.theme, "freehold", "keys outside `brand` are preserved");
+  assert.equal(written.brand.radius, "0px");
+});
+
+test("set_brand refuses what the renderer would silently drop", async () => {
+  for (const args of [
+    { colors: { accent: "burnt orange" } },
+    { colors: { accnet: "#112233" } },
+    { fonts: { heading: "comic-sans" } },
+    { radius: "very round" },
+    { scheme: "sepia" },
+  ]) {
+    const gh = settingsSite();
+    const before = gh.files.get("data/appearance.json");
+    const r = await callRaw("set_brand", args);
+    assert.ok(isError(r), `should refuse ${JSON.stringify(args)}`);
+    assert.equal(gh.files.get("data/appearance.json"), before);
+  }
+  // The refusal has to be usable: it names the valid options.
+  const r = await callRaw("set_brand", { fonts: { heading: "comic-sans" } });
+  assert.match(errText(r), /Available:/);
+});
+
+test("set_menu adds a section's nav link and preserves per-device overrides", async () => {
+  const gh = settingsSite();
+  const r = await callData("set_menu", {
+    header: [{ label: "Blog", url: "/posts" }, { label: "Properties", url: "/properties/" }],
+  });
+  assert.equal(r.header.length, 2);
+  const written = JSON.parse(gh.files.get("data/menu.en.json"));
+  assert.deepEqual(written.locations.header.desktop[1], { label: "Properties", url: "/properties/" });
+  // tablet/mobile are the CMS's responsive override; null means "inherit desktop", and
+  // a hand-configured mobile menu must not be discarded by a header change.
+  assert.deepEqual(written.locations.header.mobile, [{ label: "Blog", url: "/posts" }]);
+  assert.deepEqual(written.locations.footer.desktop, [], "the untouched location survives");
+});
+
+test("set_menu refuses a URL the site would render as a dead link", async () => {
+  // HTML-escaping does not help in an href: the parser decodes entities before the URL
+  // is parsed, so this would run on the origin that serves /admin.
+  for (const url of ["javascript:alert(1)", "data:text/html,<script>x</script>", "//evil.example", "/\\evil.example"]) {
+    const gh = settingsSite();
+    const before = gh.files.get("data/menu.en.json");
+    const r = await callRaw("set_menu", { header: [{ label: "Click", url }] });
+    assert.ok(isError(r), `should refuse ${url}`);
+    assert.equal(gh.files.get("data/menu.en.json"), before, "nothing may be written");
+  }
+});
+
+test("set_menu refuses an item with no label, and writes nothing", async () => {
+  const gh = settingsSite();
+  const before = gh.files.get("data/menu.en.json");
+  const r = await callRaw("set_menu", { header: [{ url: "/x" }] });
+  assert.ok(isError(r));
+  assert.equal(gh.files.get("data/menu.en.json"), before);
+});
+
+test("set_seo renames the site and keeps the rest", async () => {
+  const gh = settingsSite();
+  const r = await callData("set_seo", { siteName: "Bonaparte", titleTemplate: "%s · Bonaparte" });
+  assert.equal(r.seo.siteName, "Bonaparte");
+  assert.equal(r.seo.twitter, "@old", "an untouched field survives");
+  assert.equal(JSON.parse(gh.files.get("data/seo.en.json")).defaultDescription, "Old desc");
+});
+
+test("settings writes land on the locale asked for, and refuse one the site lacks", async () => {
+  const gh = settingsSite();
+  await callData("set_seo", { siteName: "Bonaparte ES", locale: "es" });
+  assert.ok(gh.files.has("data/seo.es.json"));
+  assert.equal(JSON.parse(gh.files.get("data/seo.en.json")).siteName, "Old", "en is untouched");
+  // A locale is interpolated into a write path, so it is untrusted input, not a label.
+  const r = await callRaw("set_seo", { siteName: "x", locale: "../../.github/workflows" });
+  assert.ok(isError(r));
+});
+
+// ---------------------------------------------------------------------------
+// Parts. A part has no fields.json — its scope is PART_DATA, the data Base.astro
+// actually supplies — so a name that is not on that list renders as empty text with
+// no error, which is the whole reason this is checked rather than trusted.
+// ---------------------------------------------------------------------------
+
+test("write_part writes a header against the data Base.astro supplies", async () => {
+  const gh = fakeGitHub({ "data/schema.json": SCHEMA, "data/site.json": SITE });
+  const r = await callData("write_part", {
+    name: "header",
+    template_html: `<header class="{{ headerClass }}">
+  <a href="{{ homeUrl }}">{{ siteName }}</a>
+  <nav>{{#each menuHeader}}<a href="{{ url }}">{{ label }}</a>{{/each}}</nav>
+  {{#if showSwitcher}}<span>{{#each locales}}<a href="{{ url }}">{{ code }}</a>{{/each}}</span>{{/if}}
+</header>`,
+  });
+  assert.equal(r.written, "templates/parts/header.html");
+  assert.ok(gh.files.get("templates/parts/header.html").includes("menuHeader"));
+});
+
+test("write_part refuses a name PART_DATA does not declare, and writes nothing", async () => {
+  const gh = fakeGitHub({ "data/schema.json": SCHEMA, "data/site.json": SITE });
+  // `showNav` is the name docs/authoring-templates.md wrongly advertised for months.
+  // The real one is showSwitcher, and this is what catches that class of mistake.
+  const r = await callRaw("write_part", {
+    name: "header",
+    template_html: `{{#if showNav}}<nav>{{ siteName }}</nav>{{/if}}`,
+  });
+  assert.ok(isError(r));
+  assert.match(errText(r), /undeclared-slot/);
+  assert.match(errText(r), /partData/);
+  assert.equal(gh.files.has("templates/parts/header.html"), false);
+});
+
+test("write_part applies the same markup rules as a template", async () => {
+  const gh = fakeGitHub({ "data/schema.json": SCHEMA, "data/site.json": SITE });
+  const r = await callRaw("write_part", {
+    name: "footer",
+    template_html: `<footer>{{ year }}</footer><script>fetch("/admin/api/gh")</script>`,
+  });
+  assert.ok(isError(r));
+  assert.match(errText(r), /template-executes-js/);
+  assert.equal(gh.files.has("templates/parts/footer.html"), false);
+});
+
+test("write_part refuses anything but header and footer", async () => {
+  const gh = fakeGitHub({ "data/schema.json": SCHEMA, "data/site.json": SITE });
+  for (const name of ["sidebar", "../evil", "Header"]) {
+    const r = await callRaw("write_part", { name, template_html: "<p>x</p>" });
+    assert.ok(isError(r), `should refuse part ${name}`);
+  }
+  assert.equal(gh.files.size, 2);
+});
+
+// ---------------------------------------------------------------------------
+// update_content_type — the "no, change it" half. The flow is conversational, so the
+// owner saying no has to be a call and not a hand-edit of data/schema.json.
+// ---------------------------------------------------------------------------
+
+const routedSite = () => fakeGitHub({
+  ...withTemplate(),
+  "data/schema.json": JSON.stringify([
+    { kind: "folder", name: "pages", folder: "content/pages", localized: true, body: "rich" },
+    {
+      kind: "folder",
+      name: "properties",
+      label: "Properties",
+      folder: "content/properties",
+      body: "none",
+      fields: [{ name: "address", label: "Address", widget: "string" }],
+    },
+  ]),
+});
+
+test("update_content_type renames what a type is called", async () => {
+  const gh = routedSite();
+  const r = await callData("update_content_type", { name: "properties", label: "Listings", labelSingular: "Listing" });
+  assert.equal(r.label, "Listings");
+  const after = schemaIn(gh).find((c) => c.name === "properties");
+  assert.equal(after.label, "Listings");
+  assert.equal(after.folder, "content/properties", "the identifier and folder are untouched");
+});
+
+test("update_content_type gives an unrouted type its URLs", async () => {
+  const gh = routedSite();
+  const r = await callData("update_content_type", {
+    name: "properties",
+    route: { base: "listings", template: "property" },
+  });
+  assert.equal(r.url, "/listings/");
+  assert.deepEqual(schemaIn(gh).find((c) => c.name === "properties").route, {
+    base: "listings",
+    template: "property",
+  });
+});
+
+test("update_content_type re-reads fields after the template changed", async () => {
+  const gh = routedSite();
+  // The agent edits the template to add a field…
+  await callData("write_template", {
+    name: "property",
+    position: "detail",
+    template_html: "<h1>{{ address }}</h1><p>{{ price }}</p><p>{{ epc }}</p>",
+    fields: {
+      fields: [
+        { name: "address", label: "Address", widget: "string" },
+        { name: "price", label: "Price", widget: "string" },
+        { name: "epc", label: "EPC rating", widget: "string" },
+      ],
+    },
+  });
+  // …and the type's fields are a COPY, so they are stale until re-derived.
+  assert.deepEqual(schemaIn(gh).find((c) => c.name === "properties").fields.map((f) => f.name), ["address"]);
+  const r = await callData("update_content_type", { name: "properties", fieldsFrom: "property" });
+  assert.deepEqual(r.fields, ["address", "price", "epc"]);
+});
+
+test("update_content_type applies the same route rules as creation", async () => {
+  for (const route of [{ base: "admin", template: "property" }, { base: "Properties", template: "property" }, { base: "x", template: "nosuch" }]) {
+    const gh = routedSite();
+    const before = gh.files.get("data/schema.json");
+    const r = await callRaw("update_content_type", { name: "properties", route });
+    assert.ok(isError(r), `should refuse ${JSON.stringify(route)}`);
+    assert.equal(gh.files.get("data/schema.json"), before);
+  }
+});
+
+test("update_content_type refuses an unknown type and a settings collection", async () => {
+  const gh = routedSite();
+  const before = gh.files.get("data/schema.json");
+  for (const name of ["nosuchtype", "settings"]) {
+    const r = await callRaw("update_content_type", { name, label: "X" });
+    assert.ok(isError(r), `should refuse ${name}`);
+  }
+  assert.equal(gh.files.get("data/schema.json"), before);
+});
+
+// ---------------------------------------------------------------------------
+// THE FLOW. Someone onboards, opens a chat window, and describes what they want. No
+// checkout, no terminal, no recipe — the model is invented in the conversation and the
+// checker is what says whether it holds together. Deliberately NOT real estate: the
+// system has to work for whatever someone asks for.
+// ---------------------------------------------------------------------------
+
+test("an LLM builds a pottery studio's site from a conversation, and the owner changes their mind", async () => {
+  // What an onboarded site looks like before anyone has said anything: the default
+  // model, one locale, nothing of its own.
+  const gh = fakeGitHub({
+    "data/schema.json": JSON.stringify([
+      { kind: "folder", name: "pages", folder: "content/pages", localized: true, body: "rich" },
+    ]),
+    "data/site.json": JSON.stringify({ defaultLocale: "en", locales: [{ code: "en" }] }),
+  });
+
+  // "I run a pottery studio. I teach classes and I sell pieces."
+  // The LLM reads the rules first — it has never seen this site.
+  const rules = await callData("describe_site_system");
+  assert.ok(rules.widgets.includes("list"));
+
+  // It decides the site needs a `classes` type. Nobody handed it that.
+  await callData("write_template", {
+    name: "workshop",
+    position: "detail",
+    template_html: `<style>.ws-meta{opacity:.7}</style>
+<article>
+  <h1>{{ title }}</h1>
+  <p class="ws-meta">{{ level }} · {{ duration }} · {{ price }}</p>
+  {{#if soldOut}}<p>This one is full — the next date is below.</p>{{/if}}
+  {{{ body }}}
+  <a href="{{ bookingUrl }}">Book a place</a>
+</article>`,
+    fields: {
+      body: true,
+      fields: [
+        { name: "title", label: "Class name", widget: "string" },
+        { name: "level", label: "Level", widget: "select", options: ["Beginner", "Improver"] },
+        { name: "duration", label: "Duration", widget: "string" },
+        { name: "price", label: "Price", widget: "string" },
+        { name: "soldOut", label: "Sold out", widget: "boolean" },
+        { name: "bookingUrl", label: "Booking link", widget: "string" },
+      ],
+    },
+  });
+
+  await callData("write_template", {
+    name: "workshop-index",
+    position: "list",
+    template_html: `<h1>{{ heading }}</h1>
+{{#if isEmpty}}<p>Nothing scheduled just now.</p>{{/if}}
+<ul>{{#each entries}}<li><a href="{{ url }}">{{ title }} — {{ price }}</a></li>{{/each}}</ul>`,
+    fields: {
+      fields: [{ name: "heading", label: "Heading", widget: "string", default: "Classes" }],
+      listing: { of: "classes", item: ["title", "price"] },
+    },
+  });
+
+  const type = await callData("create_content_type", {
+    name: "classes",
+    label: "Classes",
+    labelSingular: "Class",
+    fieldsFrom: "workshop",
+    body: "rich",
+    route: { base: "classes", template: "workshop", list: { template: "workshop-index" } },
+  });
+  assert.equal(type.url, "/classes/");
+
+  // The look, the chrome, the name, and the nav link — none of which existed before.
+  await callData("set_seo", {
+    siteName: "Fold & Fire",
+    defaultTitle: "Fold & Fire — a pottery studio",
+    defaultDescription: "Hand-thrown work and small classes.",
+  });
+  await callData("set_brand", { colors: { accent: "#8a5a2b", bg: "#faf6f0" }, radius: "18px", fonts: { heading: "fraunces" } });
+  await callData("write_part", {
+    name: "header",
+    template_html: `<header><a href="{{ homeUrl }}">{{ siteName }}</a><nav>{{#each menuHeader}}<a href="{{ url }}">{{ label }}</a>{{/each}}</nav></header>`,
+  });
+  await callData("set_menu", { header: [{ label: "Classes", url: "/classes/" }] });
+
+  await callData("create_content", {
+    collection: "classes",
+    title: "Wheel throwing for beginners",
+    frontmatter: { level: "Beginner", duration: "3 hours", price: "£65", bookingUrl: "https://tickets.example/wheel" },
+    body_html: "<p>Six places, six wheels, one evening.</p>",
+  });
+
+  // It checks its own work before showing anyone.
+  const check = await callData("validate_site");
+  assert.equal(check.ok, true, JSON.stringify(check.problems, null, 2));
+
+  // "Looks good, but call them Workshops, not Classes."
+  const renamed = await callData("update_content_type", { name: "classes", label: "Workshops", labelSingular: "Workshop" });
+  assert.equal(renamed.label, "Workshops");
+  await callData("set_menu", { header: [{ label: "Workshops", url: "/classes/" }] });
+
+  // Still nothing public. What exists is a diff on staging with a URL to look at.
+  assert.equal(gh.published, false);
+  const pending = await callData("list_changes");
+  assert.ok(pending.pending > 0);
+
+  // "Yes. Ship it."
+  const out = await callData("publish");
+  assert.equal(out.published, true);
+  assert.equal(gh.published, true);
 });

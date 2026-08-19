@@ -74,10 +74,19 @@ there automatically — see `docs/mcp-server.md`).
       security boundary), route validated against the SAME rules `gen-routes.mjs` enforces,
       which now live in the checker so the two cannot drift. The pending model is run
       through `checkSite` before anything is written.
-- [ ] **`apply_recipe`** — the whole-site path. Takes a recipe (see item 3), validates it
-      entire, writes nothing on failure.
-- [ ] **`list_styles` / `set_style`** — read `data/styles.json`, and write a chosen
-      variant into `appearance.json`. Proposing styles must NOT publish one.
+- [ ] **`apply_recipe`** — DEPRIORITIZED. Dave, 2026-08-19: "I'm using recipes and real
+      estate as examples, not prefabricated." The product is an LLM INVENTING the model in
+      conversation, not picking from a library. The per-call tools cover that flow; a
+      recipe applier is only worth building if a genuine atomic multi-step need appears.
+- [x] **Settings over MCP** — superseded `list_styles`/`set_style`, which were about
+      picking from canned variants. `get_settings` / `set_brand` / `set_menu` / `set_seo`
+      let an LLM set the look directly: colours, radius, fonts, scheme, the nav, the site
+      name. Paths are DERIVED from a fixed map, never read out of `data/schema.json`
+      (§3: it must not become a security boundary). `set_brand` REFUSES what
+      `resolveBrand` would silently drop — `validateBrand` shares its constants.
+- [x] **`write_part`** — the header/footer chrome, checked against `PART_DATA`.
+- [x] **`update_content_type`** — the "no, call them Workshops" half. Labels, route, and
+      re-deriving fields after the template changed. Not `name`: that is a migration.
 - [x] **`validate_site`** — runs `checkSite()` over the repo and returns findings.
       Read-only. `template: "<name>"` scopes it to one folder. It reads at most **6**
       template folders per call (a Worker gets ~50 subrequests; each template costs two

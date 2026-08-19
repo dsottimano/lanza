@@ -131,6 +131,45 @@ export interface ResolvedBrand {
   fontHref: string | null;
 }
 
+/**
+ * Everything wrong with a brand block, as human-readable reasons ("" list = fine).
+ *
+ * `resolveBrand` below DROPS anything it does not recognise, which is right at render
+ * time — an older site with a field this version stopped supporting must still build.
+ * It is exactly wrong for a WRITER: an agent that sets `accent: "burnt orange"` and is
+ * told nothing has changed the site in its own head and not on the page. So a writer
+ * (the MCP `set_brand` tool) calls this and refuses; the renderer keeps forgiving.
+ *
+ * Same constants as resolveBrand — the two cannot disagree about what a colour is.
+ */
+export function validateBrand(brand: BrandConfig): string[] {
+  const bad: string[] = [];
+  const colors = brand.colors ?? {};
+  for (const [key, v] of Object.entries(colors)) {
+    if (!(key in COLOR_VAR)) {
+      bad.push(`colors.${key} is not a brand colour — use ${Object.keys(COLOR_VAR).join(", ")}.`);
+    } else if (typeof v !== "string" || !HEX.test(v)) {
+      bad.push(`colors.${key} must be a hex colour like "#e4431b", not ${JSON.stringify(v)}.`);
+    }
+  }
+  if (brand.radius !== undefined && !LEN.test(String(brand.radius))) {
+    bad.push(`radius must be a plain length like "2px" or "1rem", not ${JSON.stringify(brand.radius)}.`);
+  }
+  if (brand.motion !== undefined && brand.motion !== "on" && brand.motion !== "off") {
+    bad.push(`motion must be "on" or "off".`);
+  }
+  if (brand.scheme !== undefined && !["auto", "light", "dark"].includes(brand.scheme)) {
+    bad.push(`scheme must be "auto", "light" or "dark".`);
+  }
+  for (const slot of ["heading", "body"] as const) {
+    const id = brand.fonts?.[slot];
+    if (id !== undefined && !(id in FONT_CATALOG)) {
+      bad.push(`fonts.${slot} "${id}" is not a font in the catalog. Available: ${Object.keys(FONT_CATALOG).join(", ")}.`);
+    }
+  }
+  return bad;
+}
+
 /** Turn an appearance record into inline style vars + motion flag + font href. */
 export function resolveBrand(appearance: Appearance | null | undefined): ResolvedBrand {
   const brand = appearance?.brand ?? {};
