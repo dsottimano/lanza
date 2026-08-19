@@ -1,0 +1,21 @@
+---
+// The listing page for a routed collection (/events/), rendered through its list
+// template with `{{#each entries}}`. Called only by generated route files.
+import type { CollectionEntry } from "astro:content";
+import HtmlTemplate from "./HtmlTemplate.astro";
+import { listScope, type CollectionRoute } from "../lib/collection-routes";
+import type { Locale } from "../lib/i18n";
+
+interface Props {
+  entries: CollectionEntry<"posts">[];
+  locale: Locale;
+  base: string;
+  list: NonNullable<CollectionRoute["list"]>;
+}
+
+const { entries, locale, base, list } = Astro.props;
+---
+
+<main>
+  <HtmlTemplate name={list.template} data={listScope(entries, base, locale, list)} />
+</main>

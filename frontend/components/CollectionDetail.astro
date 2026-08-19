@@ -1,0 +1,32 @@
+---
+// One entry of a routed collection, rendered through its HTML template. Called only
+// by the route files scripts/gen-routes.mjs emits. See lib/collection-routes.ts.
+//
+// The entry's FRONTMATTER is the template's data scope (plus url/slug/body), so a
+// content type invented in the CMS renders with the same engine and the same trust
+// model as a page's slots — the template is author-trusted and emitted verbatim,
+// values are escaped.
+import type { CollectionEntry } from "astro:content";
+import HtmlTemplate from "./HtmlTemplate.astro";
+import { sanitizeBody } from "../lib/sanitize";
+import { assertSanitizedSafe } from "../lib/assert-rendered-safe";
+import { detailScope } from "../lib/collection-routes";
+import type { Locale } from "../lib/i18n";
+
+interface Props {
+  entry: CollectionEntry<"posts">;
+  locale: Locale;
+  template: string;
+  base: string;
+}
+
+const { entry, locale, template, base } = Astro.props;
+
+// Entry bodies are attacker-reachable (the bot commits HTML, an MCP agent writes
+// bodies), so the same sanitize-then-verify posture as PageArticle applies.
+const body = assertSanitizedSafe(sanitizeBody(entry.body ?? ""), `${base} entry body`);
+---
+
+<main>
+  <HtmlTemplate name={template} data={detailScope(entry, base, locale, body)} />
+</main>

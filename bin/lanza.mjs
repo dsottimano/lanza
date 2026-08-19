@@ -46,8 +46,11 @@ if (!["mjs", "js", "ts", "mts"].some((e) => existsSync(join(process.cwd(), `astr
   process.exit(1);
 }
 
-// Codegen (content model → Zod config; redirect rules → _redirects).
+// Codegen (content model → Zod config; collection routes → .astro pages; redirect
+// rules → _redirects). Routes come AFTER the content config: a route is only
+// meaningful for a collection Astro already knows about.
 run(process.execPath, [join(PKG_ROOT, "scripts/gen-content-config.mjs")]);
+run(process.execPath, [join(PKG_ROOT, "scripts/gen-routes.mjs")]);
 run(process.execPath, [join(PKG_ROOT, "scripts/gen-redirects.mjs")]);
 
 // Astro, resolved wherever npm hoisted it (usually the tenant's node_modules, not
