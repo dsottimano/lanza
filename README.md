@@ -66,6 +66,25 @@ build, so a bare `npm run dev` won't serve `/admin` until you've built it
 
 See `admin/PROGRESS.md` for the build history and architecture notes.
 
+## Building a whole site — the site system
+
+`docs/site-system.md` is the composition contract: what a content type, a template, a
+route and a style may reference from each other, and why a site made of correct-looking
+parts can still be wrong. Read it before adding any of those. Its one rule is that a
+layer may only reference names the layer below it declares, and it is written down
+because every violation is **silent** — a misspelled `{{placeholder}}` renders as empty
+text, a content type with no route stores entries at no URL, and the build passes either
+way.
+
+```sh
+npm run check:site          # errors fail, warnings print
+npm run check:site -- --strict
+```
+
+Every site also serves the contract at `/site-system.json`, generated from the same
+constants the checker enforces, and the MCP server exposes it as `describe_site_system`
+alongside `validate_site`. `docs/authoring-templates.md` is the syntax of one template.
+
 ## Security — the CMS threat model
 
 The CMS never holds a GitHub token; every write reaches GitHub through the

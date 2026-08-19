@@ -25,7 +25,7 @@ Then prove the tree is healthy before changing anything:
 ```sh
 npm test            # 235 function + 313 admin, all green
 npm run check:site  # 1 template dir, 0 errors, 0 warnings
-node bin/lanza.mjs build   # 15 pages
+node bin/lanza.mjs build   # 15 pages + /llms.txt + /site-system.json
 ```
 
 Traps that have already cost time:
@@ -99,25 +99,24 @@ Two constraints that will shape the build, both learned the hard way:
 `docs/site-system.md` is written, and it is invisible: it is one file in a repo, and the
 audience is agents operating a site they were pointed at ten seconds ago.
 
-- [ ] **`/llms.txt` should carry it.** Highest leverage of anything on this list — the
-      audience for the contract literally *is* agents, and `frontend/pages/llms.txt.ts`
-      is already the document they fetch first. Today it advertises `window.lanza` read
-      methods and lists posts/pages. It should also say: this site is a Lanza site, here
-      is how its content model is shaped, here is where the full contract lives.
-- [ ] **A machine-readable contract endpoint** — `/site-system.json`, served from the
-      same exported constants the checker uses, so the served version cannot drift from
-      the enforced one. This is what `describe_site_system` should return too; build it
-      once.
+- [x] **`/llms.txt` carries it.** A "How this site is built" section (the one rule, the
+      contract URL, the MCP endpoint and the two checking tools) plus a "Content types"
+      section generated from the tenant's own `data/schema.json` — name, route base, and
+      declared fields.
+- [x] **`/site-system.json`** — `frontend/pages/site-system.json.ts`, serving
+      `siteSystemContract()`. Built once: `describe_site_system` returns the same object.
+      Minified for the same reason the MCP layer minifies (the reader pays per token).
 - [ ] **A public page on lanzacms.com.** A fixed page (`frontend/lib/fixed-pages.ts`,
       gated by `PRODUCT_ONLY` so tenant sites do not serve our marketing) explaining how
       an agent builds a Lanza site. `/agents/` is the natural neighbour and may be the
       right home rather than a new slug — decide before building a second page that says
       an overlapping thing.
-- [ ] **Link it from the repo.** `README.md` and `docs/authoring-templates.md` should both
-      point at `docs/site-system.md`; right now nothing does except `CLAUDE.md`.
-- [ ] Keep the doc and the code honest about each other. `site-system.md` already says
-      "the file wins" — there is no test asserting the doc's tables match the exports, and
-      that is how the `showNav` error survived in `authoring-templates.md` for months.
+- [x] **Linked from the repo.** `README.md` has a "Building a whole site" section and
+      `docs/authoring-templates.md` opens by pointing at it.
+- [~] Keep the doc and the code honest about each other. Half done: `CHECKS` is now the
+      registry of every problem code, and a test scans the checker's source both ways —
+      an emitted code missing from `CHECKS` fails, and so does a documented code nothing
+      emits. The prose tables in `site-system.md` are still hand-maintained.
 
 ## 3. Recipes beyond events — the format is unproven
 

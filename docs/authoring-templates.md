@@ -6,6 +6,12 @@ owner can then fill from the CMS. It is piece 3 of template authoring — the en
 (`frontend/lib/template-render.ts`) and the CMS are pieces 1 and 2; this doc is the
 contract you follow.
 
+**Composing a whole SITE — content types, routes, styles — is `docs/site-system.md`.**
+This doc is the syntax of one template; that one is the rule for how templates, the
+content model and routes may reference each other, and `npm run check:site` enforces it.
+Run the checker before handing over anything you built from this doc: two of the claims
+below are wrong and it will tell you which (see that doc's Traps).
+
 ## The loop
 
 The user finds (or asks you to build) a design → you reproduce it as plain HTML/CSS →
