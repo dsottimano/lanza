@@ -13,7 +13,17 @@ import { readFileSync } from "node:fs";
 import { fileURLToPath } from "node:url";
 import { join, dirname } from "node:path";
 
-import { checkTemplate, checkPart, checkFieldsJson, parseTemplate, shapeOfFields } from "./site-system.mjs";
+import {
+  checkTemplate,
+  checkPart,
+  checkFieldsJson,
+  parseTemplate,
+  shapeOfFields,
+  CHECKS,
+  POSITIONS,
+  WIDGETS,
+  siteSystemContract,
+} from "../functions/_lib/site-system.mjs";
 import { render } from "../frontend/lib/template-render.ts";
 
 const ROOT = join(dirname(fileURLToPath(import.meta.url)), "..");
@@ -222,5 +232,48 @@ describe("parseTemplate", () => {
   test("reports every unclosed block", () => {
     const { unclosed } = parseTemplate(`{{#each a}}{{#if b}}`);
     assert.equal(unclosed.length, 2);
+  });
+});
+
+// The registry is what /site-system.json and the MCP describe_site_system tool serve.
+// If it drifts from the codes the checker actually emits, the published contract
+// documents a system nobody is running — which is exactly how docs/authoring-templates.md
+// came to advertise a `showNav` that never existed.
+describe("the published contract matches the enforced one", () => {
+  // Both call sites: problem("error", "code", …) in the checker, and the raw
+  // {level, code} objects validate-site.mjs pushes for the filesystem-level checks.
+  const emitted = () => {
+    const found = new Set();
+    for (const file of ["functions/_lib/site-system.mjs", "scripts/validate-site.mjs"]) {
+      const src = read(file);
+      for (const m of src.matchAll(/problem\(\s*"(?:error|warning)",\s*"([a-z-]+)"/g)) found.add(m[1]);
+      for (const m of src.matchAll(/code:\s*"([a-z-]+)"/g)) found.add(m[1]);
+    }
+    return found;
+  };
+
+  test("every code the checker can emit is in CHECKS", () => {
+    const registered = new Set(CHECKS.map((c) => c.code));
+    const missing = [...emitted()].filter((c) => !registered.has(c)).sort();
+    assert.deepEqual(missing, [], `emitted but undocumented in CHECKS: ${missing.join(", ")}`);
+  });
+
+  test("CHECKS documents no code the checker cannot emit", () => {
+    const found = emitted();
+    const stale = CHECKS.map((c) => c.code).filter((c) => !found.has(c)).sort();
+    assert.deepEqual(stale, [], `documented in CHECKS but never emitted: ${stale.join(", ")}`);
+  });
+
+  test("the contract carries the real positions, widgets and codes", () => {
+    const c = siteSystemContract();
+    assert.deepEqual(
+      c.positions.map((p) => p.id).sort(),
+      [...POSITIONS].sort(),
+      "positions in the contract must be the positions checkTemplate accepts",
+    );
+    assert.deepEqual([...c.widgets].sort(), [...WIDGETS].sort());
+    assert.equal(c.checks.length, CHECKS.length);
+    // Serving it means it has to survive JSON — a Set or a Map here would publish `{}`.
+    assert.deepEqual(JSON.parse(JSON.stringify(c)), c);
   });
 });

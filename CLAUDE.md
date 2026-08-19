@@ -69,7 +69,7 @@ markdown on load and re-saves HTML.
    that a layer may only reference names the layer below declares, and the reason it is
    written down is that every violation is SILENT — a misspelled `{{placeholder}}`
    renders empty, a routeless content type stores entries at no URL. `npm run check:site`
-   enforces it; `scripts/site-system.mjs` mirrors the engine's own grammar and there is a
+   enforces it; `functions/_lib/site-system.mjs` mirrors the engine's own grammar and there is a
    test pinning the two together. A content type reaches the web only via its `route`
    block (`scripts/gen-routes.mjs` generates the `.astro`) — never a hand-written page.
 

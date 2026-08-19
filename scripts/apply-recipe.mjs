@@ -19,7 +19,7 @@
 // so validation runs first, over the whole set, and the writes happen at the end.
 import { readFileSync, writeFileSync, mkdirSync, existsSync, readdirSync, statSync } from "node:fs";
 import { join, dirname, relative } from "node:path";
-import { checkTemplate } from "./site-system.mjs";
+import { checkTemplate } from "../functions/_lib/site-system.mjs";
 
 const argv = process.argv.slice(2);
 const recipeDir = argv.find((a) => !a.startsWith("--"));

@@ -5,7 +5,8 @@ it built. `docs/authoring-templates.md` is the syntax of one template; this is t
 composition rule for a whole site — what may reference what, and why a site made of
 correct-looking parts can still be wrong.
 
-The enforcement lives in `scripts/site-system.mjs` and runs as `npm run check:site`.
+The enforcement lives in `functions/_lib/site-system.mjs` (under `functions/` so the MCP
+server can run it too — see "The checker" below) and runs as `npm run check:site`.
 This doc and that file are meant to agree; the file wins.
 
 ## The one rule
@@ -134,6 +135,12 @@ worse than no checker** — it either blesses a broken page or blocks a working 
 back clean, and for each failure it reports, the same markup is rendered through the real
 engine and asserted to actually misbehave.
 
+It lives under `functions/` so the MCP server can refuse a bad template with the same code
+the CLI runs. That costs it two freedoms, both of which break the **deploy** rather than
+the tests (Cloudflare bundles `functions/` with an older esbuild than the local one): no
+dependencies and no node builtins, and no import attributes. Its test stays in `scripts/`
+on purpose — everything under `functions/` is bundled, `*.test.mjs` included.
+
 What it catches, all of it otherwise silent:
 
 | Code | The failure |
@@ -151,6 +158,12 @@ What it catches, all of it otherwise silent:
 Publishing fields (`draft`, `seo`, `template`, `preset`, `slots`) are exempt from
 `unused-field` — they control publishing rather than being printed, and a warning that
 fires forever is a warning nobody reads.
+
+That table is the short version. The full one is the `CHECKS` export — every code with
+the silent failure it stands for — and a test scans the checker's source for emitted
+codes and fails if any is missing from it, so the list cannot rot. `CHECKS` is also what
+`/site-system.json` and the MCP `describe_site_system` tool serve, which is the point:
+what is published cannot disagree with what is enforced.
 
 ## Traps
 

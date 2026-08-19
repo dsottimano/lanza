@@ -13,7 +13,20 @@
 //   A layer may only reference names the layer BELOW it declares.
 //
 // Everything in this file is one of those cross-layer checks. It is pure (no fs) so
-// the CLI (validate-site.mjs), the test suite and — later — the CMS can all run it.
+// the CLI (scripts/validate-site.mjs), the test suite, the Astro build and the MCP
+// server can all run the SAME code — a second implementation would be a second
+// opinion, and the point of the checker is that there is only one.
+//
+// WHY IT LIVES UNDER functions/: an MCP tool has to be able to refuse a bad template,
+// and Cloudflare bundles `functions/` — so the checker has to be reachable from there.
+// That imposes two rules on this file, both of which break the DEPLOY (not the tests)
+// when violated, because Pages builds with an older esbuild than the local one:
+//
+//   * no dependencies, and no node builtins — it must run in the Workers runtime;
+//   * no import attributes (`with { type: "json" }`) anywhere.
+//
+// Its test deliberately stays at scripts/site-system.test.mjs: everything under
+// functions/ is bundled, *.test.mjs included, so a test living here would ship.
 //
 // ⚠️  The template grammar below MIRRORS frontend/lib/template-render.ts. A checker
 // that disagrees with the engine is worse than no checker: it either blesses a broken
@@ -102,14 +115,39 @@ export const BODY_SLOT = "body";
 //            (frontend/lib/collection-routes.ts detailScope)
 //   list   — a routed collection's listing; scope is the listing slots + `entries`
 //            (collection-routes.ts listScope)
-export const POSITIONS = new Set(["page", "detail", "list"]);
-
 /** Names collection-routes.ts adds to a DETAIL template's scope. */
 export const DETAIL_RESERVED = ["url", "slug", "indexUrl"];
 /** Names collection-routes.ts adds to a LIST template's scope, besides `entries`. */
 export const LIST_RESERVED = ["count", "isEmpty"];
 /** Names listScope adds to every item inside {{#each entries}}. */
 export const LIST_ITEM_RESERVED = ["url", "slug"];
+
+// The three positions, with what each one puts in scope. This is the source of
+// truth for BOTH the check (POSITIONS below) and the published contract, so an
+// agent reading /site-system.json is told exactly what checkTemplate enforces.
+export const POSITION_INFO = {
+  page: {
+    scope: "the page's freeform `slots`, as declared by fields.json",
+    reserved: [],
+    note: 'Also gets `body` when fields.json sets "body": true.',
+  },
+  detail: {
+    scope: "one entry's FRONTMATTER — the collection's fields, not the template's slots",
+    reserved: DETAIL_RESERVED,
+    note: "Derived from a collection's `route.template`; never guessed.",
+  },
+  list: {
+    scope: "the listing's own slots, plus `entries`",
+    reserved: [...LIST_RESERVED, "entries"],
+    note:
+      "Each item inside {{#each entries}} also gets " +
+      LIST_ITEM_RESERVED.map((n) => `\`${n}\``).join(" and ") +
+      ". `isEmpty` exists because the engine has no {{else}} — an empty state needs " +
+      "a second, opposite {{#if}}.",
+  },
+};
+
+export const POSITIONS = new Set(Object.keys(POSITION_INFO));
 
 // Fields that exist to CONTROL publishing rather than to be printed. A template is
 // not expected to interpolate them, so they are exempt from the unused-field warning —
@@ -351,6 +389,91 @@ function declaredPaths(shape, prefix = "") {
   return out;
 }
 
+// ── The check registry ───────────────────────────────────────────────────────
+// Every problem code this system can report, and the SILENT failure it stands for.
+// It is a registry rather than a comment because three audiences need the same list:
+// docs/site-system.md's table, /site-system.json, and the MCP `describe_site_system`
+// tool. scripts/site-system.test.mjs scans the source for emitted codes and fails if
+// one is missing here — the codes and their explanations cannot drift apart.
+//
+// `level` is the level the code is reported AT; `failure` is what the reader actually
+// wants to know: what the page does when the check is ignored.
+export const CHECKS = [
+  // Template grammar
+  { code: "unclosed-block", level: "error", failure: "{{#each}}/{{#if}} is never closed — the engine drops everything after it." },
+  { code: "stray-close", level: "error", failure: "A {{/each}} or {{/if}} that closes nothing." },
+  { code: "unknown-loop-var", level: "error", failure: "An @name the engine does not supply (only @index and @number exist)." },
+  { code: "loop-var-outside-each", level: "error", failure: "@index/@number used outside a loop, where they are undefined." },
+  // Cross-layer references
+  { code: "undeclared-slot", level: "error", failure: "A placeholder no enclosing scope declares — renders as empty text, silently." },
+  { code: "each-over-scalar", level: "error", failure: "{{#each}} over something that is not a list of objects — renders nothing." },
+  { code: "unused-field", level: "warning", failure: "An input the owner fills that appears in no template." },
+  // The body slot
+  { code: "body-used-undeclared", level: "error", failure: '{{{ body }}} without "body": true — the CMS hides the canvas, so it is always empty.' },
+  { code: "body-declared-unused", level: "warning", failure: '"body": true with no {{{ body }}} — a writing canvas whose text goes nowhere.' },
+  { code: "raw-non-body", level: "error", failure: "A triple-brace on anything but `body` emits user input UNESCAPED." },
+  // fields.json structure
+  { code: "bad-field", level: "error", failure: "A fields.json entry is not an object." },
+  { code: "bad-field-name", level: "error", failure: "A field name that is not a usable identifier." },
+  { code: "duplicate-field", level: "error", failure: "Two fields share a name — one of them can never be addressed." },
+  { code: "unknown-widget", level: "error", failure: "A widget the CMS renders no input for." },
+  { code: "missing-label", level: "warning", failure: "No label — the CMS shows the raw field name." },
+  { code: "select-without-options", level: "error", failure: "A select with nothing to select." },
+  { code: "object-without-fields", level: "error", failure: "An object widget with no nested shape." },
+  { code: "template-name-mismatch", level: "error", failure: "fields.json `name` disagrees with the folder. A page's `preset` names the FOLDER." },
+  { code: "bad-position", level: "error", failure: "A position outside page/detail/list." },
+  // Listings
+  { code: "listing-undeclared", level: "error", failure: "A list template with no `listing` block — nothing can check what {{#each entries}} prints." },
+  { code: "listing-unknown-field", level: "error", failure: "A listing prints a field its collection does not declare." },
+  { code: "listing-unknown-collection", level: "error", failure: "`listing.of` names a collection that does not exist." },
+  // Whole-site (scripts/validate-site.mjs — needs the filesystem, not just a template)
+  { code: "missing-template", level: "error", failure: "A template folder with no template.html." },
+  { code: "missing-fields", level: "error", failure: "A template folder with no fields.json — the CMS would show no inputs." },
+  { code: "route-template-missing", level: "error", failure: 'A live URL rendering "Unknown template".' },
+];
+
+// ── The published contract ───────────────────────────────────────────────────
+
+/**
+ * The whole composition contract, as data. Served at /site-system.json and returned
+ * by the MCP `describe_site_system` tool, both from HERE — so what is published can
+ * never disagree with what is enforced.
+ *
+ * The audience is an agent that has been pointed at a site it has never seen and has
+ * not read docs/site-system.md. Everything it needs to write a template, declare its
+ * fields and give a content type a URL is in this object.
+ */
+export function siteSystemContract() {
+  return {
+    version: 1,
+    rule: "A layer may only reference names the layer below it declares.",
+    why:
+      "Lanza's composition failures are SILENT: a misspelled {{placeholder}} renders as " +
+      "empty text, a field nobody interpolates is an input filled for nothing, and a " +
+      "content type with no route stores entries at no URL. The build passes and the page " +
+      "is merely wrong, so the rule is checked rather than remembered.",
+    layers: LAYERS,
+    positions: Object.entries(POSITION_INFO).map(([id, p]) => ({ id, ...p })),
+    widgets: [...WIDGETS],
+    nestingWidgets: [...NESTS_VIA_FIELDS],
+    reserved: {
+      body: BODY_SLOT,
+      loopVars: [...LOOP_VARS],
+      publishingFields: [...PUBLISHING_FIELDS],
+      partData: PART_DATA,
+    },
+    checks: CHECKS,
+    notes: [
+      "`template` and `preset` are different things. `template` is the layout variant; " +
+        "`preset` names the folder under templates/, and fields.json's `name` must match it.",
+      "A template's <style> is emitted globally, not scoped. Namespace every class.",
+      "Fields are declared ONCE, in the detail template's fields.json; the collection is " +
+        "derived from it. Typing them twice is how they drift.",
+      "Parts (templates/parts/*.html) have no fields.json — their scope is `reserved.partData`.",
+    ],
+  };
+}
+
 // ── Layer checks ─────────────────────────────────────────────────────────────
 
 /** Structural validation of one fields.json (before it is compared to any markup). */
@@ -545,4 +668,14 @@ export function checkPart(name, html) {
   return problems;
 }
 
-export default { LAYERS, WIDGETS, parseTemplate, shapeOfFields, checkTemplate, checkPart, checkFieldsJson };
+export default {
+  LAYERS,
+  WIDGETS,
+  CHECKS,
+  siteSystemContract,
+  parseTemplate,
+  shapeOfFields,
+  checkTemplate,
+  checkPart,
+  checkFieldsJson,
+};

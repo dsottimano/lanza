@@ -17,7 +17,7 @@ Started 2026-08-15. Last restructured 2026-08-19.
 1. `CLAUDE.md` — project rules. Rule 7 is the site system, rule 6 the review surface,
    rule 4 the CMS + security posture.
 2. `docs/site-system.md` — the composition contract. **The code wins over the doc**;
-   `scripts/site-system.mjs` is the enforcement.
+   `functions/_lib/site-system.mjs` is the enforcement.
 3. This file's `Now` section (below). It is three items and they are in priority order.
 
 Then prove the tree is healthy before changing anything:
@@ -64,7 +64,7 @@ there automatically — see `docs/mcp-server.md`).
 - [ ] **`describe_site_system`** — return the layer model, the positions, the widget list
       and the reserved names, so an agent learns the contract from the server instead of
       being expected to have read a markdown file. `LAYERS`, `POSITIONS`, `WIDGETS`,
-      `PART_DATA` in `scripts/site-system.mjs` are already exported as data for this.
+      `PART_DATA` in `functions/_lib/site-system.mjs` are already exported as data for this.
 - [ ] **`write_template`** — create/replace `templates/<name>/{template.html,fields.json}`,
       **refusing on any checker error**. The refusal is the feature: it is the only way an
       agent finds out it typed `{{ vneue }}`, because the engine renders that as empty
@@ -80,7 +80,7 @@ there automatically — see `docs/mcp-server.md`).
 
 Two constraints that will shape the build, both learned the hard way:
 
-- **The checker has to run inside `functions/`.** It lives in `scripts/site-system.mjs`
+- **The checker has to run inside `functions/`.** It lives in `functions/_lib/site-system.mjs`
   today. Cloudflare bundles all of `functions/` with an **older esbuild** than local, so
   `npm test` passing proves nothing about the deploy — verify with
   `npx wrangler@3.114.17 pages functions build --outdir /tmp/fnbuild` (CLAUDE.md).
@@ -284,7 +284,7 @@ proxies at once**.
 
 The composition contract for agent-built sites. `docs/site-system.md` is authoritative.
 
-- **A cross-layer checker** (`scripts/site-system.mjs`, `npm run check:site`) that mirrors
+- **A cross-layer checker** (`functions/_lib/site-system.mjs`, `npm run check:site`) that mirrors
   the engine's grammar and innermost-out scope resolution rather than approximating them.
   Catches what was silent: undeclared slots, `{{#each}}` over a scalar, unclosed blocks,
   `{{{ }}}` on a non-body slot, dead fields, routes to missing templates.

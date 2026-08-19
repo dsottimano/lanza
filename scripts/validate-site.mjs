@@ -7,7 +7,7 @@
 // warnings. Safe to run any time: it reads, it never writes.
 import { readFileSync, existsSync, readdirSync, statSync } from "node:fs";
 import { join } from "node:path";
-import { checkTemplate, checkPart } from "./site-system.mjs";
+import { checkTemplate, checkPart } from "../functions/_lib/site-system.mjs";
 
 const argv = process.argv.slice(2);
 const opt = (n) => {
