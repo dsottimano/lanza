@@ -39,6 +39,14 @@ every build and any edit is lost.
 
 ## Building a site from a brief
 
+Over MCP the same five steps are `describe_site_system` → `write_template` (detail) →
+`write_template` (listing) → `create_content_type` → `validate_site`. The order matters
+and is not arbitrary: a content type's fields come FROM its detail template, and its
+route NAMES its listing template, so both templates are written first. A listing naming
+a collection that does not exist yet is reported and not refused for exactly that
+reason — otherwise the two requirements deadlock.
+
+
 Someone says *"I want a simple event site."* That is a request for five artifacts that
 only work if they agree. In order:
 
@@ -189,12 +197,11 @@ Honest list of what this does **not** do, so nobody assumes otherwise:
 
 - The CMS does not yet expose the `route` block or `/style-preview/` in its UI — both are
   edited as data (`data/schema.json`, `data/styles.json`) or written by a recipe.
-- An agent connected over MCP can now **read** this contract (`describe_site_system`) and
-  **check** a site against it (`validate_site`), but cannot yet **write** one: no tool
-  creates a content type, a template, a route or a style. That is the remaining gap
-  between this system and the pitch. `write_template` and `create_content_type` also need
-  a `docs/security-model.md` §5 pass first — `data/schema.json` is compiled into code the
-  build imports, so a tool that writes it widens who can reach that position.
+- Over MCP an agent can now read the contract (`describe_site_system`), write a template
+  (`write_template`), add a content type with its route (`create_content_type`) and check
+  its own work (`validate_site`) — the "build me a real estate site" path end to end, with
+  no checkout. A test drives exactly that sequence. What is still missing: no tool offers
+  or sets a **style**, and none applies a whole **recipe** in one atomic step.
 - Taxonomy-style routes for a custom type (an `/events/tag/<x>/` archive) are not
   generated; only the listing and the detail page are.
 - Recipes never delete. Applying one twice refuses rather than merging.

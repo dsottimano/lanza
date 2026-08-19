@@ -510,8 +510,16 @@ export const TOOLS: ToolDef[] = [
       const problems = checkTemplate({ name, html, fields, position }, {
         collections: await collectionFields(client),
       });
+      // A listing naming a collection that does not exist YET is not a refusal here.
+      // The natural build order is detail template → listing template → content type
+      // (the type's fields come from the detail template, and its route names the
+      // listing), so a strict check on both sides deadlocks: the listing cannot be
+      // written before the type, and the type's route cannot name a listing that does
+      // not exist. Safe to defer — a template nothing routes to renders at no URL, and
+      // create_content_type re-checks the whole model before it grants one.
+      const deferred = problems.filter((p) => p.code === "listing-unknown-collection");
       // Two independent reasons to refuse, reported together so one call fixes both.
-      const errors = problems.filter((p) => p.level === "error");
+      const errors = problems.filter((p) => p.level === "error" && p.code !== "listing-unknown-collection");
       const unsafe = problems.filter((p) => UNTRUSTED_AUTHOR_CODES.has(p.code));
       if (errors.length || unsafe.length) {
         throw new GitHubError(
@@ -535,13 +543,18 @@ export const TOOLS: ToolDef[] = [
         `Write fields for template ${name} via MCP`,
       );
 
-      const warnings = problems.filter((p) => p.level === "warning" && !UNTRUSTED_AUTHOR_CODES.has(p.code));
+      const warnings = [
+        ...problems.filter((p) => p.level === "warning" && !UNTRUSTED_AUTHOR_CODES.has(p.code)),
+        ...deferred,
+      ];
       return {
         written: [`${dir}/template.html`, `${dir}/fields.json`],
         position,
         ...(warnings.length ? { warnings: warnings.map((p) => `[${p.code}] ${p.message}`) } : {}),
-        next:
-          position === "page"
+        next: deferred.length
+          ? "That collection does not exist yet — call create_content_type to create it, " +
+            "then validate_site to confirm the listing resolves."
+          : position === "page"
             ? "Set a page's `preset` to this template name to use it."
             : "Give a collection a `route` block naming this template so its entries get URLs.",
         ...stagedNote(site),
