@@ -1,66 +1,70 @@
 ---
-title: "Home"
+title: Home
 draft: false
-template: "landing"
-preset: "manifesto"
+template: landing
+preset: manifesto
 slots:
-  tag: "BETA · OWN YOUR PRESENCE · NOT RENTED"
-  headline: "Own your presence on the web."
-  sub: "You can post on social media all day and own none of it. Your writing, your audience, gone the day the platform is done with you. Lanza gives you a real site instead: a folder of files on GitHub, served free by Cloudflare, and edited by talking to ChatGPT or Claude. You keep a copy of everything."
-  cta1: "Start your site"
-  cta1Url: "https://connect.lanzacms.com/"
-  cta2: "How it works"
-  cta2Url: "/how-it-works"
-  demoYouWho: "you"
-  demoYou: "I run a violin repair shop in Toronto. I want a page for each service I offer, with the price and how long it takes, and a page listing them all."
-  demoAgentWho: "chatgpt"
-  demoAgent: "Built the service pages, the listing and the menu link, and put it all on your draft site. Take a look before it goes live."
-  demoCaption: "A real session. You connect ChatGPT or Claude to your site once, then you talk to it."
-  spineEyebrow: "The life of an edit"
-  spineHeadline: "One sentence in. A live page out."
+  tag: dfghgfddgfBETA · OWN YOUR PRESENCE · NOT RENTED
+  headline: Own your presence on the web.
+  sub: 'You can post on social media all day and own none of it. Your writing, your audience, gone the day the platform is done with you. Lanza gives you a real site instead: a folder of files on GitHub, served free by Cloudflare, and edited by talking to ChatGPT or Claude. You keep a copy of everything.'
+  cta1: Start your site
+  cta1Url: https://connect.lanzacms.com/
+  cta2: How it works
+  cta2Url: /how-it-works
+  demoYouWho: you
+  demoYou: I run a violin repair shop in Toronto. I want a page for each service I offer, with the price and how long it takes, and a page listing them all.
+  demoAgentWho: chatgpt
+  demoAgent: Built the service pages, the listing and the menu link, and put it all on your draft site. Take a look before it goes live.
+  demoCaption: A real session. You connect ChatGPT or Claude to your site once, then you talk to it.
+  spineEyebrow: The life of an edit
+  spineHeadline: One sentence in. A live page out.
   steps:
-    - label: "You connect"
-      svc: "one address"
-      body: "Add your site to ChatGPT or Claude as a connector. You approve it with GitHub, once."
-    - label: "You ask"
-      svc: "plain language"
-      body: "Say what the site should be, in any language. No forms, no fields, no template to choose."
-    - label: "It writes"
-      svc: "git commit"
-      body: "Your assistant edits your repository and saves every change as a commit you can undo."
-    - label: "It builds"
-      svc: "cloudflare pages"
-      body: "Cloudflare rebuilds the site from those files and serves it worldwide, free."
-    - label: "You decide"
-      svc: "draft first"
-      body: "Every change waits on a draft copy of the site. Nothing is public until you publish it."
-  doorsEyebrow: "Three ways in"
-  doorsHeadline: "Built for whoever's holding the keyboard."
+    - label: You connect
+      svc: one address
+      body: Add your site to ChatGPT or Claude as a connector. You approve it with GitHub, once.
+    - label: You ask
+      svc: plain language
+      body: Say what the site should be, in any language. No forms, no fields, no template to choose.
+    - label: It writes
+      svc: git commit
+      body: Your assistant edits your repository and saves every change as a commit you can undo.
+    - label: It builds
+      svc: cloudflare pages
+      body: Cloudflare rebuilds the site from those files and serves it worldwide, free.
+    - label: You decide
+      svc: draft first
+      body: Every change waits on a draft copy of the site. Nothing is public until you publish it.
+  doorsEyebrow: Three ways in
+  doorsHeadline: Built for whoever's holding the keyboard.
   cards:
-    - who: "You just want a site"
-      body: "No code and no jargon. Type a name, click through GitHub and Cloudflare, and you have a real site in about half an hour. See what it costs and how to start."
-      cta: "Get started"
-      href: "/start"
-    - who: "You're a developer"
-      body: "Astro, Git and Cloudflare Pages. No database, no server, no lock-in. Read the source, fork it, host it yourself, or point your own agent at the MCP server."
-      cta: "See the stack"
-      href: "/how-it-works"
-    - who: "You're an agent"
-      body: "A documented tool surface and a written contract: content types, page templates, routes, and a validator that tells you when what you built does not hold together."
-      cta: "Read the contract"
-      href: "/agents"
-  ownEyebrow: "Owned · secure · yours to leave"
-  ownHeadline: "Yours to keep. Yours to leave."
-  ownBody: "Your site is a folder of files you own, served by Cloudflare. There is no database and no server, which are the two things that usually get hacked, so there is almost nothing to attack. Every change is a commit, so nothing is altered quietly and anything can be undone. It is a real site on the open web, so people and search engines can find it. And the whole thing is open source: read the code before you trust it, and take your files with you if you ever want to leave."
+    - who: You just want a site
+      body: No code and no jargon. Type a name, click through GitHub and Cloudflare, and you have a real site in about half an hour. See what it costs and how to start.
+      cta: Get started
+      href: /start
+    - who: You're a developer
+      body: Astro, Git and Cloudflare Pages. No database, no server, no lock-in. Read the source, fork it, host it yourself, or point your own agent at the MCP server.
+      cta: See the stack
+      href: /how-it-works
+    - who: You're an agent
+      body: 'A documented tool surface and a written contract: content types, page templates, routes, and a validator that tells you when what you built does not hold together.'
+      cta: Read the contract
+      href: /agents
+  ownEyebrow: Owned · secure · yours to leave
+  ownHeadline: Yours to keep. Yours to leave.
+  ownBody: 'Your site is a folder of files you own, served by Cloudflare. There is no database and no server, which are the two things that usually get hacked, so there is almost nothing to attack. Every change is a commit, so nothing is altered quietly and anything can be undone. It is a real site on the open web, so people and search engines can find it. And the whole thing is open source: read the code before you trust it, and take your files with you if you ever want to leave.'
   tiles:
-    - value: "$0"
-      label: "to build, host and run"
-    - value: "~$12"
-      label: "a year for your domain, the only cost"
-    - value: "~30 min"
-      label: "from zero to a live site"
-  closeHeadline: "Throw your first page."
-  closeSub: "The web is filling up with machines. It needs more real human voices, and yours, owned outright, is one sentence away."
-  closeCta: "Start your site"
-  closeCtaUrl: "https://connect.lanzacms.com/"
+    - value: $0
+      label: to build, host and run
+    - value: ~$12
+      label: a year for your domain, the only cost
+    - value: ~30 min
+      label: from zero to a live site
+  closeHeadline: Throw your first page.
+  closeSub: The web is filling up with machines. It needs more real human voices, and yours, owned outright, is one sentence away.
+  closeCta: Start your site
+  closeCtaUrl: https://connect.lanzacms.com/
+seo: {}
+blocks: []
 ---
+
+<p></p>
