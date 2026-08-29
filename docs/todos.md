@@ -12,6 +12,78 @@ Started 2026-08-15. Last restructured 2026-08-19.
 
 ---
 
+## Where things stand, end of 2026-08-29 — the sovereignty release
+
+**Shipped and deployed to both `lanzacms.com` and `connect.lanzacms.com`.** Dave's
+bar: *"a lanza-cms user cannot be compromised by the broker. Once they install, it's
+theirs."* `docs/release-plan.md` states it as five tests; `docs/security-model.md` I3
+is the invariant and is now **current** rather than mid-migration.
+
+### What changed, in one list
+
+- **The broker holds nothing that can reach a finished tenant.** Deleted:
+  `GH_APP_PRIVATE_KEY` (could mint Contents:write on every installed repo),
+  `HANDOFF_PRIVATE_KEY`, `/api/token`, the fan-out, the MCP OAuth authorization
+  server, the multi-site MCP router, `auth/callback.ts`, `handoff.ts`, and the whole
+  App-JWT half of `gh-app.ts`. Six env vars remain there, all onboarding OAuth.
+- **A tenant now needs ZERO variables.** `lanzacms.com`'s Pages project has none.
+  `adminLogin`/`editors` are gone from `lanza.config.json`; the role is
+  `permissions` on the repo, asked of GitHub and cached 60s.
+- **MCP moved to a second GitHub App, `lanza-agents`** (Contents-only, user-token
+  expiry OFF). The owner pastes their own `ghu_` from Settings → Connect an agent.
+  Device flow cannot be an OAuth AS: no redirect, and GitHub has no PKCE.
+- **Sign out exists.** There was no button, and the endpoint behind it had been a
+  no-op since the device-flow cutover.
+- **People is a link to GitHub's collaborator settings.** The old list could
+  disagree with who can really write the repo, and removing someone from it did not
+  remove their access.
+- **`scripts/check-floor.mjs` replaces the fan-out.** `lanza build` refuses below the
+  `critical` dist-tag and the CMS blocks Publish for the same reason. Fails OPEN on
+  anything ambiguous.
+
+### Two corrections that cost real time — do not re-derive them
+
+1. **Uninstalling the App does not work.** A GitHub App's user-to-server token only
+   reaches repos the App is installed on, so the tenant's own sign-in depends on that
+   install. The App stays; the private key goes.
+2. **GitHub keeps a floor of one private key and one client secret.** You cannot
+   delete the last of either. The goal is therefore "no copy outside GitHub", reached
+   by generating a new one, deleting the old, and deleting the downloaded `.pem`.
+
+### Open, from this session
+
+- [ ] **Re-run a full onboarding as datadefine.** `setup.ts` and `setTenantConfig`
+      both changed. `testdelete` was mid-flight when the session ended; whether it
+      reaches its own `/admin` is the actual test.
+- [ ] **Drive MCP against `dmg` or `ai-panama`** with a pasted `lanza-agents` token,
+      end to end. Never against lanzacms.com.
+- [ ] **An error fired in the wizard and could not be read** (fixed in `2de1557`, but
+      the underlying error was never identified). If it recurs it will now stay on
+      screen. `install_incomplete` is the one to watch, since `setup.ts` no longer
+      verifies the install.
+- [ ] **Rotate** the exploratory Cloudflare API token and the broker
+      `OAUTH_CLIENT_SECRET` (both were pasted in earlier sessions), and point the
+      bot's `GITHUB_TOKEN` at `staging`.
+- [ ] **`npx` is intercepted here and fails silently** — `npx tsc` / `npx vue-tsc`
+      are rewritten to `npm run` and can exit 0 having checked nothing. Call the
+      binary: `node node_modules/typescript/bin/tsc --noEmit -p tsconfig.json`,
+      `node node_modules/vue-tsc/bin/vue-tsc.js --noEmit`.
+
+### Shipping a CMS update, now that nothing pushes
+
+```sh
+npm version patch && npm publish        # Dave's OTP; the machine cannot publish
+npm dist-tag add lanza-site@<v> stable
+npm dist-tag add lanza-site@<v> critical   # security releases ONLY
+```
+
+Tenants take it themselves from /admin → Software. **Before publishing, build a real
+tenant against the packed tarball** (`npm pack`, install into `../laperle-site`,
+`lanza build`) — `npm test` cannot see the tenant-only build trap that broke every
+site on 0.1.12.
+
+---
+
 ## Where things stand, end of 2026-08-19
 
 The demo happened. Everything below is the state a fresh session inherits.
@@ -107,7 +179,9 @@ tenant checkout above is a THIRD check that neither of the other two makes.
 ## Starting cold? Read these, in this order
 
 1. `CLAUDE.md` — project rules. Rule 7 is the site system, rule 6 the review surface,
-   rule 4 the CMS + security posture.
+   rule 4 the CMS, and **rule 5 the bar: nothing we run may hold a key to a
+   customer's site.** `docs/security-model.md` is current and authoritative;
+   `docs/security-todo.md` is history now, not a work list.
 2. `docs/site-system.md` — the composition contract. **The code wins over the doc**;
    `functions/_lib/site-system.mjs` is the enforcement.
 3. `docs/mcp-server.md` — the 20 tools, and which ones exist to close the gap above.
@@ -116,7 +190,7 @@ tenant checkout above is a THIRD check that neither of the other two makes.
 Then prove the tree is healthy before changing anything:
 
 ```sh
-npm test            # 291 function + 313 admin, all green
+npm test            # 305 function + 308 admin, all green
 npm run check:site  # 1 template dir, 0 errors, 0 warnings
 node bin/lanza.mjs build   # 15 pages + /llms.txt + /site-system.json
 npx wrangler@3.114.17 pages functions build --outdir /tmp/fnbuild   # must compile
