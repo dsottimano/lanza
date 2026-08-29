@@ -237,7 +237,7 @@ export function useHealthChecks(github: GitHubClient) {
   async function checkGithub(): Promise<void> {
     githubCard.loading = true;
     try {
-      const login = await github.getLogin();
+      const { login } = await github.getIdentity();
       proxies.gh = true;
       githubCard.state = "ok";
       githubCard.login = login;

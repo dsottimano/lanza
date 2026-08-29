@@ -10,7 +10,6 @@
 import { test } from "node:test";
 import assert from "node:assert/strict";
 import {
-  resolveRole,
   roleFromPermissions,
   roleMayWrite,
   editorMayCall,
@@ -21,38 +20,6 @@ const POLICY = { workingBranch: "staging", productionBranch: "main" };
 const may = (method, path, body = null) => editorMayCall(method, path, body, POLICY);
 
 // ── role resolution ─────────────────────────────────────────────────────────
-
-test("owner and editor lists resolve, and an unknown login gets nothing", () => {
-  assert.equal(resolveRole("dsottimano", "dsottimano", []), "owner");
-  assert.equal(resolveRole("alice", "dsottimano", ["alice"]), "editor");
-  assert.equal(resolveRole("mallory", "dsottimano", ["alice"]), null);
-});
-
-test("logins are case-insensitive, like the rest of the gate", () => {
-  assert.equal(resolveRole("DSottimano", "dsottimano", []), "owner");
-  assert.equal(resolveRole("ALICE", "dsottimano", ["Alice"]), "editor");
-});
-
-test("adminLogin still accepts the comma-list form", () => {
-  assert.equal(resolveRole("bob", "dsottimano, bob", []), "owner");
-});
-
-test("owner wins when a login is in both lists — being an editor never demotes", () => {
-  assert.equal(resolveRole("dsottimano", "dsottimano", ["dsottimano"]), "owner");
-});
-
-test("empty, missing and malformed lists admit nobody", () => {
-  assert.equal(resolveRole("alice", "", []), null);
-  assert.equal(resolveRole("alice", undefined, undefined), null);
-  assert.equal(resolveRole("alice", "dsottimano", [null, 42, {}]), null);
-  assert.equal(resolveRole("", "dsottimano", []), null);
-  assert.equal(resolveRole(null, "dsottimano", []), null);
-});
-
-test("a whitespace-only entry does not become a wildcard", () => {
-  assert.equal(resolveRole("   ", "dsottimano", ["  "]), null);
-  assert.equal(resolveRole("alice", "  ,  ", []), null);
-});
 
 // ── publishing ──────────────────────────────────────────────────────────────
 

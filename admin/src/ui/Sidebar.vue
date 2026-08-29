@@ -30,6 +30,7 @@ const props = defineProps<{
   updatesOpen: boolean;
   contentTypesOpen: boolean;
   peopleOpen: boolean;
+  agentOpen: boolean;
   // Owner chrome. Publish, settings and hosting are structurally absent for an
   // editor rather than disabled — a greyed-out control that will never enable is
   // just a question the UI refuses to answer. Defaults to false so the rail is
@@ -50,6 +51,7 @@ const emit = defineEmits<{
   (e: "updates"): void;
   (e: "contentTypes"): void;
   (e: "people"): void;
+  (e: "agent"): void;
   (e: "publish"): void;
   (e: "pending"): void;
   (e: "help"): void;
@@ -114,7 +116,7 @@ const structureActive = computed(
   () => props.contentTypesOpen || props.languagesOpen || props.activeSettings !== null,
 );
 const siteActive = computed(
-  () => props.peopleOpen || props.healthOpen || props.updatesOpen,
+  () => props.peopleOpen || props.agentOpen || props.healthOpen || props.updatesOpen,
 );
 const activeGroup = computed<GroupId | null>(() => {
   if (designActive.value) return "design";
@@ -292,6 +294,9 @@ const itemActive = "nav-item--active";
             <div class="group-body__inner flex flex-col gap-0.5">
               <button :class="[item, peopleOpen ? itemActive : '']" @click="emit('people')">
                 People
+              </button>
+              <button v-if="isOwner" :class="[item, agentOpen ? itemActive : '']" @click="emit('agent')">
+                Connect an agent
               </button>
               <button :class="[item, healthOpen ? itemActive : '']" @click="emit('health')">
                 Site health

@@ -108,7 +108,7 @@ describe("theme bundles are confined to the design file set", () => {
     ["astro.config.mjs", "process.exit(0)"],
     // Decides who owns /admin. A persistent AUTHORIZATION change: the CMS, the
     // GitHub proxy and the Cloudflare token, handed over on the next deploy.
-    ["lanza.config.json", '{"adminLogin":"attacker"}'],
+    ["lanza.config.json", '{"owner":"attacker","name":"evil"}'],
     // Not design, and nothing else validates it on the way in.
     ["data/redirects.json", '{"redirects":[]}'],
     ["README.md", "# hi"],

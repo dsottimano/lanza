@@ -9,18 +9,18 @@
 //             most — may not edit the file that says who is an owner.
 //   viewer  — reads /admin, writes nothing.
 //
-// WHERE A ROLE COMES FROM is mid-migration (docs/security-todo.md §10.8). GitHub's
-// own `permissions` booleans are the answer (roleFromPermissions, below); the list
-// lookup in resolveRole is the outgoing path, still live for anyone holding a
-// broker-signed session, and deleted in phase 4. Everything BELOW that point — what
-// each role may actually do — is shared by both and does not change.
+// WHERE A ROLE COMES FROM: GitHub's own `permissions` booleans, and nowhere else
+// (roleFromPermissions, below). There used to be a second source — `adminLogin` and
+// `editors` lists in lanza.config.json — and it was deleted rather than kept as a
+// fallback: two answers to "may this person write" can disagree, and the list was
+// the one that could say yes after GitHub said no.
 //
-// The gate in functions/admin/_middleware.ts decides IDENTITY (a valid broker
-// signature) and then ROLE (this module). Both proxies under /admin/api then ask
-// this module again per request, because identity alone has never been
-// authorization here (security-model.md I1) and a role is no different: the
-// middleware admits an editor to /admin, and it is these checks — not that
-// admission — that stop the editor from publishing.
+// The gate in functions/admin/_middleware.ts decides IDENTITY (whose GitHub token
+// this is) and then ROLE (this module). Both proxies under /admin/api then ask this
+// module again per request, because identity alone has never been authorization
+// here (security-model.md I1) and a role is no different: the middleware admits an
+// editor to /admin, and it is these checks — not that admission — that stop the
+// editor from publishing.
 //
 // IMPORTANT: an editor is a lesser role, not an untrusted one. They can write your
 // content. This bounds what a compromised or careless editor reaches; it is not a
@@ -63,36 +63,8 @@ export function roleMayWrite(role: Role): boolean {
   return role !== "viewer";
 }
 
-/** Parse a comma list (the `adminLogin` form) or an array (the `editors` form). */
-function loginSet(value: unknown): Set<string> {
-  const raw =
-    typeof value === "string"
-      ? value.split(",")
-      : Array.isArray(value)
-        ? value.filter((v): v is string => typeof v === "string")
-        : [];
-  return new Set(raw.map((s) => s.trim().toLowerCase()).filter(Boolean));
-}
-
-/**
- * The role this login holds, or null if none. Owner wins when a login appears in
- * both lists — a demotion has to be an explicit removal from `adminLogin`, never a
- * side effect of also being listed as an editor.
- */
-export function resolveRole(
-  login: string | null | undefined,
-  adminLogin: unknown,
-  editors: unknown,
-): Role | null {
-  if (typeof login !== "string" || !login) return null;
-  const who = login.toLowerCase();
-  if (loginSet(adminLogin).has(who)) return "owner";
-  if (loginSet(editors).has(who)) return "editor";
-  return null;
-}
-
 // The only paths an editor may WRITE. Everything else in the repo — lanza.config.json
-// (who is an owner), data/*.json (settings, the content model, redirects, menus),
+// (which repo this is), data/*.json (settings, the content model, redirects, menus),
 // templates/, themes/, and every build file — is owner-only.
 //
 // Trailing slashes are load-bearing: "content/" must not admit "contentious.md",

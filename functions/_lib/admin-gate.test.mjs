@@ -33,14 +33,17 @@ async function gate(path, { cookie } = {}) {
 }
 
 test("the auth exemption is an exact set, not a prefix", () => {
-  assert.ok(isAuthExempt("/admin/api/auth/login"));
-  assert.ok(isAuthExempt("/admin/api/auth/handoff"));
   assert.ok(isAuthExempt("/admin/api/auth/logout"));
   // The device-flow sign-in (docs/security-todo.md §10.1).
   assert.ok(isAuthExempt("/admin/api/auth/device/start"));
   assert.ok(isAuthExempt("/admin/api/auth/device/poll"));
-  // One trailing slash is tolerated so a stray link still starts a login.
-  assert.ok(isAuthExempt("/admin/api/auth/login/"));
+  // One trailing slash is tolerated so a stray link still works.
+  assert.ok(isAuthExempt("/admin/api/auth/logout/"));
+  // Deleted with the broker session family (docs/release-plan.md §4). They must not
+  // linger as exemptions: an exempt path that routes to nothing is a hole waiting
+  // for the next file added at that name.
+  assert.ok(!isAuthExempt("/admin/api/auth/login"));
+  assert.ok(!isAuthExempt("/admin/api/auth/handoff"));
 
   // Everything that merely LOOKS like it lives under the auth prefix.
   assert.ok(!isAuthExempt("/admin/api/auth/"));
@@ -163,22 +166,17 @@ test("a garbage session cookie is refused — a bearer is not a session", async 
   assert.equal(reached, false);
 });
 
-// REPORTED FROM PRODUCTION, 2026-08-15. Phase 2 accepted the broker session so that
-// adding a way in did not close one; phase 3 then took the mint off the runtime
-// path, and the session could no longer DO anything. The combination admitted a
-// browser into a CMS where every call 401s — and an empty content list renders the
-// ONBOARDING WIZARD, on a site that has content. The gate is where that is fixed:
-// a credential that cannot work must be refused, because only a refusal says
-// "sign in".
-test("a browser holding only the broker session is not admitted, and the cookie is dropped", async () => {
-  // Any lanza_session value: the gate no longer verifies one, so a real signature
-  // would fare no better. That is the point of the test.
+// REPORTED FROM PRODUCTION, 2026-08-15, and now permanent. The broker session was a
+// second way in until phase 4 deleted the family outright; a browser still holding
+// one must be refused, because a credential that cannot work is worse than none —
+// the CMS loads, every call 401s, and an empty content list renders the ONBOARDING
+// WIZARD on a site that has content. Only a refusal says "sign in".
+test("a browser holding only the broker session is not admitted", async () => {
+  // Any lanza_session value: nothing verifies one anywhere any more, so a real
+  // signature would fare no better. That is the point of the test.
   const nav = await gate("/admin/", { cookie: "lanza_session=looks.legit.enough" });
   assert.equal(nav.reached, false, "the SPA must not load — that is the broken state");
   assert.match(await nav.res.text(), /Get a sign-in code/);
-  const cleared = nav.res.headers.getSetCookie().join("; ");
-  assert.match(cleared, /lanza_session=;/);
-  assert.match(cleared, /Max-Age=0/);
 
   // Cloudflare in particular: that proxy authorizes nothing itself and attaches an
   // ACCOUNT-scoped token (I1), so until this change the 7-day unrevocable session
@@ -188,8 +186,12 @@ test("a browser holding only the broker session is not admitted, and the cookie 
   assert.equal(cf.reached, false);
 });
 
-test("the three login endpoints still pass through unauthenticated", async () => {
-  for (const path of ["/admin/api/auth/login", "/admin/api/auth/handoff", "/admin/api/auth/logout"]) {
+test("the sign-in endpoints still pass through unauthenticated", async () => {
+  for (const path of [
+    "/admin/api/auth/logout",
+    "/admin/api/auth/device/start",
+    "/admin/api/auth/device/poll",
+  ]) {
     const { res, reached } = await gate(path);
     assert.equal(reached, true, path);
     assert.equal(res.status, 200, path);
@@ -198,7 +200,7 @@ test("the three login endpoints still pass through unauthenticated", async () =>
 
 test("every /admin response carries the security headers, refusals included", async () => {
   const cases = [
-    await gate("/admin/api/auth/login"), // exempt pass-through
+    await gate("/admin/api/auth/logout"), // exempt pass-through
     await gate("/admin/api/cf/accounts"), // 401
     await gate("/admin/"), // the sign-in screen
     await gate("/admin/api/auth/..%2fcf/x"), // malformed

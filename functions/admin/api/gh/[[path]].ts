@@ -55,14 +55,17 @@ export const onRequest = async (context: {
   const subPath = Array.isArray(seg) ? seg.join("/") : (seg ?? "");
 
   // GET /user — answered here rather than forwarded. The gate has already asked
-  // GitHub who this is, so passing it upstream would buy a second round-trip for an
-  // answer we already hold. There is no longer a second source: the gate admits
-  // nobody without a GitHub token, so if `login` is absent, nothing else here knows
-  // it either.
+  // GitHub who this is AND what they may do on this repo, so passing it upstream
+  // would buy a second round-trip for an answer we already hold. It is also the
+  // CMS's only source for the role: there is no list of people in the repo to read
+  // any more, so the UI asks the same thing the gate asked GitHub. `repo` rides
+  // along because the SPA is built tenant-agnostic and deliberately does not know
+  // which repository it edits — but People has to link to that repo's collaborator
+  // settings, which is where access is now granted.
   if (request.method === "GET" && subPath.replace(/[?#].*$/, "").replace(/^\/+/, "") === "user") {
     const login = context.data?.login;
     if (!login) return json(401, { message: "Not authenticated." });
-    return json(200, { login });
+    return json(200, { login, role, repo: `${repo.owner}/${repo.name}` });
   }
 
   // Enforce the method+path allowlist BEFORE attaching a token: only the endpoints
@@ -115,11 +118,10 @@ export const onRequest = async (context: {
     }
   }
 
-  // The person's own token, from the gate. A browser that got in on the outgoing
-  // RS256 session has none — it is a credential for OUR broker, not for GitHub, and
-  // there is nothing left here to trade it for. Say "sign in", not "server error":
-  // one device code fixes it, and 401 is what the SPA already reads as an auth
-  // problem. (Deleted along with that family in phase 4.)
+  // The person's own token, from the gate. It is the only credential this proxy has
+  // ever to send: there is no mint and no standing PAT behind it, so an absent token
+  // is "sign in", not "server error" — one device code fixes it, and 401 is what the
+  // SPA already reads as an auth problem.
   const token = context.data?.token;
   if (!token) {
     return json(401, { message: "Sign in with GitHub again to edit this site." });

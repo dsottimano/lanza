@@ -120,12 +120,13 @@ const stripLead = (p: string) => p.replace(/^\.\//, "");
 //                         file's `build` script, so that is direct build execution,
 //                         and it also defeats the CMS's unsafe-version blocking.
 //   - astro.config.mjs  → imported by the build → build-time code execution.
-//   - lanza.config.json → decides who owns /admin (functions/admin/_middleware.ts
-//                         reads `adminLogin` from it). A theme shipping
-//                         "adminLogin":"attacker" hands over the CMS, the GitHub
-//                         proxy and the Cloudflare token on the next deploy. That is
-//                         a persistent AUTHORIZATION change, categorically worse
-//                         than the build-time execution a theme already implies.
+//   - lanza.config.json → names the repository every /admin request is authorized
+//                         against and proxied to (functions/admin/_middleware.ts and
+//                         the gh proxy both import it). A theme shipping another
+//                         owner/name repoints the gate and the proxy at a repo the
+//                         attacker controls on the next deploy. That is a persistent
+//                         AUTHORIZATION change, categorically worse than the
+//                         build-time execution a theme already implies.
 //   - data/schema.json  → compiled into build code by scripts/gen-content-config.mjs.
 //
 // data/schema.json stays IN the allow-list: shipping a content model is a real

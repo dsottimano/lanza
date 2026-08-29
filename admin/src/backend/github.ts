@@ -85,9 +85,24 @@ export class GitHubClient {
   }
 
   /** Validate the token and return the authenticated login. */
-  async getLogin(): Promise<string> {
-    const user = (await this.req("/user")) as { login: string };
-    return user.login;
+  /**
+   * Who is signed in, and what GitHub says they may do on this repo. Both come from
+   * the proxy's own answer rather than from GitHub directly: the gate already asked
+   * (`GET /repos/{owner}/{name}` → `permissions`), and asking twice would give the
+   * UI a second, drifting source for the one question that decides what it offers.
+   */
+  async getIdentity(): Promise<{
+    login: string;
+    role: "owner" | "editor" | "viewer" | null;
+    repo: string | null;
+  }> {
+    const user = (await this.req("/user")) as { login: string; role?: string; repo?: string };
+    const role = user.role;
+    return {
+      login: user.login,
+      role: role === "owner" || role === "editor" || role === "viewer" ? role : null,
+      repo: typeof user.repo === "string" ? user.repo : null,
+    };
   }
 
   private contentsUrl(p: string, withRef = true, ref: string = REPO.branch): string {
