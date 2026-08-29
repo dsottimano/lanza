@@ -3,7 +3,9 @@
 The running work list. Deeper lists live in their own files and are linked from here
 rather than copied — `security-todo.md` (the auth migration, phase by phase),
 `cms-review-todo.md` (~25 verified defects in `admin/`), `site-system.md` (the
-composition contract itself), `mcp-server.md` (the tool surface).
+composition contract itself), `mcp-server.md` (the tool surface),
+`matrix_agents.md` (how the lead session opens tmux worktree terminals and drives
+the agents in them).
 
 **Ordering:** `Now` is what is actually next and why. Everything under `Open` is real
 but unscheduled. The shipped log is at the bottom — it is context, not work.
@@ -52,11 +54,19 @@ is the invariant and is now **current** rather than mid-migration.
 
 ### Open, from this session
 
-- [ ] **Re-run a full onboarding as datadefine.** `setup.ts` and `setTenantConfig`
-      both changed. `testdelete` was mid-flight when the session ended; whether it
-      reaches its own `/admin` is the actual test.
-- [ ] **Drive MCP against `dmg` or `ai-panama`** with a pasted `lanza-agents` token,
-      end to end. Never against lanzacms.com.
+- [x] **Re-run a full onboarding as datadefine.** Done 2026-08-29, clean end to end
+      on the changed `setup.ts` / `setTenantConfig`. Result:
+      `https://mcp-test2-621d7240cc37.pages.dev/` — site 200, its own `/admin` 200,
+      and `/api/mcp` 401 unauthenticated, which is the gate working. Zero tenant
+      variables, as designed.
+- [ ] **Redesign the CMS UI off the stock look.** Not started; the parallel setup
+      for it is built and tested (`docs/matrix_agents.md` — `lz` opens a tmux window
+      per worktree with a Claude and a dev server in each). First step is a SINGLE
+      session on `admin/src/styles.css` + the `ui/` primitives, merged to `main`
+      before any fan-out.
+- [ ] **Drive MCP against `mcp-test2`** (or `dmg` / `ai-panama`) with a pasted
+      `lanza-agents` token, end to end. Never against lanzacms.com. `mcp-test2` is
+      the freshest target: `https://mcp-test2-621d7240cc37.pages.dev/api/mcp`.
 - [ ] **An error fired in the wizard and could not be read** (fixed in `2de1557`, but
       the underlying error was never identified). If it recurs it will now stay on
       screen. `install_incomplete` is the one to watch, since `setup.ts` no longer
