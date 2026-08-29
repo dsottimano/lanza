@@ -7,6 +7,7 @@
 import { computed, reactive, watch } from "vue";
 import { COLLECTIONS, type FolderCollection, type FileEntry } from "../schema";
 import { versionState, updateAvailable, securityUpdateRequired } from "../backend/version";
+import { access } from "../backend/access";
 
 // The running version sits in the footer permanently: "what am I on" should never
 // require hunting for a panel. It turns into a prompt only when there's something
@@ -336,6 +337,19 @@ const itemActive = "nav-item--active";
       >
         <span aria-hidden="true">📖</span> Guide
       </button>
+
+      <!-- Signing out is a plain link, not a fetch: the endpoint answers with a
+           302 and three expired cookies, and letting the browser follow it is what
+           makes the cookies actually land. It also has to be reachable when the
+           SPA's own calls are failing, which is exactly when someone wants it. -->
+      <a
+        v-if="access.login"
+        class="nav-item flex items-center gap-1.5"
+        href="/admin/api/auth/logout"
+      >
+        <span aria-hidden="true">🔑</span> Sign out
+        <span class="ml-auto truncate text-xs text-zinc-500">{{ access.login }}</span>
+      </a>
 
       <button
         v-if="runningVersion"
