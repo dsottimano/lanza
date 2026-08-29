@@ -2,6 +2,11 @@
 // for every Lanza site — baked into the template so a generated repo needs no manual
 // setup to sign in. An env var of the same name overrides.
 //
+// Verified empty 2026-08-29: the lanzacms.com Pages project now carries ZERO
+// variables. Every one it had (ADMIN_LOGIN, GH_APP_ID, GH_APP_PRIVATE_KEY,
+// GITHUB_CLIENT_ID, GITHUB_CLIENT_SECRET, SESSION_SECRET) belonged to a design that
+// no longer exists, and a tenant needs none of them to work.
+//
 // Per-tenant identity (owner/name) is NOT here — it lives in the repo-root
 // lanza.config.json, which the onboarding broker writes per tenant at repo creation.
 // Keeping it out of functions/ lets the whole dir ship as pure lanza-site code.
