@@ -40,8 +40,13 @@ signed-in person's own device-flow token.
 
 ## 3. The decision
 
-**Uninstall the App at the end of onboarding.** The broker keeps `GH_APP_PRIVATE_KEY`
-to create the repo and install once; it retains nothing afterwards.
+**Delete `GH_APP_PRIVATE_KEY` from the broker**, and every consumer of it.
+
+The first idea was to uninstall the App at the end of onboarding, and it was wrong:
+a GitHub App's user-to-server token only reaches repositories the App is installed
+on, so a tenant's own device-flow sign-in DEPENDS on that install. The App stays
+installed. What goes is anyone holding a key that can act *as* the App rather than
+as a person - device flow needs only the public `client_id`.
 
 Fanout dies with it. That is the cost, stated plainly:
 
@@ -63,13 +68,17 @@ Nothing is deleted before its replacement is proven live.
 |---|---|---|
 | 1 | **Phase 4** (`security-todo.md` §0) — delete the RS256 session family | grep finds no `HANDOFF`, no `adminLogin`; R4 met |
 | 2 | **Phase 5** — MCP to device flow, delete the OAuth AS | MCP writes against `dmg` with a `ghu_` bearer |
-| 3 | **Uninstall** — `DELETE /app/installations/{id}` at the end of `onboard/setup.ts` | a finished tenant appears in no `listInstallations()` page |
+| 3 | **Delete the broker's App-key surface** — `api/token.ts`, the MCP OAuth AS, `_lib/handoff.ts`, `setup.ts`'s install check, `appJwt` | `grep env.GH_APP` finds nothing |
 | 4 | **Delete fanout** — `_lib/fanout.ts`, `api/admin/fanout.ts`, `FANOUT_SECRET` | grep finds no `FANOUT`; R3 met |
+| 4b | **By hand:** delete `GH_APP_PRIVATE_KEY` from the Pages project, then every private key on the `lanza-cms` App | GitHub lists no private key for the App |
 | 5 | **Build-time floor** — `lanza build` refuses below the `critical` dist-tag | a pinned-below-floor tenant fails its build with the fix named |
 | 6 | **Phase 7** — rotate what remains; rewrite `security-model.md`, `keys-and-secrets.md`, `/architecture` | docs describe the deployed system again |
 
-Steps 3 and 4 are irreversible for existing tenants: re-acquiring write means the
-owner re-installs the App. That is the point.
+Step 4b is the irreversible one, and it is the whole release: after it, no running
+service holds anything that can write a tenant repository. Regenerating a key is
+possible from the App's settings page, which means the remaining blast radius is
+"someone compromises the owner's GitHub account", not "someone compromises a
+Worker".
 
 ## 5. Open
 

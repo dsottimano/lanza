@@ -49,6 +49,8 @@ const STYLE = `
   .copy:hover { background:var(--paper); }
   .status { font-size:.85rem; }
   .error { color:#9b1c1c; font-size:.875rem; }
+  .notice { border-left:2px solid #b45309; background:#fffbeb; color:#78350f;
+            padding:.6rem .75rem; font-size:.875rem; line-height:1.5; }
   .foot { margin:1.5rem 0 0; padding-top:1rem; border-top:1px solid var(--line); font-size:.8rem; }
 `;
 
@@ -146,8 +148,14 @@ const SCRIPT = `
  * are returned together so a caller cannot serve one without the other — a page
  * whose script the policy blocks is a button that does nothing.
  */
-export function signInPage(): { html: string; nonce: string } {
+/**
+ * `notice` is shown above the sign-in button, for the cases where the person IS
+ * signed in and still cannot get in. It is HTML-escaped and the only variable part
+ * of this page.
+ */
+export function signInPage(notice?: string): { html: string; nonce: string } {
   const n = nonce();
+  const banner = notice ? `<p class="notice">${escapeHtml(notice)}</p>` : "";
   const html = `<!doctype html>
 <html lang="en">
 <head>
@@ -159,6 +167,7 @@ export function signInPage(): { html: string; nonce: string } {
 <body>
 <main>
   <h1>Lanza</h1>
+  ${banner}
   <p>Sign in with the GitHub account that has access to this site's repository.</p>
 
   <div id="step-start">
@@ -185,4 +194,13 @@ export function signInPage(): { html: string; nonce: string } {
 </body>
 </html>`;
   return { html, nonce: n };
+}
+
+// Small and local: the notice is the only interpolated text on this page, and it is
+// composed by the gate from fixed strings plus a repository name, so this is belt
+// and braces rather than the only thing standing between us and injection.
+function escapeHtml(text: string): string {
+  return text.replace(/[&<>"']/g, (c) =>
+    c === "&" ? "&amp;" : c === "<" ? "&lt;" : c === ">" ? "&gt;" : c === '"' ? "&quot;" : "&#39;",
+  );
 }

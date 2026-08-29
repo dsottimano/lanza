@@ -103,7 +103,17 @@ export const onRequest = async (context: {
   if (!role) {
     const refused =
       gh.kind === "denied"
-        ? deny(url, "This GitHub account cannot edit this repository.", 403)
+        ? // GitHub answers 404 for a repository you cannot see, and a GitHub App's
+          // user token cannot see one the App is not installed on — so "denied" is
+          // genuinely two situations and we cannot tell them apart from here. Name
+          // both, because the install is the likely one for a site owner and the
+          // old message ("this account cannot edit this repository") sent people
+          // looking at their collaborator settings instead.
+          deny(
+            url,
+            `Your GitHub account cannot reach ${repo.owner}/${repo.name}. Either the Lanza CMS app is not installed on that repository (install it at github.com/apps/lanza-cms), or this account has no access to it.`,
+            403,
+          )
         : gh.kind === "unavailable"
           ? deny(url, "GitHub could not be reached to check your access.", 503)
           : deny(url, "Not authenticated.");
@@ -194,7 +204,11 @@ async function githubAuth(cookies: string | null, env: Env): Promise<GhAuth> {
 // honest status for a page that loaded and works — the refusal is that the request
 // never reached anything under /admin/ (§10.1 step 1).
 function deny(url: URL, message: string, status = 401): Response {
-  if (status !== 401 || url.pathname.startsWith("/admin/api/")) {
+  // An API call gets JSON whatever the reason. A top-level NAVIGATION gets the
+  // sign-in page even on a 403 — the person is looking at a browser tab, and raw
+  // JSON there is not an answer. The notice explains why signing in again may not
+  // be enough, which the bare page cannot say.
+  if (url.pathname.startsWith("/admin/api/")) {
     return withAdminSecurityHeaders(
       new Response(JSON.stringify({ message }), {
         status,
@@ -202,7 +216,7 @@ function deny(url: URL, message: string, status = 401): Response {
       }),
     );
   }
-  const page = signInPage();
+  const page = signInPage(status === 401 ? undefined : message);
   return withAdminSecurityHeaders(
     new Response(page.html, {
       status: 200,

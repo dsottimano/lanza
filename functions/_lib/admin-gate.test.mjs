@@ -18,9 +18,19 @@ const HOST = "https://lanzacms.com";
 
 // Drive the real middleware with no session cookie. Returns the response plus
 // whether the downstream Function was reached.
-async function gate(path, { cookie } = {}) {
+async function gate(path, { cookie, github } = {}) {
   let reached = false;
   const headers = cookie ? { Cookie: cookie } : {};
+  // `github` stubs what GitHub says about the access token, for the cases where a
+  // person IS signed in and is still refused.
+  if (github) {
+    globalThis.fetch = async (url) => {
+      const u = String(url);
+      if (u.endsWith("/user")) return Response.json({ login: "someone" });
+      if (u.includes("/repos/")) return new Response("{}", { status: github.repoStatus });
+      throw new Error(`unexpected fetch: ${u}`);
+    };
+  }
   const res = await onRequest({
     request: new Request(`${HOST}${path}`, { headers }),
     env: {},
@@ -231,4 +241,32 @@ test("the CSP is the one the built SPA actually needs, and denies framing", () =
   // The two external origins the CMS genuinely uses.
   assert.match(csp, /style-src[^;]*https:\/\/fonts\.googleapis\.com/);
   assert.match(csp, /connect-src[^;]*https:\/\/registry\.npmjs\.org/);
+});
+
+// A person whose token GitHub accepts but who cannot see the repository. Two very
+// different situations produce this — the App is not installed on the repo, or the
+// account genuinely has no access — and GitHub answers 404 for both, so the gate
+// cannot tell them apart. It has to name both.
+test("a navigation that is refused explains itself instead of returning JSON", async () => {
+  const { res, reached } = await gate("/admin/", {
+    cookie: "lanza_gh=ghu_valid_but_cannot_see_the_repo",
+    github: { repoStatus: 404 },
+  });
+  assert.equal(reached, false);
+  assert.match(res.headers.get("content-type"), /text\/html/);
+  const html = await res.text();
+  assert.match(html, /not installed on that repository/);
+  assert.match(html, /dsottimano\/lanza/);
+  // The install link is the actionable half; without it this is just a nicer refusal.
+  assert.match(html, /github\.com\/apps\/lanza-cms/);
+});
+
+test("an API call refused the same way still gets JSON, not a page", async () => {
+  const { res, reached } = await gate("/admin/api/gh/contents/x.md", {
+    cookie: "lanza_gh=ghu_a_different_token_so_the_cache_misses",
+    github: { repoStatus: 404 },
+  });
+  assert.equal(reached, false);
+  assert.equal(res.status, 403);
+  assert.match(res.headers.get("content-type"), /application\/json/);
 });
