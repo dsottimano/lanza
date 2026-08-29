@@ -5,10 +5,16 @@
 // long each credential lives.
 //
 // Everything here is checked against the code and docs/ rather than written from
-// memory — the auth sequence mirrors functions/admin/api/auth/{login,handoff}.ts
-// and functions/_lib/session.ts, the credential lifetimes mirror
-// docs/keys-and-secrets.md, and the agent section mirrors docs/mcp-server.md.
-// If one of those changes, this page is wrong and must change with it.
+// memory — the sign-in sequence mirrors functions/_lib/device-flow.ts and
+// gh-identity.ts, the credential lifetimes mirror docs/keys-and-secrets.md, the
+// sovereignty section mirrors docs/security-model.md I3, and the agent section
+// mirrors functions/api/mcp.ts. If one of those changes, this page is wrong and
+// must change with it.
+//
+// It was wrong once, for exactly that reason: it described a broker that signed
+// sessions and minted repository tokens for months after that stopped being a
+// design anyone wanted. The 2026-08-29 release deleted it, and this page is the
+// public statement of what replaced it.
 //
 // Static + cacheable: no client JS at all. Bilingual, driven by the same fixed-page
 // registry as its siblings (lib/fixed-pages.ts).
@@ -24,18 +30,18 @@ const href = (path: string) => localeUrl(locale, path);
 const en = {
   tag: "ARCHITECTURE · THE WHOLE MACHINE",
   headline: "Every moving part, named.",
-  sub: "How it works is the story of an edit. This is the wiring behind it: what each piece is, who runs it, which secrets it holds, and how long they live. Nothing here is a diagram of an ideal. It is what the code does.",
+  sub: "How it works is the story of an edit. This is the wiring behind it: what each piece is, who runs it, which secrets it holds, and how long they live. Nothing here is a diagram of an ideal. It is what the code does, and where the code used to do something worse, it says so.",
 
   partsEyebrow: "The parts",
-  partsHead: "Six pieces. You own four of them.",
-  partsIntro: "There is no application server anywhere in this list. Your site is compiled to files ahead of time, and the only thing that ever runs on a request is Cloudflare handing one over.",
+  partsHead: "Six pieces. You own five of them.",
+  partsIntro: "There is no application server anywhere in this list. Your site is compiled to files ahead of time, and the only thing that ever runs on a request is Cloudflare handing one over. The one piece we operate is not on the path of anything you do after your first day.",
   partsCols: ["Piece", "What it actually is", "Who runs it", "Holds secrets"],
   parts: [
     ["Your repository", "Markdown and HTML files on GitHub. The source of truth for every word on your site.", "You", "No"],
     ["Your site", "An Astro static build, served by Cloudflare Pages. Plain HTML by the time a visitor sees it.", "You", "No"],
     ["Lanza, the CMS", "A Vue app at /admin. Static files, with no backend of its own.", "You", "No"],
     ["lanza-site", "The npm package holding the render code and the site's server functions. You pin a version.", "You", "No"],
-    ["The broker", "connect.lanzacms.com, which handles onboarding, login, and minting short-lived tokens.", "Lanza", "Yes, all of them"],
+    ["The broker", "connect.lanzacms.com. It creates your repository and your Pages project during onboarding, and then has nothing further to do with your site.", "Lanza", "Two, for onboarding only"],
     ["/api/mcp", "The endpoint an AI agent connects to in order to edit your site.", "You", "No"],
   ],
 
@@ -43,7 +49,7 @@ const en = {
   editHead: "Save writes to a branch. Publish is a merge.",
   editIntro: "The CMS never writes to your live site. It writes to a staging branch, and publishing is an ordinary git merge, which is why every change is reversible and nothing is ever half-applied.",
   editSteps: [
-    { t: "You save", c: "PUT → staging", b: "The CMS commits to the staging branch through its own /admin/api/gh proxy. Your browser never holds a GitHub token: the proxy attaches one per request, scoped to this one repository, and it expires in about an hour." },
+    { t: "You save", c: "PUT → staging", b: "The CMS commits to the staging branch through its own /admin/api/gh proxy. Your browser never holds the GitHub token: it lives in a cookie JavaScript cannot read, and the proxy attaches it server-side, checking on every single request that the endpoint is one the CMS is allowed to call and that the resolved URL still points at your repository and no other." },
     { t: "You review", c: "staging.<project>.pages.dev", b: "Cloudflare builds the staging branch too, so there is a real URL showing exactly what you just wrote, before anyone else can see it." },
     { t: "You publish", c: "merge staging → main", b: "One merge. No separate deploy step and no copy of your content living anywhere else." },
     { t: "Cloudflare rebuilds", c: "astro build → dist", b: "The push to main triggers a static build. Entries marked draft never render, whether or not they were merged." },
@@ -51,34 +57,34 @@ const en = {
   ],
 
   authEyebrow: "Signing in",
-  authHead: "Two checks, and both are required.",
-  authIntro: "Your site holds no signing secret. It verifies with a public key baked into the package, which means the thing that proves who you are lives somewhere it cannot be stolen from you.",
+  authHead: "There is no secret. Anywhere.",
+  authIntro: "Signing in is GitHub Device Flow, which is the flow built for televisions and terminals: it needs a public client id and nothing else. Your site holds no signing key, no client secret and no password hash, because at no point does the design call for one.",
   authSteps: [
-    "You open /admin. It sends you to GitHub, asking for identity only, with no repository scopes at all.",
-    "GitHub returns to the broker, not to your site. The broker is the only place that holds the private key.",
-    "The broker signs a session (RS256) naming your GitHub login, your site's origin, a one-shot nonce, and an expiry.",
-    "It posts that token back to your site in a form body, never in a URL, so it cannot land in history, a log, or a referrer header.",
-    "Your site verifies the signature with the baked-in public key, then checks the audience is this site, the nonce matches the cookie it set, and the token has not expired.",
-    "Then, separately, it checks your login against the site's owner list.",
+    "You open /admin. It shows you a short code and sends you to github.com to approve it. Nothing redirects, so there is no callback URL to get wrong and no token in a URL to leak.",
+    "Your browser exchanges that approval for a GitHub token, which is stored in an HttpOnly cookie. The device code never reaches the page; the token never reaches JavaScript.",
+    "On every request, the gate asks GitHub who you are: GET /user.",
+    "Separately, on the same request, it asks GitHub what you may do here: GET /repos/owner/name, and reads the permissions object GitHub returns.",
+    "Admin becomes owner, push becomes editor, pull becomes viewer. The answer is cached for sixty seconds and no longer.",
+    "The token lives eight hours and refreshes silently for one hundred and eighty-four days, so you type a code once per browser and then effectively never again.",
   ],
-  authCalloutHead: "Why the last step is its own step",
-  authCalloutBody: "The broker will sign a token for any GitHub user who logs in, which is what an identity provider does. So a valid signature proves someone authenticated; it does not prove they own this site. Authorization is a second, independent check, and it runs on both the login endpoint and every request to /admin. A signature-only gate would admit any GitHub account on earth.",
+  authCalloutHead: "Why the role is a question, not a list",
+  authCalloutBody: "There used to be a list of usernames in your repository saying who could edit. It is gone, and the reason is worth stating: a list of ours is a second answer to a question GitHub already answers, and it was the weaker answer. It could disagree with who can actually write the repository, it only took effect after a publish and a rebuild, and removing someone from it did not take their access away. Asking GitHub costs one cached request and is right by construction. Remove a collaborator and they are locked out within a minute.",
 
   keysEyebrow: "Blast radius",
-  keysHead: "Nothing long-lived, nothing broadly scoped.",
-  keysIntro: "The useful question about a credential is not whether it is encrypted. It is what an attacker reaches if they hold it, and for how long.",
+  keysHead: "Everything is your own credential, or nothing at all.",
+  keysIntro: "The useful question about a credential is not whether it is encrypted. It is what someone reaches if they hold it, for how long, and who can take it away.",
   keysCols: ["Credential", "Reaches", "Lifetime"],
   keys: [
-    ["Your session cookie", "Your site's /admin only. HttpOnly, Secure, and scoped so it is never sent on public pages", "7 days"],
-    ["The GitHub token behind a save", "One repository, contents only. Minted per request; never sent to the browser", "~1 hour"],
-    ["An agent's access token", "The sites you ticked on the consent screen, and nothing else", "1 hour, refreshable"],
-    ["A token minted for one agent call", "Exactly one site. The audience is pinned to it", "5 minutes"],
-    ["Your site's own key material", "Nothing. It holds a public key and can only verify", "none"],
+    ["Your sign-in cookie", "Your GitHub token, for your repositories. HttpOnly, Secure, scoped to /admin so it never rides a public page", "8 hours, refreshed"],
+    ["Your agent token", "The same, for an AI agent you hand it to. Revoked in one click at GitHub", "until you revoke it"],
+    ["Your site's own key material", "Nothing. There is none", "none"],
+    ["What the broker holds about your site", "Nothing. No key, no token, no record", "none"],
+    ["What we could deploy to your site", "Nothing. There is no credential anywhere that would let us", "none"],
   ],
 
   agentEyebrow: "For agents",
-  agentHead: "An agent edits your site the way you do.",
-  agentBody: "Your site exposes an MCP endpoint. An agent that connects to it goes through the same OAuth round-trip you do: authorization code with PKCE, discovery over the standard well-known documents, and a GitHub login for identity. If you own several Lanza sites, one consent screen asks which of them this agent may touch, and that choice is carried on the token itself; a tampered response can only narrow the grant, never widen it. The agent is given a token bound to one site's endpoint. It never receives a GitHub token, and there is no personal access token to create, paste, or leak.",
+  agentHead: "An agent edits your site as you, with your credential.",
+  agentBody: "Your site exposes an MCP endpoint. The bearer it takes is a GitHub token you authorize yourself, from Settings, and paste into your agent alongside the endpoint URL. The site validates it by asking GitHub the same two questions it asks when you sign in, so an agent can never do more than you can, and the tools are confined on top of that: an entry write has to be a markdown file inside a folder one of your content types declares. This used to be a one-click OAuth popup, and we took it out. That flow required us to run an authorization server that could mint a credential for your site, which is precisely the power this release exists to remove. One paste, and nobody holds a key to your site but you.",
   agentLink: "Read the agent contract",
 
   costEyebrow: "What it costs to run",
@@ -90,9 +96,26 @@ const en = {
     ["0", "databases, servers, and things to patch"],
   ],
 
+  sovEyebrow: "The line we drew",
+  sovHead: "Once you install, we cannot reach your site.",
+  sovIntro: "This is the claim worth checking, so here is what it means precisely, and what it cost to make true.",
+  sovBeforeLabel: "Before",
+  sovAfterLabel: "After",
+  sovBefore: "Until August 2026, our onboarding service held a GitHub App private key. That key could mint a write token for every repository the app was installed on, which is every customer site. And repository write is not a small thing on a static host: Cloudflare rebuilds from your repository on every push, so whoever controls your build file controls what your visitors are served. One compromised service, every site.",
+  sovAfter: "That key is deleted, along with everything that used it. Our service now holds two OAuth client secrets, both of which are useless without a person actively clicking approve, and neither of which touches a site that already exists.",
+  sovRows: [
+    ["A private key that could write every customer repository", "Deleted"],
+    ["A signing key that could forge a login for any site", "Deleted"],
+    ["An endpoint that traded a signature for a repository token", "Deleted"],
+    ["The ability to push a fix into your repository unasked", "Deleted"],
+    ["An authorization server that could mint an agent credential for your site", "Deleted"],
+  ],
+  sovHonestHead: "The part that is still true",
+  sovHonestBody: "The GitHub app stays installed on your repository, because that install is what lets your own sign-in reach it. Whoever administers that app can generate a new key. So the honest statement is not that the risk is zero: it is that reaching your site now requires compromising a GitHub account belonging to a person, rather than a running web service. That is a much smaller and much slower target, and you can close it entirely by removing the app from your repository, which cuts every token for your site at once.",
+
   ownEyebrow: "Updates, and leaving",
   ownHead: "You pin the version. You keep the files.",
-  ownBody: "Your site depends on a published package at a version you choose, so an improvement we ship does not change your site until you take it, from Settings, when it suits you. And the exit is not a feature we had to build: your content is already a folder of ordinary files in a repository you own. The broker is a convenience layered on top of a CMS that works without it: supply your own GitHub credentials and owner list and you can run the whole thing yourself, with us removed from the picture entirely.",
+  ownBody: "Your site depends on a published package at a version you choose, so an improvement we ship does not change your site until you take it, from Settings, when it suits you. We used to be able to push a critical fix into your repository without asking. That is gone with everything else, and what replaced it is a build that refuses to deploy a version marked unsafe: your live site keeps serving, nothing new goes out, and you are told exactly what to change. Slower, and it is your hand on it. The exit was never a feature we had to build, because your content is already a folder of ordinary files in a repository you own, and the package is public.",
 
   ctaHead: "Read the plain-language version.",
   ctaSub: "Same machine, told as a story instead of a diagram.",
@@ -102,18 +125,18 @@ const en = {
 const es = {
   tag: "ARQUITECTURA · LA MÁQUINA COMPLETA",
   headline: "Cada pieza, con su nombre.",
-  sub: "Cómo funciona cuenta la historia de un cambio. Esto es el cableado que hay detrás: qué es cada pieza, quién la opera, qué secretos guarda y cuánto duran. Nada aquí es el diagrama de un ideal. Es lo que hace el código.",
+  sub: "Cómo funciona cuenta la historia de un cambio. Esto es el cableado que hay detrás: qué es cada pieza, quién la opera, qué secretos guarda y cuánto duran. Nada aquí es el diagrama de un ideal. Es lo que hace el código, y donde el código hacía algo peor, lo dice.",
 
   partsEyebrow: "Las piezas",
-  partsHead: "Seis piezas. Cuatro son suyas.",
-  partsIntro: "En esta lista no hay ningún servidor de aplicaciones. Su sitio se compila a archivos por adelantado, y lo único que ocurre al recibir una visita es que Cloudflare entrega uno.",
+  partsHead: "Seis piezas. Cinco son suyas.",
+  partsIntro: "En esta lista no hay ningún servidor de aplicaciones. Su sitio se compila a archivos por adelantado, y lo único que ocurre al recibir una visita es que Cloudflare entrega uno. La única pieza que operamos nosotros no interviene en nada de lo que usted haga después del primer día.",
   partsCols: ["Pieza", "Qué es en realidad", "Quién la opera", "Guarda secretos"],
   parts: [
     ["Su repositorio", "Archivos Markdown y HTML en GitHub. La fuente de la verdad de cada palabra de su sitio.", "Usted", "No"],
     ["Su sitio", "Un build estático de Astro, servido por Cloudflare Pages. HTML puro cuando llega al visitante.", "Usted", "No"],
     ["Lanza, el CMS", "Una aplicación Vue en /admin. Archivos estáticos, sin backend propio.", "Usted", "No"],
     ["lanza-site", "El paquete npm con el código de render y las funciones del sitio. Usted fija la versión.", "Usted", "No"],
-    ["El intermediario", "connect.lanzacms.com, que se encarga del alta, el inicio de sesión y la emisión de tokens de vida corta.", "Lanza", "Sí, todos"],
+    ["El intermediario", "connect.lanzacms.com. Crea su repositorio y su proyecto de Pages durante el alta, y después no vuelve a tener nada que ver con su sitio.", "Lanza", "Dos, solo para el alta"],
     ["/api/mcp", "El punto de conexión al que se conecta un agente de IA para editar su sitio.", "Usted", "No"],
   ],
 
@@ -121,7 +144,7 @@ const es = {
   editHead: "Guardar escribe en una rama. Publicar es una fusión.",
   editIntro: "El CMS nunca escribe en su sitio en vivo. Escribe en una rama de preparación, y publicar es una fusión de git corriente, y por eso todo cambio es reversible y nada queda aplicado a medias.",
   editSteps: [
-    { t: "Usted guarda", c: "PUT → staging", b: "El CMS hace commit en la rama staging a través de su propio proxy /admin/api/gh. Su navegador nunca tiene un token de GitHub: el proxy adjunta uno por petición, limitado a este único repositorio, y caduca en aproximadamente una hora." },
+    { t: "Usted guarda", c: "PUT → staging", b: "El CMS hace commit en la rama staging a través de su propio proxy /admin/api/gh. Su navegador nunca tiene el token de GitHub: vive en una cookie que JavaScript no puede leer, y el proxy lo adjunta en el servidor, comprobando en cada petición que el endpoint es uno de los que el CMS puede llamar y que la URL resuelta sigue apuntando a su repositorio y a ningún otro." },
     { t: "Usted revisa", c: "staging.<proyecto>.pages.dev", b: "Cloudflare también construye la rama de preparación, así que existe una URL real que muestra exactamente lo que acaba de escribir, antes de que nadie más pueda verlo." },
     { t: "Usted publica", c: "merge staging → main", b: "Una fusión. Sin paso de despliegue aparte y sin ninguna copia de su contenido viviendo en otro sitio." },
     { t: "Cloudflare reconstruye", c: "astro build → dist", b: "El push a main dispara un build estático. Las entradas marcadas como borrador no se renderizan, se hayan fusionado o no." },
@@ -129,34 +152,34 @@ const es = {
   ],
 
   authEyebrow: "Iniciar sesión",
-  authHead: "Dos comprobaciones, y ambas son obligatorias.",
-  authIntro: "Su sitio no guarda ninguna clave de firma. Verifica con una clave pública incluida en el paquete, es decir que lo que demuestra quién es usted vive en un lugar del que no se le puede robar.",
+  authHead: "No hay ningún secreto. En ninguna parte.",
+  authIntro: "Iniciar sesión es el flujo de dispositivo de GitHub, el que se diseñó para televisores y terminales: necesita un identificador de cliente público y nada más. Su sitio no guarda ninguna clave de firma, ningún secreto de cliente y ninguna contraseña, porque en ningún momento el diseño pide una.",
   authSteps: [
-    "Usted abre /admin. Le envía a GitHub pidiendo solo identidad, sin ningún permiso sobre repositorios.",
-    "GitHub vuelve al intermediario, no a su sitio. El intermediario es el único lugar que guarda la clave privada.",
-    "El intermediario firma una sesión (RS256) que nombra su usuario de GitHub, el origen de su sitio, un nonce de un solo uso y una caducidad.",
-    "Envía ese token a su sitio en el cuerpo de un formulario, nunca en una URL, para que no acabe en el historial, en un registro ni en una cabecera de referencia.",
-    "Su sitio verifica la firma con la clave pública incluida, y luego comprueba que la audiencia es este sitio, que el nonce coincide con la cookie que puso y que el token no ha caducado.",
-    "Y después, por separado, comprueba su usuario contra la lista de propietarios del sitio.",
+    "Usted abre /admin. Le muestra un código corto y le envía a github.com a aprobarlo. No hay redirección, así que no hay ninguna URL de retorno que se pueda equivocar ni ningún token en una URL que se pueda filtrar.",
+    "Su navegador cambia esa aprobación por un token de GitHub, que se guarda en una cookie HttpOnly. El código de dispositivo nunca llega a la página; el token nunca llega a JavaScript.",
+    "En cada petición, la puerta le pregunta a GitHub quién es usted: GET /user.",
+    "Por separado, en la misma petición, le pregunta a GitHub qué puede hacer aquí: GET /repos/owner/name, y lee el objeto de permisos que GitHub devuelve.",
+    "Admin se convierte en propietario, push en editor, pull en lector. La respuesta se guarda sesenta segundos y ni uno más.",
+    "El token dura ocho horas y se renueva en silencio durante ciento ochenta y cuatro días, así que usted teclea un código una vez por navegador y prácticamente nunca más.",
   ],
-  authCalloutHead: "Por qué el último paso es un paso aparte",
-  authCalloutBody: "El intermediario firmará un token para cualquier usuario de GitHub que inicie sesión, que es lo que hace un proveedor de identidad. Así que una firma válida demuestra que alguien se autenticó; no demuestra que sea el dueño de este sitio. La autorización es una segunda comprobación independiente, y se ejecuta tanto en el inicio de sesión como en cada petición a /admin. Una puerta que solo mirase la firma admitiría a cualquier cuenta de GitHub del mundo.",
+  authCalloutHead: "Por qué el rol es una pregunta y no una lista",
+  authCalloutBody: "Antes había en su repositorio una lista de usuarios que decía quién podía editar. Ya no existe, y vale la pena decir por qué: una lista nuestra es una segunda respuesta a una pregunta que GitHub ya responde, y era la respuesta más débil. Podía contradecir a quien de verdad puede escribir en el repositorio, solo surtía efecto tras publicar y reconstruir, y quitar a alguien de ella no le quitaba el acceso. Preguntarle a GitHub cuesta una petición en caché y es correcto por construcción. Quite a un colaborador y queda fuera en menos de un minuto.",
 
   keysEyebrow: "Radio de impacto",
-  keysHead: "Nada duradero, nada de alcance amplio.",
-  keysIntro: "La pregunta útil sobre una credencial no es si está cifrada. Es hasta dónde llega quien la tenga, y durante cuánto tiempo.",
+  keysHead: "Todo es una credencial suya, o no hay nada.",
+  keysIntro: "La pregunta útil sobre una credencial no es si está cifrada. Es hasta dónde llega quien la tenga, durante cuánto tiempo y quién puede quitársela.",
   keysCols: ["Credencial", "Hasta dónde llega", "Duración"],
   keys: [
-    ["Su cookie de sesión", "Solo el /admin de su sitio. HttpOnly, Secure y limitada para no viajar nunca en páginas públicas", "7 días"],
-    ["El token de GitHub tras un guardado", "Un repositorio, solo contenidos. Se emite por petición; nunca llega al navegador", "~1 hora"],
-    ["El token de acceso de un agente", "Los sitios que usted marcó en la pantalla de consentimiento, y ninguno más", "1 hora, renovable"],
-    ["Un token emitido para una llamada de agente", "Exactamente un sitio. La audiencia queda fijada a él", "5 minutos"],
-    ["El material de clave de su propio sitio", "Nada. Guarda una clave pública y solo puede verificar", "ninguna"],
+    ["Su cookie de inicio de sesión", "Su token de GitHub, para sus repositorios. HttpOnly, Secure y limitada a /admin para no viajar nunca en una página pública", "8 horas, renovada"],
+    ["Su token de agente", "Lo mismo, para un agente al que usted se lo entrega. Se revoca con un clic en GitHub", "hasta que lo revoque"],
+    ["El material de clave de su propio sitio", "Nada. No hay ninguno", "ninguna"],
+    ["Lo que el intermediario guarda sobre su sitio", "Nada. Ni clave, ni token, ni registro", "ninguna"],
+    ["Lo que nosotros podríamos desplegar en su sitio", "Nada. No existe ninguna credencial que nos lo permita", "ninguna"],
   ],
 
   agentEyebrow: "Para agentes",
-  agentHead: "Un agente edita su sitio igual que usted.",
-  agentBody: "Su sitio expone un punto de conexión MCP. Un agente que se conecte pasa por la misma ronda de OAuth que usted: código de autorización con PKCE, descubrimiento mediante los documentos estándar y un inicio de sesión de GitHub como identidad. Si tiene varios sitios Lanza, una pantalla de consentimiento pregunta cuáles puede tocar este agente, y esa elección viaja en el propio token; una respuesta manipulada solo puede restringir el permiso, nunca ampliarlo. Al agente se le entrega un token ligado al punto de conexión de un solo sitio. Nunca recibe un token de GitHub, y no hay ningún token personal que crear, pegar ni filtrar.",
+  agentHead: "Un agente edita su sitio como usted, con su credencial.",
+  agentBody: "Su sitio expone un punto de conexión MCP. La credencial que acepta es un token de GitHub que usted mismo autoriza, desde Ajustes, y pega en su agente junto con la URL del endpoint. El sitio lo valida haciéndole a GitHub las mismas dos preguntas que hace cuando usted inicia sesión, así que un agente nunca puede hacer más que usted, y encima las herramientas están acotadas: escribir una entrada tiene que ser un archivo markdown dentro de una carpeta que declare uno de sus tipos de contenido. Antes esto era una ventana de OAuth de un solo clic, y la quitamos. Ese flujo exigía que nosotros operásemos un servidor de autorización capaz de emitir una credencial para su sitio, que es justo el poder que esta versión existe para eliminar. Un pegado, y nadie tiene una llave de su sitio salvo usted.",
   agentLink: "Leer el contrato para agentes",
 
   costEyebrow: "Lo que cuesta mantenerlo",
@@ -168,9 +191,26 @@ const es = {
     ["0", "bases de datos, servidores y cosas que parchear"],
   ],
 
+  sovEyebrow: "La línea que trazamos",
+  sovHead: "Una vez instalado, no podemos llegar a su sitio.",
+  sovIntro: "Esta es la afirmación que merece comprobarse, así que aquí está lo que significa exactamente y lo que costó volverla cierta.",
+  sovBeforeLabel: "Antes",
+  sovAfterLabel: "Después",
+  sovBefore: "Hasta agosto de 2026, nuestro servicio de alta guardaba la clave privada de una aplicación de GitHub. Esa clave podía emitir un token de escritura para todos los repositorios donde la aplicación estuviera instalada, es decir, todos los sitios de nuestros clientes. Y escribir en un repositorio no es poca cosa en un alojamiento estático: Cloudflare reconstruye desde su repositorio en cada push, así que quien controla su archivo de build controla lo que se sirve a sus visitantes. Un servicio comprometido, todos los sitios.",
+  sovAfter: "Esa clave está eliminada, junto con todo lo que la usaba. Nuestro servicio guarda ahora dos secretos de cliente de OAuth, ambos inútiles sin una persona pulsando aprobar, y ninguno de los dos toca un sitio que ya existe.",
+  sovRows: [
+    ["Una clave privada capaz de escribir en todos los repositorios de clientes", "Eliminada"],
+    ["Una clave de firma capaz de falsificar un acceso a cualquier sitio", "Eliminada"],
+    ["Un endpoint que cambiaba una firma por un token de repositorio", "Eliminado"],
+    ["La capacidad de meter una corrección en su repositorio sin preguntar", "Eliminada"],
+    ["Un servidor de autorización capaz de emitir una credencial de agente para su sitio", "Eliminado"],
+  ],
+  sovHonestHead: "Lo que sigue siendo cierto",
+  sovHonestBody: "La aplicación de GitHub sigue instalada en su repositorio, porque esa instalación es lo que permite que su propio inicio de sesión llegue hasta él. Quien administre esa aplicación puede generar una clave nueva. Así que la afirmación honesta no es que el riesgo sea cero: es que llegar a su sitio exige ahora comprometer la cuenta de GitHub de una persona, y no un servicio web en marcha. Ese objetivo es mucho más pequeño y mucho más lento, y usted puede cerrarlo del todo quitando la aplicación de su repositorio, lo que corta de golpe todos los tokens de su sitio.",
+
   ownEyebrow: "Actualizaciones, y marcharse",
   ownHead: "Usted fija la versión. Usted se queda los archivos.",
-  ownBody: "Su sitio depende de un paquete publicado en la versión que usted elija, así que una mejora que publiquemos no cambia su sitio hasta que usted la tome, desde Ajustes, cuando le convenga. Y la salida no es una función que tuviéramos que construir: su contenido ya es una carpeta de archivos corrientes en un repositorio suyo. El intermediario es una comodidad añadida sobre un CMS que funciona sin él: ponga sus propias credenciales de GitHub y su lista de propietarios y puede operarlo entero usted mismo, con nosotros fuera del cuadro por completo.",
+  ownBody: "Su sitio depende de un paquete publicado en la versión que usted elija, así que una mejora que publiquemos no cambia su sitio hasta que usted la tome, desde Ajustes, cuando le convenga. Antes podíamos meter una corrección crítica en su repositorio sin preguntar. Eso desapareció con todo lo demás, y lo que ocupa su lugar es un build que se niega a desplegar una versión marcada como insegura: su sitio en vivo sigue funcionando, no sale nada nuevo, y se le dice exactamente qué cambiar. Más lento, y con su mano encima. La salida nunca fue una función que tuviéramos que construir, porque su contenido ya es una carpeta de archivos corrientes en un repositorio suyo, y el paquete es público.",
 
   ctaHead: "Lea la versión en lenguaje llano.",
   ctaSub: "La misma máquina, contada como historia en vez de como diagrama.",
@@ -301,6 +341,37 @@ const t = isEn ? en : es;
           </div>
         ))}
       </div>
+    </div>
+  </section>
+
+  <!-- the line we drew -->
+  <section class="arc-sec">
+    <div class="arc-wrap">
+      <span class="arc-eyebrow">{t.sovEyebrow}</span>
+      <h2 class="arc-h2">{t.sovHead}</h2>
+      <p class="arc-lede">{t.sovIntro}</p>
+      <div class="arc-ba">
+        <div class="arc-ba__col">
+          <span class="arc-ba__label">{t.sovBeforeLabel}</span>
+          <p class="arc-ba__body">{t.sovBefore}</p>
+        </div>
+        <div class="arc-ba__col">
+          <span class="arc-ba__label">{t.sovAfterLabel}</span>
+          <p class="arc-ba__body">{t.sovAfter}</p>
+        </div>
+      </div>
+      <ul class="arc-gone">
+        {t.sovRows.map(([what, state]) => (
+          <li class="arc-gone__row">
+            <span class="arc-gone__what">{what}</span>
+            <span class="arc-gone__state">{state}</span>
+          </li>
+        ))}
+      </ul>
+      <aside class="arc-callout">
+        <h3 class="arc-callout__t">{t.sovHonestHead}</h3>
+        <p class="arc-callout__b">{t.sovHonestBody}</p>
+      </aside>
     </div>
   </section>
 
@@ -458,6 +529,55 @@ const t = isEn ? en : es;
     margin: 0 0 0.7rem;
   }
   .arc-callout__b { font-size: 1rem; line-height: 1.68; color: var(--text-secondary); margin: 0; }
+
+  /* before / after — the release stated as a pair, because the claim only means
+     something next to what it replaced. */
+  .arc-ba {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 1.5rem;
+    margin: 2rem 0 2.25rem;
+  }
+  .arc-ba__col {
+    border-top: 2px solid var(--rule);
+    padding-top: 1rem;
+  }
+  .arc-ba__col:last-child { border-top-color: var(--accent); }
+  .arc-ba__label {
+    display: block;
+    font-size: 0.75rem;
+    letter-spacing: 0.09em;
+    text-transform: uppercase;
+    color: var(--text-tertiary, var(--text-secondary));
+    margin-bottom: 0.55rem;
+  }
+  .arc-ba__body { font-size: 1rem; line-height: 1.68; color: var(--text-secondary); margin: 0; }
+
+  /* the deletion list. Deliberately plain: a struck-through inventory reads as a
+     receipt, which is what it is. */
+  .arc-gone { list-style: none; margin: 0 0 2rem; padding: 0; max-width: 68ch; }
+  .arc-gone__row {
+    display: flex;
+    align-items: baseline;
+    justify-content: space-between;
+    gap: 1.25rem;
+    padding: 0.75rem 0;
+    border-bottom: 1px solid var(--rule);
+  }
+  .arc-gone__row:first-child { border-top: 1px solid var(--rule); }
+  .arc-gone__what { font-size: 0.98rem; line-height: 1.5; text-decoration: line-through; color: var(--text-secondary); }
+  .arc-gone__state {
+    flex: 0 0 auto;
+    font-size: 0.72rem;
+    letter-spacing: 0.08em;
+    text-transform: uppercase;
+    color: var(--accent);
+  }
+
+  @media (max-width: 46rem) {
+    .arc-ba { grid-template-columns: 1fr; gap: 1.75rem; }
+    .arc-gone__row { flex-direction: column; gap: 0.3rem; }
+  }
 
   /* cost tiles */
   .arc-tiles { display: grid; grid-template-columns: repeat(auto-fit, minmax(14rem, 1fr)); gap: 1px; background: var(--rule); border: 1px solid var(--rule); }

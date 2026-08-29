@@ -54,9 +54,9 @@ const es = {
       b: "Pages observa el repositorio, ejecuta el build en cada push y sirve el resultado desde unas 300 ciudades. Las vistas de página no se miden, así que el tráfico nunca mueve la factura. Las vistas previas por rama son lo que hace real la preparación: su borrador tiene su propia URL, construida por la misma tubería que producción. Un puñado de Pages Functions cubre lo que no puede ser estático: la puerta de /admin, el proxy de GitHub y /api/mcp. Toda ruta pública sigue siendo estática y cacheada.",
     },
     {
-      k: "connect.lanzacms.com",
-      t: "El intermediario guarda los secretos",
-      b: "Su sitio es un inquilino, y un inquilino no guarda ninguna clave privada: lleva una clave pública y solo puede verificar. El intermediario es la otra mitad. Gestiona el alta, firma una sesión RS256 de vida corta que nombra su usuario de GitHub y el origen de su sitio, y emite un token de GitHub por guardado, limitado a un repositorio y válido cerca de una hora. Su sitio comprueba la firma y luego comprueba, por separado, que esa persona es propietaria: una firma válida demuestra que alguien inició sesión, no que el sitio sea suyo.",
+      k: "GitHub Device Flow",
+      t: "No hay ningún secreto que guardar",
+      b: "Iniciar sesión es el flujo pensado para televisores: un código corto que usted aprueba en github.com, que necesita un identificador de cliente público y nada más. Su token de GitHub va a una cookie que la página no puede leer, y en cada petición el sitio le hace a GitHub dos preguntas distintas con él: quién es esta persona y qué puede hacer en este repositorio. No hay sesión que falsificar, ni lista de usuarios que se quede desactualizada, ni clave en ninguna parte que pudiera firmar una. Nuestro servicio de alta crea su repositorio el primer día y después no puede llegar a su sitio.",
     },
   ],
 
@@ -121,9 +121,9 @@ const en = {
       b: "Pages watches the repository, runs the build on every push, and serves the result from around 300 cities. Page views are unmetered, so traffic never moves the bill. Branch previews are what make staging real: your draft gets its own URL, built by the same pipeline as production. A handful of Pages Functions cover what cannot be static: the /admin gate, the GitHub proxy and /api/mcp. Every public route stays static and cached.",
     },
     {
-      k: "connect.lanzacms.com",
-      t: "The broker holds the secrets",
-      b: "Your site is a tenant, and a tenant holds no private key: it ships with a public one and can only verify. The broker is the other half. It runs onboarding, signs a short-lived RS256 session naming your GitHub login and your site's origin, and mints a GitHub token per save, scoped to one repository and good for about an hour. Your site checks the signature, then checks separately that the person is an owner: a valid signature proves someone signed in, not that the site is theirs.",
+      k: "GitHub Device Flow",
+      t: "There is no secret to hold",
+      b: "Signing in is the flow built for televisions: a short code you approve at github.com, needing a public client id and nothing else. Your GitHub token goes into a cookie the page cannot read, and on every request the site asks GitHub two separate questions with it: who is this, and what may they do on this repository. There is no session to forge, no list of usernames to fall out of date, and no key anywhere that could sign one. Our onboarding service creates your repository on your first day and cannot reach your site after that.",
     },
   ],
 
