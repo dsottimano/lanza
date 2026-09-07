@@ -38,7 +38,7 @@ describe("Sidebar navigation", () => {
 
   it("keeps publishing and administration out of editor navigation", () => {
     const wrapper = mount(Sidebar, { props: { ...defaults, isOwner: false } });
-    expect(wrapper.text()).not.toContain("Publish site");
+    expect(wrapper.text()).not.toContain("Review & publish");
     expect(wrapper.text()).not.toContain("Review changes");
     expect(wrapper.text()).not.toContain("Administration");
     expect(wrapper.text()).toContain("Posts");

@@ -30,3 +30,19 @@ existing local work. Read `docs/review-surface.md` before changing CMS previews.
 - For each new page, verify its CMS entry, declared fields, public route and
   locale; change an editable value and confirm the renderer uses it. Include its
   CMS location in the handoff. Do not claim deployment from a successful build.
+
+## Publishing alongside CMS edits
+
+- Before editing or pushing, fetch and inspect BOTH `origin/main` and
+  `origin/staging`. The CMS writes staging; a clean local main is not proof that
+  there is no human work. Never resolve a content conflict by taking all of main.
+- Compose changes with the latest drafts. When a template/field shape changes,
+  explicitly migrate the human's edited values into the new fields and verify the
+  render. Preserve legal/body content when changing templates.
+- Before pushing main, merge main into staging, reconcile conflicts, validate the
+  combined tree, then publish that reconciled commit. If staging changes again,
+  fetch and reconcile again. Never reset or force-push over draft edits.
+- Enable the checked-in guard with `git config core.hooksPath .githooks` when no
+  other hooks path is configured. It checks the live remote staging tip before
+  a main push and refuses to strand CMS work. Do not bypass it with `--no-verify`.
+  This is a local guard, not server-side branch protection.

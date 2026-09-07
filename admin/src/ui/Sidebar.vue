@@ -334,7 +334,7 @@ const itemActive = "nav-item--active";
         :aria-current="publishOpen ? 'page' : undefined"
         @click="emit('publish')"
       >
-        <SidebarIcon name="publish" />Publish site
+        <SidebarIcon name="publish" />Review &amp; publish
         <span class="ml-auto" aria-hidden="true">↗</span>
       </button>
       <button

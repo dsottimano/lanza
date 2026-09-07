@@ -283,3 +283,20 @@ checker refuses to drop undeclared legacy block content silently.
 **Saved snippets** (formerly Reusable blocks) are a separate writing feature: saved
 rich text inserted through the slash menu. They remain stored at `data/blocks.json`
 for compatibility and do not determine page layout.
+
+## Publishing a reviewed draft
+
+The CMS captures the production and staging commit IDs before comparing changes.
+Publish rechecks both IDs and updates production to exactly the reviewed staging
+commit with `force:false`. This is a fast-forward, not a merge into an unreviewed
+newer production tree. An intervening production change is also subject to GitHub's
+fast-forward check, so the preflight does not leave an overwrite race.
+
+When main and staging diverge, the CMS offers Update drafts: a normal merge of the
+reviewed production commit into staging. It never publishes as a side effect.
+Conflicts preserve both branches and show recovery instructions inline. The combined
+result must be reviewed again. New draft edits after the final check remain drafts.
+
+Repository agents must use the branch workflow in `AGENTS.md`. The checked-in
+pre-push guard fetches remote staging and refuses a main push that omits its commits.
+It must be enabled per checkout; GitHub/API writes are not covered by local hooks.
