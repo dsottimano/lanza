@@ -607,12 +607,11 @@ chat), not because anything reached git.
   threw away integrity hashes, so every tenant build resolves transitives fresh from the
   registry. `ignore-scripts` closes the execution path; it does not restore integrity.
   The real fix is for the writers to *regenerate* the lock rather than delete it.
-- ◐ **`npm publish --provenance` from CI.** `.github/workflows/publish.yml` is written
-  and does the right things (full suite + typecheck, tag↔version match, `--provenance`,
-  `--ignore-scripts=false`, then `npm audit signatures`). **Two things before it works:**
-  add an `NPM_TOKEN` repo secret, and decide whether you want publishing to move off
-  your laptop at all — if you keep publishing by hand, delete the workflow rather than
-  leave it as decoration, and add `npm audit signatures` to the checklist instead.
+- ☑ **`npm publish --provenance` from CI.** `lanza-site` trusts only the GitHub-hosted
+  `dsottimano/lanza` `publish.yml` workflow for OIDC publishing. The workflow runs the
+  full suite + typecheck, enforces tag↔version matching, publishes with provenance and
+  `--ignore-scripts=false`, then runs `npm audit signatures`. It uses npm 11.6.2 because
+  trusted publishing requires npm 11.5.1 or newer; no long-lived `NPM_TOKEN` is stored.
 - ☐ **Fan-out cannot reach past its first 10 repos** — `listAllInstalledRepos` takes a
   limit and no cursor, so every run rescans the same first 10 while the response says
   "run again to continue". The only real enforcement mechanism is capped and says
