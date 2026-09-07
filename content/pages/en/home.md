@@ -5,7 +5,7 @@ template: landing
 preset: manifesto
 slots:
   tag: BETA · OWN YOUR PRESENCE · NOT RENTED
-  headline: 'Your website, your rules. Free, '
+  headline: Your website, your rules. Free, forever.
   sub: 'It''s free, fast, and ready for your agent.  Own your own content and little corner on the web.  '
   cta1: Start your site
   cta1Url: https://connect.lanzacms.com/
