@@ -6,7 +6,7 @@ preset: manifesto
 slots:
   tag: BETA · OWN YOUR PRESENCE · NOT RENTED
   headline: Own your presence on the web.
-  sub: 'You can post on social media all day and own none of it. Your writing, your audience, gone the day the platform is done with you. Lanza gives you a real site instead: a folder of files on GitHub, served free by Cloudflare, and edited by talking to ChatGPT or Claude. You keep a copy of everything.'
+  sub: It's free, fast, and ready for your agent.  Own your own content
   cta1: Start your site
   cta1Url: https://connect.lanzacms.com/
   cta2: How it works
