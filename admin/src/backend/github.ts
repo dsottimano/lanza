@@ -430,22 +430,65 @@ export class GitHubClient {
   }
 
   /**
-   * Publish: merge the working branch into production (which triggers the public
-   * rebuild). Returns whether anything was merged (`false` = production already
-   * up to date). A merge conflict surfaces as GitHubError(409) for the caller to
-   * report ("resolve on GitHub") — it never silently overwrites production.
+   * Publish a reviewed draft by fast-forwarding production. Divergent branches
+   * must be reconciled on staging first. Never publish a moving branch or force
+   * an update: either would bypass the human's reviewed content.
    */
-  async publish(message: string): Promise<{ merged: boolean }> {
-    const res = (await this.req(`/merges`, {
-      method: "POST",
-      body: JSON.stringify({
-        base: REPO.productionBranch,
-        head: REPO.branch,
-        commit_message: message,
-      }),
-    })) as { sha: string } | null;
-    // 201 → merge commit; 204 (null) → base already contains head, nothing to do.
-    return { merged: res !== null };
+  /** Capture both branch tips; compare immutable commits so the file list and
+   * publish request always refer to the same draft. */
+  async publishReview(): Promise<PublishReview> {
+    const heads = await this.publishHeads();
+    return { ...heads, diff: await this.compare(heads.productionSha, heads.stagingSha) };
+  }
+
+  private async publishHeads(): Promise<PublishHeads> {
+    const [production, staging] = await Promise.all([
+      this.req(`/git/ref/heads/${REPO.productionBranch}`),
+      this.req(`/git/ref/heads/${REPO.branch}`),
+    ]) as { object: { sha: string } }[];
+    return { productionSha: production!.object.sha, stagingSha: staging!.object.sha };
+  }
+
+  private async requireReviewedHeads(review: PublishHeads): Promise<void> {
+    const current = await this.publishHeads();
+    if (current.productionSha !== review.productionSha || current.stagingSha !== review.stagingSha) {
+      throw new PublishReviewError("stale", "The site or drafts changed since this review. Check the changes again before continuing.");
+    }
+  }
+
+  async updateDrafts(review: PublishHeads): Promise<void> {
+    await this.requireReviewedHeads(review);
+    // A normal Git merge preserves concurrent draft commits and refuses conflicts.
+    // Never reset a branch or use a force update to synchronize it.
+    await this.req('/merges', {
+      method: 'POST',
+      body: JSON.stringify({ base: REPO.branch, head: review.productionSha,
+        commit_message: 'lanza: bring published changes into drafts' }),
+    });
+  }
+
+  async publish(_message: string, reviewed?: PublishReview): Promise<{ merged: boolean }> {
+    const review = reviewed ?? await this.publishReview();
+    await this.requireReviewedHeads(review);
+    if (review.diff.status === 'diverged') {
+      throw new PublishReviewError('diverged', 'The live site changed separately from your drafts. Update drafts and review the combined changes before publishing.');
+    }
+    if (review.diff.status === 'identical' || review.diff.status === 'behind') return { merged: false };
+    if (review.diff.status !== 'ahead') throw new PublishReviewError('stale', 'Could not verify this draft. Check the changes again.');
+    try {
+      // Publish exactly the reviewed tree. A fast-forward-only ref update is
+      // enforced by GitHub: a concurrent production change outside this draft
+      // rejects the update, including changes arriving AFTER our preflight.
+      await this.req(`/git/refs/heads/${REPO.productionBranch}`, {
+        method: 'PATCH', body: JSON.stringify({ sha: review.stagingSha, force: false }),
+      });
+    } catch (e) {
+      if (e instanceof GitHubError && (e.status === 409 || e.status === 422)) {
+        await this.requireReviewedHeads(review);
+      }
+      throw e;
+    }
+    return { merged: true };
   }
 
   /**
@@ -562,4 +605,10 @@ export interface BlobResult {
   sha: string;
   content: string;
   encoding: string;
+}
+
+export interface PublishHeads { productionSha: string; stagingSha: string; }
+export interface PublishReview extends PublishHeads { diff: CompareResult; }
+export class PublishReviewError extends Error {
+  constructor(public code: 'stale' | 'diverged', message: string) { super(message); }
 }
