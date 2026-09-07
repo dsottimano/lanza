@@ -318,7 +318,7 @@ describe("PreviewPane — the exposed highlight API", () => {
     const { w, doc } = await paintedPane();
     api(w).highlight(["slots.heading"]);
     api(w).clearHighlights();
-    expect(styleText(doc)).toBe("[data-lanza-field]{cursor:pointer}");
+    expect(styleText(doc)).toBe("*,*::before,*::after{animation:none!important;transition:none!important}[data-lanza-field]{cursor:pointer}[data-lanza-field]:hover{outline:1px dashed currentColor;outline-offset:3px}");
   });
 
   it("finds a field to scroll to, and reports when it cannot", async () => {
@@ -434,5 +434,47 @@ describe("PreviewPane — scrollToField", () => {
     } finally {
       win.matchMedia = real;
     }
+  });
+});
+
+// Loading and edits must preserve a single, current preview document.
+describe("PreviewPane — stable loading", () => {
+  it("waits for both styles and markup before creating the frame", async () => {
+    let resolveCss!: (file: { text: string; sha: string }) => void;
+    const css = new Promise<{ text: string; sha: string }>(resolve => { resolveCss = resolve; });
+    const w = await mountPane({ client: {
+      loadText: (path: string) => path.endsWith("site.css") ? css : Promise.resolve({ text: TEMPLATE, sha: "t" }),
+    } });
+    expect(w.find("iframe").exists()).toBe(false);
+    expect(w.text()).toContain("Preparing your page");
+    resolveCss({ text: ":root{--paper:#abcdef}", sha: "c" });
+    await flushPromises();
+    expect(w.find("iframe").attributes("srcdoc")).toContain("--paper:#abcdef");
+    expect(w.find("iframe").attributes("srcdoc")).toContain("Own your site");
+    w.unmount();
+  });
+
+  it("ignores a slow response from a previously selected template", async () => {
+    let resolveOld!: (file: { text: string; sha: string }) => void;
+    const old = new Promise<{ text: string; sha: string }>(resolve => { resolveOld = resolve; });
+    const w = await mountPane({ client: {
+      loadText: (path: string) => path.includes("manifesto") ? old : Promise.resolve({ text: path.endsWith("site.css") ? "" : "<h1>Latest template</h1>", sha: "n" }),
+    } });
+    await w.setProps({ preset: "latest" });
+    await flushPromises();
+    expect(w.find("iframe").attributes("srcdoc")).toContain("Latest template");
+    resolveOld({ text: "<h1>Stale template</h1>", sha: "o" });
+    await flushPromises();
+    expect(w.find("iframe").attributes("srcdoc")).not.toContain("Stale template");
+    w.unmount();
+  });
+
+  it("keeps existing elements when an update produces identical markup", async () => {
+    const { w, doc } = await paintedPane();
+    const heading = doc.querySelector("h1");
+    await w.setProps({ slots: { heading: "Own your site", cards: [{ title: "A" }, { title: "B" }], unused: "changed" } });
+    await new Promise(resolve => setTimeout(resolve, 220));
+    expect(doc.querySelector("h1")).toBe(heading);
+    w.unmount();
   });
 });

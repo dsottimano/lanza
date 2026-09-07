@@ -1,0 +1,408 @@
+
+
+<div class="arc">
+  <header class="arc-head">
+    <span class="arc-tag">{{ tag }}</span>
+    <h1 class="arc-headline">{{ headline }}</h1>
+    <p class="arc-sub">{{ sub }}</p>
+  </header>
+
+  <!-- the parts -->
+  <section class="arc-sec">
+    <div class="arc-wrap">
+      <span class="arc-eyebrow">{{ partsEyebrow }}</span>
+      <h2 class="arc-h2">{{ partsHead }}</h2>
+      <p class="arc-lede">{{ partsIntro }}</p>
+      <div class="arc-scroll">
+        <table class="arc-table">
+          <thead>
+            <tr>{{#each partsCols}}<th scope="col">{{ text }}</th>{{/each}}</tr>
+          </thead>
+          <tbody>
+            {{#each parts}}
+              <tr>
+                <th scope="row">{{ name }}</th>
+                <td>{{ what }}</td>
+                <td class="arc-td--tight">{{ who }}</td>
+                <td class="arc-td--tight">
+                  <span class="arc-flag">{{ secrets }}</span>
+                </td>
+              </tr>
+            {{/each}}
+          </tbody>
+        </table>
+      </div>
+    </div>
+  </section>
+
+  <!-- life of an edit -->
+  <section class="arc-sec arc-sec--tint">
+    <div class="arc-wrap">
+      <span class="arc-eyebrow">{{ editEyebrow }}</span>
+      <h2 class="arc-h2">{{ editHead }}</h2>
+      <p class="arc-lede">{{ editIntro }}</p>
+      <ol class="arc-steps">
+        {{#each editSteps}}
+          <li class="arc-step">
+            <span class="arc-step__num">{{ @number }}</span>
+            <div class="arc-step__body">
+              <h3 class="arc-step__t">{{ t }}</h3>
+              <code class="arc-code">{{ c }}</code>
+              <p class="arc-step__b">{{ b }}</p>
+            </div>
+          </li>
+        {{/each}}
+      </ol>
+    </div>
+  </section>
+
+  <!-- signing in -->
+  <section class="arc-sec">
+    <div class="arc-wrap">
+      <span class="arc-eyebrow">{{ authEyebrow }}</span>
+      <h2 class="arc-h2">{{ authHead }}</h2>
+      <p class="arc-lede">{{ authIntro }}</p>
+      <ol class="arc-seq">
+        {{#each authSteps}}<li>{{ text }}</li>{{/each}}
+      </ol>
+      <aside class="arc-callout">
+        <h3 class="arc-callout__t">{{ authCalloutHead }}</h3>
+        <p class="arc-callout__b">{{ authCalloutBody }}</p>
+      </aside>
+    </div>
+  </section>
+
+  <!-- blast radius -->
+  <section class="arc-sec arc-sec--tint">
+    <div class="arc-wrap">
+      <span class="arc-eyebrow">{{ keysEyebrow }}</span>
+      <h2 class="arc-h2">{{ keysHead }}</h2>
+      <p class="arc-lede">{{ keysIntro }}</p>
+      <div class="arc-scroll">
+        <table class="arc-table">
+          <thead>
+            <tr>{{#each keysCols}}<th scope="col">{{ text }}</th>{{/each}}</tr>
+          </thead>
+          <tbody>
+            {{#each keys}}
+              <tr>
+                <th scope="row">{{ cred }}</th>
+                <td>{{ reaches }}</td>
+                <td class="arc-td--tight"><code class="arc-code arc-code--bare">{{ life }}</code></td>
+              </tr>
+            {{/each}}
+          </tbody>
+        </table>
+      </div>
+    </div>
+  </section>
+
+  <!-- agents -->
+  <section class="arc-band">
+    <div class="arc-wrap">
+      <span class="arc-eyebrow arc-eyebrow--bright">{{ agentEyebrow }}</span>
+      <h2 class="arc-h2 arc-h2--invert">{{ agentHead }}</h2>
+      <p class="arc-lede arc-lede--invert">{{ agentBody }}</p>
+      <a class="arc-link" href="{{ agentUrl }}">{{ agentLink }}<span class="arc-arrow" aria-hidden="true">↗</span></a>
+    </div>
+  </section>
+
+  <!-- cost -->
+  <section class="arc-sec">
+    <div class="arc-wrap">
+      <span class="arc-eyebrow">{{ costEyebrow }}</span>
+      <h2 class="arc-h2">{{ costHead }}</h2>
+      <p class="arc-lede">{{ costBody }}</p>
+      <div class="arc-tiles">
+        {{#each costTiles}}
+          <div class="arc-tile">
+            <span class="arc-tile__v">{{ value }}</span>
+            <span class="arc-tile__l">{{ label }}</span>
+          </div>
+        {{/each}}
+      </div>
+    </div>
+  </section>
+
+  <!-- the line we drew -->
+  <section class="arc-sec">
+    <div class="arc-wrap">
+      <span class="arc-eyebrow">{{ sovEyebrow }}</span>
+      <h2 class="arc-h2">{{ sovHead }}</h2>
+      <p class="arc-lede">{{ sovIntro }}</p>
+      <div class="arc-ba">
+        <div class="arc-ba__col">
+          <span class="arc-ba__label">{{ sovBeforeLabel }}</span>
+          <p class="arc-ba__body">{{ sovBefore }}</p>
+        </div>
+        <div class="arc-ba__col">
+          <span class="arc-ba__label">{{ sovAfterLabel }}</span>
+          <p class="arc-ba__body">{{ sovAfter }}</p>
+        </div>
+      </div>
+      <ul class="arc-gone">
+        {{#each sovRows}}
+          <li class="arc-gone__row">
+            <span class="arc-gone__what">{{ what }}</span>
+            <span class="arc-gone__state">{{ state }}</span>
+          </li>
+        {{/each}}
+      </ul>
+      <aside class="arc-callout">
+        <h3 class="arc-callout__t">{{ sovHonestHead }}</h3>
+        <p class="arc-callout__b">{{ sovHonestBody }}</p>
+      </aside>
+    </div>
+  </section>
+
+  <!-- updates + leaving -->
+  <section class="arc-sec arc-sec--tint">
+    <div class="arc-wrap">
+      <span class="arc-eyebrow">{{ ownEyebrow }}</span>
+      <h2 class="arc-h2">{{ ownHead }}</h2>
+      <p class="arc-lede">{{ ownBody }}</p>
+    </div>
+  </section>
+
+  <section class="arc-cta">
+    <div class="arc-wrap arc-wrap--narrow">
+      <h2 class="arc-cta__head">{{ ctaHead }}</h2>
+      <p class="arc-cta__sub">{{ ctaSub }}</p>
+      <a class="arc-btn" href="{{ ctaUrl }}">{{ cta }}<span class="arc-arrow" aria-hidden="true">↗</span></a>
+    </div>
+  </section>
+</div>
+
+<style>
+  .arc { color: var(--ink); font-family: var(--font-ui); }
+  .arc-wrap { max-width: var(--wide); margin: 0 auto; padding: 0 1.5rem; }
+  .arc-wrap--narrow { max-width: 62rem; }
+
+  /* header */
+  .arc-head { max-width: var(--wide); margin: 0 auto; padding: clamp(3rem, 7vw, 5.5rem) 1.5rem clamp(1.5rem, 4vw, 2.5rem); }
+  .arc-tag {
+    display: inline-block;
+    font-family: var(--font-mono);
+    font-size: 0.7rem;
+    letter-spacing: 0.22em;
+    color: var(--accent);
+    padding-bottom: 0.9rem;
+    margin-bottom: 1.4rem;
+    border-bottom: 1px solid var(--rule);
+  }
+  .arc-headline {
+    font-family: var(--font-heading);
+    font-weight: 600;
+    font-size: clamp(2.4rem, 5.4vw, 4.2rem);
+    line-height: 1.02;
+    letter-spacing: -0.03em;
+    margin: 0 0 1.2rem;
+    max-width: 18ch;
+    text-wrap: balance;
+  }
+  .arc-sub { font-size: 1.16rem; line-height: 1.65; color: var(--text-secondary); max-width: 62ch; margin: 0; }
+
+  /* sections */
+  .arc-sec { padding: clamp(3rem, 7vw, 5rem) 0; }
+  .arc-sec--tint { background: var(--surface); }
+  .arc-eyebrow {
+    display: inline-block;
+    font-family: var(--font-mono);
+    font-size: 0.7rem;
+    letter-spacing: 0.22em;
+    text-transform: uppercase;
+    color: var(--accent);
+    margin-bottom: 1.1rem;
+  }
+  .arc-h2 {
+    font-family: var(--font-heading);
+    font-weight: 600;
+    font-size: clamp(1.8rem, 3.8vw, 2.8rem);
+    line-height: 1.06;
+    letter-spacing: -0.02em;
+    margin: 0 0 1.1rem;
+    max-width: 22ch;
+    text-wrap: balance;
+  }
+  .arc-lede { font-size: 1.1rem; line-height: 1.7; color: var(--text-secondary); max-width: 66ch; margin: 0 0 2rem; }
+
+  /* tables: wide content scrolls inside itself, never the page */
+  .arc-scroll { overflow-x: auto; }
+  .arc-table { width: 100%; border-collapse: collapse; min-width: 44rem; text-align: left; }
+  .arc-table th,
+  .arc-table td {
+    padding: 0.95rem 1rem 0.95rem 0;
+    border-top: 1px solid var(--rule);
+    vertical-align: top;
+    font-size: 0.98rem;
+    line-height: 1.55;
+  }
+  .arc-table thead th {
+    border-top: 0;
+    border-bottom: 1px solid var(--ink);
+    font-family: var(--font-mono);
+    font-size: 0.7rem;
+    letter-spacing: 0.16em;
+    text-transform: uppercase;
+    color: var(--muted);
+    font-weight: 500;
+    padding-bottom: 0.7rem;
+  }
+  .arc-table tbody th { font-weight: 600; color: var(--ink); padding-right: 1.5rem; }
+  .arc-table td { color: var(--text-secondary); padding-right: 1.5rem; }
+  .arc-td--tight { white-space: nowrap; }
+
+  .arc-flag { font-family: var(--font-mono); font-size: 0.78rem; letter-spacing: 0.04em; }
+  .arc-flag--no { color: var(--text-secondary); }
+  .arc-flag--yes { color: var(--accent); font-weight: 500; }
+
+  /* numbered steps */
+  .arc-steps { list-style: none; margin: 0; padding: 0; display: grid; gap: 1.6rem; }
+  .arc-step { display: grid; grid-template-columns: auto 1fr; gap: 1.2rem; align-items: start; }
+  .arc-step__num {
+    font-family: var(--font-mono);
+    font-size: 0.78rem;
+    letter-spacing: 0.1em;
+    color: var(--accent);
+    padding-top: 0.3rem;
+  }
+  .arc-step__body { border-left: 2px solid var(--rule); padding-left: 1.4rem; }
+  .arc-step__t {
+    font-family: var(--font-heading);
+    font-weight: 600;
+    font-size: 1.28rem;
+    line-height: 1.2;
+    letter-spacing: -0.01em;
+    margin: 0 0 0.6rem;
+  }
+  .arc-step__b { font-size: 1rem; line-height: 1.65; color: var(--text-secondary); max-width: 62ch; margin: 0.7rem 0 0; }
+
+  .arc-code {
+    display: inline-block;
+    font-family: var(--font-mono);
+    font-size: 0.76rem;
+    color: var(--text-secondary);
+    background: var(--paper-card);
+    border: 1px solid var(--rule);
+    border-radius: 2px;
+    padding: 0.26rem 0.55rem;
+  }
+  .arc-sec--tint .arc-code { background: var(--paper); }
+  .arc-code--bare { background: none; border: 0; padding: 0; }
+
+  /* auth sequence */
+  .arc-seq { margin: 0 0 2rem; padding: 0 0 0 1.4rem; max-width: 68ch; display: grid; gap: 0.85rem; }
+  .arc-seq li { font-size: 1.02rem; line-height: 1.65; color: var(--text-secondary); padding-left: 0.4rem; }
+  .arc-seq li::marker { font-family: var(--font-mono); font-size: 0.82rem; color: var(--accent); }
+
+  .arc-callout {
+    border-left: 3px solid var(--accent);
+    background: var(--paper-card);
+    padding: 1.5rem 1.6rem;
+    max-width: 68ch;
+  }
+  .arc-callout__t {
+    font-family: var(--font-heading);
+    font-weight: 600;
+    font-size: 1.18rem;
+    line-height: 1.25;
+    margin: 0 0 0.7rem;
+  }
+  .arc-callout__b { font-size: 1rem; line-height: 1.68; color: var(--text-secondary); margin: 0; }
+
+  /* before / after — the release stated as a pair, because the claim only means
+     something next to what it replaced. */
+  .arc-ba {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 1.5rem;
+    margin: 2rem 0 2.25rem;
+  }
+  .arc-ba__col {
+    border-top: 2px solid var(--rule);
+    padding-top: 1rem;
+  }
+  .arc-ba__col:last-child { border-top-color: var(--accent); }
+  .arc-ba__label {
+    display: block;
+    font-size: 0.75rem;
+    letter-spacing: 0.09em;
+    text-transform: uppercase;
+    color: var(--text-tertiary, var(--text-secondary));
+    margin-bottom: 0.55rem;
+  }
+  .arc-ba__body { font-size: 1rem; line-height: 1.68; color: var(--text-secondary); margin: 0; }
+
+  /* the deletion list. Deliberately plain: a struck-through inventory reads as a
+     receipt, which is what it is. */
+  .arc-gone { list-style: none; margin: 0 0 2rem; padding: 0; max-width: 68ch; }
+  .arc-gone__row {
+    display: flex;
+    align-items: baseline;
+    justify-content: space-between;
+    gap: 1.25rem;
+    padding: 0.75rem 0;
+    border-bottom: 1px solid var(--rule);
+  }
+  .arc-gone__row:first-child { border-top: 1px solid var(--rule); }
+  .arc-gone__what { font-size: 0.98rem; line-height: 1.5; text-decoration: line-through; color: var(--text-secondary); }
+  .arc-gone__state {
+    flex: 0 0 auto;
+    font-size: 0.72rem;
+    letter-spacing: 0.08em;
+    text-transform: uppercase;
+    color: var(--accent);
+  }
+
+  @media (max-width: 46rem) {
+    .arc-ba { grid-template-columns: 1fr; gap: 1.75rem; }
+    .arc-gone__row { flex-direction: column; gap: 0.3rem; }
+  }
+
+  /* cost tiles */
+  .arc-tiles { display: grid; grid-template-columns: repeat(auto-fit, minmax(14rem, 1fr)); gap: 1px; background: var(--rule); border: 1px solid var(--rule); }
+  .arc-tile { background: var(--bg); padding: 1.6rem 1.4rem; display: grid; gap: 0.5rem; }
+  .arc-sec--tint .arc-tile { background: var(--surface); }
+  .arc-tile__v { font-family: var(--font-heading); font-weight: 600; font-size: clamp(1.9rem, 4vw, 2.6rem); line-height: 1; letter-spacing: -0.02em; color: var(--accent); }
+  .arc-tile__l { font-size: 0.95rem; line-height: 1.5; color: var(--text-secondary); }
+
+  /* dark agent band */
+  .arc-band { background: var(--ink-deep); padding: clamp(3.5rem, 8vw, 5.5rem) 0; }
+  .arc-eyebrow--bright { color: var(--accent-bright); }
+  .arc-h2--invert { color: #fff; }
+  .arc-lede--invert { color: #a8a199; max-width: 68ch; margin-bottom: 1.6rem; }
+  .arc-link { font-family: var(--font-mono); font-size: 0.76rem; letter-spacing: 0.1em; text-transform: uppercase; color: var(--accent-bright); text-decoration: none; }
+
+  /* closing cta */
+  .arc-cta { background: var(--ink); padding: clamp(3.5rem, 8vw, 5.5rem) 0; text-align: center; }
+  .arc-cta__head { font-family: var(--font-heading); font-weight: 600; font-size: clamp(1.9rem, 4.6vw, 3rem); line-height: 1.04; letter-spacing: -0.02em; margin: 0 0 0.9rem; color: #fff; }
+  .arc-cta__sub { font-size: 1.08rem; color: #a8a199; margin: 0 auto 1.8rem; max-width: 44ch; }
+  .arc-btn {
+    display: inline-flex;
+    align-items: center;
+    background: var(--accent);
+    color: var(--on-accent);
+    font-family: var(--font-mono);
+    font-size: 0.8rem;
+    letter-spacing: 0.14em;
+    text-transform: uppercase;
+    padding: 1.05rem 2rem;
+    border-radius: var(--radius);
+    text-decoration: none;
+    transition: transform 140ms ease, background 140ms ease;
+  }
+  .arc-btn:hover { transform: translateY(-2px); background: var(--accent-bright); }
+
+  .arc-arrow { display: inline-block; margin-left: 0.4em; transition: transform 160ms ease; }
+  .arc-link:hover .arc-arrow, .arc-btn:hover .arc-arrow { transform: translate(2px, -2px); }
+  .arc a:focus-visible, .arc-btn:focus-visible { outline: 2px solid var(--accent); outline-offset: 3px; }
+
+  @media (prefers-reduced-motion: reduce) {
+    .arc-btn, .arc-arrow { transition: none; }
+  }
+
+  @media (max-width: 640px) {
+    .arc-step { grid-template-columns: 1fr; gap: 0.5rem; }
+    .arc-step__body { border-left: 0; padding-left: 0; }
+  }
+</style>

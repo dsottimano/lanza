@@ -142,3 +142,16 @@ describe("EntryLocaleBar", () => {
     expect(router.currentRoute.value.fullPath).toBe("/");
   });
 });
+
+it("shows each language's actual homepage path", async () => {
+  const { wrapper } = await bar({ slug: "home", showUrls: true });
+  expect(wrapper.findAll('.entry-language-path').map(el => el.text())).toEqual(['/', '/es/']);
+  wrapper.unmount();
+});
+
+it("uses the configured default locale when showing language URLs", async () => {
+  site.defaultLocale = "es";
+  const { wrapper } = await bar({ slug: "about", showUrls: true });
+  expect(wrapper.findAll('.entry-language-path').map(el => el.text())).toEqual(['/en/about/', '/about/']);
+  wrapper.unmount();
+});

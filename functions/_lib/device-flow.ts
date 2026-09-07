@@ -23,6 +23,12 @@ const DEVICE_GRANT = "urn:ietf:params:oauth:grant-type:device_code";
 export const ACCESS_COOKIE = "lanza_gh";
 export const REFRESH_COOKIE = "lanza_gh_refresh";
 export const DEVICE_COOKIE = "lanza_gh_device";
+// The AGENT authorization is a second, separate device flow — a different GitHub
+// App, and its result is handed to a person to paste into an MCP client rather than
+// kept in a cookie. It gets its own device-code cookie so starting one cannot
+// hijack or clobber a sign-in in progress, and so a code approved for one flow can
+// never be redeemed by the other.
+export const AGENT_DEVICE_COOKIE = "lanza_agent_device";
 
 // GitHub's own default when it declines to say (it always does, in practice).
 const DEFAULT_ACCESS_TTL = 8 * 3600;
@@ -204,6 +210,16 @@ const cleared = (name: string): string => `${name}=; Path=/admin; Max-Age=0`;
 /** The device code, held server-side for the length of one sign-in attempt. */
 export function deviceCookie(deviceCode: string): string {
   return cookie(DEVICE_COOKIE, deviceCode, DEVICE_CODE_TTL);
+}
+
+/** The same, for the agent authorization (a different App, a different cookie). */
+export function agentDeviceCookie(deviceCode: string): string {
+  return cookie(AGENT_DEVICE_COOKIE, deviceCode, DEVICE_CODE_TTL);
+}
+
+/** Drop a spent agent device code. */
+export function clearAgentDeviceCookie(): string {
+  return cleared(AGENT_DEVICE_COOKIE);
 }
 
 /**

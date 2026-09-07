@@ -38,7 +38,7 @@ export function templateHtmlPath(name: string): string {
 export async function listTemplates(client: GitHubClient): Promise<TemplateInfo[]> {
   const dirs = await client.listSubdirs(TEMPLATES_ROOT);
   const out: TemplateInfo[] = [];
-  for (const d of dirs) {
+  await Promise.all(dirs.map(async (d) => {
     try {
       const { data } = await client.loadJson(`${TEMPLATES_ROOT}/${d.name}/fields.json`);
       out.push({
@@ -51,6 +51,6 @@ export async function listTemplates(client: GitHubClient): Promise<TemplateInfo[
     } catch {
       // No/invalid fields.json — not a usable template; skip it.
     }
-  }
+  }));
   return out.sort((a, b) => a.label.localeCompare(b.label));
 }

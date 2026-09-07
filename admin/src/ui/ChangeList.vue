@@ -15,6 +15,8 @@ const props = defineProps<{
   diff: EntryDiff;
   /** The collection's fields, for human labels. Absent → paths render raw. */
   fields?: Field[];
+  embedded?: boolean;
+  selected?: string | null;
 }>();
 
 const emit = defineEmits<{
@@ -117,7 +119,7 @@ const isMissing = (v: unknown) => v === undefined;
 </script>
 
 <template>
-  <section class="card p-5">
+  <section class="change-list" :class="embedded ? 'change-list--embedded' : 'card p-5'">
     <header class="mb-4">
       <h2 class="font-serif text-lg font-bold tracking-tight text-zinc-900">Review changes</h2>
       <p v-if="STATE_MESSAGE[diff.status]" class="mt-1 text-sm text-zinc-600">
@@ -132,27 +134,29 @@ const isMissing = (v: unknown) => v === undefined;
       <li
         v-for="row in rows"
         :key="row.path"
-        class="group flex items-start gap-2 transition hover:bg-[var(--surface)]"
+        class="change-row group transition hover:bg-[var(--surface)]"
+        :class="{ 'change-row--selected': selected === row.path }"
       >
         <button
           type="button"
-          class="min-w-0 flex-1 px-2 py-3 text-left"
+          class="change-select min-w-0 flex-1 px-2 py-3 text-left"
+          :aria-pressed="selected === row.path"
           :title="row.path"
           @click="emit('select', row.path)"
         >
-          <span class="flex items-baseline gap-2">
+          <span class="flex flex-wrap items-baseline gap-2">
             <span class="truncate text-sm font-medium text-zinc-900">{{ labelFor(row.path) }}</span>
             <span class="shrink-0 text-xs uppercase tracking-wide text-zinc-400">
               {{ STATUS_WORD[row.status] }}
             </span>
           </span>
-          <span class="mt-1.5 flex flex-col gap-1 text-sm sm:flex-row sm:items-baseline sm:gap-3">
+          <span class="change-values mt-2 text-sm">
             <span class="min-w-0 flex-1">
               <span class="mr-1.5 text-xs text-zinc-400">Live</span>
               <span v-if="isMissing(row.live)" class="italic text-zinc-400">not set</span>
               <span v-else class="text-zinc-500 line-through decoration-zinc-300">{{ summarize(row.live) }}</span>
             </span>
-            <span class="shrink-0 text-zinc-300" aria-hidden="true">→</span>
+            <span class="change-arrow shrink-0 text-zinc-300" aria-hidden="true">→</span>
             <span class="min-w-0 flex-1">
               <span class="mr-1.5 text-xs text-zinc-400">After</span>
               <span v-if="isMissing(row.staged)" class="italic text-zinc-400">removed</span>
@@ -164,7 +168,7 @@ const isMissing = (v: unknown) => v === undefined;
         <button
           v-if="canRevert"
           type="button"
-          class="shrink-0 self-center px-3 py-1.5 text-xs text-zinc-500 opacity-0 transition focus:opacity-100 hover:text-zinc-900 hover:underline group-hover:opacity-100"
+          class="change-revert shrink-0 px-2 py-1.5 text-xs text-zinc-500 transition hover:text-zinc-900 hover:underline"
           :aria-label="`Revert ${labelFor(row.path)} to the live version`"
           @click="emit('revert', row.path)"
         >
@@ -174,3 +178,20 @@ const isMissing = (v: unknown) => v === undefined;
     </ul>
   </section>
 </template>
+
+<style scoped>
+.change-list { container-type: inline-size; min-width: 0; }
+.change-list--embedded { padding: 0; border: 0; background: transparent; }
+.change-row { display: flex; flex-wrap: wrap; align-items: start; padding-block: .3rem; }
+.change-row--selected { background: var(--surface); box-shadow: inset 2px 0 var(--accent); }
+.change-select { flex-basis: 100%; overflow-wrap: anywhere; }
+.change-values { display: grid; gap: .65rem; line-height: 1.6; }
+.change-values > span:not(.change-arrow) { display: block; }
+.change-values > span > span:first-child { display: block; margin-bottom: .15rem; }
+.change-arrow { display: none; }
+.change-revert { margin: -.25rem 0 .5rem auto; }
+@container (min-width: 34rem) {
+  .change-values { grid-template-columns: minmax(0, 1fr) auto minmax(0, 1fr); gap: 1rem; }
+  .change-arrow { display: block; }
+}
+</style>

@@ -9,7 +9,7 @@
 // the Telegram bot. HTML-escaping does NOT help here: the parser decodes entities
 // before the URL is parsed, so `javascript&#58;…` still runs.
 //
-// Callers: frontend/components/Blocks.astro (block frontmatter) and
+// Callers: frontend/components/LegacyPageBlocks.astro (block frontmatter) and
 // frontend/lib/template-render.ts (any placeholder emitted inside href/src/…).
 // MIRRORED in admin/src/backend/menu.ts so the CMS refuses to SAVE an unsafe menu
 // URL — separate build roots (Astro/TS here, Vite/TS there) mean no shared import,

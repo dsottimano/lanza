@@ -61,7 +61,7 @@ export interface Field {
   // object
   fields?: Field[];
   collapsed?: boolean;
-  // list — `fields` => object items; `types` => typed variants (page blocks);
+  // list — `fields` => object items; `types` => typed variants (structured records);
   // neither => plain string items (e.g. organization.sameAs)
   types?: Variant[];
   labelSingular?: string;

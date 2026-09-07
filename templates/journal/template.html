@@ -1,0 +1,16 @@
+<style>
+  .post-card { display: block; text-decoration: none; color: inherit; border: 1px solid var(--border-subtle); background: var(--surface); transition: border-color 0.15s; }
+  .post-card:hover { border-color: var(--gold); }
+  .post-card__media { aspect-ratio: 16/10; overflow: hidden; background: var(--surface); }
+  .post-card__media img { width: 100%; height: 100%; object-fit: cover; display: block; }
+  .post-card__body { padding: 1.1rem 1.2rem 1.4rem; }
+  .post-card__title { font-size: 1.3rem; margin: 0 0 0.5rem; }
+  .post-card__excerpt { color: var(--text-secondary); line-height: 1.6; font-size: 0.92rem; margin: 0; }
+
+
+  .journal-head { margin-bottom: 2rem; padding-bottom: 1.4rem; border-bottom: 1px solid var(--border-subtle); }
+  .journal-head .u-kicker { display: block; margin-bottom: 0.5rem; }
+  .journal-head h1 { margin: 0; }
+  .posts-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(280px, 1fr)); gap: 1.4rem; }
+  @media (max-width: 560px) { .posts-grid { grid-template-columns: 1fr; } }
+</style><div class="layout-wide"><header class="journal-head"><span class="u-kicker">{{ heading }}</span><h1>{{ heading }}</h1>{{#if intro}}<p>{{ intro }}</p>{{/if}}</header><div class="posts-grid">{{#each entries}}<a class="post-card" href="{{ url }}">{{#if featuredImage}}<div class="post-card__media"><img src="{{ featuredImage }}" alt="{{ title }}" width="400" height="260" loading="lazy" decoding="async"></div>{{/if}}<div class="post-card__body"><h3 class="post-card__title">{{ title }}</h3>{{#if description}}<p class="post-card__excerpt">{{ description }}</p>{{/if}}</div></a>{{/each}}</div>{{#if isEmpty}}<p>{{ emptyText }}</p>{{/if}}</div>

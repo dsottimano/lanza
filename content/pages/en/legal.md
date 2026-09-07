@@ -7,8 +7,6 @@ seo:
   metaTitle: Terms & Privacy
   metaDescription: 'Terms of service and privacy policy for Lanza: what the service does, what it accesses on your GitHub and Cloudflare accounts, and how your data is handled.'
   noindex: false
-preset: manifesto
-slots: {}
 ---
 
 <p><em>Last updated: July 10, 2026</em></p>

@@ -1,0 +1,318 @@
+{
+  "name": "editorial",
+  "label": "Lanza product story",
+  "description": "Product overview, real editor screenshots, workflow and questions. Text and images are grouped by visible section.",
+  "body": false,
+  "fields": [
+    {
+      "name": "eyebrow",
+      "label": "Eyebrow",
+      "widget": "string",
+      "group": "Hero"
+    },
+    {
+      "name": "headline",
+      "label": "Headline",
+      "widget": "string",
+      "group": "Hero"
+    },
+    {
+      "name": "headlineAccent",
+      "label": "Headline Accent",
+      "widget": "string",
+      "group": "Hero"
+    },
+    {
+      "name": "introduction",
+      "label": "Introduction",
+      "widget": "text",
+      "group": "Hero"
+    },
+    {
+      "name": "startLabel",
+      "label": "Start Label",
+      "widget": "string",
+      "group": "Hero"
+    },
+    {
+      "name": "startUrl",
+      "label": "Start Url",
+      "widget": "string",
+      "group": "Hero"
+    },
+    {
+      "name": "guideLabel",
+      "label": "Guide Label",
+      "widget": "string",
+      "group": "Hero"
+    },
+    {
+      "name": "guideUrl",
+      "label": "Guide Url",
+      "widget": "string",
+      "group": "Hero"
+    },
+    {
+      "name": "heroNote",
+      "label": "Hero Note",
+      "widget": "text",
+      "group": "Hero"
+    },
+    {
+      "name": "screenshotLabel",
+      "label": "Screenshot Label",
+      "widget": "string",
+      "group": "Writing workspace"
+    },
+    {
+      "name": "screenshotContext",
+      "label": "Screenshot Context",
+      "widget": "string",
+      "group": "Writing workspace"
+    },
+    {
+      "name": "workspaceImage",
+      "label": "Workspace Image",
+      "widget": "image",
+      "group": "Writing workspace"
+    },
+    {
+      "name": "workspaceAlt",
+      "label": "Workspace Alt",
+      "widget": "string",
+      "group": "Writing workspace"
+    },
+    {
+      "name": "screenshotCaption",
+      "label": "Screenshot Caption",
+      "widget": "string",
+      "group": "Writing workspace"
+    },
+    {
+      "name": "screenshotLink",
+      "label": "Screenshot Link",
+      "widget": "string",
+      "group": "Writing workspace"
+    },
+    {
+      "name": "featuresEyebrow",
+      "label": "Features Eyebrow",
+      "widget": "string",
+      "group": "Features"
+    },
+    {
+      "name": "featuresHeadline",
+      "label": "Features Headline",
+      "widget": "string",
+      "group": "Features"
+    },
+    {
+      "name": "featuresIntro",
+      "label": "Features Intro",
+      "widget": "text",
+      "group": "Features"
+    },
+    {
+      "name": "features",
+      "label": "Features",
+      "widget": "list",
+      "group": "Features",
+      "fields": [
+        {
+          "name": "number",
+          "label": "Number",
+          "widget": "string"
+        },
+        {
+          "name": "title",
+          "label": "Title",
+          "widget": "string"
+        },
+        {
+          "name": "description",
+          "label": "Description",
+          "widget": "text"
+        }
+      ]
+    },
+    {
+      "name": "workflowEyebrow",
+      "label": "Workflow Eyebrow",
+      "widget": "string",
+      "group": "Workflow"
+    },
+    {
+      "name": "workflowHeadline",
+      "label": "Workflow Headline",
+      "widget": "string",
+      "group": "Workflow"
+    },
+    {
+      "name": "workflowIntro",
+      "label": "Workflow Intro",
+      "widget": "text",
+      "group": "Workflow"
+    },
+    {
+      "name": "steps",
+      "label": "Steps",
+      "widget": "list",
+      "group": "Workflow",
+      "fields": [
+        {
+          "name": "number",
+          "label": "Number",
+          "widget": "string"
+        },
+        {
+          "name": "title",
+          "label": "Title",
+          "widget": "string"
+        },
+        {
+          "name": "description",
+          "label": "Description",
+          "widget": "text"
+        }
+      ]
+    },
+    {
+      "name": "promptLabel",
+      "label": "Prompt Label",
+      "widget": "string",
+      "group": "Workflow"
+    },
+    {
+      "name": "prompt",
+      "label": "Prompt",
+      "widget": "text",
+      "group": "Workflow"
+    },
+    {
+      "name": "detailsEyebrow",
+      "label": "Details Eyebrow",
+      "widget": "string",
+      "group": "Expanded details"
+    },
+    {
+      "name": "detailsHeadline",
+      "label": "Details Headline",
+      "widget": "string",
+      "group": "Expanded details"
+    },
+    {
+      "name": "detailsIntro",
+      "label": "Details Intro",
+      "widget": "text",
+      "group": "Expanded details"
+    },
+    {
+      "name": "detailsLink",
+      "label": "Details Link",
+      "widget": "string",
+      "group": "Expanded details"
+    },
+    {
+      "name": "detailsImage",
+      "label": "Details Image",
+      "widget": "image",
+      "group": "Expanded details"
+    },
+    {
+      "name": "detailsAlt",
+      "label": "Details Alt",
+      "widget": "string",
+      "group": "Expanded details"
+    },
+    {
+      "name": "ownershipEyebrow",
+      "label": "Ownership Eyebrow",
+      "widget": "string",
+      "group": "Ownership"
+    },
+    {
+      "name": "ownershipHeadline",
+      "label": "Ownership Headline",
+      "widget": "string",
+      "group": "Ownership"
+    },
+    {
+      "name": "ownershipIntro",
+      "label": "Ownership Intro",
+      "widget": "text",
+      "group": "Ownership"
+    },
+    {
+      "name": "sourceUrl",
+      "label": "Source Url",
+      "widget": "string",
+      "group": "Ownership"
+    },
+    {
+      "name": "sourceLabel",
+      "label": "Source Label",
+      "widget": "string",
+      "group": "Ownership"
+    },
+    {
+      "name": "facts",
+      "label": "Facts",
+      "widget": "list",
+      "group": "Ownership",
+      "fields": [
+        {
+          "name": "title",
+          "label": "Title",
+          "widget": "string"
+        },
+        {
+          "name": "description",
+          "label": "Description",
+          "widget": "text"
+        }
+      ]
+    },
+    {
+      "name": "faqEyebrow",
+      "label": "Faq Eyebrow",
+      "widget": "string",
+      "group": "Questions"
+    },
+    {
+      "name": "faqHeadline",
+      "label": "Faq Headline",
+      "widget": "string",
+      "group": "Questions"
+    },
+    {
+      "name": "questions",
+      "label": "Questions",
+      "widget": "list",
+      "group": "Questions",
+      "fields": [
+        {
+          "name": "question",
+          "label": "Question",
+          "widget": "string"
+        },
+        {
+          "name": "answer",
+          "label": "Answer",
+          "widget": "text"
+        }
+      ]
+    },
+    {
+      "name": "closeHeadline",
+      "label": "Close Headline",
+      "widget": "string",
+      "group": "Closing invitation"
+    },
+    {
+      "name": "closeIntro",
+      "label": "Close Intro",
+      "widget": "text",
+      "group": "Closing invitation"
+    }
+  ]
+}

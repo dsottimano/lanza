@@ -1,7 +1,7 @@
 # Life of an onboarding
 
-How a stranger goes from nothing to a live site they own, in detail. **Status:
-2026-07-25 — proven end to end.** `datadefine/bbbb` → `bbbb-2db67eab8649.pages.dev`,
+How a stranger goes from nothing to a live site they own, in detail. **Status: proven end to end
+2026-07-25; auth rewritten 2026-08-29, re-run owed.** `datadefine/bbbb` → `bbbb-2db67eab8649.pages.dev`,
 driven as a third-party tenant (not as the Lanza owner), including `/admin` login, an
 edit, a publish, and Cloudflare rebuilding from the merge.
 
@@ -32,7 +32,7 @@ broker origin — no KV, no database.
 | cookie | set by | carries |
 |---|---|---|
 | `lanza_gh` | `onboard/oauth/callback.ts` | `{owner, repo, login}` |
-| `lanza_cf` | `auth/cf/callback.ts` | `{access, refresh, expires_at, account_id}` |
+| `lanza_cf` | `auth/cf/callback.ts` | `{access, expires_at, account_id}` — no refresh token |
 | `lanza_cf_state` | `auth/cf/login.ts` | CSRF nonce, 600s |
 
 `POST /api/onboard/reset` expires all three. The page cannot — they are HttpOnly.
@@ -49,7 +49,8 @@ In the callback (`onboard/oauth/callback.ts`), before the user sees another scre
 1. sanitise the name → `[a-z0-9._-]`, collapse the rest to `-`, cap 90 chars,
    fall back to `<login>-site`
 2. `POST /repos/{TEMPLATE_OWNER}/{TEMPLATE_REPO}/generate` → the tenant's repo
-3. `setTenantConfig()` → write `lanza.config.json` = `{owner, name, adminLogin}`
+3. `setTenantConfig()` → write `lanza.config.json` = `{owner, name}`. It no longer
+   records who may edit; GitHub answers that
 4. `ensureStaging()` → cut `staging` from the default branch
 5. discard the user token — it is never stored
 6. redirect to the `lanza-cms` App install, pre-filled:
@@ -71,8 +72,14 @@ That pre-fill is why GitHub shows the new repo already selected and badged
 > A user who clicks **Reject** on the install screen leaves an orphan repo, because
 > creation precedes consent. Unresolved.
 
-GitHub returns to the App's Setup URL → `/api/onboard/setup`, which confirms the
-install covers *that* repo and resumes the wizard at Cloudflare.
+GitHub returns to the App's Setup URL → `/api/onboard/setup`, which resumes the wizard
+at Cloudflare.
+
+> It used to *verify* that the install covered that repo. That check ran on an App JWT,
+> which required the broker to hold `GH_APP_PRIVATE_KEY` — a key that could mint
+> `Contents:write` on every tenant repository. Confirming an install was not worth
+> keeping it (`release-plan.md`). Someone who deselected their repository now finds out
+> at their own `/admin`, which names the install and links to it.
 
 ---
 
@@ -174,8 +181,9 @@ screen and the site list check the record directly (§6).
 `<repo-slug>-<sha256(owner/repo)[0..12]>`. `*.pages.dev` is one global namespace across
 every Cloudflare account, so `test`, `blog`, `bakery` collided with strangers on the
 first attempt *and the collision read as success* — deploying nothing and pointing the
-user at a third party's `/admin`. Derived rather than random because `/api/token` must
-recompute a tenant's origin to check a session's `aud`. Full rationale:
+user at a third party's `/admin`. It was derived rather than random so `/api/token`
+could recompute a tenant's origin; that endpoint is deleted, and the derivation stays
+because every deployed tenant is already named this way. Full rationale:
 `security-model.md` §2.
 
 A git-sourced create **does not auto-deploy**; `ensureDeployment` triggers
@@ -186,14 +194,22 @@ A git-sourced create **does not auto-deploy**; `ensureDeployment` triggers
 
 ## 5. Land in `/admin`, edit, publish
 
-1. `/admin` → broker-mediated GitHub login → RS256 session (`keys-and-secrets.md` §2)
-2. `handoff.ts` checks signature, `aud`, `nonce`, `exp`, **and** `adminLogin` — the
-   ownership check is separate from identity and both are required
-3. saves go to `staging` via `/admin/api/gh`, which mints a repo-scoped
-   Contents:write token per request
+1. `/admin` renders a sign-in screen. The person gets a device code, approves it at
+   github.com, and three HttpOnly cookies come back (`keys-and-secrets.md` §2). No
+   redirect, no broker, no secret anywhere in the flow
+2. The gate asks GitHub twice, per request: `GET /user` for identity,
+   `GET /repos/{owner}/{name}` → `permissions` for the role. Both are required and
+   they are separate questions (`security-model.md` I1)
+3. saves go to `staging` via `/admin/api/gh`, which attaches **the signed-in person's
+   own token**. There is no mint and no standing PAT
 4. **Publish** merges `staging` → `main`; Cloudflare rebuilds from the push
 
 `draft: true` is the publish gate — an unticked post merges but stays hidden.
+
+**An agent** connects at Settings → Connect an agent: install `lanza-agents` on the
+repo, approve a device code, paste the token into an MCP client alongside
+`https://<site>/api/mcp`. That token is the person's own GitHub credential, so the
+agent writes as them and revoking is one click.
 
 ---
 
@@ -220,10 +236,11 @@ otherwise invisible:
 
 ## 7. Invariants
 
-1. **Never inhibit self-hosting.** Dual-mode throughout: own `CLOUDFLARE_API_TOKEN` and
-   `GITHUB_TOKEN` and `ADMIN_LOGIN`, or the broker. The broker is an optional layer
-   over a self-sufficient CMS.
-2. **Broker holds secrets; tenants verify only.**
+1. **Never inhibit self-hosting.** A tenant needs no configuration at all, and the
+   broker is an optional onboarding convenience over a self-sufficient CMS.
+2. **The broker cannot reach a finished tenant.** It holds no key that can read or
+   write a tenant repository, and a tenant accepts nothing it signs
+   (`security-model.md` I3).
 3. **Stay free-tier and all-Cloudflare; cache public routes** (CLAUDE.md rules 1–2).
    The wizard shell itself is `no-cache` — it is an app, not a document, and a
    zone-level 4h Browser Cache TTL once hid two shipped fixes mid-test.
@@ -243,8 +260,8 @@ otherwise invisible:
 | Existing sites + health | `functions/api/onboard/sites.ts` |
 | Abandon a run | `functions/api/onboard/reset.ts` |
 | Project naming / audience | `functions/_lib/tenant-origin.ts` |
-| Edit tokens | `functions/api/token.ts` |
-| Tenant login | tenant `functions/admin/api/auth/{login,handoff}.ts`, `_lib/session.ts` |
+| Tenant sign-in | tenant `functions/admin/api/auth/device/{start,poll}.ts`, `_lib/device-flow.ts`, `_lib/gh-identity.ts` |
+| Agent token | tenant `functions/admin/api/auth/agent/{start,poll}.ts` |
 
 ---
 

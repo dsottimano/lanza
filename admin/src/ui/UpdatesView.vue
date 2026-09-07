@@ -1,4 +1,5 @@
 <script setup lang="ts">
+import SettingsHeader from "./SettingsHeader.vue";
 // Settings → Software. Which version of the site software this tenant runs, and
 // the one-click move to another one. The whole update mechanism is the pinned
 // version in the tenant's package.json (see backend/version.ts) — this pane reads
@@ -107,27 +108,25 @@ onMounted(refresh);
 </script>
 
 <template>
-  <div class="min-h-screen">
-    <header class="toolbar flex items-center justify-between gap-4 px-5 py-2.5">
-      <button class="text-sm text-zinc-600 transition hover:text-zinc-900" @click="emit('back')">← Back</button>
-      <span class="flex-1 text-center text-sm"></span>
-      <button
-        v-if="hasUpdate && state?.registry"
-        class="btn btn-primary"
-        :disabled="!!busy"
-        @click="apply(state.registry.latest)"
-      >
-        {{ busy ? "Updating…" : `Update to ${state.registry.latest}` }}
-      </button>
-    </header>
-
-    <main class="mx-auto max-w-2xl px-6 pt-8 pb-24">
-      <h1 class="mb-1 font-serif text-3xl font-bold tracking-tight text-zinc-900">Software</h1>
-      <p class="mb-6 text-sm text-zinc-600">
+  <div class="settings-page">
+    <SettingsHeader title="Software" @back="$emit('back')">
+      <template #actions>
+        <button
+          v-if="hasUpdate && state?.registry"
+          class="btn btn-primary"
+          :disabled="!!busy"
+          @click="apply(state.registry.latest)"
+        >
+          {{ busy ? "Updating…" : `Update to ${state.registry.latest}` }}
+        </button>
+      </template>
+      <template #description><p>
         Your site's code is a package your build installs. You choose when to move to a newer
         version — nothing changes underneath you.
-      </p>
+      </p></template>
+    </SettingsHeader>
 
+    <main class="settings-body">
       <p v-if="doneMsg" class="mb-4 rounded-xl bg-emerald-50 px-4 py-3 text-sm text-emerald-800">
         {{ doneMsg }}
       </p>

@@ -160,15 +160,16 @@ export function needsScroll(top: number, height: number, viewportHeight: number)
 // below) and hears `select` when someone clicks a marked region. The path rules and the
 // click decision live in the plain <script> block above, where they can be tested
 // without a frame.
-import { ref, watch, onMounted, shallowRef } from "vue";
+import { ref, watch, onBeforeUnmount, shallowRef } from "vue";
 import { render } from "../../../frontend/lib/template-render";
+import { loadPageListing } from "../backend/page-listing";
 import { templateHtmlPath } from "../backend/templates";
 import type { GitHubClient } from "../backend/github";
-import { reportError } from "../errors";
 
 const props = defineProps<{
   client: GitHubClient;
   preset: string;
+  locale?: string;
   slots: Record<string, unknown>;
   // The page's rich body, if the parent has it. Optional because the body is NOT part of
   // `slots` — production merges it in as a reserved root key (PageArticle.astro:35) and
@@ -182,7 +183,7 @@ const props = defineProps<{
 const emit = defineEmits<{ select: [path: string] }>();
 
 // The site's global stylesheet supplies the :root design tokens the templates lean
-// on (--ink, --accent, --lz-*, …). Loaded once per session and shared across previews.
+// on (--ink, --accent, --lz-*, …). Reused when this preview switches templates.
 let siteCssCache: Promise<string> | null = null;
 function loadSiteCss(client: GitHubClient): Promise<string> {
   siteCssCache ??= client
@@ -192,12 +193,17 @@ function loadSiteCss(client: GitHubClient): Promise<string> {
   return siteCssCache;
 }
 
+const listingData = ref<Record<string, unknown>>({});
 const templateHtml = ref<string | null>(null);
 const siteCss = ref("");
 const loading = ref(true);
 const missing = ref(false);
 const srcdoc = ref("");
 const iframe = shallowRef<HTMLIFrameElement>();
+const frameReady = ref(false);
+let loadVersion = 0;
+let lastBody = "";
+let frameLoaded = false;
 
 // Entry paths the parent asked us to highlight. Held here, not in the frame, so a full
 // document rebuild can re-emit the rule (see buildDoc).
@@ -207,7 +213,7 @@ const HIGHLIGHT_STYLE_ID = "lz-preview-highlight";
 // What the engine renders: the same root production builds — slots plus the reserved
 // `body` key (frontend/components/PageArticle.astro:35).
 function renderData(): Record<string, unknown> {
-  const data: Record<string, unknown> = { ...props.slots };
+  const data: Record<string, unknown> = { ...props.slots, ...listingData.value };
   if (typeof props.body === "string" && templateHtml.value !== null) {
     data.body = bodyForPreview(props.body, templateHtml.value);
   }
@@ -224,20 +230,22 @@ function renderBody(): string {
 
 // The marker stylesheet: the affordance, plus whatever is currently highlighted.
 function markerCss(): string {
-  return `[data-lanza-field]{cursor:pointer}${highlightCss(highlighted.value)}`;
+  return `*,*::before,*::after{animation:none!important;transition:none!important}[data-lanza-field]{cursor:pointer}[data-lanza-field]:hover{outline:1px dashed currentColor;outline-offset:3px}${highlightCss(highlighted.value)}`;
 }
 
 // Full document: site tokens first, then the rendered template (its own <style>
 // rides along in the markup). <base target=_blank> so preview links don't navigate
 // the frame. A neutral page background keeps the frame from flashing.
 function buildDoc(): string {
+  lastBody = renderBody();
   return `<!doctype html><html><head><meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
+<meta name="lz-preview-version" content="${loadVersion}">
 <base target="_blank">
 <style>${siteCss.value}
 html,body{margin:0;background:var(--paper,#f3f1ea)}</style>
 <style id="${HIGHLIGHT_STYLE_ID}">${markerCss()}</style>
-</head><body>${renderBody()}</body></html>`;
+</head><body>${lastBody}</body></html>`;
 }
 
 // Body-only swap: keeps <head>/styles + scroll. Falls back to a full reload if the
@@ -252,38 +260,58 @@ html,body{margin:0;background:var(--paper,#f3f1ea)}</style>
 // nothing is stored on the spans — the highlight is a <head> rule and the click handler
 // is one delegated listener on <body>, and the body ELEMENT outlives its innerHTML.
 let bodyTimer: ReturnType<typeof setTimeout> | undefined;
+function updateBody(): void {
+  if (!frameLoaded || loading.value || templateHtml.value === null) return;
+  const doc = iframe.value?.contentDocument;
+  if (!doc?.body) return;
+  const html = renderBody();
+  if (html === lastBody) return;
+  const win = iframe.value?.contentWindow;
+  const scrollX = win?.scrollX ?? 0;
+  const scrollY = win?.scrollY ?? 0;
+  doc.body.innerHTML = html;
+  lastBody = html;
+  win?.scrollTo(scrollX, scrollY);
+}
+
 function scheduleBodyUpdate(): void {
   clearTimeout(bodyTimer);
-  bodyTimer = setTimeout(() => {
-    const doc = iframe.value?.contentDocument;
-    if (doc?.body) doc.body.innerHTML = renderBody();
-    // Frame not painted yet (edit landed during first load) → rebuild the whole
-    // srcdoc so the change isn't dropped until the next template reload.
-    else if (templateHtml.value !== null) srcdoc.value = buildDoc();
-  }, 180);
+  bodyTimer = setTimeout(updateBody, 180);
 }
 
 async function loadTemplate(): Promise<void> {
+  const version = ++loadVersion;
+  clearTimeout(bodyTimer);
   loading.value = true;
+  frameReady.value = false;
+  frameLoaded = false;
+  missing.value = false;
   try {
-    const f = await props.client.loadText(templateHtmlPath(props.preset));
-    templateHtml.value = f.text;
-    missing.value = false;
+    // Commit a complete document once both resources are ready. Late responses
+    // from a previously selected template must never replace the current page.
+    const [file, css, listing] = await Promise.all([
+      props.client.loadText(templateHtmlPath(props.preset)),
+      loadSiteCss(props.client),
+      props.locale ? loadPageListing(props.client, props.preset, props.locale) : Promise.resolve({}),
+    ]);
+    if (version !== loadVersion) return;
+    listingData.value = listing;
+    templateHtml.value = file.text;
+    siteCss.value = css;
+    srcdoc.value = buildDoc();
   } catch {
+    if (version !== loadVersion) return;
     templateHtml.value = null;
-    missing.value = true; // missing/removed template — show the placeholder
+    missing.value = true;
   } finally {
-    loading.value = false;
+    if (version === loadVersion) loading.value = false;
   }
 }
 
-onMounted(async () => {
-  try {
-    siteCss.value = await loadSiteCss(props.client);
-  } catch (e) {
-    reportError(e, "Couldn't load site styles for the preview.");
-  }
-  await loadTemplate();
+onBeforeUnmount(() => {
+  ++loadVersion;
+  clearTimeout(bodyTimer);
+  iframe.value?.contentDocument?.body?.removeEventListener("click", onPreviewClick);
 });
 
 // ── Marker consumers ────────────────────────────────────────────────────────
@@ -310,12 +338,19 @@ function onPreviewClick(e: MouseEvent): void {
 // A body-only swap keeps the same <body> element, so the listener attached here outlives
 // every re-render; a full srcdoc reload builds a NEW document, which is what this event
 // is for. Removing first keeps it idempotent if a frame ever loads twice.
-function onFrameLoad(): void {
+async function onFrameLoad(): Promise<void> {
+  const version = loadVersion;
   const doc = iframe.value?.contentDocument;
-  if (!doc?.body) return;
+  if (loading.value || !doc?.getElementById(HIGHLIGHT_STYLE_ID) ||
+      doc.querySelector('meta[name="lz-preview-version"]')?.getAttribute("content") !== String(version)) return;
+  frameLoaded = true;
+  updateBody();
   doc.body.removeEventListener("click", onPreviewClick);
   doc.body.addEventListener("click", onPreviewClick);
   applyHighlights();
+  // Keep the neutral placeholder in place until the frame's fonts settle.
+  await doc.fonts?.ready;
+  if (version === loadVersion && iframe.value?.contentDocument === doc) frameReady.value = true;
 }
 
 defineExpose({
@@ -358,36 +393,45 @@ defineExpose({
   },
 });
 
-// Template or CSS change → rebuild the whole document (new markup/styles).
-watch([templateHtml, siteCss], () => {
-  if (templateHtml.value !== null) srcdoc.value = buildDoc();
-});
-// Switching templates reloads the HTML (which triggers the rebuild above).
-watch(() => props.preset, loadTemplate);
+// A template switch has one complete-document update; field edits stay in-frame.
+watch(() => [props.preset, props.locale], loadTemplate, { immediate: true });
 // Slot (or body) edits → cheap debounced body swap, no reload.
 watch(() => props.slots, scheduleBodyUpdate, { deep: true });
 watch(() => props.body, scheduleBodyUpdate);
 </script>
 
 <template>
-  <div class="preview flex min-h-[24rem] flex-col overflow-hidden rounded-[var(--radius)] border border-[var(--border)] bg-[var(--paper-card)]">
-    <div class="flex items-center gap-2 border-b border-[var(--border)] px-3 py-2 text-xs text-zinc-500">
-      <span class="size-2 rounded-full bg-emerald-400" />
-      Live preview
+  <div class="preview preview-pane" :aria-busy="loading || (!missing && !frameReady)">
+    <div class="preview-pane__bar">
+      <span class="preview-pane__status" :class="{ 'preview-pane__status--ready': frameReady }" />
+      <span>{{ missing ? 'Preview unavailable' : frameReady ? 'Page preview' : 'Preparing preview…' }}</span>
+      <span v-if="frameReady" class="ml-auto">Click text to edit</span>
     </div>
-    <div v-if="loading" class="skeleton m-3 flex-1" />
-    <p v-else-if="missing" class="m-3 flex-1 text-sm text-zinc-500">
-      Couldn’t load this template’s HTML — check
-      <code>templates/{{ preset }}/template.html</code>.
-    </p>
-    <iframe
-      v-else
-      ref="iframe"
-      :srcdoc="srcdoc"
-      title="Page preview"
-      @load="onFrameLoad"
-      sandbox="allow-same-origin allow-popups"
-      class="min-h-0 w-full flex-1 border-0 bg-white"
-    />
+    <div class="preview-pane__canvas">
+      <div v-if="loading || (!missing && !frameReady)" class="preview-pane__placeholder" role="status">Preparing your page…</div>
+      <div v-else-if="missing" class="preview-pane__placeholder">
+        <p>We couldn’t load the page preview.</p>
+        <button type="button" class="btn btn-ghost mt-3" @click="loadTemplate">Try again</button>
+      </div>
+      <iframe
+        v-if="srcdoc && !missing"
+        ref="iframe"
+        :srcdoc="srcdoc"
+        title="Page preview"
+        @load="onFrameLoad"
+        sandbox="allow-same-origin allow-popups"
+        :style="{ visibility: frameReady ? 'visible' : 'hidden' }"
+      />
+    </div>
   </div>
 </template>
+
+<style scoped>
+.preview-pane { display: flex; flex-direction: column; min-height: 24rem; overflow: hidden; border: 1px solid var(--border); background: var(--paper-card); }
+.preview-pane__bar { display: flex; align-items: center; gap: .5rem; min-height: 3.25rem; padding: .75rem 1rem; border-bottom: 1px solid var(--border); color: var(--muted); font-size: .75rem; }
+.preview-pane__status { width: .4rem; height: .4rem; border-radius: 50%; background: var(--border); }
+.preview-pane__status--ready { background: #30a77c; }
+.preview-pane__canvas { position: relative; flex: 1; min-height: 0; background: var(--surface); }
+.preview-pane__placeholder { position: absolute; inset: 0; z-index: 1; display: flex; flex-direction: column; align-items: center; justify-content: center; padding: 2rem; color: var(--muted); font-size: .85rem; }
+iframe { display: block; width: 100%; height: 100%; border: 0; background: var(--paper); }
+</style>

@@ -25,10 +25,11 @@ function toggle(code: string) {
 <template>
   <div>
     <label class="mb-2 block text-xs font-medium text-zinc-500">{{ gridLabel }}</label>
-    <div class="grid grid-cols-2 gap-2">
+    <div class="grid grid-cols-1 gap-2 sm:grid-cols-2">
       <button
         v-for="l in LANG_CATALOG"
         :key="l.code"
+        :aria-pressed="chosen.includes(l.code)"
         type="button"
         :class="['flex items-center gap-2 rounded-xl border px-3 py-2 text-left text-sm transition', chosen.includes(l.code) ? 'border-zinc-900/70 bg-[var(--paper-card)]' : 'border-[var(--border)] bg-[var(--surface)] hover:border-[var(--ink-soft)]']"
         @click="toggle(l.code)"

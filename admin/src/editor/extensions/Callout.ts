@@ -8,7 +8,7 @@ import CalloutView from "../nodeviews/CalloutView.vue";
 export const Callout = Node.create({
   name: "callout",
   group: "block",
-  content: "inline*",
+  content: "block+",
   defining: true,
 
   addAttributes() {

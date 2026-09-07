@@ -1,4 +1,18 @@
-# Security TODO — fewer moving parts
+# Zero-secret auth migration
+
+> **COMPLETE — 2026-08-29.** Phases 1 through 7 are shipped. This file is kept as the
+> record of how the decision was made and what each experiment actually proved; it is
+> no longer a work list and it is no longer authoritative about the deployed system.
+> **`security-model.md` is.** `release-plan.md` records the last phase, which went
+> further than this document planned: not just the tenant's secrets but the broker's,
+> so that nothing Lanza runs can reach a site that has finished onboarding.
+>
+> Two things here were corrected by contact with the code, and are worth carrying:
+> §10.7's "nothing left whose leak is fleet-wide" was wrong while `GH_APP_PRIVATE_KEY`
+> lived on the broker, and the plan to *uninstall* the App at the end of onboarding was
+> wrong because a user-to-server token only reaches repositories the App is installed
+> on — the tenant's own sign-in depends on that install.
+
 
 **Written 2026-08-09.** A first-principles pass over the auth architecture, plus the
 work it implies. Companions: `security-model.md` (**authoritative on authz**),
@@ -54,7 +68,7 @@ each ends at a green `npm test` (baseline: 134 functions + 91 admin).
 > opens the CMS at least once every 184 days enters a device code exactly once, per
 > browser, ever.**
 
-### Next session, in order — phase 4 (updated 2026-08-15, end of session 3)
+### Next session, in order — phase 4 (updated 2026-08-15, end of session 3) — DONE
 
 Phases 1, 2 and 3 are shipped, green and verified live (§10.9, §10.10, §10.11).
 **The device-flow family is now the only one that can edit anything** — phase 3's

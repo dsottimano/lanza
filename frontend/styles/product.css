@@ -1,0 +1,13 @@
+/* Product-site chrome. Tenant branding keeps the existing default styles. */
+.lanza-product { --wide:1240px; --paper:#f5f3eb; --paper-card:#fffdf7; --ink:#252621; --ink-deep:#242722; --text-secondary:#51534b; --muted:#686b60; --border:#d9d9cd; --accent:#c53b19; --accent-bright:#fa9a77; --surface:#e9e7db; --on-accent:white; }
+.lanza-product .site-header .bar { width:min(1240px,calc(100% - 3rem)); padding:1.5rem 0; align-items:center; }
+.lanza-product .wordmark { width:116px; height:auto; }
+.lanza-product .site-nav { align-items:center; gap:1.7rem; }
+.lanza-product .site-nav > a { font-family:var(--font-ui); font-size:.95rem; text-transform:none; letter-spacing:0; }
+.lanza-product .site-nav > a:last-of-type { border:1px solid var(--ink); color:var(--ink); padding:.55rem .85rem; }
+.lanza-product .site-footer .bar { max-width:1240px; padding:2.5rem 1.5rem; line-height:2; }
+.lanza-product .site-footer a { color:#f5f3eb; text-underline-offset:.2em; }
+.lh-workflow .lh-heading h2 { color:#faf8f0; }
+.lh-hero h1,.lh-heading h2,.lh-split h2,.lh-close h2 { white-space:pre-line; }
+@media(max-width:800px) { .lanza-product .site-header .bar { gap:1rem; } .lanza-product .site-nav { gap:1rem; } }
+@media(max-width:540px) { .lanza-product .site-header .bar { width:calc(100% - 2rem); padding:1rem 0; } .lanza-product .site-nav { width:100%; align-items:stretch; gap:0; } .lanza-product .site-nav > a { font-size:.9rem; } .lanza-product .site-nav > a:last-of-type { justify-content:center; margin-top:.75rem; border:1px solid var(--ink); padding:.75rem .85rem; } }

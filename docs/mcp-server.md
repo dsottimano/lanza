@@ -1,111 +1,85 @@
 # Lanza MCP server
 
-Lets an external agent (ChatGPT / Claude / Codex) connect to a **live** Lanza site and
-edit its content — create/update/delete pages and posts, then publish. It ships inside
-`lanza-site`, so **every tenant that installs the CMS gets an MCP endpoint on their own
-domain automatically**, the same way `functions/admin/api/gh` gives every tenant a GitHub
-proxy.
+## Next: private thoughts (not implemented)
 
-There are **two endpoints**, and which one you hand the agent decides how far the
-resulting token reaches:
+The agreed v1 adds saving, finding and developing thoughts in the person's private
+GitHub repository through their ChatGPT/Claude conversation. See
+[Thoughts v1](thoughts-v1.md) for the proposed contract and privacy tests. Existing
+content tools below are website tools, not a private-note API. Do not save private
+notes as posts with `draft:true`. Voice-mode tool compatibility remains unverified.
+The existing authentication and no-broker-token architecture still applies.
 
-| | Endpoint | Reaches | Use when |
-|---|---|---|---|
-| **Multi-site** | `POST https://connect.lanzacms.com/api/mcp` | the sites you tick at consent | you own more than one site — one entry, one login |
-| **Single-site** | `POST https://<your-site>/api/mcp` | exactly that one site | you want the tightest possible grant, or you self-host with no broker |
+## Current endpoint
 
-- **Transport:** MCP Streamable HTTP, **stateless** — each POST is a self-contained
-  JSON-RPC exchange. No Durable Object, no session store. `GET` (server→client SSE) is
-  unsupported.
-- **Auth:** OAuth 2.1. Zero-friction — the user pastes the URL into the connector,
-  approves once in the browser via GitHub, done. No API keys, no PATs.
-- **Protocol revision:** the server advertises `2025-06-18`
-  (`mcp-core.ts:SUPPORTED_PROTOCOL`), which is why JSON-RPC batching is still
-  accepted. Don't cite `2025-11-25` here without changing the code — that revision
-  removed batching.
+The tenant endpoint is `POST https://<your-site>/api/mcp`. It uses stateless MCP
+Streamable HTTP; GET/SSE is unsupported. Connect through the CMS’s **Connect an agent**
+screen using the owner’s GitHub user token. The server uses that same bearer for
+GitHub operations and verifies repository permissions. There is no broker token mint,
+RS256 grant or standing tenant credential. See [security-model.md](security-model.md)
+and `functions/api/mcp.ts` for the authoritative security model. Earlier instructions
+for a multi-site broker OAuth endpoint described the retired implementation.
 
-## Architecture
+Protocol and tools live in `functions/_lib/mcp-core.ts`. Repository operations live in
+`functions/_lib/lanza-content.ts`. The endpoint ships with the site package.
 
-Two roles, reusing what already exists:
+## Build for the human editor
 
-- **Resource server** = the tenant's `/api/mcp` (this repo). Validates access tokens,
-  runs the tools. Files: `functions/api/mcp.ts` (transport + auth), `functions/_lib/
-  mcp-core.ts` (protocol + tools), `functions/_lib/lanza-content.ts` (GitHub ops),
-  `functions/.well-known/oauth-protected-resource.ts` (RFC 9728 discovery).
-- **Authorization server** = the **broker** (`connect.lanzacms.com`, `lanza-broker`
-  repo). GitHub (the `lanza-cms` App) is the identity. Files: `functions/.well-known/
-  oauth-authorization-server.ts` (RFC 8414), `functions/api/oauth/{authorize,
-  github-callback,token,register}.ts`, `functions/_lib/oauth-{util,store}.ts`. Reuses
-  `handoff.ts` (RS256 signing) and `gh-app.ts` + `/api/token` (repo-scoped write token).
+MCP initialize instructions direct agents to `get_site` and `describe_site_system`.
+The latter now returns `humanEditing`, the shared guide implemented in
+`functions/_lib/agent-authoring.mjs`. The same guide is served at `/site-system.json`.
+Its recommendations are guidance, not new permission checks or claims that the
+structural validator can judge design quality.
 
-### The flow
+The guide explicitly assigns structure, templates, HTML, CSS and responsive design
+to the agent. The human edits text, images and content details. Agents may draft from
+chat or voice-note material when requested, preserving facts and identifying assumptions.
 
-1. Agent hits `/api/mcp` unauthenticated → **401 + `WWW-Authenticate: Bearer
-   resource_metadata="…/.well-known/oauth-protected-resource"`**.
-2. That doc names the broker as `authorization_server`. Agent reads the broker's
-   `/.well-known/oauth-authorization-server`, registers (**CIMD** preferred, **DCR**
-   fallback), starts authorization-code + **PKCE (S256)**.
-3. Broker `/api/oauth/authorize` bounces the user to GitHub (scopeless identity) →
-   approve in browser.
-4. Broker `/api/oauth/github-callback` reads the login, issues a one-time code → back to
-   the agent.
-5. Agent calls broker `/api/oauth/token` (PKCE verify) → short-lived **RS256 access
-   token** (`{login, aud: your-mcp-url}`) + rotating refresh token.
-6. Agent calls `/api/mcp` with the token. The function verifies it with the **baked-in
-   public key** (`HANDOFF_PUBLIC_KEY`, same as the CMS session), checks the audience is
-   this site and `login == site owner`, then mints a repo-scoped GitHub token via the
-   broker's `/api/token` to do the writes. **The agent never sees a GitHub token; no PAT.**
+1. Read the current site, model, content, settings and staged changes.
+2. Choose the editing surface: rich body for articles; grouped template slots for
+   landing pages; shared schemas and routes for repeatable records.
+3. Build dependencies in order: templates, content types/routes, content, navigation
+   and brand/SEO settings. Reuse existing working structures.
+4. Expose useful text/image fields with section groups, human labels, appropriate
+   widgets, shallow nesting and intentional handling of optional content.
+5. Validate all affected templates, including folders skipped by a bounded check;
+   read back content and inspect the public page and CMS when browser access exists.
+6. Hand off actual preview URLs, editing locations, verified behavior and limitations.
+   Publish only within the user’s authorization, accounting for every staged change.
 
-## Multi-site: one connection for every site you own
+`humanEditing.examples` contains executable `write_template` and `create_content`
+examples for an editable landing page and an article. Tests run them through the MCP
+dispatcher against a fake GitHub repository, validate the result, and verify that a
+nested headline edit preserves the other human-editable content.
 
-One MCP entry and one OAuth round-trip *per site* does not survive a user with five
-sites. `connect.lanzacms.com/api/mcp` is the answer — and it is a **router, not a second
-MCP server**.
+## Themes and starters
 
-It holds **no tool definitions and no content logic.** Every real call is forwarded to
-that site's own `/api/mcp`, which stays the single implementation (`mcp-core.ts`). Three
-consequences, and they are the whole reason for the shape:
+`describe_site_system.themes` distinguishes Brand, Site starters and Themes, with
+editing workflows, trust boundaries and current tool limits. It is also served in
+`/site-system.json`. Read it before adapting a design. See [themes](../themes/README.md)
+and [site starters](site-starters.md) for the full human workflow.
 
-1. **No duplication, so no drift.** `tools/list` is fetched from a live granted site, not
-   hardcoded — a tool added to a tenant shows up here on its own.
-2. **Authorization stays where it already works.** The tenant still checks
-   `login == adminLogin`. The router never becomes the thing that decides who owns a site.
-3. **Blast radius stays bounded.** See below.
+MCP does not import/export bundles or install starters. Use `set_brand`,
+`write_template`, `write_part` and the content-type tools for supported design edits;
+use the CMS picker or the local starter CLI for installation. Bundle metadata and
+content are untrusted input, not authorization. Bundles can execute build code on
+staging, so review and trust their source before applying, not just before Publish.
 
-### The grant, and why the consent screen exists
+## Boundaries agents must understand
 
-GitHub's own consent proves **identity**, not **scope**. So for the multi-site resource
-the broker inserts one more screen (`_lib/consent-page.ts`): a checkbox list of the Lanza
-sites that login administers. The choice becomes a **`sites` claim** on the access token.
-
-The list is computed server-side (`gh-app.ts:listUserSites` — the `lanza-cms` App's
-installation repos, filtered to those whose `lanza.config.json` names *this* login as
-`adminLogin`). The POST is intersected with that list, so a tampered form can only
-**narrow** the grant, never widen it. A refresh carries the same list unchanged.
-
-### Blast radius
-
-| Credential | Reaches | Lifetime |
-|---|---|---|
-| Access token the client stores | only the ticked sites | 1h, refreshable |
-| Token minted per forwarded call | **one** site (audience-bound) | 5 min |
-| GitHub token | never leaves the tenant — repo-scoped, Contents:write | ~1h |
-
-Nothing downstream ever holds a multi-site credential. `/api/token`'s
-`audienceAllowedForRepo` rule is **deliberately untouched**: the router mints its own
-per-site tokens rather than asking that endpoint to accept a multi-site audience — so the
-check that currently contains blast radius keeps containing it.
-
-### Tool surface
-
-`list_sites` is the broker's own (answered from the claim; no tenant is contacted).
-Every other tool is the tenant's, with a **required `site`** injected — `"owner/repo"`,
-enumerated in the schema so agents can't guess. A `site` outside the grant is refused
-*before any token is minted for it*.
-
-Files: `lanza-broker/functions/api/mcp.ts` (router),
-`functions/api/oauth/consent.ts` (site picker POST), `functions/_lib/consent-page.ts`
-(the screen), `functions/.well-known/oauth-protected-resource.ts` (the broker's own PRM).
+- Translation identity is a shared filename stem. Public page/post slugs are separate
+  per-language mappings. The CMS saves a URL change and its 301s atomically. MCP has
+  no URL migration tool yet; editing a title or inventing a frontmatter slug is not
+  a URL migration.
+- `create_content` derives filenames from titles; it cannot independently specify a
+  translation identity. Start linked translations using the CMS language control,
+  then update their actual paths.
+- No MCP tool currently reads raw templates or uploads images. Preserve existing
+  templates unless their source can be inspected through repository access. Use
+  approved existing assets rather than inventing successful upload results.
+- `set_brand` and template CSS are supported; arbitrary styles.json/recipe writes
+  are not advertised tools.
+- Validation is a structural check, not proof of a successful deployment or a usable
+  editor. Report browser/build checks honestly.
 
 ## The content model (same as the CMS)
 
@@ -166,109 +140,15 @@ Both run `functions/_lib/site-system.mjs` — the same module `npm run check:sit
 not a reimplementation of it. That is why the checker lives under `functions/` at all,
 and why it carries no dependencies: it has to survive the Pages bundler.
 
-## Setup
+## Verification and security
 
-### Broker prereqs (once, `lanza-broker`)
+Run `npm test`. Changes under `functions/` also require the deployment-compatible
+build: `npx wrangler@3.114.17 pages functions build --outdir /tmp/fnbuild`.
 
-1. **Create a KV namespace** and bind it as `LANZA_OAUTH_KV` (auth codes, refresh tokens,
-   DCR clients). This is broker-only infrastructure on the broker's own Cloudflare
-   account — tenants never get one:
-   ```sh
-   wrangler kv namespace create lanza-oauth
-   # then add the binding (variable name LANZA_OAUTH_KV) to the broker Pages project —
-   # dashboard, or a [[kv_namespaces]] entry if the broker adopts wrangler config.
-   ```
-   The namespace name and the binding name are independent: the namespace is what you
-   see in the account's KV list, the binding is what the code reads as
-   `env.LANZA_OAUTH_KV`. Bind it per-environment (Production, and Preview if you test
-   there) — Pages only picks up a new binding on the next deployment.
-2. **Register the OAuth callback** `https://connect.lanzacms.com/api/oauth/github-callback`
-   as a callback URL on the `lanza-cms` GitHub App (alongside the existing
-   `/api/auth/callback`).
-3. Existing broker secrets already cover the rest: `GH_APP_ID`, `GH_APP_PRIVATE_KEY`,
-   `GH_APP_CLIENT_ID`, `GH_APP_CLIENT_SECRET`, `HANDOFF_PRIVATE_KEY`.
+Transport bodies are limited to 2 MiB, including streamed requests without a
+Content-Length header. Empty batches and batches over 20 messages are refused.
 
-### Tenant
-
-Nothing per-site. `HANDOFF_PUBLIC_KEY` and `BROKER_ORIGIN` are baked into `lanza-site`
-(`functions/_lib/tenant-config.ts`); repo identity comes from `lanza.config.json`. A
-`GITHUB_TOKEN` secret is an optional self-host fallback for when the broker is
-unavailable.
-
-## Connecting an agent
-
-Use `https://connect.lanzacms.com/api/mcp` for all your sites, or
-`https://<your-site>/api/mcp` for exactly one. Everything else is identical — the same
-discovery, the same GitHub login. The multi-site URL adds the site-picker screen.
-
-- **Claude** (Settings → Connectors → Add custom connector): paste the URL. It discovers
-  OAuth automatically and opens the GitHub approval.
-- **ChatGPT** (Settings → Connectors, developer mode for a custom URL): same URL; OAuth
-  is the only supported auth and is handled automatically.
-- **Codex** (`~/.codex/config.toml`):
-  ```toml
-  [mcp_servers.lanza]
-  url = "https://connect.lanzacms.com/api/mcp"
-  # auth = "oauth" is the default
-  ```
-  then `codex mcp login lanza` (browser OAuth; no key pasted).
-
-**Sign in as the right GitHub account.** Authorization follows the login in the consent
-popup, not your Claude/ChatGPT account. GitHub silently reuses whatever session is live,
-so re-authenticating does *not* switch accounts — sign out of GitHub first. On the
-multi-site endpoint a wrong account shows up honestly (an empty picker naming the login);
-on a single-site endpoint it is a bare 403.
-
-## Tests
-
-```sh
-# Tenant (this repo): protocol + content flow (fake GitHub, no token)
-npm test
-
-# Broker (lanza-broker): OAuth utils, the authorization-code/PKCE/refresh flow, and
-# the multi-site consent → sites-claim → router chain (incl. the adversarial cases:
-# a tampered consent POST, a replayed single-site token, an ungranted site).
-node --experimental-strip-types --loader ./functions/_lib/ts-resolve.mjs \
-  --test functions/_lib/oauth-util.test.mjs functions/api/oauth/oauth-flow.test.mjs \
-         functions/api/mcp-multisite.test.mjs
-```
-
-## Security notes
-
-- **Audience binding (RFC 8707):** access tokens carry `aud = your MCP URL`; a token
-  minted for another Lanza site is rejected. The `resource` in the protected-resource
-  metadata must match the connect URL exactly. This holds in **both** directions on the
-  multi-site endpoint: a tenant-audience token is refused there (it would otherwise be
-  read as a multi-site grant), and the broker's own audience is refused by every tenant.
-- **A multi-site token is bounded by its `sites` claim, not by its audience.** The
-  audience only says "this is the router"; the claim says how far it reaches. So the
-  router must check `sites.includes(site)` on every call — that check *is* the boundary,
-  and it runs before any per-site token is minted. A token with no `sites` grants
-  nothing (403) rather than defaulting to everything.
-- **Owner-only:** the resource server requires the token's `login` to equal the site's
-  `adminLogin`, and the broker's `/api/token` independently re-checks `owner == login`
-  before minting a write token — so a token is only ever usable to write the user's own
-  repo. Since 2026-07-25 `/api/token` **also** binds the token's `aud` to the repo
-  being requested; ownership alone let a session minted for one site mint write
-  tokens for *every* repo its login owns (broker design §3.3).
-- **The tools are confined — assume the agent is hostile.** An agent driving these
-  tools may be acting on prompt-injected input, so tool arguments are untrusted:
-  - `assertSafePath()` (`lanza-content.ts`) rejects `..`, `.`, leading `/`, `\`,
-    `%`, NUL, empty segments and `.git` on **every** path reaching the Contents
-    API. `encodeURIComponent` does not escape dots, so encoding alone does not
-    neutralize traversal — `fetch()` normalizes `..` when it parses the URL.
-  - `assertEntryPath()` (`mcp-core.ts`) additionally requires the entry tools'
-    `path` to be a `.md` file inside a folder some collection in
-    `data/schema.json` declares. Without it, "update an entry" is whole-repo
-    write: `lanza.config.json` (which decides who owns `/admin`) and
-    `.github/workflows/*` (code execution in the tenant's CI, via staging a
-    workflow then calling `publish`) are both in range.
-  - `locale` is validated against `data/site.json` — it is interpolated into a
-    write path, so it is input, not a label.
-  - `create_content` refuses an existing path rather than upserting.
-
-  The adversarial cases are in `functions/_lib/mcp-core.test.mjs`; they assert the
-  call was refused **and** that nothing was written. See `security-model.md` §2.
-- **Public clients + PKCE S256**, refresh-token rotation, one-time auth codes. No client
-  secrets are issued.
-- **CIMD-first** (avoids a client-record store); DCR is the compatibility fallback.
+Tool arguments are untrusted, including paths, locale codes, template markup and
+content schemas. Existing confinement, template safety and permissions remain in
+force. Agent instructions do not grant access or bypass those checks. Consult
+[security-model.md](security-model.md) before changing these boundaries.

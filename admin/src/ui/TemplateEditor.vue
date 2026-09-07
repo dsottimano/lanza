@@ -8,8 +8,8 @@
 // backend/templates.ts. This replaces the old plain-text-box fallthrough for the
 // `preset`/`slots` fields; EditorView filters them out of the generic field panel
 // and mounts this instead.
-import { computed, onBeforeUnmount, ref, watch } from "vue";
-import FieldForm from "../fields/FieldForm.vue";
+import { computed, nextTick, onBeforeUnmount, ref, watch } from "vue";
+import FieldForm, { sectionsOf } from "../fields/FieldForm.vue";
 import { toEntryPath, toSlotPaths } from "../fields/field-paths";
 import SaveButton from "./SaveButton.vue";
 import { inputCls } from "../fields/styles";
@@ -27,6 +27,7 @@ const props = defineProps<{
   locale: Locale;
   templates: TemplateInfo[];
   loading: boolean;
+  contentOnly?: boolean;
   // What a review reports as changed, as ENTRY paths (`slots.cards.0.heading`). Absent
   // until the editor has a review to show, which is why nothing here requires it.
   changed?: readonly string[];
@@ -49,6 +50,25 @@ const slotsData = computed(() => data.slots as Record<string, unknown>);
 // the slots object the form edits, so nothing downstream has to know what `slots` is
 // called or strip a prefix of its own (fields/field-paths.ts).
 const changedSlots = computed(() => toSlotPaths(props.changed ?? []));
+
+const sectionIndex = ref(0);
+const contentForm = ref<InstanceType<typeof FieldForm>>();
+const formSections = computed(() => sectionsOf(selected.value?.fields ?? []));
+const sectionFields = computed(() => (formSections.value[sectionIndex.value]?.fields ?? [])
+  .map(field => ({ ...field, group: undefined,
+    widget: field.widget === "string" && /headline|heading/i.test(field.name) ? "text" as const : field.widget })));
+watch(selected, () => { sectionIndex.value = 0; });
+async function focusField(entryPath: string): Promise<boolean> {
+  const [path] = toSlotPaths([entryPath]);
+  if (path === undefined) return false;
+  const index = formSections.value.findIndex(section => section.fields.some(field =>
+    path === field.name || path.startsWith(`${field.name}.`)));
+  if (index < 0) return false;
+  sectionIndex.value = index;
+  await nextTick();
+  return await contentForm.value?.focusField(path) ?? false;
+}
+defineExpose({ focusField });
 
 // Focus → the preview follows. Two guards, because focus fires far more often than a
 // scroll should:
@@ -140,7 +160,30 @@ watch(
 </script>
 
 <template>
-  <div class="card p-4">
+  <div v-if="contentOnly" class="page-content-fields">
+    <p v-if="loading" class="text-sm text-zinc-500">Loading content…</p>
+    <template v-else-if="selected && formSections.length">
+      <div class="page-section-picker">
+        <label for="page-section" class="block text-xs font-semibold text-zinc-500">Section</label>
+        <select id="page-section" v-model="sectionIndex" class="input mt-2">
+          <option v-for="(section, index) in formSections" :key="index" :value="index">
+            {{ section.group ?? 'Page content' }}
+          </option>
+        </select>
+        <div class="mt-2 flex items-center justify-between text-xs text-zinc-500">
+          <span>{{ sectionIndex + 1 }} of {{ formSections.length }}</span>
+          <div class="flex gap-3">
+            <button type="button" :disabled="sectionIndex === 0" @click="sectionIndex--">Previous</button>
+            <button type="button" :disabled="sectionIndex === formSections.length - 1" @click="sectionIndex++">Next</button>
+          </div>
+        </div>
+      </div>
+      <FieldForm ref="contentForm" structure-locked :fields="sectionFields" :data="slotsData" :client="client"
+        :locale="locale" :changed="changedSlots" @focus-field="onFieldFocus" />
+    </template>
+    <p v-else class="text-sm text-zinc-500">This page has no editable content fields yet.</p>
+  </div>
+  <div v-else class="card p-4">
     <h2 class="mb-3 border-b border-[var(--border)] pb-3 text-sm font-semibold text-zinc-900">
       Template
     </h2>
@@ -168,6 +211,7 @@ watch(
         <!-- The template's editable fields → the page's `slots`. -->
         <div class="mt-4 border-t border-[var(--border)] pt-4">
           <FieldForm
+            ref="contentForm"
             :fields="selected.fields"
             :data="slotsData"
             :client="client"

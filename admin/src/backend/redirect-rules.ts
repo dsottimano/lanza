@@ -34,13 +34,12 @@ export interface RedirectRule {
 }
 
 // A single token: a leading slash then no whitespace (blocks newline injection).
-const PATH_RE = /^\/\S+$/;
+const PATH_RE = /^\/\S*$/;
 
-// `from` shadows /admin if its literal prefix (before any `*` splat) is a prefix
-// of "/admin" (e.g. "/", "/ad") or sits under it ("/admin", "/admin/x").
-// (Mirror of gen-redirects.mjs shadowsAdmin.)
+// Exact root redirects do not cover /admin. Wildcards and placeholders may.
 function shadowsAdmin(from: string): boolean {
-  const prefix = from.split("*")[0];
+  if (!from.includes("*") && !from.includes(":")) return from === "/admin" || from.startsWith("/admin/");
+  const prefix = from.split(/[*:]/)[0];
   return "/admin".startsWith(prefix) || prefix.startsWith("/admin");
 }
 

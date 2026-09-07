@@ -431,3 +431,50 @@ describe("the real manifesto: the form's path is the preview's path", () => {
     }
   });
 });
+
+describe("preview-to-field editing", () => {
+  it("selects the right section and focuses a real manifesto list field", async () => {
+    const w = mount(TemplateEditor, {
+      attachTo: document.body,
+      props: {
+        client, locale: "en", contentOnly: true, loading: false,
+        data: { preset: "manifesto", slots: { headline: "Hello", cards: [{ who: "Writers", body: "Words" }] } },
+        templates: [{ ...manifestoFields, fields: manifestoFields.fields as Field[] }],
+      },
+    });
+    expect(w.find('[data-field-path="headline"]').exists()).toBe(true);
+    expect(w.find('[data-field-path="cards.0.who"]').exists()).toBe(false);
+    expect(await w.vm.focusField("slots.cards.0.who")).toBe(true);
+    expect(document.activeElement?.closest('[data-field-path]')?.getAttribute('data-field-path')).toBe('cards.0.who');
+    expect(w.find('select').element.value).toBe('3');
+    expect(w.find('button[title="Move up"]').exists()).toBe(false);
+    expect(w.text()).not.toContain('edit template HTML');
+    w.unmount();
+  });
+
+  it("opens a collapsed group and nested object before focusing its input", async () => {
+    const w = mount(FieldForm, {
+      attachTo: document.body,
+      props: { client, locale: "en", data: { card: { label: "Hello" } }, fields: [
+        { name: "card", label: "Card", widget: "object", group: "Cards", collapsed: true,
+          fields: [{ name: "label", label: "Label", widget: "string" }] },
+      ] },
+    });
+    expect(await w.vm.focusField("card.label")).toBe(true);
+    expect(document.activeElement?.closest('[data-field-path]')?.getAttribute('data-field-path')).toBe('card.label');
+    expect(w.find('details').element.open).toBe(true);
+    w.unmount();
+  });
+
+  it("leaves the selected section alone for an unrelated path", async () => {
+    const w = mount(TemplateEditor, {
+      props: { client, locale: "en", contentOnly: true, loading: false,
+        data: { preset: "manifesto", slots: {} },
+        templates: [{ ...manifestoFields, fields: manifestoFields.fields as Field[] }],
+      },
+    });
+    expect(await w.vm.focusField("seo.metaTitle")).toBe(false);
+    expect(w.find('select').element.value).toBe('0');
+    w.unmount();
+  });
+});

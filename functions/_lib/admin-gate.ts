@@ -3,22 +3,20 @@
 // middleware itself imports lanza.config.json and does crypto; these don't.
 
 // The ONLY endpoints under /admin that must be reachable without a session: the
-// login round-trip (login → broker → handoff) and logout. This is an exact set,
-// deliberately not a prefix.
+// device-flow sign-in pair and logout. This is an exact set, deliberately not a
+// prefix.
 //
 // It used to be `pathname.startsWith("/admin/api/auth/")`, and a prefix test on a
 // pathname is not the same test the router runs. `new URL().pathname` leaves `%2f`
 // ENCODED and does not treat `..%2f` as a dot segment, so
 // `/admin/api/auth/..%2fcf/accounts/…` passed the prefix test and skipped
-// verifySession/isAllowedLogin entirely. /admin/api/cf/* performs no session check
+// the gate's identity check entirely. /admin/api/cf/* performs no session check
 // of its own and attaches an account-scoped Cloudflare API token (I1) — so whether
 // the router then decodes `%2f` and delivers that request to the CF proxy decided
 // whether this was an account takeover. The fix does not depend on knowing which:
 // an exact set can't desync from routing, because a bypass path is never equal to
-// one of these three strings.
+// one of these strings.
 const AUTH_EXEMPT = new Set([
-  "/admin/api/auth/login",
-  "/admin/api/auth/handoff",
   "/admin/api/auth/logout",
   // The device-flow sign-in (docs/security-todo.md §10.1). Unauthenticated by
   // necessity — they ARE how you authenticate. Neither grants anything on its own:

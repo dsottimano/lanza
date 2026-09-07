@@ -6,7 +6,7 @@ export interface SlashItem {
   icon: string;
   hint: string;
   keywords: string[];
-  // Optional group label. Built-ins leave it unset; dynamic "My blocks" entries
+  // Optional group label. Built-ins leave it unset; dynamic "Saved snippets" entries
   // set it so SlashMenu can render a divider before the group.
   group?: string;
   command: (ctx: { editor: Editor; range: Range }) => void;
@@ -17,6 +17,12 @@ const emptyColumn = () => ({ type: "column", content: [{ type: "paragraph" }] })
 
 // The `/` command catalog. Each runs after deleting the typed `/query`.
 export const SLASH_ITEMS: SlashItem[] = [
+  {
+    title: "Table", icon: "▦", hint: "Three columns with a header",
+    keywords: ["table", "comparison", "rows", "columns"],
+    command: ({ editor, range }) => editor.chain().focus().deleteRange(range)
+      .insertTable({ rows: 3, cols: 3, withHeaderRow: true }).run(),
+  },
   {
     title: "Heading 2",
     icon: "H2",
@@ -71,7 +77,7 @@ export const SLASH_ITEMS: SlashItem[] = [
     hint: "Highlighted panel",
     keywords: ["callout", "note", "info", "panel"],
     command: ({ editor, range }) =>
-      editor.chain().focus().deleteRange(range).insertContent({ type: "callout" }).run(),
+      editor.chain().focus().deleteRange(range).insertContent({ type: "callout", content: [{ type: "paragraph" }] }).run(),
   },
   {
     title: "Image",
@@ -117,7 +123,7 @@ export const SLASH_ITEMS: SlashItem[] = [
     hint: "Quote with author",
     keywords: ["testimonial", "quote", "review", "customer"],
     command: ({ editor, range }) =>
-      editor.chain().focus().deleteRange(range).insertContent({ type: "testimonial" }).run(),
+      editor.chain().focus().deleteRange(range).insertContent({ type: "testimonial", content: [{ type: "paragraph" }] }).run(),
   },
   {
     title: "Logo strip",
@@ -138,7 +144,7 @@ export const SLASH_ITEMS: SlashItem[] = [
 ];
 
 // Filters the built-in catalog plus any dynamic `extra` items (the user's saved
-// "My blocks"). Built-ins come first, then the blocks group.
+// "Saved snippets"). Built-ins come first, then the snippets group.
 export function filterSlashItems(query: string, extra: SlashItem[] = []): SlashItem[] {
   const all = extra.length ? [...SLASH_ITEMS, ...extra] : SLASH_ITEMS;
   const q = query.toLowerCase().trim();

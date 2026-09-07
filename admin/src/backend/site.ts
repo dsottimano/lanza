@@ -17,6 +17,7 @@ export interface LocaleDef {
 }
 
 export interface SiteConfigData {
+  urls?: Record<string, string>;
   defaultLocale: string;
   locales: LocaleDef[];
   // Set true by the onboarding wizard once first-run setup is complete.
@@ -36,6 +37,7 @@ const FALLBACK: SiteConfigData = {
 };
 
 export const site = reactive<{
+  urls: Record<string, string>;
   defaultLocale: string;
   locales: LocaleDef[];
   onboarded: boolean;
@@ -43,6 +45,7 @@ export const site = reactive<{
   sha: string | null; // blob sha of site.json, for in-place updates
   loaded: boolean;
 }>({
+  urls: {},
   defaultLocale: FALLBACK.defaultLocale,
   locales: FALLBACK.locales,
   onboarded: false,
@@ -59,6 +62,7 @@ function applySite(data: Record<string, unknown>, sha: string | null): void {
   site.locales = locales;
   site.onboarded = data.onboarded === true;
   site.url = typeof data.url === "string" && data.url ? data.url : null;
+  site.urls = (data.urls && typeof data.urls === "object" && !Array.isArray(data.urls) ? data.urls : {}) as Record<string, string>;
   site.sha = sha;
 }
 

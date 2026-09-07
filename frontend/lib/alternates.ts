@@ -4,6 +4,7 @@
 // alternates are the same stem found under other locale folders.
 import { getCollection } from "astro:content";
 import { LOCALES, splitId, localeUrl, type Locale } from "./i18n";
+import { contentUrl } from "./public-urls";
 import { isPublished } from "./routing";
 
 export interface Alternate {
@@ -56,7 +57,7 @@ export async function entryAlternates(
   const have = (await localeIndex(collection)).get(stem) ?? new Set<Locale>();
   return LOCALES.filter((l) => have.has(l)).map((l) => ({
     locale: l,
-    url: localeUrl(l, prefix ? `${prefix}/${stem}/` : `${stem}/`),
+    url: contentUrl(collection, `${l}/${stem}`, prefix),
   }));
 }
 

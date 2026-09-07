@@ -37,13 +37,20 @@ jobs:
           node-version-file: .nvmrc
           registry-url: https://registry.npmjs.org
 
+      # npm trusted publishing requires npm 11.5.1 or newer. The Node version in
+      # .nvmrc currently bundles npm 10, so pin a compatible CLI for OIDC auth.
+      - run: npm install --global npm@11.6.2 --ignore-scripts
+
       - run: npm ci
+      - run: npm --prefix admin ci
+      # The root TypeScript project also includes bot/src.
+      - run: npm --prefix bot ci
 
       # The whole suite, in both halves. A release that ships a failing security
       # test is the thing this pipeline exists to prevent.
       - run: npm test
-      - run: npm --prefix admin ci && npm --prefix admin test
-      - run: npx tsc --noEmit
+      # Astro check generates the types missing from a clean checkout.
+      - run: npm run check
 
       # The tag must match the version being published, or `npm dist-tag` work and
       # the template pin drift from reality.
@@ -60,8 +67,6 @@ jobs:
       # public/admin. Without this flag the tarball ships a stale CMS.
       - name: Publish with provenance
         run: npm publish --provenance --access public --ignore-scripts=false
-        env:
-          NODE_AUTH_TOKEN: ${{ secrets.NPM_TOKEN }}
 
       # Prove the published artifact is the one this run built.
       - run: npm audit signatures

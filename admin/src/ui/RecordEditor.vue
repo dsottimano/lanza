@@ -34,7 +34,7 @@ const slug = ref(originalSlug);
 // Body-less collection: keep whatever body the file already had and re-commit it
 // untouched (this editor only edits frontmatter fields).
 let body = "";
-const { data, loading, save, markDirty } = useEntryEditor(props, {
+const { data, loading, loadFailed, save, markDirty } = useEntryEditor(props, {
   onLoaded: (loadedBody) => (body = loadedBody),
   getBody: () => body,
   getSlug: () => slug.value,
@@ -67,7 +67,7 @@ function onSaved() {
       <span class="flex-1 text-center text-sm"></span>
       <SaveButton
         :action="save"
-        :disabled="loading"
+        :disabled="loading || loadFailed"
         @saved="onSaved"
         @error="(e) => reportError(e, 'Save failed.')"
       />

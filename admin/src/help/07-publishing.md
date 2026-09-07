@@ -1,33 +1,32 @@
 # Publishing & deploy
 
-## Drafts vs. published
+## Saving is separate from publishing
 
-Every entry has a **Published** toggle. New entries start as **drafts**:
+Saving stores your work in the site's shared draft version. Posts and pages autosave;
+other settings have their own Save controls. Saved work is not automatically live.
 
-- **Draft** — saved to your repo but **hidden** from the live site's production
-  build. Safe to work on over time.
-- **Published** — included in the next build and visible to everyone.
+Each entry has a **Draft / Ready** toggle:
 
-Flip **Published** on and save when it's ready to go live.
+- **Draft** entries remain hidden from the production build.
+- **Ready** entries are included the next time the owner publishes.
 
-## How publishing works
+Translations can be marked Ready independently.
 
-Saving in Lanza commits to GitHub. Your host (Cloudflare Pages) watches the repo
-and **rebuilds the site automatically** on each commit. Within a minute or two the
-change is live — no manual deploy step.
+## Review, then publish
 
-The build drops every `draft: true` entry, so drafts never reach the public site
-even though they're committed.
+Open **Waiting to publish** to inspect the pending content and site changes. Open
+**Publish** when you are ready to release them.
 
-## Going live in another language
+Publishing merges the shared draft version into production. It releases all pending
+changes together, including changes to existing Ready entries and site settings.
+There is no per-entry publish action yet.
 
-A translation follows the same rule: it stays a draft until you publish it. You can
-publish the English version now and its Spanish translation later — they're
-independent.
+The host then rebuilds the site. A successful publish request starts that process;
+it does not prove the new version is already live. A failed build leaves the previous
+version online. Check the deployment result if your changes do not appear.
 
-## If something looks wrong
+## If publishing fails
 
-- **Change didn't appear?** Give the rebuild a minute, then hard-refresh. Check the
-  repo's commit history to confirm your save landed.
-- **A post shows raw HTML/markdown?** Open it in Lanza once and re-save — Lanza
-  normalises the body to clean HTML.
+The CMS displays the failure. A merge conflict needs to be resolved before retrying.
+A save conflict in the editor pauses autosave and preserves your working text rather
+than overwriting someone else's changes.

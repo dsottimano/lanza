@@ -2,23 +2,24 @@
 import type { CollectionEntry } from "astro:content";
 import PagePage from "../../components/PagePage.astro";
 import FixedPage from "../../components/FixedPage.astro";
+import { getCollection } from "astro:content";
 import { publishedPages } from "../../lib/routing";
 import { splitEntries, otherLocales } from "../../lib/paths";
-import { FIXED_PAGES, FIXED_SLUGS } from "../../lib/fixed-pages";
+import { FIXED_PAGES } from "../../lib/fixed-pages";
 
-// Non-default locales' standalone pages, under /<locale>/: localized CMS pages AND
-// the fixed pages, each generated once per non-default locale by the same rule as
-// the root route. "home" is the locale root ([locale]/index.astro); fixed slugs win.
+// CMS entries own their URLs in every enabled locale.
 export async function getStaticPaths() {
   const { localized } = splitEntries(await publishedPages());
   const cms = localized
-    .filter(({ slug }) => slug !== "home" && !FIXED_SLUGS.has(slug))
+    .filter(({ slug }) => slug !== "")
     .map(({ entry, locale, slug }) => ({
       params: { locale, slug },
       props: { page: entry, locale },
     }));
+  const allPages = await getCollection("pages");
+  const owned = splitEntries(allPages);
   const fixed = otherLocales().flatMap((locale) =>
-    FIXED_PAGES.map((p) => ({
+    FIXED_PAGES.filter((p) => !owned.localized.some((entry) => entry.locale === locale && (entry.slug === p.slug || entry.entry.id === `${locale}/${p.slug}`))).map((p) => ({
       params: { locale, slug: p.slug },
       props: { fixed: p.slug, locale },
     })),

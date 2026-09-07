@@ -1,5 +1,7 @@
 ---
 import "../styles/site.css";
+import "../styles/product.css";
+import siteConfig from "/data/site.json";
 import Seo from "../components/Seo.astro";
 import appearance from "/data/appearance.json";
 import type { PageSeo } from "../lib/seo";
@@ -8,7 +10,7 @@ import type { Alternate } from "../lib/alternates";
 import { DEFAULT_LOCALE, LOCALES, localeUrl, type Locale } from "../lib/i18n";
 import { getMenu, getSeoDefaults, resolveDevices } from "../lib/site";
 import { isLanding } from "../lib/templates";
-import { resolveBrand } from "../lib/appearance";
+import { resolveBrand, type Appearance } from "../lib/appearance";
 import { renderPart } from "../lib/parts";
 
 interface Props {
@@ -33,7 +35,7 @@ const landing = isLanding(template ?? "default");
 // Brand (Settings → Brand): inline custom-property overrides that beat the base
 // design tokens (site.css :root), a motion flag, and any custom-font stylesheet.
 // There is no theme switch — the base look lives in site.css; Brand owns it.
-const brand = resolveBrand(appearance);
+const brand = resolveBrand(appearance as Appearance);
 const siteName = getSeoDefaults(locale).siteName || "Site";
 const year = new Date().getFullYear();
 
@@ -51,6 +53,8 @@ const partData = {
   year,
   headerClass: landing ? "site-header landing" : "site-header",
   footerClass: landing ? "site-footer landing" : "site-footer",
+  menuLabel: locale === "es" ? "Menú" : "Menu",
+  primaryNavigationLabel: locale === "es" ? "Navegación principal" : "Primary navigation",
   menuHeader: resolveDevices(menu.header).desktop,
   menuFooter: resolveDevices(menu.footer).desktop,
   showSwitcher: LOCALES.length > 1,
@@ -90,7 +94,7 @@ const footerHtml = renderPart("footer", partData);
     <meta name="theme-color" content="#17140f" media="(prefers-color-scheme: dark)" />
     <Seo seo={seo} article={article} locale={locale} alternates={alternates} />
   </head>
-  <body>
+  <body class:list={{ "lanza-product": (siteConfig as { productSite?: boolean }).productSite === true }}>
     {/* Site parts — header/footer rendered from the editable HTML templates in
         templates/parts/*.html (see lib/parts.ts), injected around the page slot.
         The markup is human-editable HTML; the menu + language switcher are
@@ -100,6 +104,38 @@ const footerHtml = renderPart("footer", partData);
     <slot />
 
     <Fragment set:html={footerHtml} />
+
+    <script is:inline>
+      document.querySelectorAll(".site-header").forEach((header, index) => {
+        const toggle = header.querySelector(".nav-toggle");
+        const nav = header.querySelector(".site-nav");
+        if (!(toggle instanceof HTMLButtonElement) || !(nav instanceof HTMLElement)) return;
+
+        nav.id ||= `site-nav-${index + 1}`;
+        toggle.setAttribute("aria-controls", nav.id);
+        header.setAttribute("data-nav-ready", "");
+
+        const close = () => {
+          header.removeAttribute("data-nav-open");
+          toggle.setAttribute("aria-expanded", "false");
+        };
+
+        toggle.addEventListener("click", () => {
+          const open = !header.hasAttribute("data-nav-open");
+          header.toggleAttribute("data-nav-open", open);
+          toggle.setAttribute("aria-expanded", String(open));
+        });
+        nav.addEventListener("click", (event) => {
+          if (event.target instanceof HTMLAnchorElement) close();
+        });
+        header.addEventListener("keydown", (event) => {
+          if (event.key === "Escape") {
+            close();
+            toggle.focus();
+          }
+        });
+      });
+    </script>
 
     {/* Agent surface: window.lanza read API (see public/lanza.js). Static, deferred, cached site-wide. */}
     <script src="/lanza.js" defer is:inline></script>

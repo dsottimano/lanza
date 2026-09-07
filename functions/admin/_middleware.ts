@@ -6,10 +6,10 @@
 // its caching (see CLAUDE.md Rule 2). The auth endpoints are exempt by exact match
 // so the sign-in flow can complete while unauthenticated.
 //
-// Who you are comes from GITHUB: a device-flow user token in an HttpOnly cookie,
-// and `permissions` on this repo for the role (docs/security-todo.md §10). An
-// unauthenticated navigation is answered with the sign-in screen, not a redirect —
-// device flow has nowhere to redirect to.
+// Who you are comes from GITHUB, and only from GitHub: a device-flow user token in
+// an HttpOnly cookie, and `permissions` on this repo for the role
+// (docs/security-todo.md §10). An unauthenticated navigation is answered with the
+// sign-in screen, not a redirect — device flow has nowhere to redirect to.
 //
 // It is also the only place /admin's security headers can be set: Cloudflare does
 // not apply public/_headers to Pages Function responses, and this middleware wraps
@@ -20,9 +20,6 @@ import {
   withAdminSecurityHeaders,
 } from "../_lib/admin-gate";
 import { signInPage } from "../_lib/signin-page";
-// Only for reading and clearing the outgoing session cookie — nothing verifies it
-// here any more. `session.ts` goes in phase 4.
-import { SESSION_COOKIE, readCookie } from "../_lib/session";
 import { roleMayUseCloudflare, type Role } from "../_lib/roles";
 import { identityFor } from "../_lib/gh-identity";
 import {
@@ -30,20 +27,18 @@ import {
   REFRESH_COOKIE,
   authCookies,
   clearAuthCookies,
+  readCookie,
   refreshTokens,
 } from "../_lib/device-flow";
 import {
   GITHUB_CLIENT_ID as CONFIG_CLIENT_ID,
-  HANDOFF_PUBLIC_KEY as CONFIG_PUBLIC_KEY,
   productionOriginIfPreview,
 } from "../_lib/tenant-config";
-// Per-tenant identity — adminLogin is the /admin gate (same source the handoff
-// endpoint checks). The broker writes this file at repo creation.
+// Which repo this site edits. The broker writes this file at repo creation; it
+// names the repo, not the people — GitHub answers who may touch it.
 import repo from "../../lanza.config.json";
 
 interface Env {
-  HANDOFF_PUBLIC_KEY?: string;
-  ADMIN_LOGIN?: string;
   GITHUB_CLIENT_ID?: string;
 }
 
@@ -58,14 +53,14 @@ export const onRequest = async (context: {
   const { request, env, next } = context;
   const url = new URL(request.url);
 
-  // FIRST, before any auth work: there is no CMS on a preview build. The session is
-  // bound to the production origin, so every path from here 403s or bounces to a
-  // GitHub login that can't help. Send the whole of /admin/* to the live site,
+  // FIRST, before any auth work: there is no CMS on a preview build. The sign-in
+  // cookies are set on the production origin, so a preview host can never see them.
+  // Send the whole of /admin/* to the live site,
   // carrying the path and query across. The SPA's `#/...` route is lost, because a
   // fragment is never sent to a server — the CMS opens at its default screen.
   //
-  // This runs ahead of the /admin/api/auth/ exemption deliberately — starting a login
-  // round-trip on a preview host is precisely the dead end being removed.
+  // This runs ahead of the /admin/api/auth/ exemption deliberately — approving a
+  // device code for a preview host is precisely the dead end being removed.
   const productionOrigin = productionOriginIfPreview(url.hostname);
   if (productionOrigin) {
     return withAdminSecurityHeaders(
@@ -88,7 +83,7 @@ export const onRequest = async (context: {
     return deny(url, "Malformed path.");
   }
 
-  // The login/handoff/logout endpoints must be reachable without a session. This is
+  // The sign-in and logout endpoints must be reachable without a session. This is
   // an EXACT match, not a prefix — see isAuthExempt for the bypass a prefix allowed.
   if (isAuthExempt(url.pathname)) return withAdminSecurityHeaders(await next());
 
@@ -99,41 +94,32 @@ export const onRequest = async (context: {
   // of people is consulted, and removal of access takes effect within 60s.
   const gh = await githubAuth(cookies, env);
 
-  // ── The broker's RS256 session is NO LONGER A WAY IN. ────────────────────────
-  // Phase 2 accepted both families so that adding a way in did not close one. Phase
-  // 3 took the mint off the runtime path, and that changed what the old session can
-  // DO: nothing. The proxy has no GitHub token for it, so admitting it produced the
-  // worst state in the product — the CMS loads, every call 401s, and the empty
-  // result renders the onboarding wizard, on a site that has content. A credential
-  // that opens a door onto a room where nothing works is worse than one that is
-  // refused, because only the refusal tells you to sign in.
-  //
-  // It also closed a gap rather than opening one: /admin/api/cf/* does no
-  // authorization of its own and attaches an ACCOUNT-scoped Cloudflare token (I1),
-  // so until this line the 7-day unrevocable session still drove Cloudflare — by
-  // then the only thing it could still drive.
-  //
-  // The code for that family is deleted in phase 4; this is the behaviour change,
-  // made where the bug is.
+  // GitHub is the ONLY way in. The broker's RS256 session was a second family here
+  // until phase 4 deleted it; nothing the broker signs opens this door any more,
+  // which is the point — a compromised broker cannot forge its way into a tenant.
   const role: Role | null = gh.kind === "ok" ? gh.role : null;
   const login: string | null = gh.kind === "ok" ? gh.login : null;
 
   if (!role) {
     const refused =
       gh.kind === "denied"
-        ? deny(url, "This GitHub account cannot edit this repository.", 403)
+        ? // GitHub answers 404 for a repository you cannot see, and a GitHub App's
+          // user token cannot see one the App is not installed on — so "denied" is
+          // genuinely two situations and we cannot tell them apart from here. Name
+          // both, because the install is the likely one for a site owner and the
+          // old message ("this account cannot edit this repository") sent people
+          // looking at their collaborator settings instead.
+          deny(
+            url,
+            `Your GitHub account cannot reach ${repo.owner}/${repo.name}. Either the Lanza CMS app is not installed on that repository (install it at github.com/apps/lanza-cms), or this account has no access to it.`,
+            403,
+          )
         : gh.kind === "unavailable"
           ? deny(url, "GitHub could not be reached to check your access.", 503)
           : deny(url, "Not authenticated.");
     // Carry any cookie clearing through the refusal — a dead refresh token has to be
     // dropped on the response that noticed it, or the browser presents it forever.
     for (const set of gh.setCookies) refused.headers.append("set-cookie", set);
-    // Drop the broker session too. It authorises nothing now, and leaving it in the
-    // browser means every future request still carries a credential whose only
-    // remaining effect would be to confuse whoever debugs this next.
-    if (readCookie(cookies, SESSION_COOKIE)) {
-      refused.headers.append("set-cookie", `${SESSION_COOKIE}=; Path=/admin; Max-Age=0`);
-    }
     return refused;
   }
 
@@ -147,8 +133,7 @@ export const onRequest = async (context: {
 
   // The gh proxy attaches this to its GitHub calls. It is handed over here rather
   // than re-read from the cookie downstream for the reason above: after a refresh
-  // the cookie in the request is already dead. Absent for a browser on the old
-  // RS256 session — the proxy has nothing to send for it, and says so (§10.8 phase 3).
+  // the cookie in the request is already dead.
   context.data = { ...(context.data ?? {}), role, login, token: gh.kind === "ok" ? gh.token : null };
   const response = withAdminSecurityHeaders(await next());
   // A refresh happened while answering this request. The gate is where it belongs:
@@ -219,7 +204,11 @@ async function githubAuth(cookies: string | null, env: Env): Promise<GhAuth> {
 // honest status for a page that loaded and works — the refusal is that the request
 // never reached anything under /admin/ (§10.1 step 1).
 function deny(url: URL, message: string, status = 401): Response {
-  if (status !== 401 || url.pathname.startsWith("/admin/api/")) {
+  // An API call gets JSON whatever the reason. A top-level NAVIGATION gets the
+  // sign-in page even on a 403 — the person is looking at a browser tab, and raw
+  // JSON there is not an answer. The notice explains why signing in again may not
+  // be enough, which the bare page cannot say.
+  if (url.pathname.startsWith("/admin/api/")) {
     return withAdminSecurityHeaders(
       new Response(JSON.stringify({ message }), {
         status,
@@ -227,7 +216,7 @@ function deny(url: URL, message: string, status = 401): Response {
       }),
     );
   }
-  const page = signInPage();
+  const page = signInPage(status === 401 ? undefined : message);
   return withAdminSecurityHeaders(
     new Response(page.html, {
       status: 200,

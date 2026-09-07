@@ -6,6 +6,7 @@
 import { ref, computed, onMounted } from "vue";
 import { GitHubClient, GitHubError, type CompareResult } from "../backend/github";
 import { REPO } from "../backend/config";
+import { versionState, securityUpdateRequired } from "../backend/version";
 import { reportError, clearError } from "../errors";
 
 const props = defineProps<{ client: GitHubClient }>();
@@ -21,6 +22,15 @@ const doneMsg = ref<string | null>(null);
 const changes = computed(() => diff.value?.files ?? []);
 const hasChanges = computed(() => changes.value.length > 0);
 
+// Publishing while below the security floor would merge fine and then fail the
+// BUILD (scripts/check-floor.mjs), so the site would stay on its old content with
+// nothing in the CMS saying why - the failure would be a line in a Cloudflare build
+// log nobody opens. Refuse here instead, where the person is standing and where the
+// fix is one screen away.
+const blocked = computed(() =>
+  versionState.value ? securityUpdateRequired(versionState.value) : false,
+);
+
 async function refresh() {
   loading.value = true;
   try {
@@ -33,7 +43,7 @@ async function refresh() {
 }
 
 async function publish() {
-  if (publishing.value) return;
+  if (publishing.value || blocked.value) return;
   publishing.value = true;
   doneMsg.value = null;
   clearError();
@@ -78,7 +88,7 @@ function statusLabel(s: string): string {
       <span class="flex-1 text-center text-sm"></span>
       <button
         class="btn btn-primary"
-        :disabled="publishing || loading || !hasChanges"
+        :disabled="publishing || loading || !hasChanges || blocked"
         @click="publish"
       >
         {{ publishing ? "Publishing…" : "Publish to production" }}
@@ -91,6 +101,16 @@ function statusLabel(s: string): string {
         Your edits are saved to the <strong>staging</strong> branch and previewed on the staging
         domain. Publishing merges them into production and rebuilds the public site.
       </p>
+
+      <div v-if="blocked" class="mb-4 border-l-2 border-red-600 bg-red-50 px-4 py-3">
+        <p class="text-sm leading-relaxed text-red-900">
+          <strong class="font-semibold">Publishing is paused until this site is updated.</strong>
+          It runs a version of the Lanza software that has been marked unsafe, and a
+          build on that version is refused - so publishing now would leave the live site
+          on its old content with no explanation. Go to <em>Software</em> and install the
+          update, then publish.
+        </p>
+      </div>
 
       <p v-if="doneMsg" class="mb-4 rounded-xl bg-emerald-50 px-4 py-3 text-sm text-emerald-800">
         {{ doneMsg }}

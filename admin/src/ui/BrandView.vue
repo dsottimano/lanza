@@ -1,4 +1,5 @@
 <script setup lang="ts">
+import SettingsHeader from "./SettingsHeader.vue";
 // Settings → Brand. Restyle the PUBLIC site's palette, corner style, motion, and
 // fonts — a live preview on the right, one Save that commits the `brand` block
 // to appearance.json (staging) and triggers a Pages rebuild. No CSS is touched;
@@ -26,7 +27,7 @@ import { reportError, clearError } from "../errors";
 import { isDirty } from "./dirty";
 
 const props = defineProps<{ client: GitHubClient }>();
-const emit = defineEmits<{ (e: "back"): void }>();
+defineEmits<{ (e: "back"): void }>();
 
 const loading = ref(true);
 const savedOnce = ref(false);
@@ -130,47 +131,42 @@ const fontOptions = FONT_IDS.map((id) => ({ id, label: FONT_CATALOG[id].label })
 </script>
 
 <template>
-  <div class="min-h-screen">
-    <header class="toolbar flex items-center justify-between gap-4 px-5 py-2.5">
-      <button class="text-sm text-zinc-600 transition hover:text-zinc-900" @click="emit('back')">← Back</button>
-      <span class="text-sm font-semibold text-zinc-900">Brand</span>
-      <SaveButton
-        :action="save"
-        :disabled="loading"
-        @saved="clearError"
-        @error="(e) => reportError(e, 'Saving your brand failed — nothing was committed.')"
-      />
-    </header>
+  <div class="settings-page">
+    <SettingsHeader title="Brand &amp; themes" @back="$emit('back')">
+      <template #actions>
+        <SaveButton
+          :action="save"
+          :disabled="loading"
+          @saved="clearError"
+          @error="(e) => reportError(e, 'Saving your brand failed — nothing was committed.')"
+        />
+      </template>
+      <template #description><p>Shape the look of your site. Preview changes as you go.</p></template>
+      <template #navigation><slot name="navigation" /></template>
+    </SettingsHeader>
 
-    <main class="mx-auto max-w-5xl px-6 pt-8 pb-24">
-      <h1 class="mb-1 font-serif text-3xl font-bold tracking-tight text-zinc-900">Brand</h1>
-      <p class="mb-6 max-w-2xl text-sm text-zinc-600">
-        Set your site's colors, corners, motion, and fonts — Brand owns the whole
-        look. Saving commits to your repo and rebuilds the site — it goes live in a
-        minute or two. <button class="underline underline-offset-2 hover:text-zinc-900" @click="resetToDefaults">Reset to Lanza defaults</button>.
-      </p>
-
+    <main class="settings-body settings-body--wide">
       <div
         v-if="savedOnce"
         class="mb-6 rounded-xl border border-emerald-200 bg-emerald-50 px-4 py-3 text-sm text-emerald-900"
       >
-        ✓ Brand saved. Cloudflare Pages is rebuilding — your site updates in ~1–2 minutes.
+        ✓ Brand saved to staging. Preview your changes, then publish when ready.
       </div>
-
       <div v-if="loading" class="text-sm text-zinc-500">Loading appearance…</div>
 
-      <div v-else class="grid gap-6 lg:grid-cols-[1fr_22rem]">
+      <div v-else class="brand-workspace">
         <!-- ── controls ─────────────────────────────────────────────────── -->
-        <div class="flex flex-col gap-6">
+        <div class="brand-controls">
           <!-- Presets -->
-          <section class="card p-5">
+          <section class="brand-section">
             <h2 class="mb-1 text-sm font-semibold text-zinc-900">Palettes</h2>
             <p class="mb-3 text-xs text-zinc-500">Start from a preset, then fine-tune below.</p>
-            <div class="flex flex-wrap gap-2">
+            <div class="brand-palettes">
               <button
                 v-for="p in PRESETS"
                 :key="p.name"
-                class="group flex items-center gap-2 rounded-full border border-zinc-200 bg-[var(--surface)] py-1.5 pl-1.5 pr-3 text-xs font-medium text-zinc-700 transition hover:border-zinc-400"
+                class="brand-palette"
+                :aria-pressed="JSON.stringify(brand.colors) === JSON.stringify(p.brand.colors) && brand.radius === p.brand.radius && brand.motion === p.brand.motion && brand.fonts.heading === p.brand.fonts.heading && brand.fonts.body === p.brand.fonts.body"
                 @click="applyPreset(p.brand)"
               >
                 <span class="flex -space-x-1">
@@ -187,13 +183,14 @@ const fontOptions = FONT_IDS.map((id) => ({ id, label: FONT_CATALOG[id].label })
           </section>
 
           <!-- Colors -->
-          <section class="card p-5">
+          <section class="brand-section">
             <h2 class="mb-3 text-sm font-semibold text-zinc-900">Colors</h2>
-            <div class="grid gap-3 sm:grid-cols-2">
+            <div class="grid gap-4">
               <label v-for="t in COLOR_TOKENS" :key="t.key" class="flex items-center gap-3">
                 <input
                   type="color"
                   class="size-9 flex-shrink-0 cursor-pointer rounded-lg border border-zinc-200 bg-transparent p-0.5"
+                  :aria-label="`${t.label} color`"
                   :value="brand.colors[t.key]"
                   @input="setColor(t.key, ($event.target as HTMLInputElement).value)"
                 />
@@ -204,6 +201,7 @@ const fontOptions = FONT_IDS.map((id) => ({ id, label: FONT_CATALOG[id].label })
                 <input
                   type="text"
                   class="w-[5.5rem] rounded-md border border-zinc-200 px-2 py-1 font-mono text-xs text-zinc-700 focus:border-zinc-400 focus:outline-none"
+                  :aria-label="`${t.label} hex value`"
                   :value="brand.colors[t.key]"
                   spellcheck="false"
                   @change="setColor(t.key, ($event.target as HTMLInputElement).value.trim())"
@@ -212,8 +210,31 @@ const fontOptions = FONT_IDS.map((id) => ({ id, label: FONT_CATALOG[id].label })
             </div>
           </section>
 
+          <!-- Fonts -->
+          <section class="brand-section grid gap-4 sm:grid-cols-2">
+            <label class="block">
+              <span class="mb-1 block text-sm font-semibold text-zinc-900">Heading font</span>
+              <select
+                v-model="brand.fonts.heading"
+                class="w-full rounded-md border border-zinc-200 bg-white px-2 py-1.5 text-sm text-zinc-800 focus:border-zinc-400 focus:outline-none"
+              >
+                <option v-for="f in fontOptions" :key="f.id" :value="f.id">{{ f.label }}</option>
+              </select>
+            </label>
+            <label class="block">
+              <span class="mb-1 block text-sm font-semibold text-zinc-900">Body font</span>
+              <select
+                v-model="brand.fonts.body"
+                class="w-full rounded-md border border-zinc-200 bg-white px-2 py-1.5 text-sm text-zinc-800 focus:border-zinc-400 focus:outline-none"
+              >
+                <option v-for="f in fontOptions" :key="f.id" :value="f.id">{{ f.label }}</option>
+              </select>
+            </label>
+          </section>
           <!-- Corners + Motion + Color scheme -->
-          <section class="card grid gap-5 p-5 sm:grid-cols-2">
+          <details class="brand-section brand-details">
+            <summary>Finishing touches <span>Corners, motion &amp; color scheme</span></summary>
+            <div class="grid gap-5 pt-5">
             <div>
               <h2 class="mb-2 text-sm font-semibold text-zinc-900">Corners</h2>
               <div class="segment">
@@ -265,48 +286,28 @@ const fontOptions = FONT_IDS.map((id) => ({ id, label: FONT_CATALOG[id].label })
                 Auto follows each visitor's device setting. Light or Dark pins the site to one.
               </p>
             </div>
-          </section>
+            </div>
+          </details>
 
-          <!-- Fonts -->
-          <section class="card grid gap-4 p-5 sm:grid-cols-2">
-            <label class="block">
-              <span class="mb-1 block text-sm font-semibold text-zinc-900">Heading font</span>
-              <select
-                v-model="brand.fonts.heading"
-                class="w-full rounded-md border border-zinc-200 bg-white px-2 py-1.5 text-sm text-zinc-800 focus:border-zinc-400 focus:outline-none"
-              >
-                <option v-for="f in fontOptions" :key="f.id" :value="f.id">{{ f.label }}</option>
-              </select>
-            </label>
-            <label class="block">
-              <span class="mb-1 block text-sm font-semibold text-zinc-900">Body font</span>
-              <select
-                v-model="brand.fonts.body"
-                class="w-full rounded-md border border-zinc-200 bg-white px-2 py-1.5 text-sm text-zinc-800 focus:border-zinc-400 focus:outline-none"
-              >
-                <option v-for="f in fontOptions" :key="f.id" :value="f.id">{{ f.label }}</option>
-              </select>
-            </label>
-          </section>
+          <button class="brand-reset" @click="resetToDefaults">Reset to Lanza defaults</button>
         </div>
 
         <!-- ── live preview ─────────────────────────────────────────────── -->
-        <div class="lg:sticky lg:top-6 lg:self-start">
-          <p class="mb-2 text-[0.68rem] font-semibold uppercase tracking-wider text-zinc-500">Preview</p>
+        <div class="brand-preview-stage">
+          <p class="mb-2 text-[0.68rem] font-semibold uppercase tracking-wider text-zinc-500">Live preview <span class="normal-case font-normal tracking-normal"> · Sample page</span></p>
           <div class="brand-preview" :style="previewStyle" :data-motion="brand.motion">
             <div class="pv-header">
               <span class="pv-brand">Lanza ↗</span>
               <nav class="pv-nav"><a>Work</a><a>About</a><a>Journal</a></nav>
             </div>
             <div class="pv-body">
-              <h1 class="pv-h1">A quiet, confident brand</h1>
-              <p class="pv-meta">March 2026 · 4 min read</p>
+              <h2 class="pv-h1">A quiet, confident brand.</h2>
+              <p class="pv-meta">Journal · 4 min read</p>
               <p class="pv-p">
-                Body copy set in your chosen face. A <a class="pv-link">link</a> tracks the
-                accent, and <mark class="pv-mark">a highlight</mark> washes it back.
+                A space for your ideas, your work, and what comes next. Share <a class="pv-link">something meaningful</a> and make <mark class="pv-mark">a little room</mark> for discovery.
               </p>
               <a class="pv-btn">Read more →</a>
-              <div class="pv-card">Surface — cards, code, callouts and CTAs sit here.</div>
+              <div class="pv-card">Good things begin with a simple idea. Give yours a place to grow.</div>
             </div>
           </div>
         </div>
@@ -321,19 +322,19 @@ const fontOptions = FONT_IDS.map((id) => ({ id, label: FONT_CATALOG[id].label })
    faithful-enough proxy of header / heading / prose / button / card. */
 .brand-preview {
   border: 1px solid rgba(0, 0, 0, 0.08);
-  border-radius: 14px;
+  border-radius: var(--radius);
   overflow: hidden;
   background: var(--bg);
   color: var(--ink);
   font-family: var(--font-body);
-  box-shadow: 0 12px 30px -18px rgba(0, 0, 0, 0.35);
+  min-height: 32rem;
 }
 .pv-header {
   display: flex;
   align-items: baseline;
   justify-content: space-between;
   gap: 0.75rem;
-  padding: 0.85rem 1rem;
+  padding: 1.25rem 1.5rem;
   border-bottom: 1px solid var(--border);
 }
 .pv-brand {
@@ -353,15 +354,15 @@ const fontOptions = FONT_IDS.map((id) => ({ id, label: FONT_CATALOG[id].label })
   cursor: pointer;
 }
 .pv-body {
-  padding: 1.1rem 1rem 1.3rem;
+  padding: clamp(1.5rem, 4vw, 3rem);
 }
 .pv-h1 {
   font-family: var(--font-heading);
   font-weight: 600;
-  font-size: 1.5rem;
+  font-size: clamp(2rem, 3.3vw, 3.5rem);
   line-height: 1.12;
   letter-spacing: -0.01em;
-  margin: 0 0 0.35rem;
+  margin: 0 0 1rem;
   color: var(--ink);
 }
 .pv-meta {
@@ -397,12 +398,18 @@ const fontOptions = FONT_IDS.map((id) => ({ id, label: FONT_CATALOG[id].label })
   cursor: pointer;
 }
 .pv-card {
-  margin-top: 1rem;
+  margin-top: 2.5rem;
   padding: 0.8rem 0.9rem;
   background: var(--surface);
   border-radius: var(--radius);
   font-size: 0.76rem;
   color: var(--muted);
+}
+
+@media (max-width: 600px) {
+  .brand-preview { min-height: 0; }
+  .pv-body { padding: 1.5rem; }
+  .pv-h1 { font-size: 2rem; }
 }
 
 /* Motion mirrors the public [data-motion="on"] block. */

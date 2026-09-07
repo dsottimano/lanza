@@ -105,7 +105,9 @@ function localePrefix(locale: string): string {
 // The slug's own URL segment. "home" IS the locale root (frontend/pages/index.astro
 // and [locale]/index.astro build it, and [...slug].astro explicitly skips it), so it
 // contributes no segment — `/`, not `/home`, which does not exist.
-function urlSlug(collection: string, slugName: string): string {
+export function publicSlug(collection: string, slugName: string, locale: string): string {
+  const override = site.urls[`${collection}/${locale}/${slugName}`];
+  if (typeof override === "string") return override;
   return collection === "pages" && slugName === "home" ? "" : slugName;
 }
 
@@ -124,15 +126,16 @@ export function entryPathFrame(
   return {
     prefix: `${localePrefix(locale)}${route}`,
     // Entry paths end in a slash; the locale root already has one in its prefix.
-    suffix: urlSlug(collection, slugName) ? "/" : "",
+    suffix: slugName ? "/" : "",
   };
 }
 
 /** An entry's site-relative public path, or null if it has no public page. */
 export function entryPath(collection: string, slugName: string, locale: string): string | null {
-  const frame = entryPathFrame(collection, slugName, locale);
+  const segment = publicSlug(collection, slugName, locale);
+  const frame = entryPathFrame(collection, segment, locale);
   if (!frame) return null;
-  return `${frame.prefix}${urlSlug(collection, slugName)}${frame.suffix}`;
+  return `${frame.prefix}${segment}${frame.suffix}`;
 }
 
 /** Absolute staging URL for one entry, or null if it has no public page. */

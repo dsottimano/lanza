@@ -106,7 +106,7 @@ async function confirmRevert() {
       <p class="font-semibold">✓ Theme reverted.</p>
       <p class="mt-1">
         Committed as <code class="font-mono text-xs">{{ revertedSha.slice(0, 7) }}</code>.
-        Cloudflare Pages is rebuilding; your site updates in ~1–2 minutes.
+        The revert is saved to staging. Review the staging build and pending changes before publishing.
       </p>
     </div>
 

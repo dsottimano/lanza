@@ -68,9 +68,9 @@ test("the gate's token is what gets attached — no mint, no standing PAT", asyn
 });
 
 test("no token from the gate → 401 sign in, and GitHub is never called", async () => {
-  // The old RS256 session admits a browser but is a credential for OUR broker, not
-  // for GitHub. Before phase 3 this fell back to a broker mint or a standing PAT;
-  // now there is nothing to fall back TO, and that must read as "sign in", not 500.
+  // This proxy has exactly one credential: the person's own token, handed over by
+  // the gate. There is no mint and no standing PAT to fall back TO, and an absent
+  // token must read as "sign in", not 500.
   const { res, calls } = await proxy("GET", "contents/x.md", { token: null });
   assert.equal(res.status, 401);
   assert.equal(calls.length, 0);
@@ -78,9 +78,16 @@ test("no token from the gate → 401 sign in, and GitHub is never called", async
 });
 
 test("GET /user is answered from the gate's identity, without spending a round-trip", async () => {
-  const { res, calls } = await proxy("GET", "user", { login: "dsottimano" });
+  // Identity, role and repo in one answer: the SPA has no other source for any of
+  // them (the role lists in lanza.config.json are gone, and the SPA is built
+  // tenant-agnostic so it does not know which repo it edits).
+  const { res, calls } = await proxy("GET", "user", { login: "dsottimano", role: "owner" });
   assert.equal(res.status, 200);
-  assert.deepEqual(await res.json(), { login: "dsottimano" });
+  assert.deepEqual(await res.json(), {
+    login: "dsottimano",
+    role: "owner",
+    repo: "dsottimano/lanza",
+  });
   assert.equal(calls.length, 0);
 });
 

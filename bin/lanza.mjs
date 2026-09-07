@@ -14,6 +14,7 @@ import { cpSync, existsSync, realpathSync } from "node:fs";
 import { createRequire } from "node:module";
 import { fileURLToPath } from "node:url";
 import { dirname, join } from "node:path";
+import { checkFloor } from "../scripts/check-floor.mjs";
 
 const require = createRequire(import.meta.url);
 
@@ -45,6 +46,21 @@ if (!["mjs", "js", "ts", "mts"].some((e) => existsSync(join(process.cwd(), `astr
   );
   process.exit(1);
 }
+
+// A version the publisher has marked unsafe does not get to deploy. `dev` is
+// exempt: refusing to run locally would stop someone from doing the very edit that
+// fixes it. See scripts/check-floor.mjs for why this fails OPEN on anything it
+// cannot answer definitively.
+if (mode === "build") {
+  const refusal = await checkFloor(PKG_ROOT);
+  if (refusal) {
+    console.error(refusal);
+    process.exit(1);
+  }
+}
+
+// Refuse schema/template drift before generating or deploying public output.
+if (mode === "build") run(process.execPath, [join(PKG_ROOT, "scripts/validate-site.mjs")]);
 
 // Codegen (content model → Zod config; collection routes → .astro pages; redirect
 // rules → _redirects). Routes come AFTER the content config: a route is only

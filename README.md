@@ -1,4 +1,16 @@
-# Astro static site + Lanza CMS + Telegram bot (Cloudflare)
+# Lanza
+
+Never lose a good thought again. Lanza is evolving from a self-owned publishing CMS
+into a durable home for thinking with an assistant. The agreed v1 is simple: talk
+with ChatGPT or Claude, have the connected assistant save notes in your private
+GitHub repo, review/develop them in Lanza, and publish selected work when ready.
+
+The notebook is planned, not shipped. Start with [current TODOs](docs/todos.md),
+[the product vision](docs/product-vision.md), [Thoughts v1](docs/thoughts-v1.md), and
+[the latest handoff](docs/handoff-2026-09-07.md). Voice-mode tool compatibility still
+needs verification. D1/R2 are not prerequisites for this v1.
+
+## Current implementation
 
 Pure-static Astro at the repo root, edited through **Lanza** — a self-owned
 Vue 3 + TipTap CMS (`admin/`) served at `/admin` — with a Telegram Worker for
@@ -7,9 +19,8 @@ git; the production build drops `draft: true` entries. Post/page **bodies are
 HTML** (Lanza is the source of truth); Astro renders them with `set:html`,
 sanitized at build time (`frontend/lib/sanitize.ts`).
 
-No Cloudflare adapter yet — add `@astrojs/cloudflare` + per-route
-`prerender = false` only when the real-estate listings need on-demand rendering
-(those will move to D1).
+Public pages are statically built. Keep private notes outside the public content
+model and generated assets; a private repository can host a public website.
 
 ```
 .                 Astro project (root)
@@ -36,16 +47,11 @@ build, so a bare `npm run dev` won't serve `/admin` until you've built it
 
 ## Editing content — Lanza at `/admin`
 
-- Deploy, then visit `https://<your-site>/admin/`. Access is gated by "Sign in
-  with GitHub" — you're redirected to GitHub, and once your login matches the
-  `ADMIN_LOGIN` allowlist the CMS opens straight in.
-- No browser token: GitHub credentials live server-side and are injected by the
-  `/admin/api/gh` proxy (a Cloudflare Pages Function). On an onboarded site the
-  proxy mints a short-lived, repo-scoped token from the broker per request, so
-  there is nothing to configure. **Self-hosting without a broker?** Set the
-  `GITHUB_TOKEN` Pages secret (fine-grained PAT, **Contents: read & write** on
-  this repo) as a fallback. For local dev, put it in `admin/.env` (see
-  `admin/.sample.env`).
+- Deploy, then visit `https://<your-site>/admin/` and sign in with GitHub Device
+  Flow. Your repository permissions determine your CMS role.
+- GitHub credentials are held in HttpOnly cookies; `/admin/api/gh` attaches the
+  signed-in person's token. Production needs no broker mint or standing PAT.
+  Local development uses a PAT in `admin/.env` (see `admin/.sample.env`).
 - The Site Health / provisioning diagnostics reach the Cloudflare API the same
   way, through the `/admin/api/cf` proxy. Set three Pages secrets:
   `CLOUDFLARE_API_TOKEN` (Account token scoped to **Workers KV Storage:Edit,
@@ -56,11 +62,11 @@ build, so a bare `npm run dev` won't serve `/admin` until you've built it
 - **Drafts:** new entries default to `draft: true` and stay off the live site
   until you flip *Published* and save.
 - **Collections, fields, and settings** are all defined in one place —
-  `admin/src/schema.ts` (the content model; there is no `config.yml`).
+  `data/schema.json` (the content model; there is no `config.yml`).
 - **Media:** images upload straight to `public/images/uploads` and are served as
   static assets.
 - **SEO:** per-entry in the settings drawer; site-wide defaults under
-  *Settings → SEO defaults* (`data/seo.json`).
+  *Settings → SEO defaults* (`data/seo.<locale>.json`).
 - **Redirects:** *Settings → Redirects* (`data/redirects.json`), compiled to
   Cloudflare's native `public/_redirects` at build time by `scripts/gen-redirects.mjs`.
 
@@ -85,53 +91,28 @@ Every site also serves the contract at `/site-system.json`, generated from the s
 constants the checker enforces, and the MCP server exposes it as `describe_site_system`
 alongside `validate_site`. `docs/authoring-templates.md` is the syntax of one template.
 
+## Themes and site starters
+
+**Settings → Brand & themes** offers shared brand controls, additive Portfolio and
+Real estate starters, and theme bundle import/export. Read [the theme guide](themes/README.md)
+for the file format, editing workflow and staging/publication boundaries, and
+[site starters](docs/site-starters.md) for examples and the local CLI.
+MCP exposes the same guidance in `describe_site_system.themes`.
+
 ## Security — the CMS threat model
 
-The CMS never holds a GitHub token; every write reaches GitHub through the
-`/admin/api/gh` proxy. Three layers keep that proxy safe:
+GitHub Device Flow signs people in; HttpOnly cookies carry their own GitHub tokens.
+GitHub repository permissions determine the owner/editor role. The tenant does not
+trust broker-signed sessions or ask a broker to mint repository credentials.
+The GitHub proxy confines requests to allowed endpoints, repository and branch,
+and checks resolved URLs as well as input paths. Editor writes stay on staging.
+MCP requires the owner's own bearer token and repository permission.
 
-1. **Short-lived, repo-scoped token.** The proxy asks the **broker** to mint a
-   GitHub App installation token (Contents:write, ~1h, this repo only) per
-   request — a Lanza site holds no standing GitHub secret. `GITHUB_TOKEN`, a
-   fine-grained PAT scoped to Contents:read&write **on this one repo**, remains
-   only as a self-hosting fallback for when there is no broker. If you set it,
-   never broaden it and never reuse it elsewhere.
-2. **Two-part auth gate.** All of `/admin/*` (the SPA and both proxies) sits
-   behind `functions/admin/_middleware.ts`. Login is GitHub OAuth *via the
-   broker*: the tenant redirects to it, the broker exchanges the code and
-   RS256-signs a session, and `functions/admin/api/auth/handoff.ts` sets it as an
-   HttpOnly cookie. The tenant holds **only the public key** — no signing secret,
-   no `SESSION_SECRET`, no `GITHUB_CLIENT_SECRET`.
-
-   The gate makes two distinct checks, and both matter: the signature proves
-   *who* you are, and `ADMIN_LOGIN` (or `lanza.config.json`'s `adminLogin`)
-   decides whether that person owns *this* site. The broker signs a token for
-   anyone who authenticates, so a signature alone is not authorization — see
-   `docs/security-model.md` I1.
-3. **Endpoint allowlist, checked twice.** The proxy enforces a method+path
-   allowlist (`functions/_lib/gh-proxy.ts`, shared by the prod Pages Function and
-   the dev Vite middleware) *before* attaching the token, and then re-checks the
-   **resolved** URL before fetching it — a string check and a URL parser disagree
-   about `\` and `%2e%2e`. Only the exact GitHub endpoints the CMS calls, on this
-   repo/branch, are forwarded; everything else is 403.
-
-**CSRF** is mitigated by a same-origin check on state-changing methods (a write
-whose `Origin` host differs from the request host is rejected) layered on the auth gate.
-The proxy also strips GitHub's token-scope and rate-limit headers from responses.
-
-The **Cloudflare API proxy** (`/admin/api/cf`, `functions/_lib/cf-proxy.ts` shared
-by the prod Pages Function and the dev Vite middleware) follows the identical
-posture for the Site Health / provisioning features. `CLOUDFLARE_API_TOKEN` is an
-Account token scoped to only **Workers KV Storage:Edit, D1:Edit, Workers R2
-Storage:Edit, Cloudflare Pages:Edit** — it can touch nothing else. The client
-never learns the account ID or project name: it always sends the literal `self`
-placeholder for both (`accounts/self/…`, `pages/projects/self`), and the proxy
-substitutes `CLOUDFLARE_ACCOUNT_ID` / `PAGES_PROJECT` server-side — the account ID
-*after* the allowlist check (it's a secret and never takes part in the match), the
-project name *before* it (it's public and the allowlist pins that one project).
-The same method+path allowlist (only the KV/D1/R2/Pages endpoints the CMS calls),
-the same dot-segment rejection, and the same cross-origin write check apply; the
-proxy strips Cloudflare's rate-limit headers from responses.
+The optional Cloudflare proxy inherits the admin gate and attaches a tenant-owned
+Cloudflare token. State-changing admin requests require the same origin. Consult
+[the security model](docs/security-model.md) and [credential inventory](docs/keys-and-secrets.md)
+for the current boundaries and accepted risks. Themes can execute build code;
+path restrictions do not make third-party bundles safe to trust.
 
 ## Deploy to Cloudflare Pages
 

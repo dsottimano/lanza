@@ -2,6 +2,7 @@
 // every archive/listing page repeated by hand: the draft publish-gate and the
 // "posts in this locale, newest first" query. Keeping the gate in ONE place
 // means a change to the publish rule can't drift between routes.
+import { contentUrl } from "./public-urls";
 import { getCollection, type CollectionEntry } from "astro:content";
 import { splitId, localeUrl, type Locale } from "./i18n";
 
@@ -50,7 +51,7 @@ export function fallbackNav(locale: Locale): Promise<{ label: string; url: strin
         .map((p) => ({ p, ...splitId(p.id) }))
         .filter((x) => x.locale === locale)
         .sort((a, b) => a.p.data.title.localeCompare(b.p.data.title))
-        .map(({ p, slug }) => ({ label: p.data.title, url: localeUrl(locale, `${slug}/`) })),
+        .map(({ p, slug }) => ({ label: p.data.title, url: contentUrl("pages", p.id, "") })),
     );
     fallbackNavCache.set(locale, pending);
   }

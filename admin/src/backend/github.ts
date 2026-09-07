@@ -85,9 +85,24 @@ export class GitHubClient {
   }
 
   /** Validate the token and return the authenticated login. */
-  async getLogin(): Promise<string> {
-    const user = (await this.req("/user")) as { login: string };
-    return user.login;
+  /**
+   * Who is signed in, and what GitHub says they may do on this repo. Both come from
+   * the proxy's own answer rather than from GitHub directly: the gate already asked
+   * (`GET /repos/{owner}/{name}` → `permissions`), and asking twice would give the
+   * UI a second, drifting source for the one question that decides what it offers.
+   */
+  async getIdentity(): Promise<{
+    login: string;
+    role: "owner" | "editor" | "viewer" | null;
+    repo: string | null;
+  }> {
+    const user = (await this.req("/user")) as { login: string; role?: string; repo?: string };
+    const role = user.role;
+    return {
+      login: user.login,
+      role: role === "owner" || role === "editor" || role === "viewer" ? role : null,
+      repo: typeof user.repo === "string" ? user.repo : null,
+    };
   }
 
   private contentsUrl(p: string, withRef = true, ref: string = REPO.branch): string {
@@ -141,7 +156,11 @@ export class GitHubClient {
     const file = (await this.req(this.contentsUrl(path))) as {
       content: string;
       sha: string;
+      encoding?: string;
     };
+    if (file.encoding && file.encoding !== "base64") {
+      throw new Error("This entry is too large to load safely in the editor. Its stored content has not been changed.");
+    }
     const raw = b64ToUtf8(file.content);
     const { data, body } = parseFrontmatter(raw);
     return { path, sha: file.sha, data, body };
@@ -155,7 +174,7 @@ export class GitHubClient {
     message: string,
     sha?: string,
   ): Promise<string> {
-    return this.putFile(path, serializeFrontmatter(data, body), message, sha);
+    return this.putRawOnce(path, utf8ToB64(serializeFrontmatter(data, body)), message, sha);
   }
 
   /** Load a JSON settings file (from `ref`, the working branch by default). */
@@ -287,6 +306,34 @@ export class GitHubClient {
     });
   }
 
+  /** Pin reads and the eventual commit to one head. A concurrent branch move fails safely. */
+  async workingHead(): Promise<string> {
+    const ref = await this.req(`/git/ref/heads/${REPO.branch}`) as { object: { sha: string } };
+    return ref.object.sha;
+  }
+
+  async commitChecked(head: string, files: { path: string; text: string; sha?: string }[], message: string): Promise<Record<string, string>> {
+    for (const file of files) {
+      let actual: string | undefined;
+      try {
+        actual = (await this.req(this.contentsUrl(file.path, true, head)) as { sha: string }).sha;
+      } catch (e) {
+        if (!(e instanceof GitHubError && e.status === 404)) throw e;
+      }
+      if (actual !== file.sha) throw new GitHubError(409, "A file changed elsewhere. Reload before saving.");
+    }
+    const result: Record<string, string> = {};
+    const tree: TreeEntry[] = [];
+    for (const file of files) {
+      const blob = await this.req("/git/blobs", { method: "POST",
+        body: JSON.stringify({ content: utf8ToB64(file.text), encoding: "base64" }) }) as { sha: string };
+      result[file.path] = blob.sha;
+      tree.push({ path: file.path, mode: "100644", type: "blob", sha: blob.sha });
+    }
+    await this.writeCommit(tree, message, head);
+    return result;
+  }
+
   /**
    * Commit many files in ONE commit via the Git Data API — so a whole theme
    * lands as a single commit → a single Pages rebuild, not one commit (and one
@@ -330,14 +377,14 @@ export class GitHubClient {
 
   // Build a new tree on top of the current branch head, commit it, and
   // fast-forward the branch. Shared by commitFiles / commitTreeChanges.
-  private async writeCommit(tree: TreeEntry[], message: string): Promise<string> {
+  private async writeCommit(tree: TreeEntry[], message: string, pinnedHead?: string): Promise<string> {
     const { branch } = REPO;
     const git = "/git";
 
     const ref = (await this.req(`${git}/ref/heads/${branch}`)) as {
       object: { sha: string };
     };
-    const headSha = ref.object.sha;
+    const headSha = pinnedHead ?? ref.object.sha;
     const headCommit = (await this.req(`${git}/commits/${headSha}`)) as {
       tree: { sha: string };
     };

@@ -5,6 +5,8 @@
 // route pair partitions its collection through here so the rule lives once.
 import { splitId, isLocale, DEFAULT_LOCALE, LOCALES, type Locale } from "./i18n";
 
+import { publicSlug } from "./public-urls";
+
 export interface TaggedEntry<E> {
   entry: E;
   locale: Locale;
@@ -12,10 +14,13 @@ export interface TaggedEntry<E> {
 }
 
 /** Split localized entries into the default-locale (root) and other-locale groups. */
-export function splitEntries<E extends { id: string }>(
+export function splitEntries<E extends { id: string; collection?: string }>(
   entries: E[],
 ): { root: TaggedEntry<E>[]; localized: TaggedEntry<E>[] } {
-  const tagged = entries.map((entry) => ({ entry, ...splitId(entry.id) }));
+  const tagged = entries.map((entry) => {
+    const { locale, slug } = splitId(entry.id);
+    return { entry, locale, slug: publicSlug(entry.collection ?? "", slug, locale) };
+  });
   return {
     root: tagged.filter(({ locale }) => locale === DEFAULT_LOCALE),
     localized: tagged.filter(({ locale }) => locale !== DEFAULT_LOCALE && isLocale(locale)),

@@ -1,4 +1,5 @@
 <script setup lang="ts">
+import SettingsHeader from "./SettingsHeader.vue";
 // Settings → Content types. Define the CMS's folder collections and the fields
 // (templates) each entry is edited with. Master-detail: a rail of content types
 // on the left, the selected type's settings + field list on the right.
@@ -21,6 +22,7 @@ import {
 import { saveSchema } from "../backend/schema";
 import SaveButton from "./SaveButton.vue";
 import FieldEditor from "./content-types/FieldEditor.vue";
+import EditingExperience from "./content-types/EditingExperience.vue";
 import { reportError, clearError } from "../errors";
 import { isDirty } from "./dirty";
 
@@ -28,6 +30,9 @@ const props = defineProps<{ client: GitHubClient }>();
 const emit = defineEmits<{ (e: "back"): void }>();
 
 const SLUG = /^[a-z0-9-]+$/;
+// Stored field keys include camelCase (featuredImage) and underscores. They
+// are identifiers, not URL slugs, and must not be renamed to pass validation.
+const FIELD_NAME = /^[A-Za-z_][A-Za-z0-9_-]*$/;
 
 // Deep clone the live model (plain JSON — no reactivity/proxy leakage), then make
 // the clone reactive for editing. Folder fields get an explicit `required`
@@ -58,7 +63,7 @@ function select(name: string) {
 function fieldError(type: FolderCollection, i: number): string {
   const f = type.fields[i];
   if (!f.name.trim()) return "Field name is required.";
-  if (!SLUG.test(f.name)) return "Use lowercase letters, numbers and hyphens only.";
+  if (!FIELD_NAME.test(f.name)) return "Start with a letter or underscore; use letters, numbers, underscores or hyphens.";
   if (type.fields.some((o, j) => j !== i && o.name === f.name)) return `Duplicate field name "${f.name}".`;
   return "";
 }
@@ -71,7 +76,7 @@ const problems = computed<string[]>(() => {
     if (!t.fields.some((f) => f.name === "title")) out.push(`"${t.label}" must keep a title field.`);
     t.fields.forEach((_, i) => {
       const e = fieldError(t, i);
-      if (e) out.push(`${t.label}: ${e}`);
+      if (e) out.push(`${t.label} → ${t.fields[i].label || t.fields[i].name || 'New field'}: ${e}`);
     });
   }
   return out;
@@ -188,6 +193,7 @@ function serialize(): Collection[] {
   return collections.map((c) => {
     if (c.kind !== "folder") return JSON.parse(JSON.stringify(c)) as Collection;
     const out: FolderCollection = {
+      ...c,
       kind: "folder",
       name: c.name,
       label: c.label,
@@ -203,38 +209,33 @@ function serialize(): Collection[] {
 }
 
 async function save() {
+  if (!valid.value) return;
   await saveSchema(props.client, serialize());
   isDirty.value = false;
 }
 </script>
 
 <template>
-  <div class="min-h-screen">
-    <header class="toolbar flex items-center justify-between gap-4 px-5 py-2.5">
-      <button class="text-sm text-zinc-600 transition hover:text-zinc-900" @click="emit('back')">← Back</button>
-      <span class="flex-1 text-center text-sm">
-        <span v-if="isDirty" class="text-zinc-500">Unsaved changes</span>
-      </span>
+  <div class="settings-page">
+    <SettingsHeader title="Content types" @back="emit('back')">
+      <template #actions>
+        <span v-if="isDirty" class="text-sm text-zinc-500">Unsaved changes</span>
       <SaveButton
         :action="save"
         :disabled="!valid"
         @saved="clearError"
         @error="(e) => reportError(e, 'Save failed.')"
       />
-    </header>
+      </template>
+      <template #description><p>Decide what people can create, how they edit it, and which details they fill in.</p></template>
+    </SettingsHeader>
 
-    <main class="mx-auto max-w-5xl px-6 pt-8 pb-24">
-      <h1 class="mb-1 font-serif text-3xl font-bold tracking-tight text-zinc-900">Content types</h1>
-      <p class="mb-6 text-sm text-zinc-600">
-        Define the collections and fields (templates) the CMS edits. Changes commit
-        <code class="rounded bg-[var(--surface)] px-1 py-0.5 text-xs">data/schema.json</code> and take effect
-        immediately.
-      </p>
+    <main class="settings-body">
 
-      <p v-if="!valid" class="mb-4 rounded-xl border border-amber-300/60 bg-amber-50/70 px-4 py-2.5 text-sm text-amber-800">
+      <div v-if="!valid" role="alert" class="mb-4 rounded-xl border border-amber-300/60 bg-amber-50/70 px-4 py-2.5 text-sm text-amber-800">
         Fix {{ problems.length }} issue{{ problems.length === 1 ? "" : "s" }} before saving:
-        {{ problems[0] }}<span v-if="problems.length > 1"> (+{{ problems.length - 1 }} more)</span>
-      </p>
+        <ul class="mt-2 list-disc pl-5"><li v-for="problem in problems" :key="problem">{{ problem }}</li></ul>
+      </div>
 
       <div class="grid gap-5 md:grid-cols-[16rem_1fr]">
         <!-- type rail -->
@@ -247,15 +248,8 @@ async function save() {
             >
               <span class="block truncate font-medium">{{ t.label }}</span>
               <span class="block truncate font-mono text-xs" :class="t.name === selectedName && !creating ? 'text-white/60' : 'text-zinc-500'">
-                {{ t.name }}
+                {{ t.body === 'none' ? 'Field form' : t.fields.some(f => f.name === 'preset') ? 'Writing & page layouts' : 'Writing workspace' }}
               </span>
-            </button>
-            <button
-              class="grid size-7 flex-shrink-0 place-items-center rounded-md text-zinc-400 transition hover:bg-[var(--surface)] hover:text-red-600"
-              title="Delete content type"
-              @click="deleteType(t)"
-            >
-              ✕
             </button>
           </div>
           <button class="btn btn-ghost mt-2 justify-center" @click="startCreate">+ New content type</button>
@@ -281,14 +275,8 @@ async function save() {
                 <input v-model="draft.labelSingular" placeholder="Event" class="input" />
               </label>
             </div>
-            <div class="grid gap-4 sm:grid-cols-2">
-              <label class="block">
-                <span class="mb-1 block text-xs font-semibold text-zinc-600">Body</span>
-                <select v-model="draft.body" class="input">
-                  <option value="none">None (form only)</option>
-                  <option value="rich">Rich text (writing canvas)</option>
-                </select>
-              </label>
+            <EditingExperience v-model="draft.body" />
+            <div>
               <label class="flex items-center gap-2 pt-6">
                 <input type="checkbox" v-model="draft.localized" class="size-4 rounded border-zinc-300 accent-zinc-900" />
                 <span class="text-sm text-zinc-600">Localized (one file per language)</span>
@@ -304,6 +292,9 @@ async function save() {
 
         <!-- selected type editor -->
         <section v-else-if="selected" class="flex flex-col gap-5">
+          <div class="card p-6">
+            <EditingExperience v-model="selected.body" :has-templates="selected.fields.some(f => f.name === 'preset')" @update:model-value="markDirty" />
+          </div>
           <!-- type settings -->
           <div class="card p-6">
             <div class="mb-4 flex items-baseline justify-between gap-3">
@@ -318,13 +309,6 @@ async function save() {
               <label class="block">
                 <span class="mb-1 block text-xs font-semibold text-zinc-600">Label (singular)</span>
                 <input v-model="selected.labelSingular" class="input" @input="markDirty" />
-              </label>
-              <label class="block">
-                <span class="mb-1 block text-xs font-semibold text-zinc-600">Body</span>
-                <select v-model="selected.body" class="input" @change="markDirty">
-                  <option value="none">None (form only)</option>
-                  <option value="rich">Rich text (writing canvas)</option>
-                </select>
               </label>
               <label class="block">
                 <span class="mb-1 block text-xs font-semibold text-zinc-600">List thumbnail</span>
@@ -342,11 +326,12 @@ async function save() {
 
           <!-- fields -->
           <div class="card p-6">
-            <h3 class="mb-3 text-xs font-bold tracking-wide text-zinc-700 uppercase">Fields</h3>
+            <h3 class="font-semibold text-zinc-900">Content fields <span class="text-sm font-normal text-zinc-500">· {{ selected.fields.length }}</span></h3>
+            <p class="mb-4 mt-1 text-sm text-zinc-600">{{ selected.body === 'rich' ? 'Supporting details for the editor. Page sections are defined by the chosen template.' : 'These fields make up the editing form.' }} Select a field to configure it.</p>
             <div class="flex flex-col gap-3">
+              <details v-for="(f, i) in selected.fields" :key="i" class="field-disclosure" :open="!f.name || !!fieldError(selected, i)">
+                <summary><span class="font-medium">{{ f.label || f.name || 'New field' }}</span><span class="ml-auto text-xs text-zinc-500">{{ f.widget }}{{ f.required !== false ? ' · Required' : '' }}</span></summary>
               <FieldEditor
-                v-for="(f, i) in selected.fields"
-                :key="i"
                 :field="f"
                 :is-title="f.name === 'title'"
                 :folder-names="folderNames"
@@ -358,9 +343,15 @@ async function save() {
                 @move-down="moveField(i, 1)"
                 @change="markDirty"
               />
+              </details>
             </div>
             <button class="btn btn-ghost mt-3" @click="addField">+ Add field</button>
           </div>
+          <details class="card p-4 text-sm">
+            <summary class="cursor-pointer text-zinc-600">Advanced settings</summary>
+            <p class="my-3 text-zinc-500">Content type: {{ selected.name }} · Stored in {{ selected.folder }}</p>
+            <button class="btn btn-danger" @click="deleteType(selected)">Remove content type</button>
+          </details>
         </section>
 
         <section v-else class="card grid place-items-center p-10 text-center text-sm text-zinc-500">
@@ -370,3 +361,11 @@ async function save() {
     </main>
   </div>
 </template>
+
+<style scoped>
+.field-disclosure { border: 1px solid var(--border); border-radius: 5px; }
+.field-disclosure > summary { display: flex; align-items: center; gap: 12px; padding: 13px 14px; cursor: pointer; font-size: 14px; }
+.field-disclosure > summary::before { content: '›'; color: var(--muted); }
+.field-disclosure[open] > summary::before { transform: rotate(90deg); }
+.field-disclosure > summary:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; }
+</style>

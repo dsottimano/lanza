@@ -3,12 +3,20 @@
     "header": {
       "desktop": [
         {
-          "label": "Blog",
-          "url": "/es/posts"
+          "label": "Funciones",
+          "url": "/es/#features"
         },
         {
-          "label": "GitHub",
-          "url": "https://github.com/dsottimano/lanza"
+          "label": "Cómo usarlo",
+          "url": "/es/how-it-works/"
+        },
+        {
+          "label": "Para agentes",
+          "url": "/es/agents/"
+        },
+        {
+          "label": "Empezar",
+          "url": "/es/start/"
         }
       ],
       "tablet": null,
@@ -17,12 +25,16 @@
     "footer": {
       "desktop": [
         {
-          "label": "Código en GitHub",
+          "label": "GitHub",
           "url": "https://github.com/dsottimano/lanza"
         },
         {
-          "label": "Términos y Privacidad",
-          "url": "/es/legal"
+          "label": "Por dentro",
+          "url": "/es/architecture/"
+        },
+        {
+          "label": "Términos y privacidad",
+          "url": "/es/legal/"
         }
       ],
       "tablet": null,

@@ -12,11 +12,13 @@
 // renderChecked is render() plus a build-time parse5 check on the OUTPUT: it fails
 // the build if a VALUE produced markup a browser would act on. See
 // frontend/lib/assert-rendered-safe.ts.
+import { pageListingScope } from "../lib/page-listing";
 import { renderChecked } from "../lib/assert-rendered-safe";
 
 interface Props {
   name: string;
   data?: Record<string, unknown>;
+  locale?: import("../lib/i18n").Locale;
 }
 
 const { name, data = {} } = Astro.props;
@@ -28,7 +30,8 @@ const templates = import.meta.glob<string>("/templates/*/template.html", {
   eager: true,
 });
 const source = templates[`/templates/${name}/template.html`];
-const html = source ? renderChecked(source, data, `templates/${name}/template.html`) : null;
+const scope = Astro.props.locale ? await pageListingScope(name, Astro.props.locale, data) : data;
+const html = source ? renderChecked(source, scope, `templates/${name}/template.html`) : null;
 ---
 
 {

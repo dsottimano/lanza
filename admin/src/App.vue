@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { computed, defineAsyncComponent, h, ref, shallowRef } from "vue";
+import { computed, defineAsyncComponent, h, ref, shallowRef, watch } from "vue";
 import { useRoute, useRouter } from "vue-router";
 // Eager: the shell that's always on screen at boot.
 import Sidebar from "./ui/Sidebar.vue";
@@ -44,6 +44,7 @@ const HeaderFooterView = lazyPane(() => import("./ui/HeaderFooterView.vue"));
 const BrandThemesView = lazyPane(() => import("./ui/BrandThemesView.vue"));
 const ContentTypesView = lazyPane(() => import("./ui/ContentTypesView.vue"));
 const PeopleView = lazyPane(() => import("./ui/PeopleView.vue"));
+const AgentView = lazyPane(() => import("./ui/AgentView.vue"));
 const PublishView = lazyPane(() => import("./ui/PublishView.vue"));
 const PendingView = lazyPane(() => import("./ui/PendingView.vue"));
 const OnboardingWizard = lazyPane(() => import("./ui/OnboardingWizard.vue"));
@@ -56,6 +57,7 @@ import { refreshVersionState } from "./backend/version";
 import { access, loadAccess } from "./backend/access";
 import { reportError } from "./errors";
 import { confirmDiscard } from "./ui/dirty";
+import { focusMode } from "./ui/writing-preferences";
 import {
   getCollection,
   folderCollections,
@@ -64,7 +66,7 @@ import {
   type FolderCollection,
   type FileEntry,
 } from "./schema";
-import { listRoute } from "./router";
+import { entryRoute, listRoute } from "./router";
 
 type Pane =
   | "list"
@@ -81,11 +83,14 @@ type Pane =
   | "blocks"
   | "contentTypes"
   | "people"
+  | "agent"
   | "publish"
   | "pending";
 
 const route = useRoute();
 const router = useRouter();
+const settingsNavigationOpen = ref(false);
+watch(() => route.fullPath, () => { settingsNavigationOpen.value = false; });
 
 // The token lives server-side (the /admin/api/gh proxy). Past Cloudflare Access
 // the CMS just boots — no sign-in screen, no localStorage PAT.
@@ -146,13 +151,18 @@ const SPECIAL_PANELS: Record<string, Pane> = {
   updates: "updates",
   languages: "languages",
   people: "people",
+  agent: "agent",
 };
 function settingsFileByName(name: string): FileEntry | null {
   const fc = COLLECTIONS.find((c) => c.kind === "files");
   return fc && fc.kind === "files" ? (fc.files.find((f) => f.name === name) ?? null) : null;
 }
 
-const locale = computed<Locale>(() => (route.params.locale as string) || site.defaultLocale);
+const locale = computed<Locale>(() => {
+  const candidate = route.params.locale || (route.name === "settings" ? route.query.locale : undefined);
+  return typeof candidate === "string" && site.locales.some(l => l.code === candidate)
+    ? candidate : site.defaultLocale;
+});
 const routeCollection = computed<FolderCollection | undefined>(
   () => getCollection(route.params.collection as string) as FolderCollection | undefined,
 );
@@ -189,6 +199,17 @@ const editingPath = computed<string | null>(() => {
   const slug = route.params.slug as string;
   return slug === "new" ? null : `${entryFolder(collection.value, locale.value)}/${slug}.md`;
 });
+
+// A first save or explicit rename changes the address, not the editor session.
+// Keep its Vue key while replacing the route so focus and undo history survive.
+const savedEntry = ref<{ path: string; key: string } | null>(null);
+const richEditorKey = computed(() => savedEntry.value?.path === editingPath.value
+  ? savedEntry.value.key : `${collection.value.name}:${editingPath.value ?? 'new'}#${locale.value}`);
+function onEntrySaved(path: string) {
+  savedEntry.value = { path, key: richEditorKey.value };
+  const slug = path.split("/").pop()!.replace(/\.md$/, "");
+  router.replace(entryRoute(collection.value.name, locale.value, slug));
+}
 
 // ── navigation (push the URL; the beforeEach guard handles unsaved changes) ──
 function selectCollection(name: string) {
@@ -238,8 +259,12 @@ function onOnboarded() {
   <OnboardingWizard v-else-if="!site.onboarded" :client="client" @done="onOnboarded" />
 
   <!-- The collection rail is permanent; only the main column swaps. -->
-  <div v-else class="flex min-h-screen">
+  <div v-else class="flex min-h-screen" :class="{ 'editing-shell': pane === 'editRich', 'theme-shell': pane === 'brandThemes', 'settings-shell': route.name === 'settings', 'settings-shell--nav-open': settingsNavigationOpen }">
+    <button v-if="route.name === 'settings'" class="settings-mobile-navigation" :aria-expanded="settingsNavigationOpen" @click="settingsNavigationOpen = !settingsNavigationOpen">
+      {{ settingsNavigationOpen ? 'Close navigation ×' : '☰ Site navigation' }}
+    </button>
     <Sidebar
+      v-show="!(pane === 'editRich' && focusMode)"
       :active-collection="collection.name"
       :active-settings="
         pane === 'settings' || pane === 'redirects'
@@ -254,6 +279,7 @@ function onOnboarded() {
       :updates-open="pane === 'updates'"
       :content-types-open="pane === 'contentTypes'"
       :people-open="pane === 'people'"
+      :agent-open="pane === 'agent'"
       :is-owner="ownerView"
       :publish-open="pane === 'publish'"
       :pending-open="pane === 'pending'"
@@ -268,6 +294,7 @@ function onOnboarded() {
       @updates="openPanel('updates')"
       @content-types="openPanel('contentTypes')"
       @people="openPanel('people')"
+      @agent="openPanel('agent')"
       @publish="openPublish"
       @pending="openPending"
       @help="openHelp"
@@ -279,12 +306,13 @@ function onOnboarded() {
       <Transition name="pane" mode="out-in">
       <EditorView
         v-if="pane === 'editRich'"
-        :key="`${editingPath ?? 'new'}#${locale}`"
+        :key="richEditorKey"
         :client="client"
         :collection="collection"
         :locale="locale"
         :path="editingPath"
         @back="backToList"
+        @saved-path="onEntrySaved"
       />
       <RecordEditor
         v-else-if="pane === 'editRecord'"
@@ -309,6 +337,7 @@ function onOnboarded() {
         :client="client"
         :menu-file="menuFile"
         :locale="locale"
+        @locale="(next: string) => router.push({ name: 'settings', params: { panel: 'header-footer' }, query: { ...route.query, locale: next } })"
         @back="backToList"
       />
       <BrandThemesView
@@ -336,7 +365,8 @@ function onOnboarded() {
         :client="client"
         @back="backToList"
       />
-      <PeopleView v-else-if="pane === 'people'" :client="client" @back="backToList" />
+      <PeopleView v-else-if="pane === 'people'" @back="backToList" />
+      <AgentView v-else-if="pane === 'agent'" @back="backToList" />
       <PublishView
         v-else-if="pane === 'publish'"
         :client="client"

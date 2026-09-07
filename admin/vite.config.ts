@@ -5,6 +5,7 @@ import tailwindcss from "@tailwindcss/vite";
 // allowlists and CSRF checks can't drift between dev and prod.
 import { crossOriginBlocked, isAllowed, upstreamPath, upstreamTargetAllowed } from "../functions/_lib/gh-proxy";
 import repo from "../lanza.config.json";
+import { githubIdentity } from "./dev/github-identity";
 import {
   isAllowed as cfIsAllowed,
   resolveProject as cfResolveProject,
@@ -55,13 +56,8 @@ function githubProxyDev(token: string | undefined): Plugin {
           const method = r.method ?? "GET";
           const subPath = r.url ?? "";
 
-          // NO role check here, deliberately — unlike prod, which enforces
-          // functions/_lib/roles.ts per request. Dev has no session and no login:
-          // it authenticates with a GITHUB_TOKEN from admin/.env, so whoever is
-          // running the server already holds the repo's credentials and is the
-          // owner by construction. A role gate over that would be theatre, and
-          // faking a login to drive it would make dev diverge from prod in a way
-          // that hides real behaviour rather than reproducing it.
+          // Dev authenticates with the server's GITHUB_TOKEN. The identity
+          // endpoint below resolves its actual repository role for the UI.
 
           // Same allowlist + CSRF check as prod (functions/_lib/gh-proxy.ts).
           if (!isAllowed(method, subPath)) {
@@ -85,6 +81,14 @@ function githubProxyDev(token: string | undefined): Plugin {
                   "Dev GitHub proxy: GITHUB_TOKEN is missing from admin/.env (copy .sample.env).",
               }),
             );
+            return;
+          }
+
+          if (method === "GET" && subPath.replace(/[?#].*$/, "").replace(/^\/+/, "") === "user") {
+            const identity = await githubIdentity(token, repo);
+            w.statusCode = identity.status;
+            w.setHeader("content-type", "application/json");
+            w.end(await identity.text());
             return;
           }
 

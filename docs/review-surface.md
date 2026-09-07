@@ -118,8 +118,10 @@ Each of these was found by building it, and each would have shipped silently:
 
 ## Behaviour worth knowing before changing it
 
-- Opening an entry lights **every** pending change; picking a row narrows to one.
-  An entry an agent edited shows its edits without a click.
+- The page inspector shows the pending-change count on its Changes tab. Opening
+  that panel lights **every** pending change; picking a row narrows to one and
+  keeps the comparison open. Content editing starts with a clean preview; focusing
+  a field or clicking preview text highlights the selected region.
 - Focusing a field scrolls the preview to its region — unless the region is
   already comfortably in view (judged by how much of it sits inside the viewport,
   not whether its top edge peeks in), or the template does not place that field at
@@ -129,3 +131,23 @@ Each of these was found by building it, and each would have shipped silently:
   to that item. A choice, not an accident.
 - Saving re-takes the diff. A stale report would offer to revert to a value that is
   no longer live, and it is what keeps array paths valid across two reverts.
+
+## September 6: preview-to-field editing
+
+Template pages now use a viewport-height preview and a content inspector.
+`TemplateEditor.focusField` converts an entry path with the existing `toSlotPaths`
+helper, selects the containing section, then asks `FieldForm.focusField` to open
+any grouped/nested fields and focus the control. Numeric list paths remain intact.
+Preview clicks therefore move the cursor into the field; they do not edit the
+iframe DOM directly. Preview-only CSS disables entrance animations so body
+re-renders never hide content or move a click target during editing. Production
+rendering and animations are unchanged.
+
+## September 7: stable page loading
+
+The editor waits for entry data and template metadata before choosing its layout,
+so a designed page never briefly mounts the writing canvas. The preview loads CSS
+and template markup together, ignores superseded requests, and reveals its iframe
+after the document and fonts are ready. Field edits update the body only when the
+rendered markup changes; pending timers are cleared on unmount. The page inspector
+uses stacked Live/After values so comparisons remain readable in a narrow column.

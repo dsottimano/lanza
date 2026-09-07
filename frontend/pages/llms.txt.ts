@@ -2,6 +2,7 @@
 // (the llms.txt convention: like robots.txt, but a content index for LLMs).
 // An Astro endpoint, not a node script, so it reuses the content collections
 // and the exact same draft filter as the public pages. Static + cacheable.
+import { contentUrl } from "../lib/public-urls";
 import type { APIRoute } from "astro";
 import { splitId, localeUrl, isLocale, DEFAULT_LOCALE } from "../lib/i18n";
 import { getSeoDefaults } from "../lib/site";
@@ -66,6 +67,11 @@ export const GET: APIRoute = async ({ site }) => {
       `puts in scope, the field widgets, the reserved names, and every way a site can ` +
       `be silently wrong, is at ${origin}/site-system.json.`,
     ``,
+    `Brand settings, additive Portfolio/Real estate starters, and replacement theme bundles ` +
+      `are distinct workflows. The contract's themes section explains them. MCP has no ` +
+      `starter-install or theme-bundle import/export tool; use Settings → Brand & themes ` +
+      `in the CMS. Bundles may execute build code and require trusted source.`,
+    ``,
     `Content can be read and written over MCP at ${origin}/api/mcp (authenticated; ` +
       `writes land on a staging branch and are not public until published). The same ` +
       `server exposes \`describe_site_system\` and \`validate_site\`, so you can check a change ` +
@@ -87,7 +93,7 @@ export const GET: APIRoute = async ({ site }) => {
     for (const p of posts) {
       const { locale, slug } = splitId(p.id);
       if (!isLocale(locale)) continue; // skip content for disabled locales
-      const url = `${origin}${localeUrl(locale, `posts/${slug}/`)}`;
+      const url = `${origin}${contentUrl("posts", p.id, "posts")}`;
       sections.push(item(p.data.title, url, p.data.description));
     }
   }
@@ -97,7 +103,7 @@ export const GET: APIRoute = async ({ site }) => {
     for (const p of pages) {
       const { locale, slug } = splitId(p.id);
       if (!isLocale(locale)) continue; // skip content for disabled locales
-      const url = `${origin}${localeUrl(locale, `${slug}/`)}`;
+      const url = `${origin}${contentUrl("pages", p.id, "")}`;
       sections.push(item(p.data.title, url, p.data.description));
     }
   }
