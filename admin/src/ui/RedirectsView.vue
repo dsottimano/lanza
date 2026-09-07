@@ -1,4 +1,5 @@
 <script setup lang="ts">
+import SettingsHeader from "./SettingsHeader.vue";
 // Settings → Redirects. Purpose-built editor for data/redirects.json
 // ({ redirects: [{ from, to, status }] }). At deploy, scripts/gen-redirects.mjs
 // validates this file and compiles the valid rules into Cloudflare's native
@@ -223,24 +224,22 @@ const toneRing: Record<string, string> = {
 </script>
 
 <template>
-  <div class="min-h-screen">
-    <header class="toolbar flex items-center justify-between gap-4 px-5 py-2.5">
-      <button class="text-sm text-zinc-600 transition hover:text-zinc-900" @click="emit('back')">← Back</button>
-      <span class="flex-1 text-center text-sm"></span>
-      <SaveButton
-        :action="save"
-        :disabled="loading"
-        @saved="clearError"
-        @error="(e) => reportError(e, 'Save failed.')"
-      />
-    </header>
-
-    <main class="mx-auto max-w-3xl px-6 pt-8 pb-24">
-      <h1 class="mb-1 font-serif text-3xl font-bold tracking-tight text-zinc-900">Redirects</h1>
-      <p class="mb-6 text-sm text-zinc-600">
+  <div class="settings-page">
+    <SettingsHeader title="Redirects" @back="$emit('back')">
+      <template #actions>
+        <SaveButton
+          :action="save"
+          :disabled="loading"
+          @saved="clearError"
+          @error="(e) => reportError(e, 'Save failed.')"
+        />
+      </template>
+      <template #description><p>
         Send visitors from an old path to a new one. Rules apply top to bottom — the first match wins.
-      </p>
+      </p></template>
+    </SettingsHeader>
 
+    <main class="settings-body">
       <!-- Status panel -->
       <section class="card mb-5 p-4">
         <div class="flex items-center gap-2.5">
@@ -266,7 +265,6 @@ const toneRing: Record<string, string> = {
           </span>
         </div>
       </section>
-
       <div v-if="loading" class="card space-y-3 p-4">
         <div class="skeleton h-8 w-full" />
         <div class="skeleton h-8 w-full" />

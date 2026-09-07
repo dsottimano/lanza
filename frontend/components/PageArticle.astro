@@ -1,8 +1,10 @@
 ---
 // Single page body — the <main> shared by the EN route (/about/) and the
-// localized mirror (/es/about/). Pages render frontmatter blocks + the rich body.
+// localized mirror (/es/about/). Pages render a schema-defined preset or the rich body.
 import type { CollectionEntry } from "astro:content";
-import Blocks from "./Blocks.astro";
+import { splitId } from "../lib/i18n";
+import LegacyBlocks from "./LegacyPageBlocks.astro";
+import { legacyPageBlocks } from "../lib/legacy-page-blocks";
 import HtmlTemplate from "./HtmlTemplate.astro";
 import { sanitizeBody } from "../lib/sanitize";
 // Build-time check on the sanitizer's OUTPUT. A post body is attacker-reachable (the
@@ -22,6 +24,7 @@ const { page } = Astro.props;
 const body = assertSanitizedSafe(sanitizeBody(page.body ?? ""), "page body");
 const template = Astro.props.template ?? resolveTemplate(page.data);
 const landing = isLanding(template);
+const legacyBlocks = legacyPageBlocks(page.data);
 ---
 
 <main class={templateClass(template)}>
@@ -32,6 +35,7 @@ const landing = isLanding(template);
       // opts in (fields.json `"body": true`) can place it with {{{ body }}}.
       <HtmlTemplate
         name={page.data.preset}
+        locale={splitId(page.id).locale}
         data={{ ...(page.data.slots ?? {}), body }}
       />
     ) : (
@@ -40,7 +44,7 @@ const landing = isLanding(template);
         {page.data.featuredImage && (
           <img src={page.data.featuredImage} alt={page.data.title} />
         )}
-        {page.data.blocks.length > 0 && <Blocks blocks={page.data.blocks} />}
+        {legacyBlocks.length > 0 && <LegacyBlocks blocks={legacyBlocks} />}
         <article class="post-body" set:html={body} />
       </>
     )

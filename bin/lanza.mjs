@@ -59,6 +59,9 @@ if (mode === "build") {
   }
 }
 
+// Refuse schema/template drift before generating or deploying public output.
+if (mode === "build") run(process.execPath, [join(PKG_ROOT, "scripts/validate-site.mjs")]);
+
 // Codegen (content model → Zod config; collection routes → .astro pages; redirect
 // rules → _redirects). Routes come AFTER the content config: a route is only
 // meaningful for a collection Astro already knows about.

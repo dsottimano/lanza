@@ -1,23 +1,14 @@
 <script setup lang="ts">
-// Settings → Header & footer: a VISUAL BUILDER for the site chrome. Each part
-// (header/footer) is parsed into ordered SECTIONS (backend/parts-sections) shown as
-// friendly cards — the menu loop becomes the link editor, the brand/switcher get
-// labeled cards, and any other markup is an editable "HTML" block. Reorder, edit,
-// remove, or add blocks; a LIVE PREVIEW renders the real header + footer beside them
-// (same engine as the Astro build) so every change is visible before you save.
-//
-// Safety: parse partitions the source and serialize re-joins it verbatim, so a save
-// can never corrupt a part (proven byte-for-byte in parts-sections.test.ts). The menu
-// and switcher are data-backed (menu.json / the locale list), so editing them friendly-
-// side never rewrites the HTML — only editing/reordering/adding blocks changes a part.
+import SettingsHeader from "./SettingsHeader.vue";
+// Navigation is data-backed; layout remains one intact template. Recognition
+// reveals available controls without treating unmatched wrapper tags as blocks.
 import { computed, onUnmounted, reactive, ref, watch } from "vue";
 import MenuEditor from "./MenuEditor.vue";
 import HtmlPreview from "./HtmlPreview.vue";
 import SaveButton from "./SaveButton.vue";
-import { inputCls } from "../fields/styles";
 import { GitHubClient, GitHubError } from "../backend/github";
 import { PARTS, partPath, type PartName } from "../backend/parts";
-import { fileEntryPath, type FileEntry } from "../schema";
+import { COLLECTIONS, fileEntryPath, type FileEntry } from "../schema";
 import type { Locale } from "../backend/config";
 import { site, localeLabel } from "../backend/site";
 import { render } from "../../../frontend/lib/template-render";
@@ -25,16 +16,25 @@ import { normalizeMenu, serializeMenu, emptyMenu, type SiteMenu } from "../backe
 import {
   parseSections,
   serializeSections,
-  newRawSection,
   type Section,
 } from "../backend/parts-sections";
 import { reportError, clearError } from "../errors";
 import { isDirty } from "./dirty";
 
 const props = defineProps<{ client: GitHubClient; menuFile: FileEntry; locale: Locale }>();
-const emit = defineEmits<{ (e: "back"): void }>();
+const emit = defineEmits<{ (e: "back"): void; (e: "locale", locale: string): void }>();
+
+function selectLocale(event: Event) {
+  const select = event.target as HTMLSelectElement;
+  emit("locale", select.value);
+  // The parent navigates through the unsaved-change guard. Keep the displayed
+  // selection on the current language until navigation actually succeeds.
+  select.value = props.locale;
+}
 
 const loading = ref(true);
+const loadFailed = ref(false);
+const previewSiteName = ref("Your site");
 const activePart = ref<PartName>("header");
 
 // ── menu model (per-locale, shared by both parts' menu cards) ───────────────
@@ -85,10 +85,12 @@ async function loadParts() {
 }
 async function load() {
   loading.value = true;
+  loadFailed.value = false;
   try {
-    await Promise.all([loadMenu(), loadParts()]);
+    await Promise.all([loadMenu(), loadParts(), loadPreviewName()]);
     clearError();
   } catch (e) {
+    loadFailed.value = true;
     reportError(e, "Failed to load the header & footer.");
   } finally {
     menuDirty.value = false;
@@ -98,12 +100,25 @@ async function load() {
     isDirty.value = false;
   }
 }
+async function loadPreviewName() {
+  previewSiteName.value = "Your site";
+  const settings = COLLECTIONS.find(c => c.kind === "files");
+  const seo = settings?.kind === "files" ? settings.files.find(f => f.name === "seo_defaults") : undefined;
+  if (!seo) return;
+  try {
+    const { data } = await props.client.loadJson(fileEntryPath(seo, props.locale));
+    const name = (data as { siteName?: unknown })?.siteName;
+    if (typeof name === "string" && name.trim()) previewSiteName.value = name;
+  } catch { /* Site name is advisory; unavailable SEO must not block navigation editing. */ }
+}
 watch(menuPath, load, { immediate: true }); // menu is per-locale → reload on language change
 
 // ── live preview (both parts, real data) ─────────────────────────────────────
 const partData = computed(() => ({
-  homeUrl: "/",
-  siteName: "Your site",
+  homeUrl: props.locale === site.defaultLocale ? "/" : `/${props.locale}/`,
+  siteName: previewSiteName.value,
+  menuLabel: "Menu",
+  primaryNavigationLabel: "Main navigation",
   year: new Date().getFullYear(),
   headerClass: "site-header",
   footerClass: "site-footer",
@@ -113,8 +128,8 @@ const partData = computed(() => ({
   locales: site.locales.map((l, i) => ({
     code: l.code.toUpperCase(),
     url: "#",
-    active: i === 0,
-    inactive: i !== 0, // engine has no {{else}} — pair active/inactive #ifs
+    active: l.code === props.locale,
+    inactive: l.code !== props.locale,
     sep: i > 0,
   })),
 }));
@@ -122,33 +137,28 @@ const previewBody = computed(() => {
   if (loading.value) return "";
   const header = render(serializeSections(sections.header), partData.value);
   const footer = render(serializeSections(sections.footer), partData.value);
-  return `${header}<div style="min-height:40vh"></div>${footer}`;
+  return `${header}<div style="min-height:240px;display:grid;place-items:center;margin:24px;border:1px dashed currentColor;opacity:.35;font:13px system-ui">Page content appears here</div>${footer}`;
 });
 
 // ── section operations (on the active part) ──────────────────────────────────
 function markPartDirty() {
   partDirty[activePart.value] = true;
 }
-function move(i: number, delta: number) {
-  const list = activeSections.value;
-  const to = i + delta;
-  if (to < 0 || to >= list.length) return;
-  const [row] = list.splice(i, 1);
-  list.splice(to, 0, row);
-  markPartDirty();
-}
-function remove(i: number) {
-  if (!confirm("Remove this block from the " + activePart.value + "?")) return;
-  activeSections.value.splice(i, 1);
-  markPartDirty();
-}
-function addBlock() {
-  activeSections.value.push(newRawSection("<div>New block</div>"));
-  markPartDirty();
-}
+// Edit the complete template, preserving wrapper relationships and source order.
+const templateSource = computed({
+  get: () => serializeSections(activeSections.value),
+  set: (source: string) => {
+    sections[activePart.value] = parseSections(source);
+    markPartDirty();
+  },
+});
+const hasMenu = computed(() => activeSections.value.some(s => s.kind === "menu" && s.location === activePart.value));
+const hasBrand = computed(() => activeSections.value.some(s => s.kind === "brand"));
+const hasSwitcher = computed(() => activeSections.value.some(s => s.kind === "switcher"));
 
 // ── save (only changed parts + the menu) ──────────────────────────────────────
 async function save() {
+  if (loading.value || loadFailed.value) return;
   if (menuDirty.value) {
     menuSha = await props.client.saveJson(
       menuPath.value,
@@ -171,130 +181,108 @@ async function save() {
   isDirty.value = false;
 }
 
-// Card presentation per section kind.
-const META: Record<Section["kind"], { icon: string; label: string }> = {
-  brand: { icon: "◆", label: "Brand / logo" },
-  menu: { icon: "☰", label: "Menu links" },
-  switcher: { icon: "🌐", label: "Language switcher" },
-  raw: { icon: "</>", label: "HTML block" },
-};
 </script>
 
 <template>
-  <div class="min-h-screen">
-    <header class="toolbar flex items-center justify-between gap-4 px-5 py-2.5">
-      <button class="text-sm text-zinc-600 transition hover:text-zinc-900" @click="emit('back')">← Back</button>
-      <span class="flex-1 text-center text-sm">
-        <span v-if="isDirty" class="text-zinc-500">Unsaved changes</span>
-      </span>
-      <SaveButton
-        :action="save"
-        :disabled="loading"
-        @saved="clearError"
-        @error="(e) => reportError(e, 'Save failed.')"
-      />
-    </header>
+  <div class="settings-page">
+    <SettingsHeader title="Header &amp; footer" @back="emit('back')">
+      <template #actions>
+      <span class="flex-1 text-center text-sm text-zinc-500" role="status">{{ loading ? 'Loading…' : loadFailed ? 'Couldn’t load' : isDirty ? 'Unsaved changes' : 'All changes saved' }}</span>
+      <SaveButton :action="save" :disabled="loading || loadFailed || !isDirty" @saved="clearError" @error="(e) => reportError(e, 'Save failed.')" />
+      </template>
+      <template #description><p>Help visitors find their way. Manage the links that appear across your site.</p></template>
+    </SettingsHeader>
 
-    <main class="mx-auto max-w-6xl px-6 pt-8 pb-24">
-      <h1 class="mb-1 font-serif text-3xl font-bold tracking-tight text-zinc-900">
-        Header &amp; footer
-        <span v-if="menuFile.localized" class="ml-2 align-middle text-base font-medium text-zinc-500">
-          · {{ localeLabel(locale) }}
-        </span>
-      </h1>
-      <p class="mb-6 text-sm text-zinc-600">
-        Build the chrome that wraps every page. Edit the blocks on the left; the real
-        header &amp; footer update on the right.
-      </p>
-
-      <div v-if="loading" class="card space-y-4 p-5">
-        <div class="skeleton h-9 w-full" />
-        <div class="skeleton h-9 w-2/3" />
+    <main class="settings-body">
+      <div class="hf-heading">
+        <label v-if="menuFile.localized" class="text-xs text-zinc-500">
+          Link language
+          <select class="input mt-1" :value="locale" :disabled="loading" @change="selectLocale">
+            <option v-for="language in site.locales" :key="language.code" :value="language.code">{{ localeLabel(language.code) }}</option>
+          </select>
+        </label>
       </div>
 
-      <div v-else class="grid items-start gap-6 lg:grid-cols-2">
-        <!-- Builder column -->
-        <div>
-          <!-- Which part to edit -->
-          <div class="segment mb-4">
-            <button
-              v-for="p in PARTS"
-              :key="p.name"
-              class="segment-btn text-sm"
-              :class="{ 'segment-btn--active': activePart === p.name }"
-              @click="activePart = p.name"
-            >
-              {{ p.label }}
+      <div v-if="loading" class="card space-y-4 p-5"><div class="skeleton h-9 w-full" /><div class="skeleton h-9 w-2/3" /></div>
+      <div v-else-if="loadFailed" class="card p-6" role="alert">
+        <p>We couldn’t load your header and footer. Try again to edit them.</p>
+        <button class="btn btn-primary mt-3" @click="load">Try again</button>
+      </div>
+      <div v-else class="hf-layout">
+        <div class="hf-controls">
+          <div class="hf-part-picker" aria-label="Choose site area">
+            <button v-for="p in PARTS" :key="p.name" :aria-pressed="activePart === p.name" :class="{ selected: activePart === p.name }" @click="activePart = p.name">
+              <svg viewBox="0 0 36 28" fill="none" aria-hidden="true"><rect x="1" y="1" width="34" height="26" rx="2" stroke="currentColor" opacity=".4" /><rect x="4" :y="p.name === 'header' ? 4 : 18" width="28" height="6" rx="1" fill="currentColor" /></svg>
+              <span><strong>{{ p.label }}</strong><small>{{ p.name === 'header' ? 'Top of every page' : 'Bottom of every page' }}</small></span>
             </button>
           </div>
 
-          <p v-if="!activeSections.length" class="card p-5 text-sm text-zinc-500">
-            This part is empty. Add a block below.
-          </p>
-
-          <!-- Section cards, in document order -->
-          <div class="flex flex-col gap-3">
-            <div v-for="(s, i) in activeSections" :key="s.id" class="card p-4">
-              <div class="mb-2 flex items-center gap-2">
-                <span class="font-mono text-xs text-zinc-400">{{ META[s.kind].icon }}</span>
-                <span class="text-sm font-semibold text-zinc-800">{{ META[s.kind].label }}</span>
-                <span class="flex-1" />
-                <button
-                  class="grid size-7 place-items-center rounded-md text-zinc-400 transition hover:bg-[var(--surface)] hover:text-zinc-800 disabled:opacity-30 disabled:hover:bg-transparent"
-                  :disabled="i === 0"
-                  title="Move up"
-                  @click="move(i, -1)"
-                >↑</button>
-                <button
-                  class="grid size-7 place-items-center rounded-md text-zinc-400 transition hover:bg-[var(--surface)] hover:text-zinc-800 disabled:opacity-30 disabled:hover:bg-transparent"
-                  :disabled="i === activeSections.length - 1"
-                  title="Move down"
-                  @click="move(i, 1)"
-                >↓</button>
-                <button
-                  class="grid size-7 place-items-center rounded-md text-zinc-400 transition hover:bg-[var(--surface)] hover:text-red-600"
-                  title="Remove"
-                  @click="remove(i)"
-                >✕</button>
-              </div>
-
-              <!-- Menu → the friendly link editor, locked to this part's location -->
-              <MenuEditor
-                v-if="s.kind === 'menu'"
-                :model="menu"
-                :location="s.location ?? activePart"
-                @change="menuDirty = true"
-              />
-
-              <!-- Language switcher → derived, not hand-edited -->
-              <p v-else-if="s.kind === 'switcher'" class="text-sm text-zinc-500">
-                Shown automatically when you have more than one language
-                (<span class="font-medium">Settings → Languages</span>). Remove this block to
-                drop the switcher from the {{ activePart }}.
-              </p>
-
-              <!-- Brand + raw HTML → editable source -->
-              <template v-else>
-                <p v-if="s.kind === 'brand'" class="mb-2 text-xs text-zinc-500">
-                  The logo/brand link. Edit its HTML here.
-                </p>
-                <textarea
-                  v-model="s.source"
-                  :rows="s.kind === 'brand' ? 8 : 5"
-                  spellcheck="false"
-                  :class="[inputCls, 'resize-y font-mono text-xs']"
-                  @input="markPartDirty"
-                />
-              </template>
+          <section class="card hf-card">
+            <div class="hf-card-heading">
+              <h2>Navigation links</h2>
+              <span class="hf-count">{{ menu[activePart].desktop.length }} links</span>
             </div>
-          </div>
+            <p class="hf-description">{{ activePart === 'header' ? 'Keep your most useful destinations easy to reach.' : 'Add useful resources, contact links and legal pages.' }}</p>
+            <p v-if="menuFile.localized" class="mb-4 text-xs text-zinc-500">Editing {{ localeLabel(locale) }} link text and destinations. Other languages keep their own links.</p>
+            <MenuEditor v-if="hasMenu" :key="activePart" :model="menu" :location="activePart" @change="menuDirty = true" />
+            <p v-else class="hf-note">This template doesn’t contain an editable navigation menu. Ask your agent to add one, or update the template below.</p>
+          </section>
 
-          <button class="btn btn-ghost mt-3 justify-center" @click="addBlock">+ Add HTML block</button>
+          <section v-if="hasBrand || hasSwitcher || activePart === 'footer'" class="card hf-card">
+            <h2 class="mb-3">Also in your {{ activePart }}</h2>
+            <div v-if="hasBrand" class="hf-detail"><span class="hf-detail-icon" aria-hidden="true">↗</span><div><h3>Brand / logo</h3><p>Your existing logo and home link are part of the design. Ask your agent to change the logo or its layout.</p></div></div>
+            <div v-if="hasSwitcher" class="hf-detail"><span class="hf-detail-icon" aria-hidden="true">◎</span><div><h3>Language switcher</h3><p>{{ site.locales.length > 1 ? 'Visitors can switch between your site’s languages.' : 'Appears automatically when you add another site language.' }} Manage languages in Site settings.</p></div></div>
+            <div v-if="activePart === 'footer'" class="hf-detail"><span class="hf-detail-icon" aria-hidden="true">©</span><div><h3>Footer design</h3><p>Copyright text, badges and layout come from your template. Ask your agent to adjust these, or use the template editor below.</p></div></div>
+          </section>
+
+          <details :key="activePart" class="hf-advanced">
+            <summary>Advanced · Edit template</summary>
+            <div class="pt-3">
+              <p class="mb-3 text-xs text-zinc-500">The complete {{ activePart }} template, shared across languages. Changes affect every page. Keep the layout and template placeholders together.</p>
+              <label class="block text-sm font-medium" :for="'source-' + activePart">{{ activePart === 'header' ? 'Header' : 'Footer' }} HTML</label>
+              <textarea :id="'source-' + activePart" v-model="templateSource" rows="18" spellcheck="false" class="input mt-2 resize-y font-mono text-xs" />
+            </div>
+          </details>
         </div>
 
-        <!-- Live preview -->
-        <HtmlPreview :client="client" :body="previewBody" class="lg:sticky lg:top-3" />
+        <aside class="hf-preview">
+          <div class="hf-preview-heading"><span>YOUR SITE</span><span>Header + footer</span></div>
+          <HtmlPreview :client="client" :body="previewBody" />
+          <p class="mt-3 text-xs text-zinc-500">Preview uses your current design and desktop links. Save to stage your changes; publish when you’re ready.</p>
+        </aside>
       </div>
     </main>
   </div>
 </template>
+
+<style scoped>
+.hf-heading { display: flex; justify-content: space-between; align-items: center; gap: 20px; margin-bottom: 28px; }
+.hf-eyebrow { color: var(--muted); font-size: 10px; letter-spacing: .12em; font-weight: 600; margin-bottom: 8px; }
+.hf-locale { border: 1px solid var(--border); padding: 6px 12px; border-radius: 20px; white-space: nowrap; font-size: 12px; color: var(--ink-soft); }
+.hf-layout { display: grid; grid-template-columns: minmax(350px, .9fr) minmax(0, 1.3fr); gap: 32px; align-items: start; }
+.hf-controls { display: flex; flex-direction: column; gap: 18px; min-width: 0; }
+.hf-part-picker { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; }
+.hf-part-picker button { display: flex; align-items: center; gap: 12px; padding: 14px; text-align: left; border: 1px solid var(--border); border-radius: 6px; color: var(--muted); background: var(--paper-card); }
+.hf-part-picker button.selected { border-color: var(--accent); color: var(--ink); background: #faf0e8; }
+.hf-part-picker svg { width: 36px; flex-shrink: 0; }
+.hf-part-picker strong { display: block; font-size: 14px; }
+.hf-part-picker small { display: block; font-size: 11px; margin-top: 3px; color: var(--muted); }
+.hf-part-picker button:focus-visible, .hf-advanced summary:focus-visible { outline: 2px solid var(--accent); outline-offset: 3px; }
+.hf-card { padding: 22px; border-radius: 6px; }
+.hf-card h2 { font-weight: 600; font-size: 16px; }
+.hf-card-heading { display: flex; justify-content: space-between; align-items: center; gap: 12px; }
+.hf-count { font-size: 11px; color: var(--muted); background: var(--paper); border-radius: 12px; padding: 3px 8px; }
+.hf-description { font-size: 13px; color: var(--muted); margin: 6px 0 20px; line-height: 1.5; }
+.hf-detail { display: flex; gap: 12px; padding: 12px 0; }
+.hf-detail + .hf-detail { border-top: 1px solid var(--border); }
+.hf-detail-icon { font-size: 20px; color: var(--muted); width: 24px; flex-shrink: 0; }
+.hf-detail h3 { font-size: 13px; font-weight: 500; margin-bottom: 4px; }
+.hf-detail p, .hf-note { font-size: 12px; color: var(--muted); line-height: 1.6; }
+.hf-advanced { border-top: 1px solid var(--border); padding: 16px 4px; }
+.hf-advanced summary { font-size: 12px; color: var(--muted); cursor: pointer; }
+.hf-preview { position: sticky; top: 80px; min-width: 0; }
+.hf-preview-heading { display: flex; justify-content: space-between; font-size: 10px; letter-spacing: .08em; color: var(--muted); margin-bottom: 12px; }
+.hf-preview :deep(.preview) { min-height: 460px; border-radius: 6px; }
+@media (max-width: 1100px) { .hf-layout { grid-template-columns: 1fr; } .hf-preview { position: static; } }
+@media (max-width: 600px) { .hf-heading { align-items: flex-start; flex-direction: column; } }
+</style>

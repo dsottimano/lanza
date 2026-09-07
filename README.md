@@ -1,4 +1,16 @@
-# Astro static site + Lanza CMS + Telegram bot (Cloudflare)
+# Lanza
+
+Never lose a good thought again. Lanza is evolving from a self-owned publishing CMS
+into a durable home for thinking with an assistant. The agreed v1 is simple: talk
+with ChatGPT or Claude, have the connected assistant save notes in your private
+GitHub repo, review/develop them in Lanza, and publish selected work when ready.
+
+The notebook is planned, not shipped. Start with [current TODOs](docs/todos.md),
+[the product vision](docs/product-vision.md), [Thoughts v1](docs/thoughts-v1.md), and
+[the latest handoff](docs/handoff-2026-09-07.md). Voice-mode tool compatibility still
+needs verification. D1/R2 are not prerequisites for this v1.
+
+## Current implementation
 
 Pure-static Astro at the repo root, edited through **Lanza** — a self-owned
 Vue 3 + TipTap CMS (`admin/`) served at `/admin` — with a Telegram Worker for
@@ -7,9 +19,8 @@ git; the production build drops `draft: true` entries. Post/page **bodies are
 HTML** (Lanza is the source of truth); Astro renders them with `set:html`,
 sanitized at build time (`frontend/lib/sanitize.ts`).
 
-No Cloudflare adapter yet — add `@astrojs/cloudflare` + per-route
-`prerender = false` only when the real-estate listings need on-demand rendering
-(those will move to D1).
+Public pages are statically built. Keep private notes outside the public content
+model and generated assets; a private repository can host a public website.
 
 ```
 .                 Astro project (root)

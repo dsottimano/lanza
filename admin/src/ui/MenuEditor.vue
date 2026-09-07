@@ -151,9 +151,9 @@ const iconBtn =
       <ul class="space-y-2">
         <li v-for="(it, i) in items" :key="i" class="flex items-start gap-1.5">
           <div class="flex min-w-0 flex-1 flex-col gap-1">
-            <div class="flex min-w-0 gap-1.5">
-              <input v-model="it.label" :class="inputCls" placeholder="Label" @input="markDirty" />
-              <input v-model="it.url" :class="inputCls" placeholder="/path/ or https://…" @input="markDirty" />
+            <div class="flex min-w-0 flex-col gap-2">
+              <label class="text-xs text-zinc-500">Link text<input v-model="it.label" :class="[inputCls, 'mt-1']" placeholder="e.g. About us" @input="markDirty" /></label>
+              <label class="text-xs text-zinc-500">Destination<input v-model="it.url" :class="[inputCls, 'mt-1']" placeholder="/about/ or https://…" @input="markDirty" /></label>
             </div>
             <p v-if="urlBlocks(it.url)" class="text-xs font-medium text-red-600">
               That link scheme isn't allowed and won't save. Use <code>/about/</code>,

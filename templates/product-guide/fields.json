@@ -1,0 +1,129 @@
+{
+  "name": "product-guide",
+  "label": "Product guide",
+  "body": false,
+  "fields": [
+    {
+      "name": "backLabel",
+      "label": "Back Label",
+      "widget": "string",
+      "group": "Navigation"
+    },
+    {
+      "name": "backUrl",
+      "label": "Back Url",
+      "widget": "string",
+      "group": "Navigation"
+    },
+    {
+      "name": "indexLabel",
+      "label": "Index Label",
+      "widget": "string",
+      "group": "Navigation"
+    },
+    {
+      "name": "eyebrow",
+      "label": "Eyebrow",
+      "widget": "text",
+      "group": "Hero"
+    },
+    {
+      "name": "title",
+      "label": "Title",
+      "widget": "text",
+      "group": "Hero"
+    },
+    {
+      "name": "intro",
+      "label": "Intro",
+      "widget": "text",
+      "group": "Hero"
+    },
+    {
+      "name": "sections",
+      "label": "Sections",
+      "widget": "list",
+      "group": "Sections",
+      "fields": [
+        {
+          "name": "title",
+          "label": "Title",
+          "widget": "string"
+        },
+        {
+          "name": "paragraphs",
+          "label": "Paragraphs",
+          "widget": "list",
+          "fields": [
+            {
+              "name": "text",
+              "label": "Text",
+              "widget": "text"
+            }
+          ]
+        },
+        {
+          "name": "items",
+          "label": "Items",
+          "widget": "list",
+          "required": false,
+          "fields": [
+            {
+              "name": "text",
+              "label": "Text",
+              "widget": "text"
+            }
+          ]
+        },
+        {
+          "name": "code",
+          "label": "Code",
+          "widget": "text",
+          "required": false
+        },
+        {
+          "name": "link",
+          "label": "Link",
+          "widget": "object",
+          "required": false,
+          "fields": [
+            {
+              "name": "label",
+              "label": "Label",
+              "widget": "string"
+            },
+            {
+              "name": "href",
+              "label": "Href",
+              "widget": "string"
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "name": "nextTitle",
+      "label": "Next Title",
+      "widget": "text",
+      "group": "Next step"
+    },
+    {
+      "name": "nextBody",
+      "label": "Next Body",
+      "widget": "text",
+      "group": "Next step"
+    },
+    {
+      "name": "nextLabel",
+      "label": "Next Label",
+      "widget": "text",
+      "group": "Next step"
+    },
+    {
+      "name": "nextUrl",
+      "label": "Next Url",
+      "widget": "text",
+      "group": "Next step"
+    }
+  ]
+}

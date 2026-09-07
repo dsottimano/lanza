@@ -6,10 +6,6 @@
 // and the header language switcher. The slug→component map here is the ONE place a
 // fixed page binds to its component; everything else about it is data in the registry.
 import Base from "../layouts/Base.astro";
-import Agents from "./Agents.astro";
-import Architecture from "./Architecture.astro";
-import HowItWorks from "./HowItWorks.astro";
-import Start from "./Start.astro";
 import JournalIndex from "./JournalIndex.astro";
 import { FIXED_PAGES } from "../lib/fixed-pages";
 import { allLocaleAlternates } from "../lib/alternates";
@@ -23,10 +19,6 @@ interface Props {
 const { slug, locale } = Astro.props;
 
 const COMPONENTS: Record<string, unknown> = {
-  agents: Agents,
-  architecture: Architecture,
-  "how-it-works": HowItWorks,
-  start: Start,
   posts: JournalIndex,
 };
 

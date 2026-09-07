@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { computed, defineAsyncComponent, h, ref, shallowRef } from "vue";
+import { computed, defineAsyncComponent, h, ref, shallowRef, watch } from "vue";
 import { useRoute, useRouter } from "vue-router";
 // Eager: the shell that's always on screen at boot.
 import Sidebar from "./ui/Sidebar.vue";
@@ -89,6 +89,8 @@ type Pane =
 
 const route = useRoute();
 const router = useRouter();
+const settingsNavigationOpen = ref(false);
+watch(() => route.fullPath, () => { settingsNavigationOpen.value = false; });
 
 // The token lives server-side (the /admin/api/gh proxy). Past Cloudflare Access
 // the CMS just boots — no sign-in screen, no localStorage PAT.
@@ -156,7 +158,11 @@ function settingsFileByName(name: string): FileEntry | null {
   return fc && fc.kind === "files" ? (fc.files.find((f) => f.name === name) ?? null) : null;
 }
 
-const locale = computed<Locale>(() => (route.params.locale as string) || site.defaultLocale);
+const locale = computed<Locale>(() => {
+  const candidate = route.params.locale || (route.name === "settings" ? route.query.locale : undefined);
+  return typeof candidate === "string" && site.locales.some(l => l.code === candidate)
+    ? candidate : site.defaultLocale;
+});
 const routeCollection = computed<FolderCollection | undefined>(
   () => getCollection(route.params.collection as string) as FolderCollection | undefined,
 );
@@ -253,7 +259,10 @@ function onOnboarded() {
   <OnboardingWizard v-else-if="!site.onboarded" :client="client" @done="onOnboarded" />
 
   <!-- The collection rail is permanent; only the main column swaps. -->
-  <div v-else class="flex min-h-screen" :class="{ 'editing-shell': pane === 'editRich', 'theme-shell': pane === 'brandThemes' }">
+  <div v-else class="flex min-h-screen" :class="{ 'editing-shell': pane === 'editRich', 'theme-shell': pane === 'brandThemes', 'settings-shell': route.name === 'settings', 'settings-shell--nav-open': settingsNavigationOpen }">
+    <button v-if="route.name === 'settings'" class="settings-mobile-navigation" :aria-expanded="settingsNavigationOpen" @click="settingsNavigationOpen = !settingsNavigationOpen">
+      {{ settingsNavigationOpen ? 'Close navigation ×' : '☰ Site navigation' }}
+    </button>
     <Sidebar
       v-show="!(pane === 'editRich' && focusMode)"
       :active-collection="collection.name"
@@ -328,6 +337,7 @@ function onOnboarded() {
         :client="client"
         :menu-file="menuFile"
         :locale="locale"
+        @locale="(next: string) => router.push({ name: 'settings', params: { panel: 'header-footer' }, query: { ...route.query, locale: next } })"
         @back="backToList"
       />
       <BrandThemesView

@@ -2,7 +2,7 @@ import type { Editor, Range } from "@tiptap/core";
 import { GitHubClient, GitHubError } from "./github";
 import type { SlashItem } from "../editor/extensions/slash";
 
-// Reusable "My blocks": named HTML snippets the user composes in BlocksView and
+// Reusable "Saved snippets": named HTML snippets the user composes in BlocksView and
 // drops into any post/page from the slash menu. Stored shared (not localized) at
 // data/blocks.json as { "blocks": [{ id, name, html }] }; a 404 on first
 // load means the file doesn't exist yet → empty list.
@@ -51,15 +51,15 @@ export function saveBlocks(
   return client.saveJson(BLOCKS_PATH, { blocks }, `lanza: update ${BLOCKS_PATH}`, sha);
 }
 
-// Turn saved blocks into slash-menu entries (a "My blocks" group). Choosing one
+// Turn saved blocks into slash-menu entries (a "Saved snippets" group). Choosing one
 // inserts its stored HTML at the cursor; the editor re-parses it into nodes.
 export function blockSlashItems(blocks: Block[]): SlashItem[] {
   return blocks.map((b) => ({
-    title: b.name || "Untitled block",
+    title: b.name || "Untitled snippet",
     icon: "🧩",
-    hint: "My block",
+    hint: "Saved snippet",
     keywords: ["block", ...(b.name ? [b.name.toLowerCase()] : [])],
-    group: "My blocks",
+    group: "Saved snippets",
     command: ({ editor, range }: { editor: Editor; range: Range }) =>
       editor.chain().focus().deleteRange(range).insertContent(b.html).run(),
   }));

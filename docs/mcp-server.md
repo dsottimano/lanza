@@ -1,5 +1,16 @@
 # Lanza MCP server
 
+## Next: private thoughts (not implemented)
+
+The agreed v1 adds saving, finding and developing thoughts in the person's private
+GitHub repository through their ChatGPT/Claude conversation. See
+[Thoughts v1](thoughts-v1.md) for the proposed contract and privacy tests. Existing
+content tools below are website tools, not a private-note API. Do not save private
+notes as posts with `draft:true`. Voice-mode tool compatibility remains unverified.
+The existing authentication and no-broker-token architecture still applies.
+
+## Current endpoint
+
 The tenant endpoint is `POST https://<your-site>/api/mcp`. It uses stateless MCP
 Streamable HTTP; GET/SSE is unsupported. Connect through the CMS’s **Connect an agent**
 screen using the owner’s GitHub user token. The server uses that same bearer for

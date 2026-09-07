@@ -52,6 +52,8 @@ export function humanEditingGuide() {
       },
     },
     fieldDesign: [
+      "The separate top-level page blocks builder is retired. Compose reusable sections into a preset with fields.json and entry slots; do not add a second block catalog or recreate the page blocks field. Saved snippets are rich-text insertion shortcuts, not layouts. Preserve and migrate existing legacy block content before removing its schema field.",
+      "Every public content page must be an entry in a collection declared by data/schema.json. Product and marketing pages have no exemption. Never bypass the CMS with copy in Astro/TypeScript or silently shadow a CMS URL. Declare designed-page fields in templates/<preset>/fields.json and store all copy in the entry slots. Validate and verify that editing a field changes its public render.",
       "Use string for short text, text for paragraphs, image for replaceable images, and relation for references to actual entries. Follow the advertised widgets rather than inventing a rich-text field widget.",
       "Use concise human labels and helpful hints. Group by the section a person sees, not by HTML element or data type. Keep nesting shallow; use list only for genuine repeating items, with useful item labels.",
       "Keep CSS, classes, breakpoints, grid columns, template names and other implementation controls in agent-owned structure, not ordinary editing fields.",

@@ -14,7 +14,7 @@ defineEmits<{
 }>();
 
 // Show a group divider before the first item of each named group (e.g. the
-// "My blocks" entries appended after the built-ins).
+// "Saved snippets" entries appended after the built-ins).
 function groupHeader(i: number): string | null {
   const g = props.items[i].group;
   return g && g !== props.items[i - 1]?.group ? g : null;

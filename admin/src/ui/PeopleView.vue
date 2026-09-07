@@ -1,4 +1,5 @@
 <script setup lang="ts">
+import SettingsHeader from "./SettingsHeader.vue";
 // Settings → People. Who can get into this site, and at what level.
 //
 // This screen used to BE the invite mechanism: a list of GitHub usernames kept in
@@ -30,22 +31,17 @@ const roleLabel = computed(() => {
 </script>
 
 <template>
-  <div class="min-h-screen">
-    <header class="toolbar flex items-center justify-between gap-4 px-5 py-2.5">
-      <button class="text-sm text-zinc-600 transition hover:text-zinc-900" @click="$emit('back')">← Back</button>
-      <span class="flex-1 text-center text-sm"></span>
-      <span class="min-w-[6.5rem]"></span>
-    </header>
-
-    <main class="mx-auto max-w-3xl px-6 pt-8 pb-24">
-      <h1 class="mb-2 font-serif text-3xl font-bold tracking-tight text-zinc-900">People</h1>
-      <p class="mb-8 max-w-prose text-sm leading-relaxed text-zinc-600">
+  <div class="settings-page">
+    <SettingsHeader title="People" @back="$emit('back')">
+      <template #description><p>
         Everyone signs in with their own GitHub account. There are no passwords to share
         and nothing to send them: add them as a collaborator on the repository, and they
         can sign in at this site's
         <code class="rounded bg-zinc-100 px-1 py-0.5 text-[0.8em]">/admin</code> straight away.
-      </p>
+      </p></template>
+    </SettingsHeader>
 
+    <main class="settings-body">
       <section class="mb-10">
         <h2 class="mb-1 text-sm font-semibold text-zinc-900">You</h2>
         <div class="card flex items-center justify-between gap-3 px-4 py-3">

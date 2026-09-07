@@ -166,7 +166,7 @@ export const PUBLISHING_FIELDS = new Set(["draft", "seo", "template", "preset", 
 //
 // ⚠️  MIRROR: frontend/layouts/Base.astro `partData`. Edit both together.
 export const PART_DATA = {
-  scalars: ["homeUrl", "siteName", "year", "headerClass", "footerClass", "showSwitcher"],
+  scalars: ["homeUrl", "siteName", "year", "headerClass", "footerClass", "showSwitcher", "menuLabel", "primaryNavigationLabel"],
   lists: {
     menuHeader: ["label", "url"],
     menuFooter: ["label", "url"],

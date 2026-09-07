@@ -1,4 +1,5 @@
 <script setup lang="ts">
+import SettingsHeader from "./SettingsHeader.vue";
 // Settings → Site Health. A friendly diagnostics dashboard: is the CMS talking
 // to GitHub and Cloudflare, is the site deploying, and are the optional storage
 // services (KV / D1 / R2) turned on and wired to this project. Non-technical
@@ -99,28 +100,24 @@ onMounted(refreshAll);
 </script>
 
 <template>
-  <div class="min-h-screen">
-    <header class="toolbar flex items-center justify-between gap-4 px-5 py-2.5">
-      <div class="flex items-center gap-4">
-        <button class="text-sm text-zinc-600 transition hover:text-zinc-900" @click="emit('back')">← Back</button>
-        <span class="text-sm font-semibold text-zinc-900">Site Health</span>
-      </div>
-      <button
-        class="btn btn-primary text-xs"
-        :disabled="refreshing"
-        @click="refreshAll"
-      >
-        {{ refreshing ? "Checking…" : "Refresh all" }}
-      </button>
-    </header>
-
-    <main class="mx-auto max-w-2xl px-6 pt-8 pb-24">
-      <h1 class="mb-1 font-serif text-3xl font-bold tracking-tight text-zinc-900">Site Health</h1>
-      <p class="mb-8 text-sm text-zinc-600">
+  <div class="settings-page">
+    <SettingsHeader title="Site Health" @back="$emit('back')">
+      <template #actions>
+        <button
+          class="btn btn-primary text-xs"
+          :disabled="refreshing"
+          @click="refreshAll"
+        >
+          {{ refreshing ? "Checking…" : "Refresh all" }}
+        </button>
+      </template>
+      <template #description><p>
         A quick read on how your site is connected and what's turned on. Green means good;
         amber needs a look; red needs fixing.
-      </p>
+      </p></template>
+    </SettingsHeader>
 
+    <main class="settings-body">
       <!-- ── Connections ─────────────────────────────────────────────── -->
       <h2 class="mb-3 text-xs font-semibold uppercase tracking-wide text-zinc-600">Connections</h2>
       <div class="space-y-3">

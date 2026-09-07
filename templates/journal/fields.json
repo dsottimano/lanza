@@ -1,0 +1,33 @@
+{
+  "name": "journal",
+  "label": "Blog index",
+  "body": false,
+  "listing": {
+    "of": "posts",
+    "item": [
+      "title",
+      "description",
+      "featuredImage"
+    ],
+    "sortBy": "pubDate",
+    "order": "desc"
+  },
+  "fields": [
+    {
+      "name": "heading",
+      "label": "Heading",
+      "widget": "string"
+    },
+    {
+      "name": "intro",
+      "label": "Introduction",
+      "widget": "text",
+      "required": false
+    },
+    {
+      "name": "emptyText",
+      "label": "Empty blog message",
+      "widget": "string"
+    }
+  ]
+}

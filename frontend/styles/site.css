@@ -364,7 +364,7 @@ main > ul > li > a:hover {
   text-decoration: underline;
 }
 
-/* ── page-builder blocks ───────────────────────────────────────────────── */
+/* ── legacy page-block compatibility ───────────────────────────────────────────────── */
 .block {
   margin: 2.5rem 0;
 }

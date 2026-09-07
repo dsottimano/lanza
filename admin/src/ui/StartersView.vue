@@ -1,4 +1,6 @@
 <script setup lang="ts">
+import SettingsHeader from "./SettingsHeader.vue";
+defineEmits<{ (e: "back"): void }>();
 import { computed, ref, shallowRef, watch } from 'vue';
 import { render } from '../../../frontend/lib/template-render';
 import { resolveBrand } from '../../../frontend/lib/appearance';
@@ -43,10 +45,12 @@ async function install() {
 }
 </script>
 <template>
-  <main class="starters">
-    <p class="eyebrow">A starting point that works</p>
-    <h1>Make it your kind of site.</h1>
-    <p class="intro">Choose a starter with pages, editable content and a visual style. Your agent can adapt the structure; you make the words and images yours.</p>
+  <div class="settings-page">
+    <SettingsHeader title="Brand &amp; themes" @back="$emit('back')">
+      <template #description><p>A starting point with pages, content and a style you can make your own.</p></template>
+      <template #navigation><slot name="navigation" /></template>
+    </SettingsHeader>
+  <main class="starters settings-body settings-body--wide">
     <fieldset :disabled="busy">
       <legend class="sr-only">Site starter</legend>
       <div class="starter-options">
@@ -83,7 +87,8 @@ async function install() {
       <button class="btn btn-primary mt-5" :disabled="busy" @click="install">{{ busy ? 'Installing…' : 'Install to staging' }}</button>
     </section>
   </main>
+  </div>
 </template>
 <style scoped>
-fieldset{min-width:0}.starters{max-width:1100px;margin:auto;padding:3rem 2rem 6rem}.eyebrow{font-size:.7rem;text-transform:uppercase;letter-spacing:.12em;color:var(--muted,#666)}h1{font-size:2.7rem;letter-spacing:-.04em;line-height:1.1;margin:.6rem 0 1rem}h2{font-size:1.35rem;font-weight:600;margin:1.5rem 0 .8rem}.intro{max-width:650px;line-height:1.8;margin-bottom:2rem}.starter-options{display:grid;grid-template-columns:1fr 1fr;gap:1.5rem}.starter-option,.looks button{min-width:0;overflow-wrap:anywhere;border:1px solid #d8d5ca;text-align:left;padding:1.5rem;background:#faf9f4}.chosen{outline:2px solid #35382e;outline-offset:3px}.starter-option h2{font-size:2rem}.starter-option p,.starter-option li,.review li{line-height:1.8}.starter-option ul{margin:1rem 0;padding-left:1.2rem;list-style:disc}.looks{display:grid;grid-template-columns:repeat(3,1fr);gap:1rem;margin:1.5rem 0}.looks button>span:last-child{display:block;font-size:.8rem;margin-top:.5rem}.swatches{display:flex;margin-bottom:1rem}.swatches i{width:34px;height:34px;border:1px solid #aaa;border-radius:50%;margin-right:-5px}.setup{display:flex;align-items:center;gap:2rem;margin:2rem 0 1rem;flex-wrap:wrap}.setup select{margin-left:.5rem;padding:.5rem;border:1px solid #d8d5ca}.muted{font-size:.85rem;line-height:1.7;color:#666;margin:.7rem 0 1rem}.review,.notice{border:1px solid #d8d5ca;padding:1.5rem;margin-top:2rem}.review ul{margin:1rem 0}.review details{font-size:.8rem}button:focus-visible{outline:3px solid #956019;outline-offset:4px}@media(max-width:700px){.starter-options,.looks{grid-template-columns:1fr}.starters{padding:2rem 1rem}h1{font-size:2rem}}
+fieldset{min-width:0}.eyebrow{font-size:.7rem;text-transform:uppercase;letter-spacing:.12em;color:var(--muted,#666)}h1{font-size:2.7rem;letter-spacing:-.04em;line-height:1.1;margin:.6rem 0 1rem}h2{font-size:1.35rem;font-weight:600;margin:1.5rem 0 .8rem}.intro{max-width:650px;line-height:1.8;margin-bottom:2rem}.starter-options{display:grid;grid-template-columns:1fr 1fr;gap:1.5rem}.starter-option,.looks button{min-width:0;overflow-wrap:anywhere;border:1px solid #d8d5ca;text-align:left;padding:1.5rem;background:#faf9f4}.chosen{outline:2px solid #35382e;outline-offset:3px}.starter-option h2{font-size:2rem}.starter-option p,.starter-option li,.review li{line-height:1.8}.starter-option ul{margin:1rem 0;padding-left:1.2rem;list-style:disc}.looks{display:grid;grid-template-columns:repeat(3,1fr);gap:1rem;margin:1.5rem 0}.looks button>span:last-child{display:block;font-size:.8rem;margin-top:.5rem}.swatches{display:flex;margin-bottom:1rem}.swatches i{width:34px;height:34px;border:1px solid #aaa;border-radius:50%;margin-right:-5px}.setup{display:flex;align-items:center;gap:2rem;margin:2rem 0 1rem;flex-wrap:wrap}.setup select{margin-left:.5rem;padding:.5rem;border:1px solid #d8d5ca}.muted{font-size:.85rem;line-height:1.7;color:#666;margin:.7rem 0 1rem}.review,.notice{border:1px solid #d8d5ca;padding:1.5rem;margin-top:2rem}.review ul{margin:1rem 0}.review details{font-size:.8rem}button:focus-visible{outline:3px solid #956019;outline-offset:4px}@media(max-width:700px){.starter-options,.looks{grid-template-columns:1fr}h1{font-size:2rem}}
 </style>

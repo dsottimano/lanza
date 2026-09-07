@@ -1,4 +1,5 @@
 <script setup lang="ts">
+import SettingsHeader from "./SettingsHeader.vue";
 // Settings → Connect an agent. Authorize an AI agent (Claude, ChatGPT, Codex) to
 // edit this site's content over MCP, and hand it the token.
 //
@@ -120,21 +121,16 @@ async function copy() {
 </script>
 
 <template>
-  <div class="min-h-screen">
-    <header class="toolbar flex items-center justify-between gap-4 px-5 py-2.5">
-      <button class="text-sm text-zinc-600 transition hover:text-zinc-900" @click="$emit('back')">← Back</button>
-      <span class="flex-1 text-center text-sm"></span>
-      <span class="min-w-[6.5rem]"></span>
-    </header>
-
-    <main class="mx-auto max-w-3xl px-6 pt-8 pb-24">
-      <h1 class="mb-2 font-serif text-3xl font-bold tracking-tight text-zinc-900">Connect an agent</h1>
-      <p class="mb-8 max-w-prose text-sm leading-relaxed text-zinc-600">
+  <div class="settings-page">
+    <SettingsHeader title="Connect an agent" @back="$emit('back')">
+      <template #description><p>
         Let Claude, ChatGPT or another agent read and edit this site's content directly.
         You authorize it once with your own GitHub account, then paste one token into the
         agent's settings. Nothing else holds a key to your site.
-      </p>
+      </p></template>
+    </SettingsHeader>
 
+    <main class="settings-body">
       <!-- Step 1: install -->
       <section class="mb-8">
         <h2 class="mb-1 text-sm font-semibold text-zinc-900">1. Give the agent app access to this repository</h2>

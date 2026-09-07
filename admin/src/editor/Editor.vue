@@ -40,7 +40,7 @@ const slashSelected = ref(0);
 const slashTop = ref(0);
 const slashLeft = ref(0);
 const slashCommand = shallowRef<((item: SlashItem) => void) | null>(null);
-// The user's saved "My blocks", loaded once per mount and appended to the slash
+// The user's saved "Saved snippets", loaded once per mount and appended to the slash
 // catalog. Empty until (and unless) the async load resolves — never blocks boot.
 const myBlocks = ref<SlashItem[]>([]);
 
@@ -172,7 +172,7 @@ defineExpose({
 });
 
 onMounted(() => {
-  // Load the user's saved "My blocks" into the slash catalog. Async and
+  // Load the user's saved "Saved snippets" into the slash catalog. Async and
   // failure-tolerant: a missing/broken blocks.json just leaves the group empty.
   if (props.client) {
     loadBlocks(props.client)

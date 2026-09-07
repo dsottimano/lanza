@@ -238,3 +238,48 @@ included in theme exports. A starter does not imply external integrations.
 `/site-system.json`. It distinguishes shared Brand settings, additive Site starters
 and replacement theme bundles; documents staging/build trust and installation
 limits; and points agents toward supported tools. See [themes](../themes/README.md).
+
+## Public pages must be editable
+
+`data/schema.json` is authoritative for every public content page, including the
+Lanza product site. One-off pages live in the Pages collection; designed pages
+select a preset and hold its declared fields in `slots`. Do not add marketing copy
+in Astro/TypeScript or fixed routes that override CMS entries. `AGENTS.md` makes
+this mandatory for repository agents; the shared `humanEditing` contract tells MCP
+agents the same rule.
+
+The product guides, Architecture, and Blog now live in Pages in English and Spanish.
+Their presets are `product-guide`, `architecture`, and `journal`. The journal
+preset declares `listing.of: "posts"`, item fields, and optional `sortBy`/`order`;
+page rendering and the CMS preview supply published entries for the page language.
+A CMS blog entry owns its URL even when drafted or moved; only sites without that
+entry use the generic archive fallback.
+
+`lanza build` now runs `check:site` before code generation. The filesystem checker
+also rejects handwritten public routes outside the platform route families,
+content outside declared collection folders, missing page templates,
+and stored slot names absent from the selected template's fields. This supplements
+the shared template checker; MCP validation does not yet perform this filesystem
+content inventory. These checks cannot prove arbitrary Astro code has no hardcoded
+copy: route/renderer review and CMS edit-to-render regression tests remain required.
+
+## Page sections, not a second page builder
+
+The top-level Pages `blocks` field is retired from this site's schema. The content
+inventory found no entries using it. Pages use either a rich-text body or a preset
+with declared slots, including ordinary lists for repeated content.
+
+Agents can reuse section markup, CSS and field declarations from existing templates
+or recipes, then compose them into the target preset. Give fields human labels and
+section groups; preserve stored field names. There is no extra block catalog or
+runtime to configure. Do not recreate the old page-builder field.
+
+The legacy renderer remains for tenants whose schema still declares page blocks.
+Before removing that field on an existing tenant, inventory its entries and migrate
+nonempty block content into preset fields, preserving section order, body content,
+URLs and translations. Verify the render before retiring the schema field. The build
+checker refuses to drop undeclared legacy block content silently.
+
+**Saved snippets** (formerly Reusable blocks) are a separate writing feature: saved
+rich text inserted through the slash menu. They remain stored at `data/blocks.json`
+for compatibility and do not determine page layout.

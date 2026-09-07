@@ -6,7 +6,7 @@ export interface SlashItem {
   icon: string;
   hint: string;
   keywords: string[];
-  // Optional group label. Built-ins leave it unset; dynamic "My blocks" entries
+  // Optional group label. Built-ins leave it unset; dynamic "Saved snippets" entries
   // set it so SlashMenu can render a divider before the group.
   group?: string;
   command: (ctx: { editor: Editor; range: Range }) => void;
@@ -144,7 +144,7 @@ export const SLASH_ITEMS: SlashItem[] = [
 ];
 
 // Filters the built-in catalog plus any dynamic `extra` items (the user's saved
-// "My blocks"). Built-ins come first, then the blocks group.
+// "Saved snippets"). Built-ins come first, then the snippets group.
 export function filterSlashItems(query: string, extra: SlashItem[] = []): SlashItem[] {
   const all = extra.length ? [...SLASH_ITEMS, ...extra] : SLASH_ITEMS;
   const q = query.toLowerCase().trim();

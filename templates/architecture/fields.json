@@ -1,0 +1,402 @@
+{
+  "name": "architecture",
+  "label": "Architecture",
+  "body": false,
+  "fields": [
+    {
+      "name": "tag",
+      "label": "Tag",
+      "widget": "text",
+      "group": "Hero"
+    },
+    {
+      "name": "headline",
+      "label": "Headline",
+      "widget": "text",
+      "group": "Hero"
+    },
+    {
+      "name": "sub",
+      "label": "Sub",
+      "widget": "text",
+      "group": "Hero"
+    },
+    {
+      "name": "partsEyebrow",
+      "label": "Parts Eyebrow",
+      "widget": "text",
+      "group": "Components"
+    },
+    {
+      "name": "partsHead",
+      "label": "Parts Head",
+      "widget": "text",
+      "group": "Components"
+    },
+    {
+      "name": "partsIntro",
+      "label": "Parts Intro",
+      "widget": "text",
+      "group": "Components"
+    },
+    {
+      "name": "partsCols",
+      "label": "Parts Cols",
+      "widget": "list",
+      "group": "Components",
+      "fields": [
+        {
+          "name": "text",
+          "label": "Text",
+          "widget": "text"
+        }
+      ]
+    },
+    {
+      "name": "parts",
+      "label": "Parts",
+      "widget": "list",
+      "group": "Components",
+      "fields": [
+        {
+          "name": "name",
+          "label": "Name",
+          "widget": "text"
+        },
+        {
+          "name": "what",
+          "label": "What",
+          "widget": "text"
+        },
+        {
+          "name": "who",
+          "label": "Who",
+          "widget": "text"
+        },
+        {
+          "name": "secrets",
+          "label": "Secrets",
+          "widget": "text"
+        }
+      ]
+    },
+    {
+      "name": "editEyebrow",
+      "label": "Edit Eyebrow",
+      "widget": "text",
+      "group": "Life of an edit"
+    },
+    {
+      "name": "editHead",
+      "label": "Edit Head",
+      "widget": "text",
+      "group": "Life of an edit"
+    },
+    {
+      "name": "editIntro",
+      "label": "Edit Intro",
+      "widget": "text",
+      "group": "Life of an edit"
+    },
+    {
+      "name": "editSteps",
+      "label": "Edit Steps",
+      "widget": "list",
+      "group": "Life of an edit",
+      "fields": [
+        {
+          "name": "t",
+          "label": "Step heading",
+          "widget": "text"
+        },
+        {
+          "name": "c",
+          "label": "Command",
+          "widget": "text"
+        },
+        {
+          "name": "b",
+          "label": "Description",
+          "widget": "text"
+        }
+      ]
+    },
+    {
+      "name": "authEyebrow",
+      "label": "Auth Eyebrow",
+      "widget": "text",
+      "group": "Signing in"
+    },
+    {
+      "name": "authHead",
+      "label": "Auth Head",
+      "widget": "text",
+      "group": "Signing in"
+    },
+    {
+      "name": "authIntro",
+      "label": "Auth Intro",
+      "widget": "text",
+      "group": "Signing in"
+    },
+    {
+      "name": "authSteps",
+      "label": "Auth Steps",
+      "widget": "list",
+      "group": "Signing in",
+      "fields": [
+        {
+          "name": "text",
+          "label": "Text",
+          "widget": "text"
+        }
+      ]
+    },
+    {
+      "name": "authCalloutHead",
+      "label": "Auth Callout Head",
+      "widget": "text",
+      "group": "Signing in"
+    },
+    {
+      "name": "authCalloutBody",
+      "label": "Auth Callout Body",
+      "widget": "text",
+      "group": "Signing in"
+    },
+    {
+      "name": "keysEyebrow",
+      "label": "Keys Eyebrow",
+      "widget": "text",
+      "group": "Credentials"
+    },
+    {
+      "name": "keysHead",
+      "label": "Keys Head",
+      "widget": "text",
+      "group": "Credentials"
+    },
+    {
+      "name": "keysIntro",
+      "label": "Keys Intro",
+      "widget": "text",
+      "group": "Credentials"
+    },
+    {
+      "name": "keysCols",
+      "label": "Keys Cols",
+      "widget": "list",
+      "group": "Credentials",
+      "fields": [
+        {
+          "name": "text",
+          "label": "Text",
+          "widget": "text"
+        }
+      ]
+    },
+    {
+      "name": "keys",
+      "label": "Keys",
+      "widget": "list",
+      "group": "Credentials",
+      "fields": [
+        {
+          "name": "cred",
+          "label": "Cred",
+          "widget": "text"
+        },
+        {
+          "name": "reaches",
+          "label": "Reaches",
+          "widget": "text"
+        },
+        {
+          "name": "life",
+          "label": "Life",
+          "widget": "text"
+        }
+      ]
+    },
+    {
+      "name": "agentEyebrow",
+      "label": "Agent Eyebrow",
+      "widget": "text",
+      "group": "Agents"
+    },
+    {
+      "name": "agentHead",
+      "label": "Agent Head",
+      "widget": "text",
+      "group": "Agents"
+    },
+    {
+      "name": "agentBody",
+      "label": "Agent Body",
+      "widget": "text",
+      "group": "Agents"
+    },
+    {
+      "name": "agentLink",
+      "label": "Agent Link",
+      "widget": "text",
+      "group": "Agents"
+    },
+    {
+      "name": "costEyebrow",
+      "label": "Cost Eyebrow",
+      "widget": "text",
+      "group": "Costs"
+    },
+    {
+      "name": "costHead",
+      "label": "Cost Head",
+      "widget": "text",
+      "group": "Costs"
+    },
+    {
+      "name": "costBody",
+      "label": "Cost Body",
+      "widget": "text",
+      "group": "Costs"
+    },
+    {
+      "name": "costTiles",
+      "label": "Cost Tiles",
+      "widget": "list",
+      "group": "Costs",
+      "fields": [
+        {
+          "name": "value",
+          "label": "Value",
+          "widget": "text"
+        },
+        {
+          "name": "label",
+          "label": "Label",
+          "widget": "text"
+        }
+      ]
+    },
+    {
+      "name": "sovEyebrow",
+      "label": "Sov Eyebrow",
+      "widget": "text",
+      "group": "Ownership"
+    },
+    {
+      "name": "sovHead",
+      "label": "Sov Head",
+      "widget": "text",
+      "group": "Ownership"
+    },
+    {
+      "name": "sovIntro",
+      "label": "Sov Intro",
+      "widget": "text",
+      "group": "Ownership"
+    },
+    {
+      "name": "sovBeforeLabel",
+      "label": "Sov Before Label",
+      "widget": "text",
+      "group": "Ownership"
+    },
+    {
+      "name": "sovAfterLabel",
+      "label": "Sov After Label",
+      "widget": "text",
+      "group": "Ownership"
+    },
+    {
+      "name": "sovBefore",
+      "label": "Sov Before",
+      "widget": "text",
+      "group": "Ownership"
+    },
+    {
+      "name": "sovAfter",
+      "label": "Sov After",
+      "widget": "text",
+      "group": "Ownership"
+    },
+    {
+      "name": "sovRows",
+      "label": "Sov Rows",
+      "widget": "list",
+      "group": "Ownership",
+      "fields": [
+        {
+          "name": "what",
+          "label": "What",
+          "widget": "text"
+        },
+        {
+          "name": "state",
+          "label": "State",
+          "widget": "text"
+        }
+      ]
+    },
+    {
+      "name": "sovHonestHead",
+      "label": "Sov Honest Head",
+      "widget": "text",
+      "group": "Ownership"
+    },
+    {
+      "name": "sovHonestBody",
+      "label": "Sov Honest Body",
+      "widget": "text",
+      "group": "Ownership"
+    },
+    {
+      "name": "ownEyebrow",
+      "label": "Own Eyebrow",
+      "widget": "text",
+      "group": "Updates"
+    },
+    {
+      "name": "ownHead",
+      "label": "Own Head",
+      "widget": "text",
+      "group": "Updates"
+    },
+    {
+      "name": "ownBody",
+      "label": "Own Body",
+      "widget": "text",
+      "group": "Updates"
+    },
+    {
+      "name": "ctaHead",
+      "label": "Cta Head",
+      "widget": "text",
+      "group": "Closing call to action"
+    },
+    {
+      "name": "ctaSub",
+      "label": "Cta Sub",
+      "widget": "text",
+      "group": "Closing call to action"
+    },
+    {
+      "name": "cta",
+      "label": "Cta",
+      "widget": "text",
+      "group": "Closing call to action"
+    },
+    {
+      "name": "agentUrl",
+      "label": "Agent Url",
+      "widget": "text",
+      "group": "Agents"
+    },
+    {
+      "name": "ctaUrl",
+      "label": "Cta Url",
+      "widget": "text",
+      "group": "Closing call to action"
+    }
+  ]
+}

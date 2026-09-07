@@ -1,12 +1,13 @@
 ---
-import type { CollectionEntry } from "astro:content";
+// Compatibility only for older tenant schemas. New pages use presets + slots.
+import type { LegacyPageBlock } from "../lib/legacy-page-blocks";
 // Block URLs are plain CMS strings (git-edited, and agent-writable via MCP) —
 // guard the href at render time with the site-wide policy. It lives in lib/url.ts
 // rather than here because the template engine has the identical sink and the two
 // must not drift.
 import { safeHref } from "../lib/url";
 
-type Block = CollectionEntry<"pages">["data"]["blocks"][number];
+type Block = LegacyPageBlock;
 
 interface Props {
   blocks: Block[];

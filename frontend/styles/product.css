@@ -9,28 +9,5 @@
 .lanza-product .site-footer a { color:#f5f3eb; text-underline-offset:.2em; }
 .lh-workflow .lh-heading h2 { color:#faf8f0; }
 .lh-hero h1,.lh-heading h2,.lh-split h2,.lh-close h2 { white-space:pre-line; }
-.product-guide { width:min(1240px,calc(100% - 3rem)); max-width:none; margin:0 auto; padding:0 0 5rem; }
-.pg-hero { padding:3rem 0 4rem; border-bottom:1px solid var(--border); }
-.pg-back { color:var(--muted); text-decoration:none; font-size:.85rem; }
-.pg-eyebrow { font:.7rem var(--font-mono); letter-spacing:.13em; color:var(--accent); text-transform:uppercase; }
-.pg-hero > .pg-eyebrow { margin:3rem 0 1.5rem; }
-.pg-hero h1 { font-size:clamp(3rem,6vw,6rem); line-height:1.03; letter-spacing:-.045em; max-width:15ch; font-weight:500; margin:0; }
-.pg-intro { font-size:1.3rem; line-height:1.7; max-width:42rem; margin:2rem 0 0; color:var(--text-secondary); }
-.pg-layout { display:grid; grid-template-columns:15rem minmax(0,1fr); gap:6rem; padding-top:3rem; }
-.pg-index { position:sticky; top:2rem; align-self:start; display:flex; flex-direction:column; gap:1.2rem; }
-.pg-index a { display:flex; gap:1rem; font-size:.95rem; color:var(--text-secondary); text-decoration:none; }
-.pg-index a:hover { color:var(--accent); }
-.pg-index a span { font:.7rem var(--font-mono); padding-top:.3rem; color:var(--muted); }
-.pg-section { max-width:46rem; padding:1rem 0 3rem; margin-bottom:2rem; border-bottom:1px solid var(--border); scroll-margin-top:2rem; }
-.pg-section h2 { font-size:clamp(1.9rem,3vw,2.7rem); font-weight:500; line-height:1.15; letter-spacing:-.025em; margin:1rem 0 1.4rem; }
-.pg-section p,.pg-section li { font-size:1.1rem; line-height:1.8; color:var(--text-secondary); }
-.pg-section li { margin-bottom:.6rem; }
-.pg-section pre { overflow-x:auto; padding:1.5rem; background:#e9e7db; color:#252621; border-left:3px solid var(--accent); font:.8rem/1.9 var(--font-mono); white-space:pre-wrap; overflow-wrap:anywhere; }
-.pg-link { display:inline-block; margin-top:.75rem; color:var(--accent); text-underline-offset:.2em; }
-.pg-next { background:#242722; color:#faf8f0; padding:2.5rem; max-width:46rem; }
-.pg-next h2 { font-size:2rem; color:inherit; font-weight:500; margin:0 0 1rem; }
-.pg-next p { line-height:1.7; color:#c2c7bb; }
-.pg-cta { display:inline-block; background:#cfddac; color:#242722; padding:.8rem 1.15rem; text-decoration:none; margin-top:1rem; font-weight:500; }
-.product-guide a:focus-visible { outline:3px solid var(--accent); outline-offset:4px; }
-@media(max-width:800px) { .pg-layout { grid-template-columns:1fr; gap:2rem; } .pg-index { position:static; flex-direction:row; flex-wrap:wrap; gap:1rem 1.5rem; padding-bottom:2rem; border-bottom:1px solid var(--border); } .pg-index > span { width:100%; } .pg-index a { font-size:.85rem; } .lanza-product .site-header .bar { gap:1rem; } .lanza-product .site-nav { gap:1rem; } }
-@media(max-width:540px) { .product-guide,.lanza-product .site-header .bar { width:calc(100% - 2rem); } .lanza-product .site-header .bar { padding:1rem 0; } .lanza-product .site-nav { width:100%; align-items:stretch; gap:0; } .lanza-product .site-nav > a { font-size:.9rem; } .lanza-product .site-nav > a:last-of-type { justify-content:center; margin-top:.75rem; border:1px solid var(--ink); padding:.75rem .85rem; } .pg-hero { padding-top:2rem; } .pg-intro { font-size:1.15rem; } .pg-next { padding:1.5rem; } }
+@media(max-width:800px) { .lanza-product .site-header .bar { gap:1rem; } .lanza-product .site-nav { gap:1rem; } }
+@media(max-width:540px) { .lanza-product .site-header .bar { width:calc(100% - 2rem); padding:1rem 0; } .lanza-product .site-nav { width:100%; align-items:stretch; gap:0; } .lanza-product .site-nav > a { font-size:.9rem; } .lanza-product .site-nav > a:last-of-type { justify-content:center; margin-top:.75rem; border:1px solid var(--ink); padding:.75rem .85rem; } }

@@ -1,5 +1,6 @@
 <script setup lang="ts">
-// Settings → Blocks. Manager for reusable "My blocks" — named HTML snippets the
+import SettingsHeader from "./SettingsHeader.vue";
+// Settings → Saved snippets. Manager for reusable "Saved snippets" — named HTML snippets the
 // user composes here and drops into any post/page from the slash menu. Stored
 // shared (not localized) at data/blocks.json; a 404 = no blocks yet.
 // Each block's content is edited in the same rich Editor the posts use.
@@ -40,7 +41,7 @@ async function load() {
     sha = loaded.sha;
     activeId.value = blocks[0]?.id ?? null;
   } catch (e) {
-    reportError(e, "Failed to load blocks.");
+    reportError(e, "Failed to load snippets.");
   } finally {
     loading.value = false;
     isDirty.value = false;
@@ -56,16 +57,16 @@ function select(id: string) {
 
 function addBlock() {
   flushActive();
-  const block: Block = { id: crypto.randomUUID(), name: "Untitled block", html: "<p></p>" };
+  const block: Block = { id: crypto.randomUUID(), name: "Untitled snippet", html: "<p></p>" };
   blocks.push(block);
   activeId.value = block.id;
   markDirty();
 }
 
 function rename(block: Block) {
-  const next = window.prompt("Block name", block.name);
+  const next = window.prompt("Snippet name", block.name);
   if (next === null) return;
-  block.name = next.trim() || "Untitled block";
+  block.name = next.trim() || "Untitled snippet";
   markDirty();
 }
 
@@ -92,27 +93,24 @@ function preview(html: string): string {
 </script>
 
 <template>
-  <div class="min-h-screen">
-    <header class="toolbar flex items-center justify-between gap-4 px-5 py-2.5">
-      <button class="text-sm text-zinc-600 transition hover:text-zinc-900" @click="emit('back')">← Back</button>
-      <span class="flex-1 text-center text-sm">
-        <span v-if="isDirty" class="text-zinc-500">Unsaved changes</span>
-      </span>
-      <SaveButton
-        :action="save"
-        :disabled="loading"
-        @saved="clearError"
-        @error="(e) => reportError(e, 'Save failed.')"
-      />
-    </header>
-
-    <main class="mx-auto max-w-5xl px-6 pt-8 pb-24">
-      <h1 class="mb-1 font-serif text-3xl font-bold tracking-tight text-zinc-900">Blocks</h1>
-      <p class="mb-6 text-sm text-zinc-600">
+  <div class="settings-page">
+    <SettingsHeader title="Saved snippets" @back="$emit('back')">
+      <template #actions>
+  <span v-if="isDirty" class="text-xs text-zinc-500">Unsaved changes</span>
+        <SaveButton
+          :action="save"
+          :disabled="loading"
+          @saved="clearError"
+          @error="(e) => reportError(e, 'Save failed.')"
+        />
+      </template>
+      <template #description><p>
         Reusable snippets you can drop into any post or page with the “/” menu (under
-        “My blocks”). Shared across all languages.
-      </p>
+        “Saved snippets”). Shared across all languages.
+      </p></template>
+    </SettingsHeader>
 
+    <main class="settings-body settings-body--wide">
       <div v-if="loading" class="card space-y-4 p-5">
         <div class="skeleton h-9 w-full" />
         <div class="skeleton h-9 w-2/3" />
@@ -121,7 +119,7 @@ function preview(html: string): string {
       <div v-else class="grid gap-5 md:grid-cols-[16rem_1fr]">
         <!-- Block list -->
         <aside class="card flex h-max flex-col gap-1 p-3">
-          <p v-if="!blocks.length" class="px-1.5 py-2 text-sm text-zinc-500">No blocks yet.</p>
+          <p v-if="!blocks.length" class="px-1.5 py-2 text-sm text-zinc-500">No snippets yet.</p>
           <div
             v-for="b in blocks"
             :key="b.id"
@@ -155,7 +153,7 @@ function preview(html: string): string {
               ✕
             </button>
           </div>
-          <button class="btn btn-ghost mt-2 justify-center" @click="addBlock">+ New block</button>
+          <button class="btn btn-ghost mt-2 justify-center" @click="addBlock">+ New snippet</button>
         </aside>
 
         <!-- Active block editor -->
@@ -163,7 +161,7 @@ function preview(html: string): string {
           <input
             v-model="activeBlock.name"
             class="input mb-4 font-serif text-lg font-semibold"
-            placeholder="Block name"
+            placeholder="Snippet name"
             @input="markDirty"
           />
           <Editor
@@ -175,7 +173,7 @@ function preview(html: string): string {
           />
         </section>
         <section v-else class="card grid place-items-center p-10 text-center text-sm text-zinc-500">
-          <p>Create a block to start building your snippet library.</p>
+          <p>Save a snippet to reuse a passage in your writing.</p>
         </section>
       </div>
     </main>

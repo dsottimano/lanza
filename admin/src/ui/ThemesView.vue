@@ -1,4 +1,5 @@
 <script setup lang="ts">
+import SettingsHeader from "./SettingsHeader.vue";
 // Settings → Themes. Upload a prebuilt Lanza theme (.tar.gz), preview what it
 // will change, then apply it — which commits every file in the bundle in ONE
 // commit (Git Data API) and triggers a single Cloudflare Pages rebuild. The
@@ -60,20 +61,13 @@ async function apply() {
 </script>
 
 <template>
-  <div class="min-h-screen">
-    <header class="toolbar flex items-center gap-4 px-5 py-2.5">
-      <button class="text-sm text-zinc-600 transition hover:text-zinc-900" @click="emit('back')">← Back</button>
-      <span class="text-sm font-semibold text-zinc-900">Themes</span>
-    </header>
+  <div class="settings-page">
+    <SettingsHeader title="Brand &amp; themes" @back="$emit('back')">
+      <template #description><p>Import a theme, revisit a previous look, or export your own.</p></template>
+      <template #navigation><slot name="navigation" /></template>
+    </SettingsHeader>
 
-    <main class="mx-auto max-w-2xl px-6 pt-8 pb-24">
-      <h1 class="mb-1 font-serif text-3xl font-bold tracking-tight text-zinc-900">Themes</h1>
-      <p class="mb-6 text-sm text-zinc-600">
-        Upload a prebuilt theme bundle (<code class="rounded bg-zinc-100 px-1 py-0.5 text-xs">.tar.gz</code>).
-        Applying it saves the theme to staging in one commit. Review the staging
-        build and all pending changes before publishing.
-      </p>
-
+    <main class="settings-body">
       <!-- Success -->
       <div
         v-if="appliedSha"

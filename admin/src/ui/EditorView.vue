@@ -67,7 +67,7 @@ const focusFormatting = ref(false);
 onMounted(() => window.addEventListener("resize", growTitle));
 onUnmounted(() => window.removeEventListener("resize", growTitle));
 const saveLabel = computed(() => {
-  if (loading.value) return "Loading…";
+  if (loading.value || templatesLoading.value) return "Loading…";
   if (loadFailed.value) return "Couldn't load entry";
   if (saving.value) return "Saving…";
   if (saveError.value) return "Not saved";
@@ -179,7 +179,8 @@ watch([() => data.title, titleInput], () => nextTick(growTitle), { flush: "post"
 
 // ── templates: one load feeds the picker, the show-body decision + the preview ──
 const templates = ref<TemplateInfo[]>([]);
-const templatesLoading = ref(false);
+const templatesLoading = ref(props.collection.fields.some((field) => field.name === "preset"));
+const editorLoading = computed(() => loading.value || templatesLoading.value);
 
 // Collections with a `preset` field get the Template surface (picker + slots +
 // preview). Posts don't — they're always the writing canvas.
@@ -260,7 +261,7 @@ const review = useEntryReview({
 function onRowSelect(path: string): void {
   review.select(path);
   previewRef.value?.scrollToField(path);
-  if (templated.value) void onPreviewSelect(path);
+
 }
 
 async function onPreviewSelect(path: string): Promise<void> {
@@ -276,6 +277,7 @@ async function onPreviewSelect(path: string): Promise<void> {
 // scrollToField declines to move for a field the template doesn't place, so tabbing
 // through SEO fields leaves the page where it is rather than jumping to the top.
 function onFocusField(path: string): void {
+  if (templated.value) review.select(path);
   previewRef.value?.scrollToField(path);
 }
 
@@ -284,13 +286,12 @@ function onRevert(path: string): void {
   if (review.revert(path)) previewRef.value?.scrollToField(path);
 }
 
-// One highlighted region at a time once a row is picked; before that, every pending
-// change is lit, so opening an entry an agent edited SHOWS the edits rather than
-// requiring a click to discover them.
+// Keep content editing quiet; the Changes panel reveals all pending edits.
+// A selected review row or field highlights only the region being inspected.
 watchEffect(() => {
   const preview = previewRef.value;
   if (!preview) return;
-  preview.highlight(review.selected.value ? [review.selected.value] : review.changed.value);
+  preview.highlight(review.selected.value ? [review.selected.value] : pagePanel.value === "changes" ? review.changed.value : []);
 });
 
 // Saving commits to staging → the "to publish" count changes; keep it honest.
@@ -323,7 +324,7 @@ onMounted(async () => {
 </script>
 
 <template>
-  <div class="writing-workspace flex min-h-screen flex-col" :class="{ 'writing-workspace--focus': focusMode && !templated }">
+  <div class="writing-workspace flex min-h-screen flex-col" :class="{ 'writing-workspace--focus': focusMode && !templated && !editorLoading, 'page-editing-workspace': templated || (editorLoading && hasTemplate) }">
     <header class="toolbar writing-header flex flex-wrap items-center justify-between gap-3 px-5 py-3">
       <button
         class="text-sm text-zinc-600 transition hover:text-zinc-900"
@@ -337,14 +338,14 @@ onMounted(async () => {
       </span>
 
       <div class="flex flex-wrap items-center gap-3">
-        <button v-if="!templated" type="button" class="btn btn-ghost" :aria-pressed="focusMode"
+        <button v-if="!editorLoading && !templated" type="button" class="btn btn-ghost" :aria-pressed="focusMode"
           @click="focusMode = !focusMode">{{ focusMode ? "Exit focus" : "Focus" }}</button>
-        <button v-if="!templated && !focusMode" type="button" class="btn btn-ghost"
+        <button v-if="!editorLoading && !templated && !focusMode" type="button" class="btn btn-ghost"
           :aria-expanded="preferences.options" aria-controls="writing-options"
           @click="preferences.options = !preferences.options">Details</button>
         <!-- Pending: saved-to-staging but not yet published. Click → the Publish pane. -->
         <button
-          v-if="access.role === 'owner' && pendingCount && !focusMode"
+          v-if="!editorLoading && !templated && access.role === 'owner' && pendingCount && !focusMode"
           class="flex items-center gap-1.5 rounded-full border border-amber-300 bg-amber-50 px-2.5 py-1 text-xs font-medium text-amber-800 transition hover:bg-amber-100"
           :title="`${pendingCount} change${pendingCount === 1 ? '' : 's'} saved to staging, not yet published`"
           @click="goPublish"
@@ -364,6 +365,7 @@ onMounted(async () => {
             <input
               type="checkbox"
               class="sr-only"
+              :disabled="editorLoading || loadFailed"
               :checked="data.draft === false"
               @change="data.draft = !($event.target as HTMLInputElement).checked; markDirty()"
             />
@@ -377,7 +379,7 @@ onMounted(async () => {
           </span>
         </label>
 
-        <button type="button" class="btn btn-primary" :disabled="loading || loadFailed || saving || !!recovery || !!editorProblem"
+        <button type="button" class="btn btn-primary" :disabled="editorLoading || loadFailed || saving || !!recovery || !!editorProblem"
           @click="saveNow">{{ saving ? "Saving…" : saveError ? "Retry save" : "Save" }}</button>
       </div>
     </header>
@@ -397,27 +399,25 @@ onMounted(async () => {
       The entry couldn't be loaded. Reload this page to try again. Saving is disabled to protect the stored content.
     </div>
 
-    <main v-if="templated && !loadFailed && !recovery" class="page-editor">
-      <div class="page-identity">
-        <IdentityField label="Page name" class="page-identity__name">
-          <template #default="{ inputId }">
-            <input :id="inputId" v-model="title" placeholder="Page name" class="identity-name-input" />
-          </template>
-        </IdentityField>
-        <div class="page-identity__url">
-          <SlugField :editable="!publicUrlEditing || !currentPath || isOwner()" v-model="slug" :prefix="urlPrefix" :suffix="urlSuffix" :placeholder="slugPlaceholder"
-            :label="urlLabel" @update:model-value="markDirty" />
-        </div>
-        <EntryLocaleBar show-urls :client="client" :collection="collection" :locale="locale" :slug="entryStem" :data="data" />
+    <main v-if="editorLoading && !loadFailed && !recovery" class="page-loading" :class="{ 'page-loading--template': hasTemplate }" aria-busy="true" aria-label="Loading editor">
+      <div class="page-loading__identity"><div class="skeleton h-10 w-64" /><div class="skeleton h-10 w-48" /></div>
+      <div class="page-loading__workspace">
+        <div class="page-loading__controls"><div class="skeleton h-8 w-full" /><div class="skeleton h-4 w-32" /><div class="skeleton h-24 w-full" /><div class="skeleton h-24 w-full" /></div>
+        <div class="page-loading__preview"><span>Loading {{ collection.labelSingular.toLowerCase() }}…</span></div>
       </div>
-      <p v-if="dirty && effectiveSlug !== savedSlug" class="writing-notice">Save to change this language’s URL. The old URL will redirect here with a 301 after Publish.</p>
+    </main>
+    <main v-else-if="templated && !loadFailed && !recovery" class="page-editor">
+      <div class="page-editor-heading">
+        <div><p class="page-editor-eyebrow">Page editor</p><h1>{{ title || 'Untitled page' }}</h1><p class="page-editor-address">{{ urlPrefix }}{{ effectiveSlug }}{{ urlSuffix }}</p></div>
+        <EntryLocaleBar :client="client" :collection="collection" :locale="locale" :slug="entryStem" :data="data" />
+      </div>
       <div class="page-workspace">
         <aside class="page-inspector" aria-label="Page editing controls">
           <div class="page-inspector__tabs" aria-label="Editing panels">
             <button type="button" :aria-pressed="pagePanel === 'content'" @click="pagePanel = 'content'">Content</button>
-            <button type="button" :aria-pressed="pagePanel === 'details'" @click="pagePanel = 'details'">Page details</button>
+            <button type="button" :aria-pressed="pagePanel === 'details'" @click="pagePanel = 'details'">Settings</button>
             <button type="button" :aria-pressed="pagePanel === 'changes'" @click="pagePanel = 'changes'">
-              Changes<span v-if="review.hasChanges.value" class="page-changes-dot" aria-label="Pending changes" />
+              Changes<span v-if="review.hasChanges.value" class="page-changes-count">{{ review.changed.value.length }}</span>
             </button>
           </div>
           <div class="page-inspector__body">
@@ -427,13 +427,26 @@ onMounted(async () => {
                 :templates="templates" :loading="templatesLoading" :changed="review.changed.value" @focus-field="onFocusField" />
             </div>
             <div v-show="pagePanel === 'details'">
+              <div class="page-identity">
+                <IdentityField label="Page name" class="page-identity__name">
+                  <template #default="{ inputId }">
+                    <input :id="inputId" v-model="title" placeholder="Page name" class="identity-name-input" />
+                  </template>
+                </IdentityField>
+                <div class="page-identity__url">
+                  <SlugField :editable="!publicUrlEditing || !currentPath || isOwner()" v-model="slug" :prefix="urlPrefix" :suffix="urlSuffix" :placeholder="slugPlaceholder"
+                    :label="urlLabel" @update:model-value="markDirty" />
+                </div>
+              </div>
+              <p v-if="dirty && effectiveSlug !== savedSlug" class="writing-notice">Save to change this language’s URL. The old URL will redirect here with a 301 after Publish.</p>
+
               <p class="page-edit-hint">Search appearance and page settings. These are separate from the words shown on the page.</p>
               <FieldForm :fields="seoFields" :data="data" :client="client" :locale="locale" />
               <FieldForm :fields="detailFields" :data="data" :client="client" :locale="locale" />
               <p class="page-template-note">Design: {{ selectedTemplate?.label ?? data.preset }}. Ask your agent to change the layout or structure.</p>
             </div>
             <div v-show="pagePanel === 'changes'">
-              <ChangeList v-if="review.hasChanges.value" :diff="review.diff.value!" :fields="collection.fields"
+              <ChangeList v-if="review.hasChanges.value" embedded :selected="review.selected.value" :diff="review.diff.value!" :fields="collection.fields"
                 @select="onRowSelect" @revert="onRevert" />
               <p v-else-if="review.loading.value" class="page-edit-hint">Checking page changes…</p>
               <p v-else-if="review.diff.value" class="page-edit-hint">No changes to review for this page.</p>
@@ -442,7 +455,7 @@ onMounted(async () => {
           </div>
         </aside>
         <PreviewPane ref="previewRef" class="page-preview" :client="client" :preset="(data.preset as string)"
-          :slots="slotsData" :body="bodyHtml" @select="onPreviewSelect" />
+          :locale="locale" :slots="slotsData" :body="bodyHtml" @select="onPreviewSelect" />
       </div>
     </main>
 

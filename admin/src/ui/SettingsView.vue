@@ -1,4 +1,5 @@
 <script setup lang="ts">
+import SettingsHeader from "./SettingsHeader.vue";
 // Editor for a single JSON settings file (seo.json / menu.json / redirects.json).
 // Same field renderer as everything else; persists via the JSON file helpers.
 import { computed, onUnmounted, reactive, ref, watch } from "vue";
@@ -62,25 +63,22 @@ async function save() {
 </script>
 
 <template>
-  <div class="min-h-screen">
-    <header class="toolbar flex items-center justify-between gap-4 px-5 py-2.5">
-      <button class="text-sm text-zinc-600 transition hover:text-zinc-900" @click="emit('back')">← Back</button>
-      <span class="flex-1 text-center text-sm"></span>
-      <SaveButton
-        :action="save"
-        :disabled="loading"
-        @saved="clearError"
-        @error="(e) => reportError(e, 'Save failed.')"
-      />
-    </header>
+  <div class="settings-page">
+    <SettingsHeader :title="file.label + (file.localized ? ` · ${localeLabel(locale)}` : '')" @back="$emit('back')">
+      <template #actions>
+        <SaveButton
+          :action="save"
+          :disabled="loading"
+          @saved="clearError"
+          @error="(e) => reportError(e, 'Save failed.')"
+        />
+      </template>
+      <template v-if="file.name === 'seo_defaults'" #description>
+        <p>Set how your site appears in search results and shared links.</p>
+      </template>
+    </SettingsHeader>
 
-    <main class="mx-auto max-w-3xl px-6 pt-8 pb-24">
-      <h1 class="mb-6 font-serif text-3xl font-bold tracking-tight text-zinc-900">
-        {{ file.label }}
-        <span v-if="file.localized" class="ml-2 align-middle text-base font-medium text-zinc-500">
-          · {{ localeLabel(locale) }}
-        </span>
-      </h1>
+    <main class="settings-body">
       <div v-if="loading" class="card space-y-4 p-6">
         <div class="skeleton h-4 w-28" />
         <div class="skeleton h-9 w-full" />
