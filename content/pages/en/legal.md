@@ -1,13 +1,16 @@
 ---
-title: "Terms & Privacy"
+title: Terms & Privacy
 draft: false
-template: "default"
-description: "The terms of service and privacy policy for Lanza."
+template: default
+description: The terms of service and privacy policy for Lanza.
 seo:
-  metaTitle: "Terms & Privacy"
-  metaDescription: "Terms of service and privacy policy for Lanza: what the service does, what it accesses on your GitHub and Cloudflare accounts, and how your data is handled."
+  metaTitle: Terms & Privacy
+  metaDescription: 'Terms of service and privacy policy for Lanza: what the service does, what it accesses on your GitHub and Cloudflare accounts, and how your data is handled.'
   noindex: false
+preset: manifesto
+slots: {}
 ---
+
 <p><em>Last updated: July 10, 2026</em></p>
 
 <p>This page covers both the <a href="#terms">Terms of Service</a> and the
