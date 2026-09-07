@@ -286,6 +286,9 @@ for compatibility and do not determine page layout.
 
 ## Publishing a reviewed draft
 
+See [Publishing and reconciliation](publishing.md) for the incident, recovery,
+repository-agent workflow, and the remaining MCP/deployment limits.
+
 The CMS captures the production and staging commit IDs before comparing changes.
 Publish rechecks both IDs and updates production to exactly the reviewed staging
 commit with `force:false`. This is a fast-forward, not a merge into an unreviewed

@@ -9,6 +9,14 @@ Companions: `authoring-templates.md` (how a template declares its slots),
 
 ---
 
+## Publishing the reviewed version
+
+See [Publishing and reconciliation](publishing.md). The CMS review captures both
+branch tips, and Publish targets that exact staging commit with a fast-forward-only
+production update. Changed tips require a new review; divergent branches require
+Update drafts first. This is separate from field preview/revert behavior below.
+MCP publishing has not yet adopted this contract.
+
 ## Why this exists
 
 Lanza is heading toward a dashboard where an **agent does the work** and the owner

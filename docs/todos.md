@@ -57,7 +57,27 @@ release old package versions, or treat old test counts as the current baseline.
   conversation, develop, review in CMS, publish a chosen derivative and verify the
   note stays private and survives website Discard.
 
-## Finish the current local product pass
+## Publishing reliability: September 7 repair
+
+See [Publishing and reconciliation](publishing.md) for the incident and workflow.
+
+- [x] Reconcile the homepage conflict while preserving the owner's latest English
+  headline and introduction in the new design. Restore the legal page's visible body.
+- [x] Push the reconciled code/content to main and staging together (`7239901`).
+- [x] Capture immutable branch tips for CMS review; reject stale reviews; publish
+  the reviewed SHA with a fast-forward-only update. Never force an overwrite.
+- [x] Require Update drafts and a fresh review when main/staging diverge; show
+  conflict recovery inline. Distinguish Review & publish from the final Publish site.
+- [x] Test duplicate clicks, stale tips, production races, conflicts and load errors.
+- [x] Add and enable the local pre-push guard against stranding pending CMS commits.
+- [ ] Give MCP publishing the same reviewed-commit and reconciliation safeguards;
+  `functions/_lib/lanza-content.ts` still uses its separate merge implementation.
+- [ ] Browser-check the deployed publishing flow, including concurrent editing.
+- [ ] Show deployment completion/failure after publishing, separately from Git success.
+- [ ] Evaluate server-side protection for writers outside this checkout. The local
+  hook is not a repository-wide enforcement policy.
+
+## Finish the current product pass
 
 - [x] Retire the separate Pages content-block field. No repository entries used it.
   Presets/slots and rich text are the authoring surfaces; legacy tenant rendering
@@ -65,8 +85,13 @@ release old package versions, or treat old test counts as the current baseline.
   independent rich-text reuse feature to Saved snippets.
 
 - [ ] Align homepage copy, SEO and CMS guides with conversation-first GitHub v1.
-  Current local homepage copy predates the final clarification and still describes
-  storage as undecided. Do not advertise the notebook as shipped.
+  Preserve the owner's latest English hero text (“Your website, your rules. Free,
+  forever.”). Review remaining sections and translations with the agreed direction;
+  do not replace approved copy or advertise the notebook as shipped.
+- [ ] Simplify designed-page settings: remove irrelevant block/image/excerpt controls
+  where the chosen template does not use them. Page blocks are already retired.
+- [ ] Make design changes deliberate and reversible: preview, Cancel and Apply;
+  restore the exact starting state on Cancel. Layout/template switching remains open.
 - [ ] Improve content-type deletion discoverability. It works under Advanced
   settings → Remove content type, but the user could not find it. No subsequent
   visibility improvement was implemented.
@@ -78,8 +103,11 @@ release old package versions, or treat old test counts as the current baseline.
 - [ ] Browser-check sidebar, content types and header/footer, including narrow
   widths, language switching with unsaved edits and owner/editor navigation. Tests
   and builds passed; no browser pass was performed for these September 7 changes.
-- [ ] Run the full baseline and packed-package tenant validation before release.
-  No commit, push, deployment or npm release was performed in this conversation.
+- [x] Full baseline after the publishing repair: 347 Node tests and 409 CMS tests
+  passed; CMS/public builds, type checks and site validation passed. Packed-tenant
+  and legacy-block rendering checks passed in the preceding schema/block pass.
+- [ ] Repeat packed-package validation for the final release artifact. No npm release
+  was performed. Git pushes have occurred; track Cloudflare deployment separately.
 
 ## Later
 
@@ -98,7 +126,7 @@ release old package versions, or treat old test counts as the current baseline.
 Historical details remain in [TODO history](todos-history.md). Recheck these areas
 against code rather than asserting that every old finding remains open:
 
-- Staging/main drift, conflicts and reliable preview claims.
+- Publishing paths outside the new CMS snapshot flow and reliable preview claims.
 - Entry/schema/template validation, detail/list scopes and generated routes.
 - Write atomicity, optimistic concurrency and transient-read retries.
 - Third-party agent tests, media transport and safe uploads.
@@ -121,8 +149,8 @@ npm run check:site
 node bin/lanza.mjs build
 ```
 
-Inspect checker output as well as exit status: the known template errors were
-printed despite a successful command exit in this session. For Functions/package
+Site validation currently reports zero errors and warnings; the earlier header
+scope errors are fixed, and validation runs during `lanza build`. For Functions/package
 changes also compile Pages Functions and build a real tenant from the packed
 package; monorepo success does not prove tenant imports work. Follow the Wrangler
 skill before invoking Wrangler. See [release-plan.md](release-plan.md); archive
