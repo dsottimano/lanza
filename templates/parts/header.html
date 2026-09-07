@@ -18,7 +18,10 @@
       </a>
       <span class="beta">beta</span>
     </div>
-    <nav class="site-nav">
+    <button class="nav-toggle" type="button" aria-expanded="false">
+      <span>{{ menuLabel }}</span><span class="nav-toggle__mark" aria-hidden="true">+</span>
+    </button>
+    <nav class="site-nav" aria-label="{{ primaryNavigationLabel }}">
       {{#each menuHeader}}<a href="{{ url }}">{{ label }}</a>{{/each}}
       {{#if showSwitcher}}
       <span class="nav-locale">{{#each locales}}{{#if sep}}<span>·</span>{{/if}}{{#if active}}<span class="is-active">{{ code }}</span>{{/if}}{{#if inactive}}<a href="{{ url }}">{{ code }}</a>{{/if}}{{/each}}</span>
