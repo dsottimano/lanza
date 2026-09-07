@@ -12,7 +12,7 @@
 // The vocabulary is from the WORKING branch's point of view, because that is the
 // side holding the unpublished work: `added` is a file staging has and production
 // doesn't, `removed` is one publishing would take down.
-import type { GitHubClient } from "./github";
+import type { GitHubClient, PublishReview } from "./github";
 import { REPO, MEDIA, type Locale } from "./config";
 import { TEMPLATES_ROOT } from "./templates";
 import { folderCollections, type FolderCollection } from "../schema";
@@ -142,8 +142,9 @@ export function classifyPath(
 export async function loadPendingChanges(
   client: GitHubClient,
   collections?: FolderCollection[],
+  reviewed?: PublishReview,
 ): Promise<PendingChange[]> {
-  const result = await client.compare(REPO.productionBranch, REPO.branch);
+  const result = reviewed?.diff ?? await client.compare(REPO.productionBranch, REPO.branch);
   const files = (result.files ?? []) as ComparedFile[];
   return files.map((f) => {
     const previous = f.previous_filename;

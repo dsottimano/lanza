@@ -3,9 +3,10 @@ import vue from "@vitejs/plugin-vue";
 import tailwindcss from "@tailwindcss/vite";
 // Shared proxy policy — same modules the prod Pages Functions use, so the
 // allowlists and CSRF checks can't drift between dev and prod.
-import { crossOriginBlocked, isAllowed, upstreamPath, upstreamTargetAllowed } from "../functions/_lib/gh-proxy";
+import { crossOriginBlocked, isAllowed } from "../functions/_lib/gh-proxy";
 import repo from "../lanza.config.json";
-import { githubIdentity } from "./dev/github-identity";
+import { identityFor } from "../functions/_lib/gh-identity";
+import { onRequest as githubProxy } from "../functions/admin/api/gh/[[path]]";
 import {
   isAllowed as cfIsAllowed,
   resolveProject as cfResolveProject,
@@ -84,54 +85,26 @@ function githubProxyDev(token: string | undefined): Plugin {
             return;
           }
 
-          if (method === "GET" && subPath.replace(/[?#].*$/, "").replace(/^\/+/, "") === "user") {
-            const identity = await githubIdentity(token, repo);
-            w.statusCode = identity.status;
-            w.setHeader("content-type", "application/json");
-            w.end(await identity.text());
+          const identity = await identityFor(token, repo.owner, repo.name);
+          if (identity.status !== "ok") {
+            reject(identity.status === "unavailable" ? 503 : 403, "GitHub could not authorize this repository access.");
             return;
           }
-
-          // Repo-relative subPath → repos/<owner>/<name>/… (same as prod, via the
-          // shared upstreamPath); /user passes through account-scoped.
-          const target = `https://api.github.com/${upstreamPath(subPath, repo.owner, repo.name)}`;
-
-          // I3's second half, which this file used to skip: isAllowed() inspects a
-          // STRING, but what gets fetched is a parsed URL, and only the parser decides
-          // what a segment means. Prod re-checks the resolved target; dev must too, or
-          // the two drift — and this file's whole purpose is that they don't. It also
-          // matters more here than it looks: dev attaches a raw GITHUB_TOKEN with no
-          // ownership check at all.
-          if (!upstreamTargetAllowed(target, repo.owner, repo.name)) {
-            res.statusCode = 403;
-            res.end(JSON.stringify({ message: "Blocked by proxy: request resolves outside this repository." }));
-            return;
-          }
-
           let body = "";
-          if (r.method !== "GET" && r.method !== "HEAD") {
-            for await (const chunk of req as AsyncIterable<unknown>)
-              body += String(chunk);
+          if (method !== "GET" && method !== "HEAD") {
+            for await (const chunk of req as AsyncIterable<unknown>) body += String(chunk);
           }
-
-          const upstream = await fetch(target, {
-            method: r.method,
-            headers: {
-              Authorization: `Bearer ${token}`,
-              Accept: r.headers["accept"] ?? "application/vnd.github+json",
-              "X-GitHub-Api-Version": "2022-11-28",
-              "User-Agent": "lanza-cms-dev",
-              ...(r.headers["content-type"]
-                ? { "Content-Type": r.headers["content-type"] }
-                : {}),
-            },
-            body: body || undefined,
+          const incomingHeaders = new Headers();
+          for (const [key, value] of Object.entries(r.headers)) if (value) incomingHeaders.set(key, value);
+          const url = new URL(`/admin/api/gh${subPath}`, `http://${r.headers.host ?? "localhost"}`);
+          const response = await githubProxy({
+            request: new Request(url, { method, headers: incomingHeaders, body: body || undefined }),
+            env: {}, params: { path: subPath.split("?")[0] },
+            data: { ...identity.identity, token },
           });
-
-          w.statusCode = upstream.status;
-          const ct = upstream.headers.get("content-type");
-          if (ct) w.setHeader("content-type", ct);
-          w.end(await upstream.text());
+          w.statusCode = response.status;
+          response.headers.forEach((value, name) => w.setHeader(name, value));
+          w.end(await response.text());
         } catch (e) {
           w.statusCode = 502;
           w.setHeader("content-type", "application/json");

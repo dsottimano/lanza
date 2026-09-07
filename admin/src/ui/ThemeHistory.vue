@@ -72,7 +72,7 @@ function cancel() {
 }
 
 async function confirmRevert() {
-  if (!plan.value) return;
+  if (!plan.value || reverting.value) return;
   reverting.value = true;
   clearError();
   try {

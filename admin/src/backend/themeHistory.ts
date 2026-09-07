@@ -3,7 +3,6 @@ import type {
   CommitFile,
   TreeEntry,
 } from "./github";
-import { REPO } from "./config";
 
 // Theme revert. Every theme apply is exactly ONE commit (see theme.ts):
 //   lanza: apply theme "<title>" v<version>
@@ -24,6 +23,7 @@ export interface AppliedTheme {
 }
 
 export interface RevertPlan {
+  head: string;
   applySha: string;
   title: string;
   // Restore these paths to the blob they had before the apply.
@@ -65,7 +65,7 @@ export function computeRevertSet(
   files: CommitFile[],
   parentBlobs: Map<string, string>,
   changedSince: Set<string>,
-): Omit<RevertPlan, "applySha" | "title"> {
+): Omit<RevertPlan, "head" | "applySha" | "title"> {
   const restore: { path: string; sha: string }[] = [];
   const remove: string[] = [];
 
@@ -101,6 +101,7 @@ export async function planRevert(
   client: GitHubClient,
   applySha: string,
 ): Promise<RevertPlan> {
+  const head = await client.workingHead();
   const commit = await client.getCommit(applySha);
   const parent = commit.parents[0];
   if (!parent) {
@@ -118,7 +119,7 @@ export async function planRevert(
   // Ancestor guard + conflict detection in one compare: base=apply, head=branch.
   // `status` is "ahead"/"identical" iff the apply is an ancestor of HEAD; its
   // `files` are exactly the paths changed by commits AFTER the apply.
-  const diff = await client.compare(applySha, REPO.branch);
+  const diff = await client.compare(applySha, head);
   if (diff.status !== "ahead" && diff.status !== "identical") {
     throw new Error(
       `Cannot revert: this apply isn't in the current history (compare status "${diff.status}"). ` +
@@ -139,7 +140,7 @@ export async function planRevert(
   }
 
   const set = computeRevertSet(files, parentBlobs, changedSince);
-  return { applySha, title, ...set };
+  return { head, applySha, title, ...set };
 }
 
 /** Execute a revert plan as ONE commit referencing existing blobs + deletions. */
@@ -156,5 +157,5 @@ export async function executeRevert(
     ),
   ];
   const message = `lanza: revert theme "${plan.title}"`;
-  return client.commitTreeChanges(entries, message);
+  return client.commitTreeChanges(entries, message, plan.head);
 }

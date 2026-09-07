@@ -140,12 +140,24 @@ If you add a credential source with a fallback, it needs this distinction on day
 
 ### I5 — An editor is a lesser role, not an untrusted one
 
-`roles.ts` grants `editor` writes only under `content/` and `public/images/uploads/`,
-only on the working branch, and never `POST /merges`. The branch pin is what makes
-"cannot publish" true — refusing the merge endpoint alone would not, because the
-contents and git-data APIs can each write a branch directly, and a git-data **tree entry
-path travels in the request body** where the URL allowlist never sees it. Both are
-checked with the same prefix rule.
+`roles.ts` grants `editor` writes only to Markdown under `content/` and raster images
+(PNG, JPEG, GIF, WebP, AVIF) under `public/images/uploads/`, only on the working
+branch, and never `POST /merges`. Contents writes and git-data tree entries share
+this path policy; executable files, symlinks and submodules cannot be introduced.
+
+Before updating a draft ref, `editor-ref.ts` checks the complete immutable tree
+against the current draft. Checking only the submitted entries would miss a reused
+tree or deletions caused by an omitted `base_tree`. Incomplete tree responses fail
+closed. The commit must have exactly one parent: the current draft head. Ref updates
+must be non-force, so an intervening sibling commit makes GitHub reject the write.
+Creating a missing draft branch may only copy the current production commit. The
+Vite development proxy invokes this same production handler with the token's real
+repository role. Missing roles default to read-only.
+
+CMS JSON/text saves retain the version originally loaded and surface conflicts
+without retrying stale data against a newer SHA. Theme install/revert uses a pinned
+review head. Discard checks both reviewed branch heads and creates a non-force
+recovery commit whose parents preserve both histories; it does not reset staging.
 
 This bounds a careless or compromised editor. It is not a sandbox for someone you would
 not otherwise let near the site: they can write your content, and content is what the

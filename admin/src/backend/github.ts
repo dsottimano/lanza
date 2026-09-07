@@ -249,18 +249,9 @@ export class GitHubClient {
     message: string,
     sha?: string,
   ): Promise<string> {
-    try {
-      return await this.putRawOnce(path, base64, message, sha);
-    } catch (e) {
-      // Stale-sha conflict: the file moved on since we read it (another editor,
-      // or an earlier save whose new sha we didn't keep). Re-fetch the current
-      // sha and retry once — last-write-wins, which is fine for this
-      // single-editor-mostly CMS. This is the ONE place writes recover from 409.
-      if (e instanceof GitHubError && e.status === 409) {
-        return this.putRawOnce(path, base64, message, await this.currentSha(path));
-      }
-      throw e;
-    }
+    // A changed SHA means another writer owns newer data. Never retry an old
+    // payload with their SHA: retain the local edit and surface the conflict.
+    return this.putRawOnce(path, base64, message, sha);
   }
 
   private async putRawOnce(
@@ -346,9 +337,12 @@ export class GitHubClient {
     files: { path: string; base64: string }[],
     message: string,
     onProgress?: (done: number, total: number) => void,
+    reviewedHead?: string,
   ): Promise<string> {
     if (files.length === 0) throw new Error("No files to commit.");
     const git = "/git";
+    const head = reviewedHead ?? await this.workingHead();
+    await this.requireWorkingHead(head);
 
     // Upload each file as a blob, collecting tree entries; then one commit.
     const tree: TreeEntry[] = [];
@@ -361,7 +355,7 @@ export class GitHubClient {
       tree.push({ path: f.path, mode: "100644", type: "blob", sha: blob.sha });
       onProgress?.(++done, files.length);
     }
-    return this.writeCommit(tree, message);
+    return this.writeCommit(tree, message, head);
   }
 
   /**
@@ -370,9 +364,9 @@ export class GitHubClient {
    * sha they had before the apply, and added files are removed with `sha: null`
    * (the Git Data API's deletion form). Every other file is left untouched.
    */
-  async commitTreeChanges(entries: TreeEntry[], message: string): Promise<string> {
+  async commitTreeChanges(entries: TreeEntry[], message: string, reviewedHead?: string): Promise<string> {
     if (entries.length === 0) throw new Error("No changes to commit.");
-    return this.writeCommit(entries, message);
+    return this.writeCommit(entries, message, reviewedHead);
   }
 
   // Build a new tree on top of the current branch head, commit it, and
@@ -384,6 +378,7 @@ export class GitHubClient {
     const ref = (await this.req(`${git}/ref/heads/${branch}`)) as {
       object: { sha: string };
     };
+    if (pinnedHead && ref.object.sha !== pinnedHead) throw new GitHubError(409, "Drafts changed since review. Review the changes again.");
     const headSha = pinnedHead ?? ref.object.sha;
     const headCommit = (await this.req(`${git}/commits/${headSha}`)) as {
       tree: { sha: string };
@@ -399,7 +394,7 @@ export class GitHubClient {
     })) as { sha: string };
     await this.req(`${git}/refs/heads/${branch}`, {
       method: "PATCH",
-      body: JSON.stringify({ sha: commit.sha }),
+      body: JSON.stringify({ sha: commit.sha, force: false }),
     });
     return commit.sha;
   }
@@ -491,35 +486,28 @@ export class GitHubClient {
     return { merged: true };
   }
 
-  /**
-   * Throw the whole draft away: point the working branch back at production.
-   *
-   * The opposite of publish(), and the only other operation that moves a branch
-   * wholesale. It exists because without it the sole way to undo a draft is
-   * `git push origin main:staging --force` from a terminal — so an owner could not
-   * discard an agent's entire session without a developer, which is the person this
-   * product exists to remove.
-   *
-   * `force: true` is REQUIRED and is the whole point: the working branch has commits
-   * production does not, so this is never a fast-forward. It is destructive and it is
-   * a deliberate exception to the rule in docs/review-surface.md that a revert writes
-   * to the editor and never to GitHub — that rule protects against an automatic undo
-   * being irreversible, and this is the opposite, a human explicitly choosing to
-   * discard. Callers MUST name what is being lost before calling.
-   *
-   * Doubles as the fix for a working branch that has fallen BEHIND production (this
-   * repo's staging was 51 commits behind on 2026-08-19, so its previews built new
-   * content against old code). Reset-to-live and catch-up-to-live are one operation.
-   */
-  async discardDraft(): Promise<{ sha: string }> {
-    const prod = (await this.req(`/git/ref/heads/${REPO.productionBranch}`)) as {
-      object: { sha: string };
-    };
+  /** Restore the reviewed production tree in a recoverable commit. History is
+   * retained; a concurrent staging move cannot be overwritten by the ref update. */
+  async discardDraft(review: PublishHeads): Promise<{ sha: string }> {
+    await this.requireReviewedHeads(review);
+    if (review.stagingSha === review.productionSha) return { sha: review.stagingSha };
+    const production = await this.req(`/git/commits/${review.productionSha}`) as { tree: { sha: string } };
+    const commit = await this.req("/git/commits", {
+      method: "POST", body: JSON.stringify({
+        message: "lanza: restore reviewed published version to drafts",
+        tree: production.tree.sha,
+        // Retain both histories even if production advanced separately.
+        parents: [review.stagingSha, review.productionSha],
+      }),
+    }) as { sha: string };
     await this.req(`/git/refs/heads/${REPO.branch}`, {
-      method: "PATCH",
-      body: JSON.stringify({ sha: prod.object.sha, force: true }),
+      method: "PATCH", body: JSON.stringify({ sha: commit.sha, force: false }),
     });
-    return { sha: prod.object.sha };
+    return { sha: commit.sha };
+  }
+
+  async requireWorkingHead(head: string): Promise<void> {
+    if (await this.workingHead() !== head) throw new GitHubError(409, "Drafts changed since review. Review the changes again.");
   }
 
   // ── Read-only history/diff endpoints (used by theme revert) ──────────────

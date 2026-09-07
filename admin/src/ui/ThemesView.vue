@@ -16,6 +16,7 @@ const emit = defineEmits<{ (e: "back"): void }>();
 
 const fileName = ref("");
 const theme = shallowRef<ParsedTheme | null>(null);
+const reviewedHead = ref<string | null>(null);
 const showFiles = ref(false);
 const applying = ref(false);
 const progress = ref({ done: 0, total: 0 });
@@ -23,6 +24,7 @@ const appliedSha = ref<string | null>(null);
 
 function reset() {
   theme.value = null;
+  reviewedHead.value = null;
   fileName.value = "";
   showFiles.value = false;
   appliedSha.value = null;
@@ -36,7 +38,9 @@ async function onPick(e: Event) {
   fileName.value = file.name;
   clearError();
   try {
-    theme.value = await parseTheme(file);
+    const parsed = await parseTheme(file);
+    reviewedHead.value = await props.client.workingHead();
+    theme.value = parsed;
   } catch (err) {
     fileName.value = "";
     reportError(err, "Couldn't read that theme bundle.");
@@ -45,13 +49,13 @@ async function onPick(e: Event) {
 }
 
 async function apply() {
-  if (!theme.value) return;
+  if (!theme.value || !reviewedHead.value || applying.value) return;
   applying.value = true;
   clearError();
   try {
     appliedSha.value = await applyTheme(props.client, theme.value, (done, total) => {
       progress.value = { done, total };
-    });
+    }, reviewedHead.value);
   } catch (err) {
     reportError(err, "Applying the theme failed — no changes were committed.");
   } finally {

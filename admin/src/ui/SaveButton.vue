@@ -17,7 +17,7 @@ const state = ref<State>("idle");
 let revertTimer: ReturnType<typeof setTimeout> | undefined;
 
 async function run() {
-  if (state.value === "saving") return;
+  if (props.disabled || state.value === "saving") return;
   clearTimeout(revertTimer);
   state.value = "saving";
   try {

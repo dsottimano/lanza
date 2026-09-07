@@ -43,7 +43,7 @@ beforeEach(() => {
 
 /** A client whose compare() returns the given diff-entries — the only call made. */
 function clientWith(files?: { filename: string; status: string; previous_filename?: string }[]) {
-  return { compare: async () => ({ status: "ahead", files }) } as unknown as GitHubClient;
+  return { publishReview: async () => ({ productionSha: "prod", stagingSha: "draft", diff: { status: "ahead", files } }) } as unknown as GitHubClient;
 }
 
 async function mountView(files?: Parameters<typeof clientWith>[0]) {
@@ -231,12 +231,13 @@ describe("PendingView — discarding the whole draft", () => {
   function discardClient(files: { filename: string; status: string }[]) {
     const calls = { compare: 0, discard: 0 };
     const client = {
-      compare: async () => {
+      publishReview: async () => {
         calls.compare++;
         // After the discard the branch matches production: nothing pending.
-        return { status: "ahead", files: calls.discard ? [] : files };
+        return { productionSha: "prod", stagingSha: "draft", diff: { status: "ahead", files: calls.discard ? [] : files } };
       },
-      discardDraft: async () => {
+      discardDraft: async (review: {productionSha: string; stagingSha: string}) => {
+        expect(review).toMatchObject({productionSha: "prod", stagingSha: "draft"});
         calls.discard++;
         return { sha: "abc123" };
       },
@@ -270,8 +271,8 @@ describe("PendingView — discarding the whole draft", () => {
     await flushPromises();
     expect(prompt).toContain("about"); // the row itself, by name
     expect(prompt).toContain("edited"); // and what happened to it
-    expect(prompt).toContain("cannot be undone");
-    // Declining leaves the draft alone — this is the irreversible one.
+    expect(prompt).toContain("remain in Git history");
+    // Declining leaves the draft alone.
     expect(calls.discard).toBe(0);
   });
 
@@ -283,5 +284,13 @@ describe("PendingView — discarding the whole draft", () => {
     expect(calls.discard).toBe(1);
     expect(calls.compare).toBe(2); // mounted, then again after the write
     expect(w.text()).toContain("Nothing waiting");
+  });
+
+  it("lets the owner refresh the review before retrying a stale operation", async () => {
+    const { w, calls } = await mountDiscardable(ONE);
+    await w.findAll("button").find(b => b.text() === "Refresh review")!.trigger("click");
+    await flushPromises();
+    expect(calls.compare).toBe(2);
+    expect(calls.discard).toBe(0);
   });
 });

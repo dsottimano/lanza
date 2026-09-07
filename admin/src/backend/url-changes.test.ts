@@ -85,7 +85,8 @@ describe("GitHub atomic writes", () => {
       calls.push({ url, body, method: init.method ?? "GET" });
       let result: unknown = { sha: "new" };
       if (url.includes("/contents/")) result = { sha: "base" };
-      if (url.includes("/git/ref/")) result = { object: { sha: "concurrent-head" } };
+      // The branch moves after the preflight; GitHub rejects the final update.
+      if (url.includes("/git/ref/")) result = { object: { sha: "head" } };
       if (url.includes("/git/commits/head")) result = { tree: { sha: "tree-base" } };
       return new Response(JSON.stringify(result), { status: init.method === "PATCH" ? 422 : 200 });
     }));

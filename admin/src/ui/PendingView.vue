@@ -14,7 +14,7 @@
 //     is labelled as itself (the classifier's tagged union makes mislabelling a
 //     compile error rather than a review catch).
 import { computed, onMounted, ref } from "vue";
-import { GitHubClient } from "../backend/github";
+import { GitHubClient, type PublishReview } from "../backend/github";
 import {
   loadPendingChanges,
   movedPublicUrl,
@@ -30,6 +30,7 @@ import { reportError } from "../errors";
 const props = defineProps<{ client: GitHubClient }>();
 const emit = defineEmits<{ (e: "back"): void }>();
 
+const review = ref<PublishReview | null>(null);
 const changes = ref<PendingChange[]>([]);
 const loading = ref(true);
 const failed = ref(false);
@@ -37,8 +38,11 @@ const failed = ref(false);
 async function load() {
   loading.value = true;
   failed.value = false;
+  review.value = null;
   try {
-    changes.value = await loadPendingChanges(props.client);
+    const snapshot = await props.client.publishReview();
+    changes.value = await loadPendingChanges(props.client, undefined, snapshot);
+    review.value = snapshot;
   } catch (e) {
     failed.value = true;
     reportError(e, "Couldn't load what's waiting to publish.");
@@ -169,9 +173,8 @@ const redirectsPanel = computed(() => {
 // read its doc comment before changing anything here.
 const discarding = ref(false);
 
-/** The confirm NAMES what will be lost. `window.confirm` is the house pattern for
- *  an irreversible act (ContentTypesView, SiteHealthView), but "are you sure?" is
- *  not — the rows are already on screen, so the dialog lists them back. Capped
+/** The confirm names what will be removed from the current draft. The rows are
+ *  already on screen, so the dialog lists them back. Capped
  *  because a browser confirm doesn't scroll. */
 function discardSummary(): string {
   const rows = changes.value.map((c) => `  • ${rowLabel(c)} — ${STATUS_WORD[c.status]}`);
@@ -182,16 +185,16 @@ function discardSummary(): string {
     `Throw away ${n} unpublished change${n === 1 ? "" : "s"}?\n\n` +
     shown.join("\n") +
     (more > 0 ? `\n  …and ${more} more` : "") +
-    `\n\nYour drafts go back to exactly what is published live. This cannot be undone.`
+    `\n\nThe reviewed published version will be restored in a new commit. Earlier drafts remain in Git history.`
   );
 }
 
 async function discardAll(): Promise<void> {
-  if (!changes.value.length || discarding.value) return;
+  if (!changes.value.length || discarding.value || loading.value || failed.value || !review.value) return;
   if (!window.confirm(discardSummary())) return;
   discarding.value = true;
   try {
-    await props.client.discardDraft();
+    await props.client.discardDraft(review.value);
     // Reload rather than clearing the list locally: the screen then lands on its
     // own "Nothing waiting" state, from the server, so what it shows is true.
     await load();
@@ -212,11 +215,12 @@ async function discardAll(): Promise<void> {
       <!-- The two ends of one decision: ship the whole draft or throw the whole
            draft away. The only publish control on this screen says what it does —
            there is no per-row publish, so offering one would be a lie. -->
-      <div v-if="changes.length" class="flex items-center gap-2">
-        <button class="btn btn-ghost" :disabled="discarding" @click="discardAll">
+      <div class="flex items-center gap-2">
+        <button class="btn btn-ghost" :disabled="discarding || loading" @click="load">Refresh review</button>
+        <button v-if="changes.length" class="btn btn-ghost" :disabled="discarding || loading || failed || !review" @click="discardAll">
           {{ discarding ? "Discarding…" : "Discard everything" }}
         </button>
-        <router-link class="btn btn-primary" to="/publish"> Publish everything </router-link>
+        <router-link v-if="changes.length" class="btn btn-primary" to="/publish"> Publish everything </router-link>
       </div>
     </header>
 

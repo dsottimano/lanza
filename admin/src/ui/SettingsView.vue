@@ -50,8 +50,7 @@ async function load() {
 watch(path, load, { immediate: true });
 
 async function save() {
-  // A stale `sha` (e.g. an edit landed elsewhere) is recovered inside the client:
-  // it re-fetches the current sha and retries once on a 409.
+  // A stale SHA is surfaced; local form values stay dirty for recovery.
   sha = await props.client.saveJson(
     path.value,
     { ...data },

@@ -252,8 +252,9 @@ export async function applyTheme(
   client: GitHubClient,
   theme: ParsedTheme,
   onProgress?: (done: number, total: number) => void,
+  reviewedHead?: string,
 ): Promise<string> {
   const { title, version } = theme.manifest;
   const message = `lanza: apply theme "${title}"${version ? ` v${version}` : ""}`;
-  return client.commitFiles(theme.files, message, onProgress);
+  return client.commitFiles(theme.files, message, onProgress, reviewedHead);
 }

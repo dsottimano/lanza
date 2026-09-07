@@ -72,7 +72,7 @@ function applySite(data: Record<string, unknown>, sha: string | null): void {
  * falls back to the authoritative production copy so a lag never masquerades as
  * a first run and re-triggers onboarding. A 404 on BOTH is a genuine first run.
  * (sha is null when read from production: the next write re-reads on the working
- * branch, and the client's 409 retry covers a stale sha regardless.)
+ * branch, and a concurrent write surfaces a conflict.)
  */
 export async function loadSiteConfig(client: GitHubClient): Promise<void> {
   try {
@@ -110,8 +110,8 @@ export const LANG_CATALOG: LocaleDef[] = [
 
 // Merge-write a JSON file through the proxy: read the current file, hand its data
 // (or {} if absent) to `build` so callers can preserve unknown keys (e.g.
-// `onboarded`), then save. The stale-sha 409 retry lives in the client's write
-// path, so this stays a thin read-merge helper. Used by the onboarding wizard and
+// `onboarded`), then save. A concurrent write fails instead of resending this
+// merged snapshot over newer data. Used by the onboarding wizard and
 // the Languages settings.
 export async function putJsonSafe(
   client: GitHubClient,

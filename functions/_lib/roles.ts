@@ -69,17 +69,12 @@ export function roleMayWrite(role: Role): boolean {
 //
 // Trailing slashes are load-bearing: "content/" must not admit "contentious.md",
 // and a bare "content" is a file path, not the directory.
-const EDITOR_WRITE_PREFIXES = ["content/", "public/images/uploads/"];
-
-// A dot segment defeats a prefix test outright: `content/../data/site.json` starts
-// with "content/" and lands in settings. The proxy's own allowlist rejects these in
-// the URL path, but a git-data TREE ENTRY path travels in the request BODY and is
-// never seen by that check — so it has to be rejected here too, for both.
-const DOT_SEGMENT = /(^|\/)\.\.?(\/|$)/;
-
-function underEditorPrefix(path: string): boolean {
-  if (DOT_SEGMENT.test(path)) return false;
-  return EDITOR_WRITE_PREFIXES.some((prefix) => path.startsWith(prefix));
+// Applied to both explicit writes and the COMPLETE tree diff before a ref moves.
+export function editorWritablePath(path: string): boolean {
+  if (/[\\%\x00-\x1f\x7f]/.test(path) ||
+      path.split("/").some((part) => !part || part === "." || part === ".." || part.toLowerCase() === ".git")) return false;
+  return (path.startsWith("content/") && path.endsWith(".md")) ||
+    (path.startsWith("public/images/uploads/") && /\.(png|jpe?g|gif|webp|avif)$/i.test(path));
 }
 
 /**
@@ -158,7 +153,7 @@ export function editorMayCall(
   if ((m === "PUT" || m === "DELETE") && p.startsWith("contents/")) {
     const filePath = decodePath(p.slice("contents/".length));
     if (filePath === null) return deny("Malformed path.");
-    if (!underEditorPrefix(filePath)) {
+    if (!editorWritablePath(filePath)) {
       return deny(`Only an owner can change ${filePath}.`);
     }
     // GitHub defaults an absent `branch` to the repository's DEFAULT branch, which
@@ -182,10 +177,13 @@ export function editorMayCall(
     const entries = record?.tree;
     if (!Array.isArray(entries)) return deny("Malformed tree.");
     for (const entry of entries) {
+      if (!entry || typeof entry !== "object" || entry.mode !== "100644" || entry.type !== "blob") {
+        return deny("Editors may only write regular content and image files.");
+      }
       const entryPath = (entry as Record<string, unknown> | null)?.path;
       if (typeof entryPath !== "string") return deny("Malformed tree.");
       const decoded = decodePath(entryPath);
-      if (decoded === null || !underEditorPrefix(decoded)) {
+      if (decoded === null || !editorWritablePath(decoded)) {
         return deny(`Only an owner can change ${entryPath}.`);
       }
     }
@@ -201,7 +199,11 @@ export function editorMayCall(
     }
     return ALLOW;
   }
-  if (m === "PATCH" && p === `git/refs/heads/${policy.workingBranch}`) return ALLOW;
+  if (m === "PATCH" && p === `git/refs/heads/${policy.workingBranch}`) {
+    if (record?.force !== undefined && record.force !== false) return deny("An editor cannot force-update drafts.");
+    // The proxy MUST also validate the candidate commit and full tree before forwarding.
+    return ALLOW;
+  }
   if (m === "PATCH" && p.startsWith("git/refs/")) {
     return deny("An editor can only write to the working branch.");
   }

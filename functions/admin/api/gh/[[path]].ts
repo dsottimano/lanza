@@ -23,6 +23,7 @@ import {
   BRANCH,
   WORKING_BRANCH,
 } from "../../../_lib/gh-proxy";
+import { editorRefAllowed } from "../../../_lib/editor-ref";
 import { editorMayCall, roleMayWrite, type Role } from "../../../_lib/roles";
 // Per-tenant repo identity — the broker writes this at repo creation; the proxy is
 // the single place that turns repo-relative CMS paths into repos/<owner>/<name>/…
@@ -39,16 +40,16 @@ export const onRequest = async (context: {
   env: Env;
   params: { path?: string | string[] };
   // Set by functions/admin/_middleware.ts, which is the only thing that can reach
-  // this route. Absent role = treat as an editor (the lesser of the two), never as
+  // this route. Absent role = read-only, never as
   // an owner — a missing claim must not be the permissive case.
   data?: { role?: Role; login?: string; token?: string | null };
 }): Promise<Response> => {
   const { request, params } = context;
   const url = new URL(request.url);
-  // Absent role = treat as an editor (the middle role), never as an owner — a
+  // Absent role = read-only, never as an owner — a
   // missing claim must not be the permissive case.
   const claimed = context.data?.role;
-  const role: Role = claimed === "owner" || claimed === "viewer" ? claimed : "editor";
+  const role: Role = claimed === "owner" || claimed === "editor" ? claimed : "viewer";
 
   // `[[path]]` catch-all → array of path segments after /admin/api/gh/.
   const seg = params.path;
@@ -98,8 +99,8 @@ export const onRequest = async (context: {
     return json(403, { message: "A viewer has read-only access to this site." });
   }
 
+  let parsed: unknown = null;
   if (role === "editor") {
-    let parsed: unknown = null;
     if (bodyBytes && bodyBytes.byteLength) {
       try {
         parsed = JSON.parse(new TextDecoder().decode(bodyBytes));
@@ -141,6 +142,23 @@ export const onRequest = async (context: {
   headers.set("Authorization", `Bearer ${token}`);
   if (!headers.has("Accept")) headers.set("Accept", "application/vnd.github+json");
   headers.set("User-Agent", "lanza-cms");
+
+  if (role === "editor") {
+    try {
+      const decision = await editorRefAllowed(request.method, subPath, parsed, {
+        workingBranch: WORKING_BRANCH, productionBranch: BRANCH,
+      }, async (path) => {
+        const readTarget = `${GITHUB_API}/${upstreamPath(path, repo.owner, repo.name)}`;
+        if (!upstreamTargetAllowed(readTarget, repo.owner, repo.name)) throw new Error("Invalid validation target.");
+        const response = await fetch(readTarget, { headers, cache: "no-store" });
+        if (!response.ok) throw new Error("GitHub could not verify the proposed draft.");
+        return response.json();
+      });
+      if (!decision.ok) return json(403, { message: decision.reason });
+    } catch {
+      return json(503, { message: "Could not verify this draft update. Nothing was changed; reload and try again." });
+    }
+  }
 
   const upstream = await fetch(target, {
     method: request.method,

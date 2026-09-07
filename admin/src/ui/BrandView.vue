@@ -30,6 +30,7 @@ const props = defineProps<{ client: GitHubClient }>();
 defineEmits<{ (e: "back"): void }>();
 
 const loading = ref(true);
+const loadFailed = ref(false);
 const savedOnce = ref(false);
 const brand = reactive<BrandConfig>(defaultBrand());
 let baseline = "";
@@ -37,17 +38,21 @@ let baseline = "";
 const snapshot = () => JSON.stringify(brand);
 const HEX = /^#(?:[0-9a-fA-F]{3}|[0-9a-fA-F]{6})$/;
 
-onMounted(async () => {
+async function load() {
+  loading.value = true;
+  loadFailed.value = false;
   try {
     const a = await loadAppearance(props.client);
     Object.assign(brand, a.brand);
     baseline = snapshot();
   } catch (e) {
+    loadFailed.value = true;
     reportError(e, "Couldn't load the current appearance.");
   } finally {
     loading.value = false;
   }
-});
+}
+onMounted(load);
 
 // Dirty tracking drives App.vue's leave-guard + the tab-close warning.
 watch(
@@ -82,6 +87,7 @@ function resetToDefaults() {
 }
 
 async function save() {
+  if (loading.value || loadFailed.value) throw new Error("Load the current appearance before saving.");
   await saveBrand(props.client, JSON.parse(JSON.stringify(brand)) as BrandConfig);
   baseline = snapshot();
   isDirty.value = false;
@@ -132,11 +138,15 @@ const fontOptions = FONT_IDS.map((id) => ({ id, label: FONT_CATALOG[id].label })
 
 <template>
   <div class="settings-page">
+    <div v-if="loadFailed" role="alert" class="m-6 border-l-2 border-amber-600 p-4">
+      <p>Couldn’t load your appearance. Saving is paused to protect your existing design.</p>
+      <button class="btn btn-ghost mt-2" :disabled="loading" @click="load">Retry loading</button>
+    </div>
     <SettingsHeader title="Brand &amp; themes" @back="$emit('back')">
       <template #actions>
         <SaveButton
           :action="save"
-          :disabled="loading"
+          :disabled="loading || loadFailed"
           @saved="clearError"
           @error="(e) => reportError(e, 'Saving your brand failed — nothing was committed.')"
         />
