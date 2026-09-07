@@ -6,7 +6,7 @@ preset: manifesto
 slots:
   tag: BETA · OWN YOUR PRESENCE · NOT RENTED
   headline: Your website, your rules. Free, forever.
-  sub: 'It''s free, fast, and ready for your agent.  Own your own content and little corner on the web.  '
+  sub: 'Y'
   cta1: Start your site
   cta1Url: https://connect.lanzacms.com/
   cta2: How it works
