@@ -38,12 +38,15 @@ jobs:
           registry-url: https://registry.npmjs.org
 
       - run: npm ci
+      - run: npm --prefix admin ci
+      # The root TypeScript project also includes bot/src.
+      - run: npm --prefix bot ci
 
       # The whole suite, in both halves. A release that ships a failing security
       # test is the thing this pipeline exists to prevent.
       - run: npm test
-      - run: npm --prefix admin ci && npm --prefix admin test
-      - run: npx tsc --noEmit
+      # Astro check generates the types missing from a clean checkout.
+      - run: npm run check
 
       # The tag must match the version being published, or `npm dist-tag` work and
       # the template pin drift from reality.
