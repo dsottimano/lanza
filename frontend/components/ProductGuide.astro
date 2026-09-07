@@ -1,0 +1,32 @@
+---
+import { DEFAULT_LOCALE, localeUrl, type Locale } from "../lib/i18n";
+import { productGuides } from "../lib/product-guides";
+interface Props { kind: "how-it-works" | "start" | "agents"; locale?: Locale; }
+const { kind, locale = DEFAULT_LOCALE } = Astro.props;
+const t = productGuides[locale === "es" ? "es" : "en"][kind];
+---
+<main class="product-guide">
+  <header class="pg-hero">
+    <a class="pg-back" href={localeUrl(locale, "")}>← Lanza</a>
+    <p class="pg-eyebrow">{t.eyebrow}</p>
+    <h1>{t.title}</h1>
+    <p class="pg-intro">{t.intro}</p>
+  </header>
+  <div class="pg-layout">
+    <nav class="pg-index" aria-label={locale === "es" ? "En esta página" : "On this page"}>
+      <span class="pg-eyebrow">{locale === "es" ? "EN ESTA GUÍA" : "IN THIS GUIDE"}</span>
+      {t.sections.map((section, i) => <a href={`#step-${i + 1}`}><span>{String(i + 1).padStart(2, "0")}</span>{section.title}</a>)}
+    </nav>
+    <div class="pg-content">
+      {t.sections.map((section, i) => <section id={`step-${i + 1}`} class="pg-section">
+        <span class="pg-eyebrow">{String(i + 1).padStart(2, "0")}</span>
+        <h2>{section.title}</h2>
+        {section.paragraphs.map(paragraph => <p>{paragraph}</p>)}
+        {section.items && <ul>{section.items.map(item => <li>{item}</li>)}</ul>}
+        {section.code && <pre><code>{section.code}</code></pre>}
+        {section.link && <a class="pg-link" href={section.link.href.startsWith("/") && !section.link.href.includes(".json") ? localeUrl(locale, section.link.href.slice(1)) : section.link.href}>{section.link.label} ↗</a>}
+      </section>)}
+      <aside class="pg-next"><h2>{t.nextTitle}</h2><p>{t.nextBody}</p><a class="pg-cta" href={kind === "start" ? "https://connect.lanzacms.com/" : localeUrl(locale, "start/")}>{t.nextLabel} ↗</a></aside>
+    </div>
+  </div>
+</main>

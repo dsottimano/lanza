@@ -7,6 +7,7 @@
 // form (theme select + logo) is gone — its `theme` was unread and `logo` unrendered.
 import { ref } from "vue";
 import BrandView from "./BrandView.vue";
+import StartersView from "./StartersView.vue";
 import ThemesView from "./ThemesView.vue";
 import { GitHubClient } from "../backend/github";
 import { confirmDiscard } from "./dirty";
@@ -15,6 +16,7 @@ defineProps<{ client: GitHubClient }>();
 const emit = defineEmits<{ (e: "back"): void }>();
 
 const TABS = [
+  { key: "starters", label: "Site starters" },
   { key: "brand", label: "Brand" },
   { key: "themes", label: "Themes" },
 ] as const;
@@ -31,6 +33,7 @@ function select(key: TabKey) {
 
 <template>
   <div class="min-h-screen">
+    <button class="px-5 pt-4 text-sm" @click="emit('back')">← Back to content</button>
     <!-- Tab strip: pick which slice of look-and-feel to edit. -->
     <div class="flex justify-center px-5 pt-3">
       <div class="segment">
@@ -47,6 +50,7 @@ function select(key: TabKey) {
     </div>
 
     <BrandView v-if="tab === 'brand'" :client="client" @back="emit('back')" />
+    <StartersView v-else-if="tab === 'starters'" :client="client" />
     <ThemesView v-else :client="client" @back="emit('back')" />
   </div>
 </template>

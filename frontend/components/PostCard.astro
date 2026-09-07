@@ -2,13 +2,14 @@
 // Journal teaser card. Posts aren't translated — both locales link to the ES
 // post detail at /posts/<stem>/ (see project rules; EN is UI-only). Posts are a
 // localized collection, so `id` is "<locale>/<stem>"; the route serves the stem.
+import { contentUrl } from "../lib/public-urls";
 import { splitId } from "../lib/i18n";
 interface Props {
   post: { id: string; data: Record<string, any> };
 }
 const { post } = Astro.props;
 const d = post.data;
-const href = `/posts/${splitId(post.id).slug}/`;
+const href = contentUrl("posts", post.id, "posts");
 ---
 
 <a class="post-card" href={href}>

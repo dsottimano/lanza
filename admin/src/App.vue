@@ -57,6 +57,7 @@ import { refreshVersionState } from "./backend/version";
 import { access, loadAccess } from "./backend/access";
 import { reportError } from "./errors";
 import { confirmDiscard } from "./ui/dirty";
+import { focusMode } from "./ui/writing-preferences";
 import {
   getCollection,
   folderCollections,
@@ -65,7 +66,7 @@ import {
   type FolderCollection,
   type FileEntry,
 } from "./schema";
-import { listRoute } from "./router";
+import { entryRoute, listRoute } from "./router";
 
 type Pane =
   | "list"
@@ -193,6 +194,17 @@ const editingPath = computed<string | null>(() => {
   return slug === "new" ? null : `${entryFolder(collection.value, locale.value)}/${slug}.md`;
 });
 
+// A first save or explicit rename changes the address, not the editor session.
+// Keep its Vue key while replacing the route so focus and undo history survive.
+const savedEntry = ref<{ path: string; key: string } | null>(null);
+const richEditorKey = computed(() => savedEntry.value?.path === editingPath.value
+  ? savedEntry.value.key : `${collection.value.name}:${editingPath.value ?? 'new'}#${locale.value}`);
+function onEntrySaved(path: string) {
+  savedEntry.value = { path, key: richEditorKey.value };
+  const slug = path.split("/").pop()!.replace(/\.md$/, "");
+  router.replace(entryRoute(collection.value.name, locale.value, slug));
+}
+
 // ── navigation (push the URL; the beforeEach guard handles unsaved changes) ──
 function selectCollection(name: string) {
   router.push(listRoute(name, locale.value));
@@ -241,8 +253,9 @@ function onOnboarded() {
   <OnboardingWizard v-else-if="!site.onboarded" :client="client" @done="onOnboarded" />
 
   <!-- The collection rail is permanent; only the main column swaps. -->
-  <div v-else class="flex min-h-screen">
+  <div v-else class="flex min-h-screen" :class="{ 'editing-shell': pane === 'editRich', 'theme-shell': pane === 'brandThemes' }">
     <Sidebar
+      v-show="!(pane === 'editRich' && focusMode)"
       :active-collection="collection.name"
       :active-settings="
         pane === 'settings' || pane === 'redirects'
@@ -284,12 +297,13 @@ function onOnboarded() {
       <Transition name="pane" mode="out-in">
       <EditorView
         v-if="pane === 'editRich'"
-        :key="`${editingPath ?? 'new'}#${locale}`"
+        :key="richEditorKey"
         :client="client"
         :collection="collection"
         :locale="locale"
         :path="editingPath"
         @back="backToList"
+        @saved-path="onEntrySaved"
       />
       <RecordEditor
         v-else-if="pane === 'editRecord'"

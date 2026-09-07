@@ -2,6 +2,7 @@
 // Shared list page — the homepage and every archive (category / tag / author)
 // render through this. Post links carry the locale prefix via localeUrl, so one
 // component serves EN at the root and ES/FR under their prefix.
+import { contentUrl } from "../lib/public-urls";
 import type { CollectionEntry } from "astro:content";
 import { splitId, localeUrl, type Locale } from "../lib/i18n";
 
@@ -64,7 +65,7 @@ const {
       <ul>
         {posts.map((p) => (
           <li>
-            <a href={localeUrl(locale, `posts/${splitId(p.id).slug}/`)}>
+            <a href={contentUrl("posts", p.id, "posts")}>
               {p.data.title}
             </a>
             {showDrafts && p.data.draft && <em> (draft)</em>}

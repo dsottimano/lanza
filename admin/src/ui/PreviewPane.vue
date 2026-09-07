@@ -224,7 +224,7 @@ function renderBody(): string {
 
 // The marker stylesheet: the affordance, plus whatever is currently highlighted.
 function markerCss(): string {
-  return `[data-lanza-field]{cursor:pointer}${highlightCss(highlighted.value)}`;
+  return `*,*::before,*::after{animation:none!important;transition:none!important}[data-lanza-field]{cursor:pointer}[data-lanza-field]:hover{outline:1px dashed currentColor;outline-offset:3px}${highlightCss(highlighted.value)}`;
 }
 
 // Full document: site tokens first, then the rendered template (its own <style>
@@ -373,7 +373,8 @@ watch(() => props.body, scheduleBodyUpdate);
   <div class="preview flex min-h-[24rem] flex-col overflow-hidden rounded-[var(--radius)] border border-[var(--border)] bg-[var(--paper-card)]">
     <div class="flex items-center gap-2 border-b border-[var(--border)] px-3 py-2 text-xs text-zinc-500">
       <span class="size-2 rounded-full bg-emerald-400" />
-      Live preview
+      Page preview
+      <span class="ml-auto">Click text to edit</span>
     </div>
     <div v-if="loading" class="skeleton m-3 flex-1" />
     <p v-else-if="missing" class="m-3 flex-1 text-sm text-zinc-500">

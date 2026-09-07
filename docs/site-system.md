@@ -205,3 +205,36 @@ Honest list of what this does **not** do, so nobody assumes otherwise:
 - Taxonomy-style routes for a custom type (an `/events/tag/<x>/` archive) are not
   generated; only the listing and the detail page are.
 - Recipes never delete. Applying one twice refuses rather than merging.
+
+## Page and post URL identity
+
+Pages/posts may override their public slug per language through `data/site.json`'s
+optional `urls` map (`"pages/es/home": "inicio"`). Storage filenames continue linking
+translations. `frontend/lib/public-urls.ts` resolves the map for routing and links.
+An empty homepage slug means the language root. When moving an existing public URL,
+change the mapping and add a 301 in `data/redirects.json` together; do not rename its
+translation file. The CMS performs that transaction and checks URL availability.
+
+
+## Agent guidance for human editing
+
+`siteSystemContract().humanEditing` carries the authoring workflow, division of work,
+editing-surface choices, field-design rules, examples and handoff criteria. It is
+shared by MCP `describe_site_system` and `/site-system.json`; MCP initialize points
+agents to it. Source: `functions/_lib/agent-authoring.mjs`. Keep this guide aligned with
+the actual CMS and advertised tools. Recommendations are distinct from machine checks.
+
+## First-party site starters
+
+Portfolio and real-estate starters compose these same layers through a shared,
+additive planner. The CMS picker previews designs and commits an installation to
+staging; the local CLI uses the same plan. See [Site starters](site-starters.md) for
+installation, scope and extension rules. Starter templates and style variants are
+included in theme exports. A starter does not imply external integrations.
+
+## Theme and starter discovery
+
+`siteSystemContract().themes` is shared by MCP `describe_site_system` and the static
+`/site-system.json`. It distinguishes shared Brand settings, additive Site starters
+and replacement theme bundles; documents staging/build trust and installation
+limits; and points agents toward supported tools. See [themes](../themes/README.md).

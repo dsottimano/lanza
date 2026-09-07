@@ -3,9 +3,10 @@
 //   - field.types  => typed variants (page blocks); each item carries `type`
 //   - field.fields => object items (menu items, redirects, gallery images)
 //   - neither      => plain string items (organization.sameAs)
-import { computed, ref } from "vue";
+import { computed, inject, ref } from "vue";
 import type { Field, Variant } from "../schema";
 import FieldInput from "./FieldInput.vue";
+import { STRUCTURE_LOCKED } from "./context";
 import { inputCls } from "./styles";
 import { childPath } from "./field-paths";
 
@@ -16,10 +17,9 @@ const props = defineProps<{
   path?: string;
 }>();
 const model = defineModel<any[]>();
+const structureLocked = inject(STRUCTURE_LOCKED, false);
 
-// Initialise the array once, at setup — never mutate reactive state in render.
-if (!Array.isArray(model.value)) model.value = [];
-const items = computed<any[]>(() => model.value as any[]);
+const items = computed<any[]>(() => Array.isArray(model.value) ? model.value : []);
 
 const isScalar = computed(() => !props.field.fields && !props.field.types);
 const singular = computed(() => props.field.labelSingular ?? "Item");
@@ -32,12 +32,12 @@ function blankFromFields(fields: Field[]): Record<string, unknown> {
 }
 
 function add() {
-  if (isScalar.value) items.value.push("");
-  else if (props.field.fields) items.value.push(blankFromFields(props.field.fields));
+  if (isScalar.value) model.value = [...items.value, ""];
+  else if (props.field.fields) model.value = [...items.value, blankFromFields(props.field.fields)];
 }
 
 function addVariant(v: Variant) {
-  items.value.push({ type: v.name, ...blankFromFields(v.fields) });
+  model.value = [...items.value, { type: v.name, ...blankFromFields(v.fields) }];
   addMenu.value = false;
 }
 
@@ -79,7 +79,7 @@ function move(i: number, dir: -1 | 1) {
         <span class="text-[0.7rem] font-bold tracking-wide text-zinc-500 uppercase">
           {{ variantOf(item)?.label ?? `${singular} ${i + 1}` }}
         </span>
-        <div class="flex gap-1">
+        <div v-if="!structureLocked" class="flex gap-1">
           <button
             type="button"
             :disabled="i === 0"
@@ -108,6 +108,7 @@ function move(i: number, dir: -1 | 1) {
         v-if="isScalar"
         type="text"
         v-model="items[i]"
+        :aria-label="`${singular} ${i + 1}`"
         :class="inputCls"
       />
 
@@ -135,7 +136,7 @@ function move(i: number, dir: -1 | 1) {
     </div>
 
     <!-- add control: variant picker when typed, plain add otherwise -->
-    <div v-if="field.types" class="relative">
+    <div v-if="field.types && !structureLocked" class="relative">
       <button type="button" class="btn btn-ghost self-start" @click="addMenu = !addMenu">
         + Add {{ singular.toLowerCase() }}
       </button>
@@ -154,7 +155,7 @@ function move(i: number, dir: -1 | 1) {
         </button>
       </div>
     </div>
-    <button v-else type="button" class="btn btn-ghost self-start" @click="add">
+    <button v-else-if="!structureLocked" type="button" class="btn btn-ghost self-start" @click="add">
       + Add {{ singular.toLowerCase() }}
     </button>
   </div>

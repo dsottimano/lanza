@@ -1,3 +1,4 @@
+import { AGENT_INSTRUCTIONS } from "./agent-authoring.mjs";
 // Lanza CMS — MCP protocol + tool definitions (transport-agnostic).
 //
 // This module owns the JSON-RPC dispatch and the tool surface. It takes a
@@ -505,6 +506,7 @@ export const TOOLS: ToolDef[] = [
   {
     name: "describe_site_system",
     description:
+      "Call before building or redesigning. Includes humanEditing: responsibilities, article versus landing-page editing, grouped text/image fields, ordered workflow, runnable examples, URL/translation limits and handoff criteria. " +
       "Explain how a Lanza site is COMPOSED — the layer model, what each template position " +
       "puts in scope, the field widgets the CMS can render, the reserved names, and every " +
       "way a site can be silently wrong. Call this before writing a template, declaring " +
@@ -646,7 +648,7 @@ export const TOOLS: ToolDef[] = [
       "template may not contain (no script, no event handlers, no iframes: the engine " +
       "renders at build time, so listings, galleries and detail pages are structure and " +
       "CSS). Replacing an existing template is allowed and is a reviewable, revertable " +
-      "change like any other. Not live until publish.",
+      "change like any other. Group editable text/image fields by visible section; keep layout and CSS in the template. Read humanEditing in describe_site_system before choosing body:true or slots. Not live until publish.",
     inputSchema: obj(
       {
         name: str("Template folder name, lowercase kebab-case, e.g. 'property' or 'property-index'."),
@@ -1264,7 +1266,7 @@ export const TOOLS: ToolDef[] = [
   {
     name: "publish",
     description:
-      "Publish: merge staging into main to make all staged changes live. Returns whether a merge happened (false = nothing to publish). A merge conflict is reported so it can be resolved on GitHub.",
+      "Publish only within the user’s authorization. Run validate_site and inspect list_changes first: this includes unrelated staged work. Publish: merge staging into main to make all staged changes live. Returns whether a merge happened (false = nothing to publish). A merge conflict is reported so it can be resolved on GitHub.",
     inputSchema: obj({ message: str("Optional publish commit message.") }, []),
     run: async (args, client) => {
       const merged = await client.publish(args.message ? String(args.message) : "Publish via MCP");
@@ -1346,8 +1348,7 @@ export async function handleMessage(
           protocolVersion: (params?.protocolVersion as string) || SUPPORTED_PROTOCOL,
           capabilities: { tools: { listChanged: false } },
           serverInfo: SERVER_INFO,
-          instructions:
-            "Edit this Lanza site's content. Reads/writes target a staging branch; call publish to make changes live.",
+          instructions: AGENT_INSTRUCTIONS,
         },
       };
     case "ping":

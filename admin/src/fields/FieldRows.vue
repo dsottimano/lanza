@@ -15,6 +15,7 @@ const props = defineProps<{
   fields: Field[];
   data: Record<string, unknown>;
   dense?: boolean;
+  inlineObjects?: boolean;
   // Paths RELATIVE TO `data` that a review reports as changed — see field-paths.ts.
   changed?: readonly string[];
 }>();
@@ -33,7 +34,7 @@ function onFocusIn(e: FocusEvent): void {
 }
 
 // Widgets that need the full row even in the two-column grid.
-const WIDE = new Set(["text", "image", "object", "list", "relation"]);
+const WIDE = new Set(["text", "image", "object", "list", "relation", "datetime"]);
 const isWide = (f: Field) => WIDE.has(f.widget);
 
 // Marked only in the dense grid, which already wraps each field in a div of its own.
@@ -54,7 +55,7 @@ const isChanged = (f: Field) => anyTouchesField(props.changed ?? [], f.name);
         ]"
         :data-changed="isChanged(f) ? 'true' : undefined"
       >
-        <FieldInput :field="f" :path="childPath(undefined, f.name)" v-model="data[f.name]" />
+        <FieldInput :field="f" :inline-object="inlineObjects" :path="childPath(undefined, f.name)" v-model="data[f.name]" />
       </div>
     </div>
   </div>
@@ -62,7 +63,7 @@ const isChanged = (f: Field) => anyTouchesField(props.changed ?? [], f.name);
     <FieldInput
       v-for="f in fields"
       :key="f.name"
-      :field="f"
+      :field="f" :inline-object="inlineObjects"
       :path="childPath(undefined, f.name)"
       v-model="data[f.name]"
     />

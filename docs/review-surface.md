@@ -129,3 +129,14 @@ Each of these was found by building it, and each would have shipped silently:
   to that item. A choice, not an accident.
 - Saving re-takes the diff. A stale report would offer to revert to a value that is
   no longer live, and it is what keeps array paths valid across two reverts.
+
+## September 6: preview-to-field editing
+
+Template pages now use a viewport-height preview and a content inspector.
+`TemplateEditor.focusField` converts an entry path with the existing `toSlotPaths`
+helper, selects the containing section, then asks `FieldForm.focusField` to open
+any grouped/nested fields and focus the control. Numeric list paths remain intact.
+Preview clicks therefore move the cursor into the field; they do not edit the
+iframe DOM directly. Preview-only CSS disables entrance animations so body
+re-renders never hide content or move a click target during editing. Production
+rendering and animations are unchanged.

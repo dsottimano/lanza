@@ -18,7 +18,7 @@ import { safeImageUrl } from "../url";
 export const Testimonial = Node.create({
   name: "testimonial",
   group: "block",
-  content: "inline*",
+  content: "block+",
   draggable: true,
   isolating: true,
   priority: 200,

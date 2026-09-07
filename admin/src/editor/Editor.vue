@@ -4,6 +4,7 @@ import { useEditor, EditorContent } from "@tiptap/vue-3";
 import type { GitHubClient } from "../backend/github";
 import { CLIENT_KEY } from "../fields/context";
 import StarterKit from "@tiptap/starter-kit";
+import { Table, TableKit } from "@tiptap/extension-table";
 import Link from "@tiptap/extension-link";
 import Placeholder from "@tiptap/extension-placeholder";
 import Highlight from "@tiptap/extension-highlight";
@@ -22,10 +23,11 @@ import SlashMenu from "./SlashMenu.vue";
 import { safeLinkUrl } from "./url";
 
 const props = withDefaults(
-  defineProps<{ initialHtml?: string; client?: GitHubClient }>(),
+  defineProps<{ initialHtml?: string; client?: GitHubClient; showInspector?: boolean }>(),
   { initialHtml: "<p></p>", client: undefined },
 );
-const emit = defineEmits<{ (e: "change"): void }>();
+const emit = defineEmits<{ (e: "change"): void; (e: "invalid", message: string): void }>();
+const contentProblem = ref("");
 
 // Expose the client to node views (Figure upload). TipTap vue-3 mounts node
 // views with this component's app context, so inject() reaches them here.
@@ -49,8 +51,27 @@ function runSlash(index: number) {
 
 const editor = useEditor({
   content: props.initialHtml,
+  enableContentCheck: true,
+  onContentError: () => {
+    contentProblem.value = "This document contains formatting the editor cannot preserve yet. Saving is paused so the original content stays intact. Ask your agent to adapt the content before editing it here.";
+    emit("invalid", contentProblem.value);
+  },
   extensions: [
     StarterKit.configure({ link: false }),
+    TableKit.configure({ table: false }),
+    Table.extend({
+      parseHTML() {
+        return [
+          ...(this.parent?.() ?? []),
+          // Table containers carry structure but are not document nodes. Explicit
+          // skip rules let strict content checking accept Markdown and browser HTML.
+          { tag: "table > thead", skip: true },
+          { tag: "table > tbody", skip: true },
+          { tag: "table > tfoot", skip: true },
+          { tag: "table > colgroup", ignore: true },
+        ];
+      },
+    }),
     // `protocols` + `validate` pin link policy to our own allowlist (safeLinkUrl)
     // rather than relying on TipTap's defaults — pasted/autolinked/loaded hrefs
     // with a junk scheme (javascript:, data:, …) are dropped at parse time.
@@ -63,7 +84,7 @@ const editor = useEditor({
     Placeholder.configure({
       placeholder: ({ node }) =>
         node.type.name === "paragraph"
-          ? "Type / for commands, or just start writing…"
+          ? "Start writing…"
           : "",
     }),
     Highlight,
@@ -143,7 +164,10 @@ defineExpose({
   // renders the Toolbar above the title (outside this component's template).
   editor,
   link,
-  getHTML: () => editor.value?.getHTML() ?? "",
+  getHTML: () => {
+    if (contentProblem.value) throw new Error(contentProblem.value);
+    return editor.value?.getHTML() ?? "";
+  },
   focus: () => editor.value?.commands.focus(),
 });
 
@@ -197,7 +221,7 @@ function link() {
       @hover="(i) => (slashSelected = i)"
     />
 
-    <button class="html-toggle" @click="toggleHtml">&lt;/&gt;</button>
+    <button v-if="showInspector !== false" class="html-toggle" aria-label="Inspect document HTML" @click="toggleHtml">&lt;/&gt;</button>
     <pre v-if="showHtml" class="html-panel">{{ html }}</pre>
   </div>
 </template>
@@ -215,6 +239,9 @@ function link() {
   line-height: 1.75;
   color: var(--ink);
 }
+.prose :deep(table) { width: 100%; border-collapse: collapse; table-layout: fixed; }
+.prose :deep(td), .prose :deep(th) { border: 1px solid var(--border); padding: .5rem .75rem; vertical-align: top; overflow-wrap: anywhere; }
+.prose :deep(th) { background: var(--surface); text-align: left; }
 .prose :deep(.tiptap > * + *) {
   margin-top: 1.1em;
 }

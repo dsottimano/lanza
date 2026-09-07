@@ -18,6 +18,12 @@ const emptyColumn = () => ({ type: "column", content: [{ type: "paragraph" }] })
 // The `/` command catalog. Each runs after deleting the typed `/query`.
 export const SLASH_ITEMS: SlashItem[] = [
   {
+    title: "Table", icon: "▦", hint: "Three columns with a header",
+    keywords: ["table", "comparison", "rows", "columns"],
+    command: ({ editor, range }) => editor.chain().focus().deleteRange(range)
+      .insertTable({ rows: 3, cols: 3, withHeaderRow: true }).run(),
+  },
+  {
     title: "Heading 2",
     icon: "H2",
     hint: "Section heading",
@@ -71,7 +77,7 @@ export const SLASH_ITEMS: SlashItem[] = [
     hint: "Highlighted panel",
     keywords: ["callout", "note", "info", "panel"],
     command: ({ editor, range }) =>
-      editor.chain().focus().deleteRange(range).insertContent({ type: "callout" }).run(),
+      editor.chain().focus().deleteRange(range).insertContent({ type: "callout", content: [{ type: "paragraph" }] }).run(),
   },
   {
     title: "Image",
@@ -117,7 +123,7 @@ export const SLASH_ITEMS: SlashItem[] = [
     hint: "Quote with author",
     keywords: ["testimonial", "quote", "review", "customer"],
     command: ({ editor, range }) =>
-      editor.chain().focus().deleteRange(range).insertContent({ type: "testimonial" }).run(),
+      editor.chain().focus().deleteRange(range).insertContent({ type: "testimonial", content: [{ type: "paragraph" }] }).run(),
   },
   {
     title: "Logo strip",

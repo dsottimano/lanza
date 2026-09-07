@@ -20,10 +20,12 @@ import type { FolderCollection } from "../schema";
 import type { Locale } from "../backend/config";
 import { site } from "../backend/site";
 import { findTranslations, setTranslationSeed, translationShell } from "../backend/translations";
+import { entryPath } from "../backend/site-urls";
 import { entryRoute } from "../router";
 import { reportError } from "../errors";
 
 const props = defineProps<{
+  showUrls?: boolean;
   client: GitHubClient;
   collection: FolderCollection;
   locale: Locale;
@@ -92,16 +94,19 @@ function open(code: Locale) {
   });
 }
 
+function pathFor(code: Locale): string | null {
+  return entryPath(props.collection.name, props.slug, code);
+}
 function hint(code: Locale, label: string): string {
-  if (code === props.locale) return `Editing the ${label} version`;
+  if (code === props.locale) return `Editing the ${label} version${pathFor(code) ? ` at ${pathFor(code)}` : ""}`;
   return exists(code)
-    ? `Open the ${label} version`
-    : `Start the ${label} version — same URL and layout, no text copied over`;
+    ? `Open the ${label} version${pathFor(code) ? ` at ${pathFor(code)}` : ""}`
+    : `Start the ${label} version${pathFor(code) ? ` at ${pathFor(code)}` : ""}, same layout, no text copied over`;
 }
 </script>
 
 <template>
-  <div v-if="show" class="flex items-center gap-2 text-xs">
+  <div v-if="show" class="entry-language-bar flex items-center gap-2 text-xs" :class="{ 'entry-language-bar--urls': showUrls }">
     <span class="uppercase tracking-wide text-zinc-400">Language</span>
     <div class="segment">
       <button
@@ -114,9 +119,9 @@ function hint(code: Locale, label: string): string {
         :aria-current="l.code === locale ? 'true' : undefined"
         @click="open(l.code)"
       >
-        {{ l.label }}<span v-if="!exists(l.code)" class="ml-1 text-zinc-400" aria-hidden="true"
-          >+</span
-        >
+        <span>{{ l.label }}<span v-if="!exists(l.code)" class="ml-1 text-zinc-400" aria-hidden="true"
+          >+</span></span>
+        <span v-if="showUrls && pathFor(l.code)" class="entry-language-path">{{ pathFor(l.code) }}</span>
       </button>
     </div>
   </div>

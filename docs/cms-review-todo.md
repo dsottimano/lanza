@@ -68,14 +68,14 @@ the real one, and it is §1.1.
       (`JSON.parse("")` throws). Fix: reject a non-`base64` encoding loudly, and
       fall back to the blobs API (good to 100 MB) for large files.
 
-- [ ] **1.3 Anything typed during a save is discarded with no prompt.**
+- [x] **1.3 Anything typed during a save is discarded with no prompt.**
       `admin/src/ui/useEntryEditor.ts:126`
       `save()` snapshots the body, awaits the write, then sets `isDirty = false` —
       clearing edits made *during* the round trip. The route guard and
       `beforeunload` then both pass, so navigating away loses the work silently.
       Fix: capture a dirty-counter at snapshot time and only clear if unchanged.
 
-- [ ] **1.4 List and image field edits never mark the editor dirty.**
+- [x] **1.4 List and image field edits never mark the editor dirty.**
       `admin/src/fields/ListInput.vue:28,42,45`, `admin/src/fields/ImageInput.vue:52`
       Both entry editors detect edits by letting native `input`/`change` bubble.
       Add/remove/reorder an item, or remove the featured image, and nothing bubbles
@@ -84,7 +84,7 @@ the real one, and it is §1.1.
       `RedirectsView`, `MenuEditor`) calls `markDirty()` explicitly from these same
       handlers; the entry editors are the outlier. Fix them the same way.
 
-- [ ] **1.5 Tables are destroyed on the first save.**
+- [x] **1.5 Tables are destroyed on the first save.**
       `admin/src/editor/Editor.vue:52` — no table extension is registered.
       ProseMirror lifts every cell into one paragraph:
       `<table>…</table>` → `<p>a b 1 2</p>`, stable across re-saves, unrecoverable
@@ -102,7 +102,7 @@ the real one, and it is §1.1.
       A bot draft with one autolink opens as a single block with literal `#` and
       `-` characters, and saving commits that.
 
-- [ ] **1.7 Block-content custom nodes empty themselves.**
+- [x] **1.7 Block-content custom nodes empty themselves.**
       `admin/src/editor/extensions/Callout.ts:9`, `Testimonial.ts:20` — both are
       `content: "inline*"`, so `<div data-callout><p>one</p><p>two</p></div>`
       becomes an empty card with its text loose in the document. Permanently wrong
@@ -321,3 +321,13 @@ Recorded so the next pass does not spend time here.
   `media.ts`, `MenuEditor.vue`, `OnboardingWizard.vue`, `fields/*` partial-write
   behaviour, and the route/`beforeunload` guards themselves — §1.3 and §1.4 are
   about `isDirty` being wrong when they fire, not about the guards being missing.
+
+## Writing pass, 2026-09-06
+
+Items 1.3, 1.4, 1.5 and 1.7 were addressed in the writing-experience pass, with
+regressions covering saves in flight, model-only edits, table round trips and
+multi-paragraph custom nodes. Item 1.2 now refuses non-base64 entry responses; a
+large-blob fallback is still absent. Item 1.6's inline-tag/autolink cases now parse
+as Markdown, but format detection remains heuristic. Unsupported loaded HTML
+blocks saving through TipTap's content check; this does not resolve every markup
+compatibility issue in 1.8. See `writing-experience.md` for scope and remaining work.

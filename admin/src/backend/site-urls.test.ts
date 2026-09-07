@@ -60,6 +60,6 @@ describe("entryPathFrame — the path either side of an editable slug", () => {
   });
 
   it("frames the locale root with no trailing segment", () => {
-    expect(entryPathFrame("pages", "home", "es")).toEqual({ prefix: "/es/", suffix: "" });
+    expect(entryPathFrame("pages", "", "es")).toEqual({ prefix: "/es/", suffix: "" });
   });
 });

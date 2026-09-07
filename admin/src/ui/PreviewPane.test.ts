@@ -318,7 +318,7 @@ describe("PreviewPane — the exposed highlight API", () => {
     const { w, doc } = await paintedPane();
     api(w).highlight(["slots.heading"]);
     api(w).clearHighlights();
-    expect(styleText(doc)).toBe("[data-lanza-field]{cursor:pointer}");
+    expect(styleText(doc)).toBe("*,*::before,*::after{animation:none!important;transition:none!important}[data-lanza-field]{cursor:pointer}[data-lanza-field]:hover{outline:1px dashed currentColor;outline-offset:3px}");
   });
 
   it("finds a field to scroll to, and reports when it cannot", async () => {

@@ -1,0 +1,84 @@
+<style>
+.lanza-home { --lh-orange:#c53b19; color:var(--ink); }
+.lh-wrap { width:min(1240px,calc(100% - 3rem)); margin-inline:auto; }
+.lh-eyebrow { font:500 .7rem var(--font-mono); letter-spacing:.13em; text-transform:uppercase; }
+.lh-hero { padding:clamp(3rem,8vw,7rem) 0 3rem; }
+.lh-hero-grid { display:grid; grid-template-columns:1.4fr 1fr; gap:5rem; align-items:end; }
+.lh-hero h1 { font-size:clamp(3.4rem,7.5vw,7rem); font-weight:500; line-height:.98; letter-spacing:-.06em; margin:1.5rem 0 0; }
+.lh-hero h1 span { display:block; color:var(--lh-orange); }
+.lh-hero-copy { max-width:28rem; padding-bottom:.25rem; }
+.lh-hero-copy p { font-size:1.25rem; line-height:1.65; margin:0 0 1.6rem; }
+.lh-actions { display:flex; flex-wrap:wrap; gap:1rem; align-items:center; }
+.lh-button { display:inline-flex; align-items:center; gap:1rem; padding:.9rem 1.25rem; border:1px solid var(--ink); background:var(--ink); color:var(--paper-card); text-decoration:none; font-weight:500; }
+.lh-button:hover { background:var(--lh-orange); border-color:var(--lh-orange); color:white; }
+.lh-text-link { color:inherit; text-underline-offset:.25em; padding:.6rem 0; }
+.lh-note { display:block; margin-top:1.2rem; color:var(--muted); font-size:.85rem; }
+.lh-product { margin-top:3.5rem; }
+.lh-product-bar { display:flex; justify-content:space-between; align-items:center; padding:1rem 1.25rem; background:#e9e5dc; border:1px solid var(--border); font-size:.8rem; }
+.lh-product-bar span:first-child { display:flex; gap:.6rem; align-items:center; }
+.lh-product-bar i { width:7px; height:7px; border-radius:50%; background:#35765d; }
+.lh-product-frame { border:1px solid var(--border); border-top:0; background:#f3f1ea; overflow:hidden; max-height:680px; }
+.lh-product-frame img { display:block; width:100%; height:auto; }
+.lh-caption { display:flex; justify-content:space-between; gap:1rem; margin:1rem 0 0; color:var(--muted); font-size:.85rem; }
+.lh-caption a { color:inherit; text-underline-offset:.2em; }
+.lh-band { padding:clamp(4rem,8vw,7rem) 0; }
+.lh-rule { border-top:1px solid var(--border); }
+.lh-heading { display:grid; grid-template-columns:1fr 1fr; gap:3rem; align-items:end; margin:1.5rem 0 3rem; }
+.lh-heading h2,.lh-close h2 { font-size:clamp(2.5rem,4.5vw,4.5rem); line-height:1.05; font-weight:500; letter-spacing:-.04em; margin:0; }
+.lh-heading p { font-size:1.15rem; line-height:1.7; max-width:34rem; margin:0; color:var(--text-secondary); }
+.lh-features { display:grid; grid-template-columns:repeat(3,1fr); border-top:1px solid var(--border); border-left:1px solid var(--border); }
+.lh-feature { padding:2rem; border-right:1px solid var(--border); border-bottom:1px solid var(--border); }
+.lh-feature-number { color:var(--lh-orange); font: .75rem var(--font-mono); }
+.lh-feature h3 { font-size:1.5rem; line-height:1.2; font-weight:500; margin:1.7rem 0 .8rem; letter-spacing:-.02em; }
+.lh-feature p { margin:0; color:var(--text-secondary); line-height:1.7; }
+.lh-workflow { background:#242722; color:#faf8f0; }
+.lh-workflow .lh-eyebrow { color:#cfddac; }
+.lh-workflow .lh-heading p { color:#c2c7bb; }
+.lh-steps { display:grid; grid-template-columns:repeat(3,1fr); gap:2.5rem; }
+.lh-step { border-top:1px solid #565c51; padding-top:1.5rem; }
+.lh-step > span { font: .75rem var(--font-mono); color:#cfddac; }
+.lh-step h3 { font-size:1.6rem; font-weight:500; margin:1.5rem 0 .8rem; color:#faf8f0; }
+.lh-step p { color:#c2c7bb; line-height:1.7; }
+.lh-prompt { margin:3rem 0 0; padding:1.5rem 2rem; border:1px solid #565c51; border-left:3px solid #cfddac; }
+.lh-prompt span { font:.7rem var(--font-mono); color:#cfddac; text-transform:uppercase; }
+.lh-prompt p { font-size:1.3rem; line-height:1.6; margin:.75rem 0 0; }
+.lh-split { display:grid; grid-template-columns:1fr 1fr; gap:4rem; align-items:center; }
+.lh-split h2 { font-size:clamp(2.5rem,4vw,4rem); line-height:1.08; font-weight:500; letter-spacing:-.04em; margin:1.5rem 0; }
+.lh-split p { font-size:1.1rem; line-height:1.75; color:var(--text-secondary); }
+.lh-detail-shot { height:550px; overflow:hidden; border:1px solid var(--border); background:var(--paper-card); }
+.lh-detail-shot img { display:block; width:100%; height:auto; }
+.lh-ownership { background:#e9e7db; }
+.lh-ownership-grid { display:grid; grid-template-columns:1.2fr 1fr; gap:5rem; }
+.lh-ownership h2 { font-size:clamp(2.5rem,4vw,4rem); font-weight:500; letter-spacing:-.04em; line-height:1.05; margin:1rem 0; }
+.lh-ownership p { color:var(--text-secondary); line-height:1.75; max-width:34rem; }
+.lh-facts { margin:0; padding:0; list-style:none; }
+.lh-facts li { padding:1.25rem 0; border-bottom:1px solid #c7c6b7; }
+.lh-facts strong { display:block; font-weight:500; font-size:1.25rem; margin-bottom:.35rem; }
+.lh-facts span { color:var(--text-secondary); }
+.lh-faq { max-width: 50rem; }
+.lh-faq details { border-top:1px solid var(--border); padding:1.4rem 0; }
+.lh-faq details:last-child { border-bottom:1px solid var(--border); }
+.lh-faq summary { cursor:pointer; font-size:1.2rem; font-weight:500; padding-right:1rem; }
+.lh-faq details p { color:var(--text-secondary); max-width: 50rem; line-height:1.75; margin:1rem 0 0; }
+.lh-close { padding:clamp(3.5rem,7vw,6rem) 0; border-top:1px solid var(--border); }
+.lh-close .lh-wrap { display:flex; align-items:center; justify-content:space-between; gap:3rem; }
+.lh-close p { color:var(--muted); font-size:1.1rem; margin:1.2rem 0 0; }
+.lanza-home a:focus-visible,.lanza-home summary:focus-visible { outline:3px solid var(--lh-orange); outline-offset:5px; }
+@media(max-width:800px) { .lh-hero-grid,.lh-heading,.lh-split,.lh-ownership-grid { grid-template-columns:1fr; gap:2rem; } .lh-hero-copy { max-width:38rem; } .lh-features { grid-template-columns:repeat(2,1fr); } .lh-steps { gap:1.5rem; } .lh-close .lh-wrap { display:block; } .lh-close .lh-actions { margin-top:2rem; } .lh-detail-shot { height:460px; } }
+@media(max-width:540px) { .lh-wrap { width:calc(100% - 2rem); } .lh-hero h1 { font-size:clamp(3rem,12vw,4.2rem); } .lh-features,.lh-steps { grid-template-columns:1fr; } .lh-feature { padding:1.5rem; } .lh-feature h3 { margin-top:1rem; } .lh-caption { flex-direction:column; } .lh-product-bar { padding:.75rem; } .lh-product-bar > span:last-child { display:none; } .lh-detail-shot { height:370px; } }
+</style>
+<div class="lanza-home">
+<section class="lh-hero lh-wrap">
+  <div class="lh-hero-grid">
+    <div><div class="lh-eyebrow">{{ eyebrow }}</div><h1>{{ headline }}<span>{{ headlineAccent }}</span></h1></div>
+    <div class="lh-hero-copy"><p>{{ introduction }}</p><div class="lh-actions"><a class="lh-button" href="{{ startUrl }}">{{ startLabel }} <span aria-hidden="true">↗</span></a><a class="lh-text-link" href="{{ guideUrl }}">{{ guideLabel }}</a></div><small class="lh-note">{{ heroNote }}</small></div>
+  </div>
+  <div class="lh-product"><div class="lh-product-bar"><span><i aria-hidden="true"></i>{{ screenshotLabel }}</span><span>{{ screenshotContext }}</span></div><div class="lh-product-frame"><img src="{{ workspaceImage }}" alt="{{ workspaceAlt }}" width="1600" height="1028" fetchpriority="high" /></div><p class="lh-caption"><span>{{ screenshotCaption }}</span><a href="{{ guideUrl }}">{{ screenshotLink }} ↗</a></p></div>
+</section>
+<section id="features" class="lh-band lh-wrap"><div class="lh-eyebrow">{{ featuresEyebrow }}</div><div class="lh-heading"><h2>{{ featuresHeadline }}</h2><p>{{ featuresIntro }}</p></div><div class="lh-features">{{#each features}}<article class="lh-feature"><span class="lh-feature-number">{{ number }}</span><h3>{{ title }}</h3><p>{{ description }}</p></article>{{/each}}</div></section>
+<section id="workflow" class="lh-band lh-workflow"><div class="lh-wrap"><div class="lh-eyebrow">{{ workflowEyebrow }}</div><div class="lh-heading"><h2>{{ workflowHeadline }}</h2><p>{{ workflowIntro }}</p></div><div class="lh-steps">{{#each steps}}<article class="lh-step"><span>{{ number }}</span><h3>{{ title }}</h3><p>{{ description }}</p></article>{{/each}}</div><blockquote class="lh-prompt"><span>{{ promptLabel }}</span><p>{{ prompt }}</p></blockquote></div></section>
+<section class="lh-band lh-wrap lh-split"><div><div class="lh-eyebrow">{{ detailsEyebrow }}</div><h2>{{ detailsHeadline }}</h2><p>{{ detailsIntro }}</p><a class="lh-text-link" href="{{ guideUrl }}">{{ detailsLink }} ↗</a></div><div class="lh-detail-shot"><img src="{{ detailsImage }}" alt="{{ detailsAlt }}" width="1024" height="1035" loading="lazy" /></div></section>
+<section class="lh-band lh-ownership"><div class="lh-wrap lh-ownership-grid"><div><div class="lh-eyebrow">{{ ownershipEyebrow }}</div><h2>{{ ownershipHeadline }}</h2><p>{{ ownershipIntro }}</p><a class="lh-text-link" href="{{ sourceUrl }}">{{ sourceLabel }} ↗</a></div><ul class="lh-facts">{{#each facts}}<li><strong>{{ title }}</strong><span>{{ description }}</span></li>{{/each}}</ul></div></section>
+<section class="lh-band lh-wrap"><div class="lh-eyebrow">{{ faqEyebrow }}</div><div class="lh-heading"><h2>{{ faqHeadline }}</h2></div><div class="lh-faq">{{#each questions}}<details><summary>{{ question }}</summary><p>{{ answer }}</p></details>{{/each}}</div></section>
+<section class="lh-close"><div class="lh-wrap"><div><h2>{{ closeHeadline }}</h2><p>{{ closeIntro }}</p></div><div class="lh-actions"><a class="lh-button" href="{{ startUrl }}">{{ startLabel }} <span aria-hidden="true">↗</span></a></div></div></section>
+</div>

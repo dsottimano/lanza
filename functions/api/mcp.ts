@@ -65,6 +65,30 @@ function unauthorized(message = "Unauthorized."): Response {
 // is a free way to blow that ceiling (and to amplify one authenticated request into
 // hundreds of writes). 20 is well above anything a real client sends.
 const MAX_BATCH = 20;
+export const MAX_MCP_BODY_BYTES = 2 * 1024 * 1024;
+
+async function readPayload(request: Request): Promise<unknown> {
+  if (!request.body) throw new SyntaxError("Missing body");
+  const reader = request.body.getReader();
+  const decoder = new TextDecoder();
+  let bytes = 0;
+  let text = "";
+  try {
+    for (;;) {
+      const { done, value } = await reader.read();
+      if (done) break;
+      bytes += value.byteLength;
+      if (bytes > MAX_MCP_BODY_BYTES) {
+        await reader.cancel();
+        throw new RangeError("MCP body too large.");
+      }
+      text += decoder.decode(value, { stream: true });
+    }
+    return JSON.parse(text + decoder.decode());
+  } finally {
+    reader.releaseLock();
+  }
+}
 
 export const onRequest = async (context: { request: Request }): Promise<Response> => {
   const { request } = context;
@@ -81,6 +105,10 @@ export const onRequest = async (context: { request: Request }): Promise<Response
   const githubToken = auth.startsWith("Bearer ") ? auth.slice(7) : "";
   if (!githubToken) {
     return unauthorized("Unauthorized: paste the token from /admin → Connect an agent.");
+  }
+
+  if (Number(request.headers.get("content-length")) > MAX_MCP_BODY_BYTES) {
+    return jsonResponse(rpcError(null, -32600, "MCP body too large (maximum 2 MiB)."), 413);
   }
 
   const identity = await identityFor(githubToken, repo.owner, repo.name);
@@ -102,8 +130,11 @@ export const onRequest = async (context: { request: Request }): Promise<Response
 
   let payload: unknown;
   try {
-    payload = await request.json();
-  } catch {
+    payload = await readPayload(request);
+  } catch (error) {
+    if (error instanceof RangeError) {
+      return jsonResponse(rpcError(null, -32600, "MCP body too large (maximum 2 MiB)."), 413);
+    }
     return jsonResponse(rpcError(null, -32700, "Parse error: body is not valid JSON."), 400);
   }
 
@@ -120,6 +151,7 @@ export const onRequest = async (context: { request: Request }): Promise<Response
 
   // Streamable HTTP accepts a single message or a batch (array).
   if (Array.isArray(payload)) {
+    if (payload.length === 0) return jsonResponse(rpcError(null, -32600, "Empty batch."), 400);
     if (payload.length > MAX_BATCH) {
       return jsonResponse(rpcError(null, -32600, "Batch too large."), 400);
     }

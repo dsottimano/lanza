@@ -14,7 +14,7 @@ import { FIXED_PAGES, FIXED_SLUGS } from "../lib/fixed-pages";
 export async function getStaticPaths() {
   const { root } = splitEntries(await publishedPages());
   const cms = root
-    .filter(({ slug }) => slug !== "home" && !FIXED_SLUGS.has(slug))
+    .filter(({ slug }) => slug !== "" && !FIXED_SLUGS.has(slug))
     .map(({ entry, slug }) => ({ params: { slug }, props: { page: entry } }));
   const fixed = FIXED_PAGES.map((p) => ({
     params: { slug: p.slug },

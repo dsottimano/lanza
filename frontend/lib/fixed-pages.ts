@@ -37,12 +37,12 @@ const ALL_FIXED_PAGES: FixedPage[] = [
       en: {
         title: "How it works",
         description:
-          "The life of an edit, end to end: you ask, an agent edits your repository, GitHub stores it and Cloudflare serves it. No database, no server, no lock-in.",
+          "A practical guide to writing, editing pages, managing languages and URLs, reviewing changes and publishing with Lanza.",
       },
       es: {
         title: "Cómo funciona",
         description:
-          "La vida de un cambio, de principio a fin: usted lo pide, un agente edita su repositorio, GitHub lo guarda y Cloudflare lo sirve. Sin base de datos, sin servidor, sin ataduras.",
+          "Una guía práctica para escribir, editar páginas, gestionar idiomas y URLs, revisar cambios y publicar con Lanza.",
       },
     },
   },
@@ -72,12 +72,12 @@ const ALL_FIXED_PAGES: FixedPage[] = [
       en: {
         title: "Get started",
         description:
-          "Zero to a live site in about 30 minutes: sign in with GitHub, pick your address, say what you want, and publish. Free to start; a domain (~$12/yr) is the only cost.",
+          "Create your Lanza site with GitHub and Cloudflare, connect an agent, make a first draft and review before publishing.",
       },
       es: {
         title: "Empezar",
         description:
-          "De cero a un sitio en vivo en unos 30 minutos: entre con GitHub, elija su dirección, diga qué quiere y publique. Gratis para empezar; un dominio (~$12/año) es el único gasto.",
+          "Crea tu sitio Lanza con GitHub y Cloudflare, conecta un agente, prepara un borrador y revísalo antes de publicar.",
       },
     },
   },
@@ -88,12 +88,12 @@ const ALL_FIXED_PAGES: FixedPage[] = [
       en: {
         title: "For agents",
         description:
-          "The contract for AI agents: how to read a Lanza site (/llms.txt + window.lanza) and how to edit one (the Git repo + schema.ts). No database, no proprietary API.",
+          "Build a Lanza site for its human editor: MCP tools, templates, content types, editable fields, validation and a reviewable handoff.",
       },
       es: {
         title: "Para agentes",
         description:
-          "El contrato para agentes de IA: cómo leer un sitio Lanza (/llms.txt + window.lanza) y cómo editarlo (repositorio de Git + schema.ts). Sin base de datos, sin API propietaria.",
+          "Construye un sitio Lanza para quien lo edita: herramientas MCP, plantillas, tipos de contenido, campos editables, validación y entrega.",
       },
     },
   },

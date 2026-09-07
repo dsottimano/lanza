@@ -55,12 +55,12 @@ export function sectionsOf(fields: readonly Field[]): FieldSection[] {
 // review flagged — the point is to show a reviewer the changed fields and nothing else,
 // while leaving every field reachable. A form whose fields declare no `group` renders
 // exactly as it always has, with no disclosure in sight.
-import { computed, provide, reactive } from "vue";
+import { computed, nextTick, provide, reactive, ref } from "vue";
 import type { GitHubClient } from "../backend/github";
 import type { Locale } from "../backend/config";
 import FieldRows from "./FieldRows.vue";
-import { anyTouchesField } from "./field-paths";
-import { CLIENT_KEY, LOCALE_KEY } from "./context";
+import { anyTouchesField, touchesField } from "./field-paths";
+import { CLIENT_KEY, LOCALE_KEY, STRUCTURE_LOCKED } from "./context";
 
 const props = defineProps<{
   fields: Field[];
@@ -68,6 +68,8 @@ const props = defineProps<{
   client: GitHubClient;
   locale: Locale;
   dense?: boolean;
+  inlineObjects?: boolean;
+  structureLocked?: boolean;
   // Paths a review reports as changed, RELATIVE TO `data` — `cards.0.heading`, not
   // `slots.cards.0.heading`. Callers holding entry paths convert once on the way in
   // (fields/field-paths.ts); this component never does prefix arithmetic.
@@ -81,6 +83,7 @@ const emit = defineEmits<{ focusField: [path: string] }>();
 
 provide(CLIENT_KEY, props.client);
 provide(LOCALE_KEY, props.locale);
+provide(STRUCTURE_LOCKED, props.structureLocked === true);
 
 const sections = computed(() => sectionsOf(props.fields));
 // Nothing is grouped: render the rows straight, with no wrapper at all, so every form in
@@ -100,14 +103,49 @@ const isOpen = (section: FieldSection): boolean =>
 function onToggle(section: FieldSection, e: Event): void {
   toggled[section.group ?? ""] = (e.target as HTMLDetailsElement).open;
 }
+const root = ref<HTMLElement>();
+let focusRequest = 0;
+async function focusField(path: string): Promise<boolean> {
+  const request = ++focusRequest;
+  for (const section of sections.value) {
+    if (section.group && section.fields.some(field => touchesField(path, field.name))) {
+      toggled[section.group] = true;
+    }
+  }
+  // Nested object inputs mount their children when opened. Walk one depth per
+  // tick so even a collapsed object inside a list is reachable by its real path.
+  for (let depth = 0; depth <= path.split(".").length; depth++) {
+    await nextTick();
+    if (request !== focusRequest || !root.value) return false;
+    const fields = [...root.value.querySelectorAll<HTMLElement>("[data-field-path]")];
+    const field = fields.find(el => el.dataset.fieldPath === path);
+    const control = field?.querySelector<HTMLElement>('input:not([type="hidden"]), textarea, select');
+    if (control) {
+      control.focus({ preventScroll: true });
+      control.scrollIntoView?.({ block: "nearest" });
+      return true;
+    }
+    const ancestor = fields.find(el => el.tagName === "FIELDSET" &&
+      touchesField(path, el.dataset.fieldPath ?? "") &&
+      el.querySelector(':scope > legend button[aria-expanded="false"]'));
+    const button = ancestor?.querySelector<HTMLButtonElement>(':scope > legend button');
+    if (!button) return false;
+    button.click();
+  }
+  return false;
+}
+defineExpose({ focusField });
+
 </script>
 
 <template>
+  <div ref="root">
   <FieldRows
     v-if="flat"
     :fields="fields"
     :data="data"
     :dense="dense"
+    :inline-objects="inlineObjects"
     :changed="changed"
     @focus-field="emit('focusField', $event)"
   />
@@ -118,6 +156,7 @@ function onToggle(section: FieldSection, e: Event): void {
         :fields="s.fields"
         :data="data"
         :dense="dense"
+    :inline-objects="inlineObjects"
         :changed="changed"
         @focus-field="emit('focusField', $event)"
       />
@@ -143,11 +182,13 @@ function onToggle(section: FieldSection, e: Event): void {
             :fields="s.fields"
             :data="data"
             :dense="dense"
+    :inline-objects="inlineObjects"
             :changed="changed"
             @focus-field="emit('focusField', $event)"
           />
         </div>
       </details>
     </template>
+  </div>
   </div>
 </template>

@@ -15,6 +15,7 @@ export const DESIGN_DIR_PREFIXES = [
   "frontend/lib/",
   "frontend/styles/",
   "frontend/presets/",
+  "templates/",
 ];
 
 // … plus the content model. schema.json is the source of truth (the generator
@@ -37,6 +38,7 @@ function isDesignDataFile(path) {
   if (name.includes("/")) return false; // top-level data files only
   return (
     name === "appearance.json" ||
+    name === "styles.json" ||
     name === "site.json" ||
     /^seo\..+\.json$/.test(name) ||
     /^menu\..+\.json$/.test(name)

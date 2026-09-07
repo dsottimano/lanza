@@ -12,7 +12,7 @@ import { FIXED_PAGES, FIXED_SLUGS } from "../../lib/fixed-pages";
 export async function getStaticPaths() {
   const { localized } = splitEntries(await publishedPages());
   const cms = localized
-    .filter(({ slug }) => slug !== "home" && !FIXED_SLUGS.has(slug))
+    .filter(({ slug }) => slug !== "" && !FIXED_SLUGS.has(slug))
     .map(({ entry, locale, slug }) => ({
       params: { locale, slug },
       props: { page: entry, locale },

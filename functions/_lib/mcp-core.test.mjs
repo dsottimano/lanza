@@ -1292,3 +1292,61 @@ test("an LLM builds a pottery studio's site from a conversation, and the owner c
   assert.equal(out.published, true);
   assert.equal(gh.published, true);
 });
+
+test("agent discovery teaches the human editing workflow without performing writes", async () => {
+  globalThis.fetch = async () => { throw new Error("Guidance must not access the repository"); };
+  const initialized = await handleMessage({ jsonrpc: "2.0", id: 71, method: "initialize" }, client());
+  assert.match(initialized.result.instructions, /describe_site_system/);
+  assert.match(initialized.result.instructions, /human edits text, images/);
+  const { humanEditing: guide } = await callData("describe_site_system");
+  assert.equal(guide.guidanceVersion, 1);
+  assert.match(guide.surfaces.article.model, /body:'rich'/);
+  assert.match(guide.surfaces.designedPage.model, /frontmatter.slots/);
+  const advertised = new Set(TOOL_LIST.map(tool => tool.name));
+  for (const step of guide.workflow) for (const tool of step.tools) assert.ok(advertised.has(tool), `Guide advertises unavailable tool: ${tool}`);
+  assert.ok(guide.urlsAndLanguages.some(rule => rule.includes("301")));
+  assert.ok(guide.urlsAndLanguages.some(rule => rule.includes("shared filename stem")));
+  assert.ok(guide.limitations.some(rule => rule.includes("No MCP tool currently reads raw template")));
+});
+
+test("human editing examples build an editable landing page and article through MCP", async () => {
+  const schema = JSON.stringify([
+    { kind: "folder", name: "pages", folder: "content/pages", localized: true, body: "rich", fields: [
+      { name: "title", label: "Title", widget: "string" },
+      { name: "preset", label: "Design", widget: "preset" },
+      { name: "slots", label: "Content", widget: "slots" },
+    ] },
+    { kind: "folder", name: "posts", folder: "content/posts", localized: true, body: "rich", fields: [
+      { name: "title", label: "Title", widget: "string" },
+    ] },
+  ]);
+  const gh = fakeGitHub({ "data/schema.json": schema, "data/site.json": SITE });
+  const { humanEditing: guide } = await callData("describe_site_system");
+  for (const example of Object.values(guide.examples)) {
+    const result = await call(example.tool, example.arguments);
+    assert.notEqual(result.result.isError, true, JSON.stringify(result));
+  }
+  const template = JSON.parse(gh.files.get("templates/studio-intro/fields.json"));
+  assert.equal(template.body, false);
+  assert.ok(template.fields.every(field => field.group === "Introduction"));
+  const page = await callData("read_content", { path: "content/pages/en/studio.md" });
+  assert.equal(page.frontmatter.preset, "studio-intro");
+  assert.equal(page.frontmatter.slots.heading, "A space to make");
+  await callData("update_content", { path: "content/pages/en/studio.md", frontmatter: { slots: { heading: "Human's revised headline" } } });
+  const revised = await callData("read_content", { path: "content/pages/en/studio.md" });
+  assert.equal(revised.frontmatter.slots.introduction, page.frontmatter.slots.introduction);
+  const article = await callData("read_content", { path: "content/posts/en/notes-from-the-studio.md" });
+  assert.match(article.body_html, /<h2>What we are making<\/h2>/);
+  assert.equal(article.frontmatter.draft, true);
+  assert.equal((await callData("validate_site")).ok, true);
+  assert.equal(gh.published, false);
+});
+
+
+test("theme guidance is discoverable without granting installation tools", async () => {
+  globalThis.fetch = async () => { throw new Error("No repository reads expected"); };
+  const contract = await callData("describe_site_system");
+  assert.match(contract.themes.surfaces.starters, /Portfolio.*Real estate/);
+  assert.match(contract.themes.trust, /staging builds execute/);
+  assert.match(contract.themes.agentWorkflow.join(" "), /no MCP starter-install/);
+});

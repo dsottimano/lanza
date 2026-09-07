@@ -1,10 +1,12 @@
+import { readFileSync } from "node:fs";
+import { URL as NodeURL } from "node:url";
 // A theme bundle is the one input the CMS explicitly treats as UNTRUSTED: an
 // upload from a third party that gets committed straight into the tenant's repo.
 // These cases go through the real parseTheme → applyTheme path and assert refusal
 // **and** that nothing was committed — a rejection that still writes is not a
 // rejection.
 import { describe, it, expect } from "vitest";
-import { parseTheme, applyTheme } from "./theme";
+import { parseTheme, applyTheme, MAX_THEME_COMPRESSED_BYTES, MAX_THEME_EXPANDED_BYTES } from "./theme";
 import type { GitHubClient } from "./github";
 
 // ── a real .tar.gz, built in the test ────────────────────────────────────────
@@ -156,4 +158,61 @@ describe("theme bundles are confined to the design file set", () => {
     const written = await applyBundle([{ name: "files/data/schema.json", body: "[]" }]);
     expect(written).toEqual(["data/schema.json"]);
   });
+});
+
+
+describe("hostile theme archive parsing", () => {
+  it.each(["frontend/./styles/x.css", "frontend//styles/x.css", "frontend/%2e%2e/x.css", "frontend/styles/x\n.css"])("rejects ambiguous path %s", async (path) => {
+    await expect(parseTheme(await bundle([{ name: `files/${path}`, body: "x" }]))).rejects.toThrow(/file path/);
+  });
+
+  it("rejects duplicate payloads and manifests before committing", async () => {
+    for (const payload of [
+      [{ name: "files/frontend/styles/x.css", body: "a" }, { name: "files/frontend/styles/x.css", body: "b" }],
+      [{ name: "./theme.json", body: '{"name":"other","title":"Other"}' }],
+    ]) {
+      const { client, commits } = spyClient();
+      await expect((async () => applyTheme(client, await parseTheme(await bundle(payload))))()).rejects.toThrow(/Duplicate/);
+      expect(commits).toEqual([]);
+    }
+  });
+
+  it("rejects oversized uploads before reading bytes", async () => {
+    let read = false;
+    const file = { size: MAX_THEME_COMPRESSED_BYTES + 1, arrayBuffer: async () => { read = true; return new ArrayBuffer(0); } } as File;
+    await expect(parseTheme(file)).rejects.toThrow(/compressed limit/);
+    expect(read).toBe(false);
+  });
+
+  it("stops a gzip bomb at the expanded limit", async () => {
+    const stream = new Blob([new Uint8Array(MAX_THEME_EXPANDED_BYTES + 1)]).stream().pipeThrough(new CompressionStream("gzip"));
+    const file = new File([await new Response(stream).arrayBuffer()], "bomb.tar.gz");
+    expect(file.size).toBeLessThan(MAX_THEME_COMPRESSED_BYTES);
+    await expect(parseTheme(file)).rejects.toThrow(/expanded limit/);
+  });
+
+  it("rejects malformed sizes, truncated entries and links", async () => {
+    for (const mode of ["size", "truncated", "link"]) {
+      const bytes = tar([{ name: "theme.json", body: '{"name":"x","title":"X"}' }]);
+      if (mode === "size") bytes.fill(0x39, 124, 135);
+      if (mode === "truncated") bytes.set(ENC.encode("00077777777\0"), 124);
+      if (mode === "link") bytes[156] = 0x32;
+      const stream = new Blob([bytes as BlobPart]).stream().pipeThrough(new CompressionStream("gzip"));
+      await expect(parseTheme(new File([await new Response(stream).arrayBuffer()], "bad.tar.gz"))).rejects.toThrow(/Invalid tar size|Truncated|Unsupported/);
+    }
+  });
+
+  it.each([null, [], { name: {}, title: "X" }, { name: "x", title: " " }, { name: "x", title: "X", author: {} }])("rejects invalid manifest %j", async (manifest) => {
+    const bytes = tar([{ name: "theme.json", body: JSON.stringify(manifest) }, { name: "files/data/appearance.json", body: "{}" }]);
+    const stream = new Blob([bytes as BlobPart]).stream().pipeThrough(new CompressionStream("gzip"));
+    await expect(parseTheme(new File([await new Response(stream).arrayBuffer()], "bad.tar.gz"))).rejects.toThrow(/theme.json/);
+  });
+});
+
+
+it.each(["ocean", "default"])("imports the shipped %s bundle", async (name) => {
+  const bytes = readFileSync(new NodeURL(`../../../themes/lanza-theme-${name}.tar.gz`, import.meta.url));
+  const theme = await parseTheme(new File([bytes as BlobPart], `${name}.tar.gz`));
+  expect(theme.files.some(file => file.path === "data/appearance.json")).toBe(true);
+  expect(theme.files.some(file => file.path.startsWith("frontend/data/"))).toBe(false);
 });

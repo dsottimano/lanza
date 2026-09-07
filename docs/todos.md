@@ -14,6 +14,15 @@ Started 2026-08-15. Last restructured 2026-08-19.
 
 ---
 
+## Local writing-experience pass, 2026-09-06
+
+Implemented locally, not released: autosave and tab-local recovery, quieter post
+editing with focus mode and remembered panels, shared input fixes, tables and
+multi-paragraph callout/testimonial preservation. `writing-experience.md` records
+behavior and limits. The agent proposal store, combined content/review home and
+direct inline editing in the preview remain subsequent slices. The landing-page
+workspace now supports clicking preview text to focus the corresponding field.
+
 ## Where things stand, end of 2026-08-29 — the sovereignty release
 
 **Shipped and deployed to both `lanzacms.com` and `connect.lanzacms.com`.** Dave's

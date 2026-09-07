@@ -21,12 +21,12 @@ const outPath = join(process.cwd(), "public/_redirects");
 // Status codes Cloudflare's _redirects supports (200 = rewrite/proxy).
 const OK_STATUS = new Set([200, 301, 302, 303, 307, 308]);
 // A single token: a leading slash then no whitespace (blocks newline injection).
-const PATH_RE = /^\/\S+$/;
+const PATH_RE = /^\/\S*$/;
 
-// `from` shadows /admin if its literal prefix (before any `*` splat) is a prefix
-// of "/admin" (e.g. "/", "/ad") or sits under it ("/admin", "/admin/x").
+// Exact root redirects do not cover /admin. Wildcards and placeholders may.
 function shadowsAdmin(from) {
-  const prefix = from.split("*")[0];
+  if (!from.includes("*") && !from.includes(":")) return from === "/admin" || from.startsWith("/admin/");
+  const prefix = from.split(/[*:]/)[0];
   return "/admin".startsWith(prefix) || prefix.startsWith("/admin");
 }
 

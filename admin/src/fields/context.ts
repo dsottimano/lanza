@@ -9,3 +9,6 @@ export const CLIENT_KEY: InjectionKey<GitHubClient> = Symbol("lanza:client");
 // The active editing locale — the relation widget needs it to scope a localized
 // target collection to its per-locale subfolder. Provided alongside CLIENT_KEY.
 export const LOCALE_KEY: InjectionKey<Locale> = Symbol("lanza:locale");
+
+// Content editing can change existing values without changing page structure.
+export const STRUCTURE_LOCKED: InjectionKey<boolean> = Symbol("lanza:structure-locked");

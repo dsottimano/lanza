@@ -8,7 +8,7 @@ import { entryFolder, getCollection } from "../schema";
 import { CLIENT_KEY, LOCALE_KEY } from "./context";
 import { inputCls } from "./styles";
 
-const props = defineProps<{ field: Field }>();
+const props = defineProps<{ field: Field; inputId?: string }>();
 const model = defineModel<string | string[] | undefined>();
 
 const client = inject(CLIENT_KEY);
@@ -55,16 +55,16 @@ function toggle(slug: string) {
   <p v-else-if="!slugs.length" class="text-sm text-zinc-500">No entries yet.</p>
 
   <!-- multiple: checkbox chips -->
-  <div v-else-if="field.multiple" class="flex flex-wrap gap-1.5">
+  <div v-else-if="field.multiple" role="group" :aria-labelledby="inputId ? `${inputId}-label` : undefined" class="flex flex-wrap gap-1.5">
     <label
       v-for="s in slugs"
       :key="s"
-      class="inline-flex cursor-pointer items-center rounded-full border px-3 py-1 text-sm transition"
+      class="focus-within:ring-2 focus-within:ring-[var(--accent)] inline-flex cursor-pointer items-center rounded-full border px-3 py-1 text-sm transition"
       :class="selected.includes(s)
         ? 'border-zinc-900 bg-zinc-900 text-white'
         : 'border-[var(--border)] bg-[var(--surface)] text-zinc-700 hover:border-[var(--ink-soft)]'"
     >
-      <input type="checkbox" class="hidden" :checked="selected.includes(s)" @change="toggle(s)" />
+      <input type="checkbox" class="sr-only" :checked="selected.includes(s)" @change="toggle(s)" />
       {{ s }}
     </label>
   </div>
@@ -72,6 +72,7 @@ function toggle(slug: string) {
   <!-- single: dropdown -->
   <select
     v-else
+    :id="inputId"
     v-model="model"
     :class="inputCls"
   >

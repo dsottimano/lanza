@@ -70,8 +70,8 @@ async function apply() {
       <h1 class="mb-1 font-serif text-3xl font-bold tracking-tight text-zinc-900">Themes</h1>
       <p class="mb-6 text-sm text-zinc-600">
         Upload a prebuilt theme bundle (<code class="rounded bg-zinc-100 px-1 py-0.5 text-xs">.tar.gz</code>).
-        Applying it commits the theme to your repo in one commit and rebuilds the
-        site — it usually goes live in a minute or two.
+        Applying it saves the theme to staging in one commit. Review the staging
+        build and all pending changes before publishing.
       </p>
 
       <!-- Success -->
@@ -79,10 +79,10 @@ async function apply() {
         v-if="appliedSha"
         class="rounded-2xl border border-emerald-200 bg-emerald-50 p-6 text-sm text-emerald-900"
       >
-        <p class="font-semibold">✓ Theme applied.</p>
+        <p class="font-semibold">✓ Theme applied to staging.</p>
         <p class="mt-1">
           Committed as <code class="font-mono text-xs">{{ appliedSha.slice(0, 7) }}</code>.
-          Cloudflare Pages is rebuilding now; your site updates in ~1–2 minutes.
+          Check the staging build and preview. Publish is a separate step.
         </p>
         <button class="btn btn-primary mt-4 text-xs" @click="reset">
           Apply another theme
@@ -118,7 +118,8 @@ async function apply() {
             <strong>This rewrites {{ theme.files.length }}
             file{{ theme.files.length === 1 ? "" : "s" }}</strong>
             in your site and triggers a rebuild. Existing files at these paths are
-            overwritten — you can revert from git if needed.
+            overwritten. Only apply themes from trusted authors: design code can run
+            during the staging build. Theme history can prepare a revert.
           </p>
           <p v-if="theme.manifest.rebuildNote" class="mt-1">{{ theme.manifest.rebuildNote }}</p>
         </div>
@@ -135,7 +136,7 @@ async function apply() {
 
         <div class="mt-6 flex items-center gap-3">
           <button class="btn btn-primary" :disabled="applying" @click="apply">
-            {{ applying ? `Applying… ${progress.done}/${progress.total}` : "Apply theme" }}
+            {{ applying ? `Applying… ${progress.done}/${progress.total}` : "Apply to staging" }}
           </button>
           <button
             v-if="!applying"

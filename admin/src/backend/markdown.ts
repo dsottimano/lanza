@@ -4,7 +4,7 @@ import { marked } from "marked";
 // upgrade markdown → HTML so the editor shows formatted content. One-way:
 // once saved from Lanza the body is HTML and `looksLikeHtml` short-circuits.
 export function looksLikeHtml(body: string): boolean {
-  return /<([a-z][a-z0-9]*)\b[^>]*>/i.test(body.trim());
+  return /^<(?:p|h[1-6]|div|section|article|blockquote|ul|ol|pre|table|figure|details|iframe|video|audio|hr)\b[^>]*>/i.test(body.trim());
 }
 
 export function toEditorHtml(body: string): string {
