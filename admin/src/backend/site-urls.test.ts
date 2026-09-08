@@ -1,5 +1,5 @@
-import { describe, it, expect, beforeEach } from "vitest";
-import { entryPath, entryPathFrame } from "./site-urls";
+import { describe, it, expect, beforeEach, vi } from "vitest";
+import { entryPath, entryPathFrame, resolveStagingOrigin, stagingOrigin, liveOrigin } from "./site-urls";
 import { site } from "./site";
 
 // The locale prefix rule has exactly one home in the admin (site-urls.ts). These
@@ -61,5 +61,29 @@ describe("entryPathFrame — the path either side of an editable slug", () => {
 
   it("frames the locale root with no trailing segment", () => {
     expect(entryPathFrame("pages", "", "es")).toEqual({ prefix: "/es/", suffix: "" });
+  });
+});
+
+
+describe("automatic site addresses", () => {
+  it("uses declared production domain and project without a Cloudflare connection", async () => {
+    site.url = null;
+    const loadJson = vi.fn().mockResolvedValue({ data: { domains: ["lanzacms.com"], pagesProject: "lanza" } });
+    await resolveStagingOrigin({ loadJson } as any);
+    expect(liveOrigin.value).toBe("https://lanzacms.com");
+    expect(stagingOrigin.value).toBe("https://staging.lanza.pages.dev");
+    expect(loadJson).toHaveBeenCalledTimes(1);
+    site.url = "https://custom.example/path";
+    expect(liveOrigin.value).toBe("https://custom.example");
+  });
+
+  it("rejects unsafe URLs and clears a previous tenant's addresses on failure", async () => {
+    site.url = "javascript:alert(1)";
+    await resolveStagingOrigin({ loadJson: vi.fn().mockResolvedValue({ data: { domains: ["https://user:pass@example.com"], pagesProject: "bad/name" } }) } as any);
+    expect(liveOrigin.value).toBeNull();
+    expect(stagingOrigin.value).toBeNull();
+    await resolveStagingOrigin({ loadJson: vi.fn().mockRejectedValue(new Error("offline")) } as any);
+    expect(liveOrigin.value).toBeNull();
+    expect(stagingOrigin.value).toBeNull();
   });
 });

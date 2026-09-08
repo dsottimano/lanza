@@ -9,7 +9,7 @@
 // the broker (`functions/_lib/tenant-origin.ts`, projectNameCandidates) — the two
 // derivations must stay in step, because a change there silently points every link
 // here at a hostname that does not resolve.
-import { ref } from "vue";
+import { computed, ref } from "vue";
 import type { GitHubClient } from "./github";
 import { REPO } from "./config";
 import { site } from "./site";
@@ -42,22 +42,33 @@ async function repoHash(owner: string, repo: string): Promise<string> {
 /** `https://staging.<project>.pages.dev`, or null while unresolved / underivable. */
 export const stagingOrigin = ref<string | null>(null);
 
-export async function resolveStagingOrigin(client: GitHubClient): Promise<void> {
-  // Fast path: on `<project>.pages.dev` the project name is already in the hostname,
-  // so the common tenant costs no request. (`staging.<project>.pages.dev/admin`
-  // redirects to the live CMS, so this host is never itself a staging host.)
-  const direct = /^([a-z0-9-]+)\.pages\.dev$/.exec(window.location.hostname);
-  if (direct) {
-    stagingOrigin.value = `https://${REPO.branch}.${direct[1]}.pages.dev`;
-    return;
-  }
+export const detectedLiveOrigin = ref<string | null>(null);
+export const liveOrigin = computed(() => safeOrigin(site.url) ?? detectedLiveOrigin.value);
 
-  // Custom domain: the hostname says nothing about the project, so derive it from
-  // owner/repo. The SPA deliberately does not hold its own repo identity (see
-  // config.ts) — but it can READ it, because the proxy prepends the tenant's repo to
-  // every path, so this can only ever return OUR config.
+export function safeOrigin(value: unknown): string | null {
+  if (typeof value !== "string" || !value.trim()) return null;
+  try {
+    const url = new URL(value);
+    return url.protocol === "https:" && !url.username && !url.password ? url.origin : null;
+  } catch { return null; }
+}
+
+export async function resolveStagingOrigin(client: GitHubClient): Promise<void> {
+  stagingOrigin.value = null;
+  detectedLiveOrigin.value = null;
+  // Read declared domains even on pages.dev, so live links use the canonical host.
+  const direct = /^(?:[a-z0-9-]+\.)?([a-z0-9-]+)\.pages\.dev$/.exec(window.location.hostname);
+  if (direct) {
+    detectedLiveOrigin.value = `https://${direct[1]}.pages.dev`;
+    stagingOrigin.value = `https://${REPO.branch}.${direct[1]}.pages.dev`;
+  }
   try {
     const { data } = await client.loadJson("lanza.config.json", REPO.productionBranch);
+    const domain = Array.isArray(data.domains) ? data.domains[0] : null;
+    if (typeof domain === "string" && domain.trim()) {
+      detectedLiveOrigin.value = safeOrigin(/^https?:\/\//i.test(domain.trim()) ? domain.trim() : `https://${domain.trim()}`) ?? detectedLiveOrigin.value;
+    }
+    if (direct) return;
 
     // Explicit `pagesProject` beats derivation: a site whose Pages project was not
     // created by the broker (dsottimano/lanza is one — its project is just `lanza`)
@@ -67,6 +78,7 @@ export async function resolveStagingOrigin(client: GitHubClient): Promise<void> 
     if (declared) {
       if (/^[a-z0-9][a-z0-9-]{0,57}$/.test(declared)) {
         stagingOrigin.value = `https://${REPO.branch}.${declared}.pages.dev`;
+        detectedLiveOrigin.value ??= `https://${declared}.pages.dev`;
       }
       return;
     }
@@ -74,10 +86,12 @@ export async function resolveStagingOrigin(client: GitHubClient): Promise<void> 
     const owner = typeof data.owner === "string" ? data.owner : "";
     const name = typeof data.name === "string" ? data.name : "";
     if (!owner || !name) return;
-    stagingOrigin.value = `https://${REPO.branch}.${slug(name)}-${await repoHash(owner, name)}.pages.dev`;
+    const project = `${slug(name)}-${await repoHash(owner, name)}`;
+    stagingOrigin.value = `https://${REPO.branch}.${project}.pages.dev`;
+    detectedLiveOrigin.value ??= `https://${project}.pages.dev`;
   } catch {
     // Advisory chrome only — a missing View link is never worth blocking the CMS for.
-    stagingOrigin.value = null;
+    // Keep the hostname-derived fallback when the advisory config read fails.
   }
 }
 

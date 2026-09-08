@@ -45,12 +45,25 @@ describe("Sidebar navigation", () => {
     expect(wrapper.text()).toContain("Help & guide");
   });
 
-  it("keeps review and publish as separate actions", async () => {
-    const wrapper = mount(Sidebar, { props: defaults });
-    await wrapper.findAll("button").find((b) => b.text() === "Review changes")!.trigger("click");
+  it("offers one review action only when saved changes exist", async () => {
+    const wrapper = mount(Sidebar, { props: { ...defaults, pendingCount: 0 } });
+    expect(wrapper.find(".sidebar-publish").exists()).toBe(false);
+    await wrapper.setProps({ pendingCount: 3 });
+    expect(wrapper.text()).not.toContain("Review changes");
+    await wrapper.find(".sidebar-publish").trigger("click");
     expect(wrapper.emitted("pending")).toHaveLength(1);
     expect(wrapper.emitted("publish")).toBeUndefined();
-    await wrapper.find(".sidebar-publish").trigger("click");
-    expect(wrapper.emitted("publish")).toHaveLength(1);
+    await wrapper.setProps({ pendingCount: 0 });
+    expect(wrapper.find(".sidebar-publish").exists()).toBe(false);
   });
+  it("offers a retry when the change check fails without hiding known changes", async () => {
+    const wrapper = mount(Sidebar, { props: { ...defaults, pendingCount: 2, pendingCheckFailed: true } });
+    expect(wrapper.find(".sidebar-publish").exists()).toBe(true);
+    await wrapper.findAll("button").find(b => b.text() === "Retry")!.trigger("click");
+    expect(wrapper.emitted("retryPending")).toHaveLength(1);
+    await wrapper.setProps({ pendingCount: null });
+    expect(wrapper.find(".sidebar-publish").exists()).toBe(false);
+    expect(wrapper.text()).toContain("Retry");
+  });
+
 });

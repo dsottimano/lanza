@@ -1,3 +1,4 @@
+import { repositoryRevision, pendingCount, pendingCheckFailed } from "./repository-state";
 import { REPO } from "./config";
 import { parseFrontmatter, serializeFrontmatter } from "./frontmatter";
 
@@ -80,6 +81,9 @@ export class GitHubClient {
         /* non-JSON body — keep raw text */
       }
       throw new GitHubError(res.status, detail);
+    }
+    if (init.method && init.method !== "GET" && /^(\/contents\/|\/git\/refs(?:\/|$)|\/merges$)/.test(path)) {
+      repositoryRevision.value++;
     }
     return res.status === 204 ? null : res.json();
   }
@@ -433,7 +437,10 @@ export class GitHubClient {
    * publish request always refer to the same draft. */
   async publishReview(): Promise<PublishReview> {
     const heads = await this.publishHeads();
-    return { ...heads, diff: await this.compare(heads.productionSha, heads.stagingSha) };
+    const diff = await this.compare(heads.productionSha, heads.stagingSha);
+    pendingCount.value = diff.files?.length ?? 0;
+    pendingCheckFailed.value = false;
+    return { ...heads, diff };
   }
 
   private async publishHeads(): Promise<PublishHeads> {

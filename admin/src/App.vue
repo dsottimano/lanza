@@ -51,7 +51,9 @@ const OnboardingWizard = lazyPane(() => import("./ui/OnboardingWizard.vue"));
 import { GitHubClient } from "./backend/github";
 import type { Locale } from "./backend/config";
 import { site, loadSiteConfig } from "./backend/site";
-import { resolveStagingOrigin } from "./backend/site-urls";
+import { pendingCount, pendingCheckFailed } from "./backend/repository-state";
+import { usePendingCount } from "./ui/usePendingCount";
+import { liveOrigin, stagingOrigin, resolveStagingOrigin } from "./backend/site-urls";
 import { loadSchema } from "./backend/schema";
 import { refreshVersionState } from "./backend/version";
 import { access, loadAccess } from "./backend/access";
@@ -107,9 +109,6 @@ client.value
     Promise.all([
       loadSiteConfig(client.value),
       loadSchema(client.value),
-      // Advisory only — resolves the "View" links. Never rejects, so it cannot
-      // stop the boot chain that follows.
-      resolveStagingOrigin(client.value),
       // Who is signed in and what they may do. Also never rejects: it fails to
       // "not an owner", so a hiccup hides owner-only controls rather than
       // offering them. The server enforces the same rule either way.
@@ -125,6 +124,7 @@ client.value
   .catch((e) => reportError(e))
   .finally(() => {
     ready.value = true;
+    void resolveStagingOrigin(client.value);
     // Advisory chrome for the sidebar's version line — deliberately NOT awaited,
     // so a slow or unreachable npm registry can never delay the CMS booting.
     void refreshVersionState(client.value);
@@ -135,6 +135,7 @@ client.value
 // "yes" by default. This only decides what is OFFERED: the gh proxy re-checks every
 // write against lanza.config.json regardless (functions/_lib/roles.ts).
 const ownerView = computed(() => access.loaded && access.role === "owner");
+const { retry: retryPending } = usePendingCount(client.value, ownerView);
 
 // Every navigation guards on unsaved changes — one global guard replaces the
 // per-action confirmDiscard() calls the manual nav functions used to make.
@@ -281,6 +282,9 @@ function onOnboarded() {
       :people-open="pane === 'people'"
       :agent-open="pane === 'agent'"
       :is-owner="ownerView"
+      :pending-count="pendingCount"
+      :pending-check-failed="pendingCheckFailed"
+      @retry-pending="retryPending"
       :publish-open="pane === 'publish'"
       :pending-open="pane === 'pending'"
       :help-open="pane === 'help'"
@@ -300,6 +304,10 @@ function onOnboarded() {
       @help="openHelp"
     />
     <main class="min-w-0 flex-1">
+      <div v-show="!(pane === 'editRich' && focusMode)" class="flex flex-wrap justify-end gap-4 border-b border-[var(--border)] px-5 py-2 text-xs text-zinc-600" aria-label="Site links">
+        <a v-if="stagingOrigin" :href="stagingOrigin" target="_blank" rel="noopener noreferrer" title="Saved changes appear after the staging build finishes">View staging ↗</a>
+        <a v-if="liveOrigin" :href="liveOrigin" target="_blank" rel="noopener noreferrer">View live site ↗</a>
+      </div>
       <!-- Crossfade the main-column swap so switching panes doesn't hard-flash.
            Each branch below carries its own :key, so same-component switches
            (e.g. list → list) also fade. mode="out-in" avoids overlap. -->

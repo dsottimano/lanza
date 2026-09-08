@@ -35,6 +35,8 @@ const props = defineProps<{
   // just a question the UI refuses to answer. Defaults to false so the rail is
   // never briefly permissive while access is still loading.
   isOwner: boolean;
+  pendingCount?: number | null;
+  pendingCheckFailed?: boolean;
   publishOpen: boolean;
   pendingOpen: boolean;
   helpOpen: boolean;
@@ -53,6 +55,7 @@ const emit = defineEmits<{
   (e: "agent"): void;
   (e: "publish"): void;
   (e: "pending"): void;
+  (e: "retryPending"): void;
   (e: "help"): void;
 }>();
 
@@ -316,27 +319,20 @@ const itemActive = "nav-item--active";
     </div>
 
     <div class="sidebar-footer flex-shrink-0 border-t border-[var(--border)] pt-2 flex flex-col gap-0.5">
-      <!-- Sits directly above Publish because it is the step before it: see what
-           would go out, then send it. Owner-only for the same reason Publish is. -->
       <button
-        v-if="isOwner"
-        class="nav-item flex items-center gap-1.5"
-        :class="{ 'nav-item--active': pendingOpen }"
-        :aria-current="pendingOpen ? 'page' : undefined"
+        v-if="isOwner && (pendingCount || pendingOpen || publishOpen)"
+        class="nav-item sidebar-publish flex items-center gap-1.5"
+        :class="{ 'nav-item--active': publishOpen || pendingOpen }"
+        :aria-current="publishOpen || pendingOpen ? 'page' : undefined"
         @click="emit('pending')"
       >
-        <SidebarIcon name="pending" />Review changes
-      </button>
-      <button
-        v-if="isOwner"
-        class="nav-item sidebar-publish flex items-center gap-1.5"
-        :class="{ 'nav-item--active': publishOpen }"
-        :aria-current="publishOpen ? 'page' : undefined"
-        @click="emit('publish')"
-      >
         <SidebarIcon name="publish" />Review &amp; publish
-        <span class="ml-auto" aria-hidden="true">↗</span>
+        <span v-if="pendingCount" class="ml-auto">{{ pendingCount }}</span>
       </button>
+      <div v-if="isOwner && pendingCheckFailed" class="px-2 py-1 text-xs text-zinc-600" role="status">
+        Couldn't check for changes.
+        <button class="underline" @click="emit('retryPending')">Retry</button>
+      </div>
       <button
         class="nav-item flex items-center gap-1.5"
         :class="{ 'nav-item--active': helpOpen }"

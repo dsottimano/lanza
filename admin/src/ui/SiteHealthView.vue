@@ -9,6 +9,7 @@ import SettingsHeader from "./SettingsHeader.vue";
 import { onMounted, reactive, ref } from "vue";
 import { GitHubClient } from "../backend/github";
 import { site } from "../backend/site";
+import { liveOrigin, stagingOrigin } from "../backend/site-urls";
 import {
   useHealthChecks,
   SERVICE_META,
@@ -258,17 +259,20 @@ onMounted(refreshAll);
         <!-- Site address (Astro `site` → canonical / OG / hreflang) -->
         <section class="card p-5">
           <div class="flex items-start gap-3">
-            <span class="mt-1.5 h-2.5 w-2.5 shrink-0 rounded-full" :class="site.url ? dotClass.ok : dotClass.muted" />
+            <span class="mt-1.5 h-2.5 w-2.5 shrink-0 rounded-full" :class="liveOrigin ? dotClass.ok : dotClass.muted" />
             <div class="min-w-0 flex-1">
               <h3 class="font-semibold text-zinc-900">Site address</h3>
               <p class="mt-0.5 text-sm text-zinc-600">
                 The public URL used for canonical links, social previews and search.
               </p>
               <p class="mt-2 break-all text-sm">
-                <span v-if="site.url" class="font-medium text-zinc-800">{{ site.url }}</span>
-                <span v-else class="text-zinc-500">Not set — the build falls back to the deployment URL.</span>
+                <span v-if="liveOrigin" class="font-medium text-zinc-800">{{ liveOrigin }}{{ !site.url ? " (automatic)" : "" }}</span>
+                <span v-else class="text-zinc-500">No address detected yet. Set your public address below.</span>
               </p>
 
+              <p v-if="stagingOrigin" class="mt-2 text-sm text-zinc-600">
+                Staging: <a :href="stagingOrigin" target="_blank" rel="noopener noreferrer" class="underline">{{ stagingOrigin }}</a>
+              </p>
               <!-- Derive from the connected Pages project -->
               <button
                 v-if="siteUrlCard.suggestion && siteUrlCard.suggestion !== site.url"
