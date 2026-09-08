@@ -2,6 +2,20 @@
   "theme": "freehold",
   "logo": "",
   "brand": {
+    "colors": {
+      "bg": "#f3f1ea",
+      "surface": "#eae7dd",
+      "ink": "#201d1b",
+      "muted": "#6b655e",
+      "accent": "#3f3c3b",
+      "border": "#ddd8cc"
+    },
+    "radius": "2px",
+    "motion": "on",
+    "fonts": {
+      "heading": "jost",
+      "body": "jost"
+    },
     "scheme": "light"
   },
   "plugins": {
