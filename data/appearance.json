@@ -3,5 +3,9 @@
   "logo": "",
   "brand": {
     "scheme": "light"
+  },
+  "plugins": {
+    "readingProgress": true,
+    "imageZoom": false
   }
 }
