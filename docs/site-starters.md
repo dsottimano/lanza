@@ -4,7 +4,10 @@ Settings → Brand & themes → Site starters offers complete, additive starting
 Portfolio provides project collections, case studies, galleries and an introduction
 page. Real estate provides property listings, prices, availability, property facts,
 galleries and an agency introduction. Each supports Editorial, Gallery and Nocturne
-styles. The picker renders the actual introduction template before installation.
+styles, plus Folio and Cobalt. Writer adds an essay archive and reading pages;
+Events adds a programme, event details and external ticket links. These four
+starters have distinct layouts. The picker renders actual introduction, listing
+and detail templates at desktop and mobile widths before installation.
 
 Choose an enabled language and whether to include example entries, then **Review
 installation**. The review lists the files and public paths. **Install to staging**
@@ -18,7 +21,7 @@ page paths, style IDs and conflicting redirects cause installation to refuse.
 Navigation links are appended in the selected language; device inheritance survives.
 
 Open Projects or Properties in the CMS to replace examples. Edit the introduction
-through Pages. Upload your images, describe them, and supply email/contact-page
+through Pages. Writer entries live in Essays; event entries live in Events. Upload your images, describe them, and supply email/contact-page
 links. Example content and introductory copy are English even when another language
 is selected. Included examples are marked Ready so they appear in staging; replace
 or mark them Draft before publishing. Clear the visible starter notes when ready.
@@ -26,7 +29,7 @@ Agents own template structure and collection/list configuration; humans edit ent
 text, images and facts using the existing writing surface.
 
 The selected style is scoped to the starter templates, preserving the site's global
-brand and header/footer. It is not a whole-site rebrand. The three variants are also
+brand and header/footer. It is not a whole-site rebrand. The five variants are also
 added to `data/styles.json`. To change an installed starter's scoped style, an agent
 can update its template token overrides; the picker does not reinstall over edits.
 Theme export/import now includes `templates/` and `data/styles.json`; content and
@@ -61,3 +64,17 @@ use the existing template/content-type tools or direct the owner to the CMS pick
 For whole-theme replacement, bundle format, trust and export options, see
 [the theme guide](../themes/README.md). MCP exposes these distinctions in
 `describe_site_system.themes`; this guidance does not add installation permissions.
+
+## September 7 design expansion
+
+Portfolio uses an asymmetric introduction and numbered service sections; Real estate
+uses a wide property showcase; Writer uses a centered masthead and single-column
+archive; Events uses a poster-style introduction and programme cards. Existing
+installed templates are not rewritten by a package update. Their saved fields and
+content remain intact; installation continues to refuse collisions.
+
+The two new starters create `/writer/` and `/gatherings/` introductions when the
+locale already has a homepage. Their collections use `/essays/` and `/events/`,
+keeping the overview and listing distinct. Without
+a homepage, each starter creates that locale's root page. All detail and listing
+routes come from the declared collection.

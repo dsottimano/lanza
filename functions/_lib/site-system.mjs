@@ -623,7 +623,8 @@ export function siteSystemContract() {
       cmsLocation: "Settings → Brand & themes",
       surfaces: {
         brand: "Shared colours, fonts, corners and motion; MCP set_brand supports these settings.",
-        starters: "Portfolio and Real estate add editable templates, collections and an introduction. Editorial, Gallery and Nocturne styles are scoped to starter templates. Review installation, then Install to staging in the CMS.",
+        starters: "Portfolio, Real estate, Writer and Events add editable templates, collections and an introduction. Editorial, Gallery, Nocturne, Folio and Cobalt styles are scoped to starter templates. Review installation, then Install to staging in the CMS.",
+        plugins: "Plugins are built by an agent for the human's needs and owned in the human's repository. No third-party plugin installation or marketplace is planned. Settings → Brand & themes → Plugins currently offers reading progress and image zoom as built-in examples, disabled by default and applied to staging. A dedicated agent plugin-authoring workflow is not yet implemented; repository code changes follow the existing schema, testing, review and publishing contracts.",
         bundles: "Themes imports/exports .tar.gz design bundles. Applying overwrites listed paths on staging. Content and uploaded media are opt-in export additions; a base theme is not a full backup.",
       },
       starterRules: [

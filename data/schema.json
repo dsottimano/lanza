@@ -362,6 +362,28 @@
             "widget": "image",
             "required": false,
             "hint": "Shown in the site header in place of the text wordmark. Leave empty to use the site name."
+          },
+          {
+            "name": "plugins",
+            "label": "Site plugins",
+            "widget": "object",
+            "required": false,
+            "fields": [
+              {
+                "name": "readingProgress",
+                "label": "Reading progress",
+                "widget": "boolean",
+                "default": false,
+                "required": false
+              },
+              {
+                "name": "imageZoom",
+                "label": "Image zoom",
+                "widget": "boolean",
+                "default": false,
+                "required": false
+              }
+            ]
           }
         ]
       },

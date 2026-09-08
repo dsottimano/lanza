@@ -6,12 +6,15 @@ what you want to change:
 | Surface | Purpose | What it changes |
 |---|---|---|
 | Brand | Colours, fonts, corners and motion | Shared brand settings |
-| Site starters | Portfolio or Real estate with editable pages and collections | Adds templates, a collection, introduction, navigation and style options |
+| Site starters | Portfolio, Real estate, Writer or Events with editable pages and collections | Adds templates, a collection, introduction, navigation and style options |
+| Plugins | Optional first-party reading progress and image zoom | Saves enable/disable choices to staging |
 | Themes | Import/export a `.tar.gz` design bundle | Creates or overwrites the files listed in the bundle |
 
 ## Site starters
 
-Choose Portfolio or Real estate, then Editorial, Gallery or Nocturne. Choose an
+Choose Portfolio, Real estate, Writer or Events, then Editorial, Gallery, Nocturne,
+Folio or Cobalt. Compare introduction, listing and detail pages at desktop or mobile
+widths. Choose an
 enabled language and whether to include examples. **Review installation** shows
 files and public paths; **Install to staging** applies that reviewed snapshot in
 one commit. If the repository changes, prepare a new review.
@@ -102,3 +105,13 @@ these surfaces and their boundaries. MCP can change brand settings, templates,
 parts and content types through its advertised tools. It has no theme-bundle
 import/export or starter-install tool. Use the CMS picker, or the local starter CLI
 with repository access. Never claim an installation or publication that did not run.
+
+## Reversible design and plugin choices
+
+Brand controls preview edits locally. Cancel restores the last loaded or applied
+brand, including fonts, colors, corners, motion and scheme. Apply to staging saves
+the choice; publication is still separate. Starter installation review also has a
+Cancel action that writes nothing. This does not add layout switching for installed
+starter templates.
+
+See [Site plugins](../docs/site-plugins.md) for the first-party catalog and its limits.

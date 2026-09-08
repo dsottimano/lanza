@@ -27,6 +27,8 @@ release old package versions, or treat old test counts as the current baseline.
   distinguishable. Git authorship does not prove human thought.
 - The CMS supports reviewing, finding, developing and curating thoughts and public work.
 - Preserve sovereign auth: no broker-held customer credential.
+- Plugins are built by an agent for the human and owned in the human's repository.
+  No third-party plugin installation or marketplace.
 
 ## Now: prove one complete thought workflow
 
@@ -90,8 +92,16 @@ See [Publishing and reconciliation](publishing.md) for the incident and workflow
   do not replace approved copy or advertise the notebook as shipped.
 - [ ] Simplify designed-page settings: remove irrelevant block/image/excerpt controls
   where the chosen template does not use them. Page blocks are already retired.
-- [ ] Make design changes deliberate and reversible: preview, Cancel and Apply;
-  restore the exact starting state on Cancel. Layout/template switching remains open.
+- [x] Brand changes now support preview, Cancel and Apply to staging; Cancel restores
+  the last loaded/applied brand. Starter installation review can also be canceled.
+- [x] Expand site starters to Portfolio, Real estate, Writer and Events with five
+  looks and introduction/listing/detail previews. Add optional first-party reading
+  progress and image zoom under Brand & themes → Plugins.
+- [ ] Layout/template switching for installed designs remains open.
+- [ ] Develop the agent-built plugin workflow: turn a human's requested feature
+  into site-owned code and declared settings, with testing, review and reversible
+  enable/disable controls. The current two built-in plugins are examples; no
+  third-party installation is planned. See [site plugins](site-plugins.md).
 - [ ] Improve content-type deletion discoverability. It works under Advanced
   settings → Remove content type, but the user could not find it. No subsequent
   visibility improvement was implemented.

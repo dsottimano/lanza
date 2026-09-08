@@ -226,7 +226,7 @@ the actual CMS and advertised tools. Recommendations are distinct from machine c
 
 ## First-party site starters
 
-Portfolio and real-estate starters compose these same layers through a shared,
+Portfolio, real-estate, writer and events starters compose these same layers through a shared,
 additive planner. The CMS picker previews designs and commits an installation to
 staging; the local CLI uses the same plan. See [Site starters](site-starters.md) for
 installation, scope and extension rules. Starter templates and style variants are
@@ -303,3 +303,12 @@ result must be reviewed again. New draft edits after the final check remain draf
 Repository agents must use the branch workflow in `AGENTS.md`. The checked-in
 pre-push guard fetches remote staging and refuses a main push that omits its commits.
 It must be enabled per checkout; GitHub/API writes are not covered by local hooks.
+
+## Optional first-party site features
+
+Settings → Brand & themes → Plugins manages reading progress and image zoom.
+`data/appearance.json` stores explicit boolean choices; absent values are off.
+See [Site plugins](site-plugins.md). Plugins are built by an agent for the human's
+needs and owned in the human's repository. There is no third-party installation or
+marketplace planned. The current static renderer enables the two built-in examples;
+a dedicated agent authoring workflow remains to be built.

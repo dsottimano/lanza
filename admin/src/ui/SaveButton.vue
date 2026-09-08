@@ -6,7 +6,7 @@
 import { computed, onBeforeUnmount, ref } from "vue";
 
 // `action` may resolve to anything (e.g. the saved path) — the button ignores it.
-const props = defineProps<{ action: () => Promise<unknown>; disabled?: boolean }>();
+const props = defineProps<{ action: () => Promise<unknown>; disabled?: boolean; label?: string }>();
 const emit = defineEmits<{
   (e: "saved"): void;
   (e: "error", err: unknown): void;
@@ -41,7 +41,7 @@ const label = computed(() =>
       ? "Saved"
       : state.value === "error"
         ? "Retry"
-        : "Save",
+        : props.label ?? "Save",
 );
 
 const tone = computed(() => {

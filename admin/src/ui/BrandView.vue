@@ -32,6 +32,7 @@ defineEmits<{ (e: "back"): void }>();
 const loading = ref(true);
 const loadFailed = ref(false);
 const savedOnce = ref(false);
+const saving = ref(false);
 const brand = reactive<BrandConfig>(defaultBrand());
 let baseline = "";
 
@@ -86,12 +87,25 @@ function resetToDefaults() {
   applyPreset(defaultBrand());
 }
 
+function cancel() {
+  if (!baseline || saving.value) return;
+  Object.assign(brand, JSON.parse(baseline));
+  isDirty.value = false;
+  savedOnce.value = false;
+}
+
 async function save() {
   if (loading.value || loadFailed.value) throw new Error("Load the current appearance before saving.");
-  await saveBrand(props.client, JSON.parse(JSON.stringify(brand)) as BrandConfig);
-  baseline = snapshot();
-  isDirty.value = false;
-  savedOnce.value = true;
+  saving.value = true;
+  const submitted = snapshot();
+  try {
+    await saveBrand(props.client, JSON.parse(submitted) as BrandConfig);
+    baseline = submitted;
+    isDirty.value = snapshot() !== baseline;
+    savedOnce.value = !isDirty.value;
+  } finally {
+    saving.value = false;
+  }
 }
 
 // ── live preview ──────────────────────────────────────────────────────────
@@ -144,9 +158,11 @@ const fontOptions = FONT_IDS.map((id) => ({ id, label: FONT_CATALOG[id].label })
     </div>
     <SettingsHeader title="Brand &amp; themes" @back="$emit('back')">
       <template #actions>
+        <button class="btn btn-ghost" :disabled="loading || loadFailed || saving || !isDirty" @click="cancel">Cancel</button>
         <SaveButton
           :action="save"
-          :disabled="loading || loadFailed"
+          label="Apply to staging"
+          :disabled="loading || loadFailed || saving || !isDirty"
           @saved="clearError"
           @error="(e) => reportError(e, 'Saving your brand failed — nothing was committed.')"
         />
@@ -166,7 +182,8 @@ const fontOptions = FONT_IDS.map((id) => ({ id, label: FONT_CATALOG[id].label })
 
       <div v-else class="brand-workspace">
         <!-- ── controls ─────────────────────────────────────────────────── -->
-        <div class="brand-controls">
+        <fieldset class="brand-controls" :disabled="loadFailed || saving">
+          <legend class="sr-only">Brand settings</legend>
           <!-- Presets -->
           <section class="brand-section">
             <h2 class="mb-1 text-sm font-semibold text-zinc-900">Palettes</h2>
@@ -300,7 +317,7 @@ const fontOptions = FONT_IDS.map((id) => ({ id, label: FONT_CATALOG[id].label })
           </details>
 
           <button class="brand-reset" @click="resetToDefaults">Reset to Lanza defaults</button>
-        </div>
+        </fieldset>
 
         <!-- ── live preview ─────────────────────────────────────────────── -->
         <div class="brand-preview-stage">

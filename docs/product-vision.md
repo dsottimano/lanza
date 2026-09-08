@@ -96,3 +96,15 @@ Cloudflare is the land. GitHub is the house and its history. Lanza helps the per
 - Publishing a derived article leaves the notebook private.
 - Disconnecting an agent or leaving Lanza does not take away the person's files or domain.
 - Public copy describes the actual release honestly.
+
+## Plugins built for the person
+
+A plugin is a capability an agent builds for the human's needs and stores in that
+person's repository. The human requests the feature; the agent implements and tests
+it, exposes the relevant settings, and presents a reviewable change. The human
+controls enabling, disabling and publishing it. There will be no third-party plugin
+installation or marketplace. This extends the existing site composition and review
+contracts; it does not introduce another source of customer credentials.
+
+The current reading-progress and image-zoom features are built-in examples. A
+dedicated agent plugin-authoring workflow remains to be built.

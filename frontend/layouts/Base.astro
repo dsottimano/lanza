@@ -12,6 +12,8 @@ import { getMenu, getSeoDefaults, resolveDevices } from "../lib/site";
 import { isLanding } from "../lib/templates";
 import { resolveBrand, type Appearance } from "../lib/appearance";
 import { renderPart } from "../lib/parts";
+import SitePlugins from "../components/SitePlugins.astro";
+import { resolveSitePlugins } from "../lib/site-plugins";
 
 interface Props {
   seo?: PageSeo;
@@ -36,6 +38,7 @@ const landing = isLanding(template ?? "default");
 // design tokens (site.css :root), a motion flag, and any custom-font stylesheet.
 // There is no theme switch — the base look lives in site.css; Brand owns it.
 const brand = resolveBrand(appearance as Appearance);
+const plugins = resolveSitePlugins((appearance as { plugins?: unknown }).plugins);
 const siteName = getSeoDefaults(locale).siteName || "Site";
 const year = new Date().getFullYear();
 
@@ -104,6 +107,7 @@ const footerHtml = renderPart("footer", partData);
     <slot />
 
     <Fragment set:html={footerHtml} />
+    {(plugins.readingProgress || plugins.imageZoom) && <SitePlugins plugins={plugins} />}
 
     <script is:inline>
       document.querySelectorAll(".site-header").forEach((header, index) => {

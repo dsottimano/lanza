@@ -1,0 +1,10 @@
+---
+import type { SitePlugins } from '../lib/site-plugins';
+interface Props { plugins: SitePlugins }
+const { plugins } = Astro.props;
+---
+{(plugins.readingProgress || plugins.imageZoom) && <div data-site-plugins data-reading-progress={plugins.readingProgress ? '' : undefined} data-image-zoom={plugins.imageZoom ? '' : undefined} hidden></div>}
+<script>
+  import { mountSitePlugins } from '../lib/site-plugins-browser';
+  document.querySelectorAll<HTMLElement>('[data-site-plugins]').forEach(mountSitePlugins);
+</script>
