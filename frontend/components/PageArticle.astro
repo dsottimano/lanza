@@ -6,6 +6,8 @@ import { splitId } from "../lib/i18n";
 import LegacyBlocks from "./LegacyPageBlocks.astro";
 import { legacyPageBlocks } from "../lib/legacy-page-blocks";
 import HtmlTemplate from "./HtmlTemplate.astro";
+import HomepageMotion from "./HomepageMotion.astro";
+import LaunchCar from "./LaunchCar.astro";
 import { sanitizeBody } from "../lib/sanitize";
 // Build-time check on the sanitizer's OUTPUT. A post body is attacker-reachable (the
 // Telegram bot commits raw HTML; an MCP agent writes bodies) and DOMPurify being
@@ -50,3 +52,6 @@ const legacyBlocks = legacyPageBlocks(page.data);
     )
   }
 </main>
+
+{page.data.preset === "editorial" && <HomepageMotion />}
+{page.data.preset === "editorial" && <LaunchCar />}

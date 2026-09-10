@@ -66,12 +66,57 @@
 .lanza-home a:focus-visible,.lanza-home summary:focus-visible { outline:3px solid var(--lh-orange); outline-offset:5px; }
 @media(max-width:800px) { .lh-hero-grid,.lh-heading,.lh-split,.lh-ownership-grid { grid-template-columns:1fr; gap:2rem; } .lh-hero-copy { max-width:38rem; } .lh-features { grid-template-columns:repeat(2,1fr); } .lh-steps { gap:1.5rem; } .lh-close .lh-wrap { display:block; } .lh-close .lh-actions { margin-top:2rem; } .lh-detail-shot { height:460px; } }
 @media(max-width:540px) { .lh-wrap { width:calc(100% - 2rem); } .lh-hero h1 { font-size:clamp(3rem,12vw,4.2rem); } .lh-features,.lh-steps { grid-template-columns:1fr; } .lh-feature { padding:1.5rem; } .lh-feature h3 { margin-top:1rem; } .lh-caption { flex-direction:column; } .lh-product-bar { padding:.75rem; } .lh-product-bar > span:last-child { display:none; } .lh-detail-shot { height:370px; } }
+
+/* The launch study: offset impressions resolve into Lanza's northeast mark. */
+.lh-hero { position:relative; }
+.lh-hero-grid { align-items:center; gap:clamp(2rem,5vw,5rem); }
+.lh-launch { margin:-2rem 0 1.5rem; position:relative; aspect-ratio:2/1; color:var(--lh-orange); }
+.lh-launch svg { display:block; width:100%; height:100%; overflow:visible; }
+.lh-launch-grid { stroke:currentColor; stroke-width:.6; opacity:.18; }
+.lh-launch-orbit { fill:none; stroke:currentColor; stroke-width:.8; opacity:.3; }
+.lh-launch-echo { fill:none; stroke:currentColor; stroke-width:1; opacity:.35; }
+.lh-launch-mark { fill:none; stroke:currentColor; stroke-width:28; stroke-linejoin:miter; }
+.lh-launch-plane { transform-origin:60% 50%; }
+.lh-product { perspective:1400px; }
+.lh-product-frame { transform-origin:50% 0; }
+.lh-feature { position:relative; overflow:hidden; }
+.lh-feature::before { content:""; position:absolute; inset:0; background:var(--lh-orange); opacity:0; pointer-events:none; }
+.lh-feature::after { content:"↗"; position:absolute; right:1.5rem; top:1.5rem; font-size:1.6rem; color:var(--lh-orange); opacity:0; transform:translate(-8px,8px); }
+.lh-step { position:relative; }
+.lh-step::before { content:""; position:absolute; height:2px; background:#cfddac; left:0; right:0; top:-1px; transform:scaleX(0); transform-origin:left; }
+.lh-close { position:relative; overflow:hidden; }
+.lh-close::before { content:""; display:block; height:4px; background:var(--lh-orange); position:absolute; left:0; right:0; top:0; transform:scaleX(.08); transform-origin:left; }
+@media(prefers-reduced-motion:no-preference) {
+  [data-motion="on"] .lanza-home .lh-button { transition:background .25s, border-color .25s, transform .35s cubic-bezier(.2,.8,.2,1); }
+  [data-motion="on"] .lanza-home .lh-button span { transition:transform .35s cubic-bezier(.2,.8,.2,1); }
+  [data-motion="on"] .lanza-home .lh-button:hover { transform:translateY(-3px); }
+  [data-motion="on"] .lanza-home .lh-button:hover span { transform:translate(3px,-3px); }
+  [data-motion="on"] .lh-feature::before,[data-motion="on"] .lh-feature::after { transition:opacity .35s,transform .45s; }
+  [data-motion="on"] .lh-feature:hover::before { opacity:.045; }
+  [data-motion="on"] .lh-feature:hover::after { opacity:1; transform:none; }
+  [data-motion="on"] .lh-step.lh-entered::before { transform:scaleX(1); transition:transform .9s cubic-bezier(.2,.8,.2,1) var(--lh-delay,0ms); }
+  [data-motion="on"] .lh-close.lh-entered::before { transform:scaleX(1); transition:transform 1.2s cubic-bezier(.2,.8,.2,1); }
+}
+@media(max-width:800px) { .lh-launch { width:min(360px,85%); margin:0 0 1.5rem auto; } }
+@media(max-width:540px) { .lh-launch { width:72%; margin-top:-.5rem; } }
 </style>
 <div class="lanza-home">
 <section class="lh-hero lh-wrap">
   <div class="lh-hero-grid">
     <div><div class="lh-eyebrow">{{ eyebrow }}</div><h1>{{ headline }}<span>{{ headlineAccent }}</span></h1></div>
-    <div class="lh-hero-copy"><p>{{ introduction }}</p><div class="lh-actions"><a class="lh-button" href="{{ startUrl }}">{{ startLabel }} <span aria-hidden="true">↗</span></a><a class="lh-text-link" href="{{ guideUrl }}">{{ guideLabel }}</a></div><small class="lh-note">{{ heroNote }}</small></div>
+    <div class="lh-hero-copy"><div class="lh-launch" aria-hidden="true">
+      <svg viewBox="0 0 520 260" fill="none">
+        <path class="lh-launch-grid" d="M0 65H520M0 130H520M0 195H520M65 0V260M130 0V260M195 0V260M260 0V260M325 0V260M390 0V260M455 0V260" />
+        <circle class="lh-launch-orbit" cx="300" cy="130" r="117" />
+        <g class="lh-launch-plane">
+          <path class="lh-launch-echo" d="M42 230L232 40M102 40H232V170" />
+          <path class="lh-launch-echo" d="M92 230L282 40M152 40H282V170" />
+          <path class="lh-launch-echo" d="M142 230L332 40M202 40H332V170" />
+          <path class="lh-launch-mark" d="M192 230L382 40M252 40H382V170" />
+        </g>
+        <path class="lh-launch-grid" d="M0 0H18M0 0V18M502 260H520V242" />
+      </svg>
+    </div><p>{{ introduction }}</p><div class="lh-actions"><a class="lh-button" href="{{ startUrl }}">{{ startLabel }} <span aria-hidden="true">↗</span></a><a class="lh-text-link" href="{{ guideUrl }}">{{ guideLabel }}</a></div><small class="lh-note">{{ heroNote }}</small></div>
   </div>
   <div class="lh-product"><div class="lh-product-bar"><span><i aria-hidden="true"></i>{{ screenshotLabel }}</span><span>{{ screenshotContext }}</span></div><div class="lh-product-frame"><img src="{{ workspaceImage }}" alt="{{ workspaceAlt }}" width="1600" height="1028" fetchpriority="high" /></div><p class="lh-caption"><span>{{ screenshotCaption }}</span><a href="{{ guideUrl }}">{{ screenshotLink }} ↗</a></p></div>
 </section>

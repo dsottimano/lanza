@@ -1,0 +1,74 @@
+<!-- Public editorial preset enhancement; content stays in its CMS template. -->
+<script is:inline>
+(() => {
+  const home = document.querySelector('.lanza-home');
+  if (!home?.matches('.lanza-home') || !('IntersectionObserver' in window)) return;
+  const preference = matchMedia('(prefers-reduced-motion: reduce)');
+  let cleanup = () => {};
+  const configure = () => {
+    cleanup();
+    if (preference.matches || document.documentElement.dataset.motion !== 'on') return;
+    const animations = new Set();
+    const play = (element, frames, options) => {
+      const animation = element.animate(frames, options);
+      animations.add(animation);
+      animation.finished.then(() => animations.delete(animation), () => animations.delete(animation));
+    };
+    const ease = 'cubic-bezier(.16,1,.3,1)';
+    // Animate at intersection, never hide content while waiting for JavaScript.
+    const observer = new IntersectionObserver(entries => {
+      for (const entry of entries) {
+        if (!entry.isIntersecting) continue;
+        const element = entry.target;
+        observer.unobserve(element);
+        element.classList.add('lh-entered');
+        const delay = Number(element.dataset.lhDelay || 0);
+        if (element.matches('.lh-product-frame')) {
+          play(element, [{ transform:'rotateX(7deg) scale(.96)' }, { transform:'none' }], { duration:1200, easing:ease });
+        } else {
+          play(element, [{ opacity:0, transform:'translateY(28px)' }, { opacity:1, transform:'none' }], { duration:950, delay, easing:ease, fill:'backwards' });
+        }
+      }
+    }, { threshold:0.12 });
+    const selectors = '.lh-hero h1,.lh-hero-copy > p,.lh-hero-copy > .lh-actions,.lh-heading,.lh-feature,.lh-step,.lh-product-frame,.lh-prompt,.lh-split > div,.lh-ownership-grid > div,.lh-facts li,.lh-close';
+    home.querySelectorAll(selectors).forEach(element => {
+      if (element.matches('.lh-feature,.lh-step,.lh-facts li')) {
+        const index = Array.from(element.parentElement.children).indexOf(element);
+        element.dataset.lhDelay = String((index % 3) * 100);
+        element.style.setProperty('--lh-delay', element.dataset.lhDelay + 'ms');
+      }
+      observer.observe(element);
+    });
+    const launch = home.querySelector('.lh-launch');
+    const plane = home.querySelector('.lh-launch-plane');
+    home.querySelectorAll('.lh-launch-echo,.lh-launch-mark').forEach((path, index) => {
+      play(path, [{ opacity:0, transform:'translate(-65px,65px)' }, { opacity:index === 3 ? 1 : .35, transform:'none' }], { duration:1500, delay:160 + index * 110, easing:ease, fill:'backwards' });
+    });
+    const finePointer = matchMedia('(hover: hover) and (pointer: fine)');
+    const move = event => {
+      if (!finePointer.matches) return;
+      const rect = launch.getBoundingClientRect();
+      const x = (event.clientX - rect.left) / rect.width - .5;
+      const y = (event.clientY - rect.top) / rect.height - .5;
+      plane.style.transform = `translate(${x * 12}px, ${y * 10}px) rotate(${x * 3}deg)`;
+    };
+    const reset = () => { plane.style.transform = ''; };
+    plane.style.transition = 'transform 600ms cubic-bezier(.16,1,.3,1)';
+    launch.addEventListener('pointermove', move);
+    launch.addEventListener('pointerleave', reset);
+    cleanup = () => {
+      observer.disconnect();
+      animations.forEach(animation => animation.cancel());
+      animations.clear();
+      launch.removeEventListener('pointermove', move);
+      launch.removeEventListener('pointerleave', reset);
+      plane.style.transition = '';
+      reset();
+      home.querySelectorAll('.lh-entered').forEach(element => element.classList.remove('lh-entered'));
+    };
+  };
+  configure();
+  preference.addEventListener('change', configure);
+  new MutationObserver(configure).observe(document.documentElement, { attributes:true, attributeFilter:['data-motion'] });
+})();
+</script>
