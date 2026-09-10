@@ -9,7 +9,7 @@ slots:
   headline: Your website, your rules. Free, forever.
   headlineAccent: ''
   introduction: 'Your AI agent builds it, you write. Built on the shoulder of giants, free, open source. '
-  startLabel: Explore the publishing beta
+  startLabel: Get me live in 10 mins, Go!
   startUrl: https://connect.lanzacms.com/
   guideLabel: See how it works
   guideUrl: /how-it-works/
