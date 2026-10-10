@@ -124,7 +124,7 @@ export class ContentClient {
     const value = body as Record<string, unknown> | undefined;
     if (method === "PUT" && value?.branch !== "lanza-agent-requests") throw new GitHubError(403, "Invalid archive branch.");
     if (path === "git/refs" && value?.ref !== "refs/heads/lanza-agent-requests") throw new GitHubError(403, "Invalid archive ref.");
-    const response = await this.gh(path, { method, redirect: "error", signal: AbortSignal.timeout(15000), cache: "no-store", ...(body === undefined ? {} : { body: JSON.stringify(body) }) });
+    const response = await this.gh(path, { method, redirect: "error", signal: AbortSignal.timeout(15000), headers: { "Cache-Control": "no-cache" }, ...(body === undefined ? {} : { body: JSON.stringify(body) }) });
     if (response.status === 404 && method === "GET") { await response.body?.cancel(); return null; }
     if (!response.ok) throw await this.fail(response, "access private agent requests");
     const reader = response.body?.getReader();
@@ -137,7 +137,7 @@ export class ContentClient {
   }
 
   private async gh(path: string, init?: RequestInit): Promise<Response> {
-    return fetch(`${GITHUB_API}/repos/${this.repo.owner}/${this.repo.name}/${path}`, {
+    return fetch(`${GITHUB_API}/repos/${this.repo.owner}/${this.repo.name}${path ? `/${path}` : ""}`, {
       ...init,
       headers: {
         Authorization: `Bearer ${this.token}`,

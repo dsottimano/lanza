@@ -17,7 +17,7 @@ function fixture(options={}) {
  globalThis.fetch=async(url,init={})=>{
   const u=new URL(url);const route=u.pathname.replace(/^\/repos\/[^/]+\/[^/]+\/?/,'');const method=init.method||'GET';const body=init.body?JSON.parse(init.body):null;
   calls.push({route,method,body,url:String(url)});
-  if(route==='') {privacyChecks++;return respond(200,{private:!options.public&&!(options.publicAfter&&privacyChecks>=options.publicAfter),permissions:{admin:!options.editor,push:true}});}
+  if(route==='') {if(u.pathname.endsWith('/')) return respond(404,{message:'Not Found'});privacyChecks++;return respond(200,{private:!options.public&&!(options.publicAfter&&privacyChecks>=options.publicAfter),permissions:{admin:!options.editor,push:true}});}
   if(route==='contents/data/schema.json')return respond(200,{content:b64(JSON.stringify([{kind:'folder',name:'posts',folder:'content/posts',body:'rich'}]))});
   if(route===`git/ref/heads/${REQUEST_BRANCH}`)return respond(branch?200:404,branch?{object:{sha:'b'.repeat(40)}}:{});
   if(method==='POST'&&route==='git/trees')return respond(201,{sha:'c'.repeat(40)});
