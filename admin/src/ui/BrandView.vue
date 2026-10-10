@@ -29,6 +29,8 @@ import { isDirty } from "./dirty";
 const props = defineProps<{ client: GitHubClient }>();
 defineEmits<{ (e: "back"): void }>();
 
+let active = true;
+let appearanceSha: string | undefined;
 const loading = ref(true);
 const loadFailed = ref(false);
 const savedOnce = ref(false);
@@ -44,13 +46,16 @@ async function load() {
   loadFailed.value = false;
   try {
     const a = await loadAppearance(props.client);
+    if (!active) return;
+    appearanceSha = a.sha;
     Object.assign(brand, a.brand);
     baseline = snapshot();
   } catch (e) {
+    if (!active) return;
     loadFailed.value = true;
     reportError(e, "Couldn't load the current appearance.");
   } finally {
-    loading.value = false;
+    if (active) loading.value = false;
   }
 }
 onMounted(load);
@@ -65,6 +70,7 @@ watch(
   { deep: true },
 );
 onBeforeUnmount(() => {
+  active = false;
   isDirty.value = false;
 });
 
@@ -96,10 +102,13 @@ function cancel() {
 
 async function save() {
   if (loading.value || loadFailed.value) throw new Error("Load the current appearance before saving.");
+  if (saving.value) return;
   saving.value = true;
   const submitted = snapshot();
   try {
-    await saveBrand(props.client, JSON.parse(submitted) as BrandConfig);
+    const nextSha = await saveBrand(props.client, JSON.parse(submitted) as BrandConfig, appearanceSha);
+    if (!active) return;
+    appearanceSha = nextSha;
     baseline = submitted;
     isDirty.value = snapshot() !== baseline;
     savedOnce.value = !isDirty.value;

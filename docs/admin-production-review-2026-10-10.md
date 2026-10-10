@@ -392,3 +392,34 @@ verified the compiled editor loads and tracks template edits with mocked API
 reads and no page errors or writes. The transaction helper's existing regression
 suite passed; this pass did not execute authenticated production writes. Existing
 build warnings remain and deployment of this change is unverified.
+
+## Brand appearance conflicts and late responses
+
+Brand previously merged its complete local brand snapshot into the most recent
+appearance file, without checking the version that supplied the form. A second
+editor's brand changes could therefore be overwritten. Loading now retains the
+appearance SHA; saving compares that version before writing and uses it as the
+write precondition. Success advances the version for subsequent edits. Unrelated
+appearance properties remain preserved, and conflict failures retain local edits.
+Late load failures and save completions after unmount no longer affect another
+panel's error/dirty state. Duplicate direct save calls are guarded.
+
+Plugins already saves against its loaded appearance SHA and preserves unrelated
+properties; its existing conflict/permission regressions passed in this run.
+Four new Brand regressions cover newer remote data, successive saves, unmount and
+late read errors. All 441 Functions/script and 515 CMS tests passed. Admin
+typecheck/build, site validation (zero errors/warnings), and the 15-page public
+build passed. Chromium checked the compiled Brand panel's edit/cancel behavior
+with mocked reads and no page errors or writes. Existing build warnings remain;
+authenticated production changes and deployment are unverified.
+
+### Current completion evidence gaps
+
+The earlier remaining-scope paragraph is historical: custom links, software
+staging, theme-history failure states and several settings save paths now have
+specific evidence below it. They do not prove the complete original objective.
+Remaining verification includes authenticated owner/editor production flows,
+session-refresh concurrency, starter/recipe installation atomicity, remaining
+editor/media interactions, and confirmation cancellation/accessibility. The
+current UI file inventory and these passing suites are an index for continued
+review, not proof that every control or security invariant is covered.

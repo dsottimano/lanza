@@ -9,7 +9,6 @@
 // Google fragments MUST stay identical in both — edit both when adding a font.
 import type { GitHubClient } from "./github";
 import { GitHubError } from "./github";
-import { putJsonSafe } from "./site";
 
 export const APPEARANCE_PATH = "data/appearance.json";
 
@@ -166,6 +165,7 @@ export const PRESETS: { name: string; brand: BrandPreset }[] = [
 ];
 
 export interface LoadedAppearance {
+  sha?: string;
   brand: BrandConfig;
   /** True when the file had no `brand` block yet (seeded from the base design). */
   seeded: boolean;
@@ -174,14 +174,18 @@ export interface LoadedAppearance {
 /** Read appearance.json; return a fully-populated brand (base defaults + saved). */
 export async function loadAppearance(client: GitHubClient): Promise<LoadedAppearance> {
   let data: Record<string, unknown> = {};
+  let sha: string | undefined;
   try {
-    data = (await client.loadJson(APPEARANCE_PATH)).data;
+    const loaded = await client.loadJson(APPEARANCE_PATH);
+    data = loaded.data;
+    sha = loaded.sha;
   } catch (e) {
     if (!(e instanceof GitHubError && e.status === 404)) throw e;
   }
   const seed = defaultBrand();
   const raw = (data.brand ?? {}) as Partial<BrandConfig>;
   return {
+    sha,
     seeded: !data.brand,
     brand: {
       colors: { ...seed.colors, ...(raw.colors ?? {}) },
@@ -197,6 +201,16 @@ export async function loadAppearance(client: GitHubClient): Promise<LoadedAppear
 }
 
 /** Merge the brand block into appearance.json (preserving theme/logo/etc.). */
-export async function saveBrand(client: GitHubClient, brand: BrandConfig): Promise<void> {
-  await putJsonSafe(client, APPEARANCE_PATH, (cur) => ({ ...cur, brand }), "lanza: update brand");
+export async function saveBrand(client: GitHubClient, brand: BrandConfig, expectedSha: string | undefined): Promise<string> {
+  let current: Record<string, unknown> = {};
+  let sha: string | undefined;
+  try {
+    const loaded = await client.loadJson(APPEARANCE_PATH);
+    current = loaded.data;
+    sha = loaded.sha;
+  } catch (e) {
+    if (!(e instanceof GitHubError && e.status === 404)) throw e;
+  }
+  if (sha !== expectedSha) throw new GitHubError(409, "Appearance changed elsewhere. Reload before saving; your local changes have not been saved.");
+  return client.saveJson(APPEARANCE_PATH, { ...current, brand }, "lanza: update brand", sha);
 }

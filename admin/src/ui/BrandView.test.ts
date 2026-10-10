@@ -2,6 +2,9 @@ import {afterEach,expect,it,vi} from 'vitest';
 import {mount,flushPromises} from '@vue/test-utils';
 import BrandView from './BrandView.vue';
 import type {GitHubClient} from '../backend/github';
+import SaveButton from './SaveButton.vue';
+import {isDirty} from './dirty';
+import {errorState} from '../errors';
 import {clearError} from '../errors';
 vi.mock('../backend/brand', async importOriginal => ({ ...await importOriginal<typeof import('../backend/brand')>(), previewFontHref: () => null }));
 afterEach(clearError);
@@ -35,4 +38,28 @@ it('Cancel restores all starting brand values without writing; Apply establishes
  await button('Midnight').trigger('click');await button('Cancel').trigger('click');
  expect(w.get('.brand-preview').attributes('style')).toBe(appliedStyle);
  expect(saveJson).toHaveBeenCalledTimes(1);w.unmount();
+});
+
+it('refuses newer remote appearance without writing and retains the local edit',async()=>{
+ const loadJson=vi.fn().mockResolvedValueOnce({data:{brand:{}},sha:'loaded'}).mockResolvedValue({data:{brand:{radius:'18px'}},sha:'remote-edit'});
+ const saveJson=vi.fn();const w=mount(BrandView,{props:{client:{loadJson,saveJson} as unknown as GitHubClient}});await flushPromises();
+ await w.findAll('button').find(b=>b.text()==='Midnight')!.trigger('click');
+ await expect(w.findComponent(SaveButton).props('action')()).rejects.toThrow('Appearance changed elsewhere');
+ expect(saveJson).not.toHaveBeenCalled();expect(isDirty.value).toBe(true);w.unmount();
+});
+it('advances the loaded version after save for a second edit',async()=>{
+ const loadJson=vi.fn().mockResolvedValueOnce({data:{brand:{}},sha:'old'}).mockResolvedValueOnce({data:{brand:{},logo:'keep'},sha:'old'}).mockResolvedValue({data:{brand:{},logo:'keep'},sha:'new'});
+ const saveJson=vi.fn().mockResolvedValue('new');const w=mount(BrandView,{props:{client:{loadJson,saveJson} as unknown as GitHubClient}});await flushPromises();
+ await w.findAll('button').find(b=>b.text()==='Midnight')!.trigger('click');await w.findComponent(SaveButton).props('action')();
+ await w.findAll('button').find(b=>b.text()==='Editorial')!.trigger('click');await w.findComponent(SaveButton).props('action')();
+ expect(saveJson.mock.calls.map(c=>c[3])).toEqual(['old','new']);expect(saveJson.mock.calls[1]![1].logo).toBe('keep');w.unmount();
+});
+it('does not clear another editor dirty state after an unmounted save',async()=>{
+ let finish!:(sha:string)=>void;const loadJson=vi.fn().mockResolvedValue({data:{brand:{}},sha:'old'});
+ const saveJson=vi.fn().mockReturnValue(new Promise<string>(resolve=>{finish=resolve;}));const w=mount(BrandView,{props:{client:{loadJson,saveJson} as unknown as GitHubClient}});await flushPromises();
+ const saving=w.findComponent(SaveButton).props('action')();await flushPromises();w.unmount();isDirty.value=true;finish('saved');await saving;expect(isDirty.value).toBe(true);isDirty.value=false;
+});
+it('does not surface a failed brand load after leaving the panel',async()=>{
+ let fail!:(error:Error)=>void;const loadJson=vi.fn().mockReturnValue(new Promise((_resolve,reject)=>{fail=reject;}));
+ const w=mount(BrandView,{props:{client:{loadJson} as unknown as GitHubClient}});w.unmount();fail(new Error('late'));await flushPromises();expect(errorState.message).toBeNull();
 });
