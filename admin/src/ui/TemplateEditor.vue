@@ -16,6 +16,7 @@ import { inputCls } from "../fields/styles";
 import type { GitHubClient } from "../backend/github";
 import type { Locale } from "../backend/config";
 import { templateHtmlPath, type TemplateInfo } from "../backend/templates";
+import { useAdditionalDirtyFlag } from "./dirty";
 import { reportError, clearError } from "../errors";
 
 // The template list + its loading state are owned by EditorView (one load feeds the
@@ -95,6 +96,8 @@ onBeforeUnmount(() => clearTimeout(focusTimer));
 const presetModel = computed<string>({
   get: () => (data.preset as string) ?? "",
   set: (v) => {
+    if (v === presetModel.value) return;
+    if (sourceDirty.value && !window.confirm("Discard unsaved template HTML and switch templates?")) return;
     if (v) {
       data.preset = v;
       ensureSlots();
@@ -103,6 +106,12 @@ const presetModel = computed<string>({
     }
   },
 });
+
+function selectPreset(event: Event): void {
+  const select = event.target as HTMLSelectElement;
+  presetModel.value = select.value;
+  select.value = presetModel.value;
+}
 
 // A page with a preset always needs a slots object to edit into; never clobber
 // slots already loaded from frontmatter.
@@ -115,7 +124,10 @@ function ensureSlots(): void {
 
 // ── Advanced: the shared template HTML (lazy-loaded when the disclosure opens) ──
 const sourceText = ref("");
+const sourceBaseline = ref("");
 const sourceSha = ref<string>();
+const sourceDirty = computed(() => sourceSha.value !== undefined && sourceText.value !== sourceBaseline.value);
+useAdditionalDirtyFlag(sourceDirty);
 const sourceLoading = ref(false);
 const sourceFailed = ref(false);
 const sourceSaving = ref(false);
@@ -133,6 +145,7 @@ async function loadSource(): Promise<void> {
     const f = await props.client.loadText(templateHtmlPath(name));
     if (!active || request !== sourceGeneration) return;
     sourceText.value = f.text;
+    sourceBaseline.value = f.text;
     sourceSha.value = f.sha;
   } catch (e) {
     if (!active || request !== sourceGeneration) return;
@@ -153,6 +166,7 @@ async function saveSource(): Promise<boolean | void> {
     const sha = await props.client.saveText(templateHtmlPath(name), text, `Edit template ${name}`, sourceSha.value);
     if (!active || request !== sourceGeneration) return false;
     sourceSha.value = sha;
+    sourceBaseline.value = text;
   } finally {
     if (active && request === sourceGeneration) sourceSaving.value = false;
   }
@@ -215,7 +229,7 @@ watch(
 
     <template v-else>
       <label class="mb-1.5 block text-xs font-semibold text-zinc-600" for="tpl-preset">Template</label>
-      <select id="tpl-preset" v-model="presetModel" :class="inputCls">
+      <select id="tpl-preset" :value="presetModel" @change="selectPreset" :class="inputCls">
         <option value="">None — default page</option>
         <option v-for="t in templates" :key="t.name" :value="t.name">{{ t.label }}</option>
       </select>
@@ -263,10 +277,11 @@ watch(
               spellcheck="false"
               :class="[inputCls, 'mt-2 resize-y font-mono text-xs']"
             />
-            <div class="mt-2 flex justify-end">
+            <div class="mt-2 flex items-center justify-end gap-3">
+              <span v-if="sourceDirty" role="status" class="text-xs text-zinc-500">Unsaved template changes</span>
               <SaveButton
                 :action="saveSource"
-                :disabled="sourceSaving"
+                :disabled="sourceSaving || !sourceDirty"
                 @saved="clearError"
                 @error="(e) => reportError(e, 'Template save failed.')"
               />

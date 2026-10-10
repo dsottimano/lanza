@@ -459,3 +459,25 @@ page errors, or writes. These smoke checks do not simulate template request race
 the component tests do. Source-edit navigation/dirty warnings remain a separate
 open review item. Existing build warnings remain; live writes and deployment are
 unverified.
+
+## Independent template-source unsaved warnings
+
+Template source edits now own an additional dirty flag observed by the common
+route-discard and beforeunload guards. Saving the surrounding page cannot clear
+that flag. Each independently saved editor owns/disposes only its own flag; the
+existing page dirty flag remains intact. Template-source save completion advances
+its baseline to the submitted text, so edits made during the save remain dirty.
+The panel displays the source-specific unsaved status and disables clean saves.
+
+Switching templates through the picker asks before discarding source edits.
+Cancelling restores the displayed selection and retains the source; accepting
+resets the source editor for the selected template. Three regressions cover
+navigation/tab-close guards, page-save independence, cancellation, concurrent
+edits and owner cleanup.
+
+All 441 Functions/script and 524 CMS tests passed. Admin typecheck/build, site
+validation (zero errors/warnings), and the 15-page public build passed. Chromium
+mounted the actual Vue template editor through Vite with synthetic client methods
+and verified page-save independence, native confirmation cancellation, and source
+save clearing its own warning. No actual API writes or page errors occurred.
+Existing build warnings remain; live writes and deployment are unverified.
