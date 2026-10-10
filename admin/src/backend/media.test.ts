@@ -1,5 +1,5 @@
-import { describe, it, expect, vi } from "vitest";
-import type { GitHubClient } from "./github";
+import { afterEach, describe, it, expect, vi } from "vitest";
+import { GitHubClient } from "./github";
 import { fileSlug, uploadableExt, uploadImage } from "./media";
 
 // An upload is committed to the repo and served as a static asset from the SITE's
@@ -9,9 +9,9 @@ import { fileSlug, uploadableExt, uploadImage } from "./media";
 // nothing reached GitHub (uploadBinary never called).
 
 function fakeClient() {
-  const uploadBinary = vi.fn(async (_path: string, _base64: string, _message: string) => undefined);
-  const exists = vi.fn(async () => false);
-  return { client: { uploadBinary, exists } as unknown as GitHubClient, uploadBinary, exists };
+  const uploadBinary = vi.fn(async (_path: string, _base64: string, _message: string, _sha?: string) => undefined);
+  const currentSha = vi.fn<() => Promise<string | undefined>>().mockResolvedValue(undefined);
+  return { client: { uploadBinary, currentSha } as unknown as GitHubClient, uploadBinary, currentSha };
 }
 
 const file = (name: string, type = "image/png") =>
@@ -57,4 +57,24 @@ describe("media upload extension allowlist", () => {
   it("fileSlug keeps the allowed extension it was given", () => {
     expect(fileSlug("My Photo!!.jpg")).toBe("my-photo.jpg");
   });
+});
+
+afterEach(()=>vi.unstubAllGlobals());
+it('pins confirmed replacements to the version found before confirmation',async()=>{
+ const f=fakeClient();f.currentSha.mockResolvedValue('confirmed');vi.stubGlobal('confirm',vi.fn().mockReturnValue(true));
+ await uploadImage(f.client,file('photo.png'));expect(f.uploadBinary.mock.calls[0]![3]).toBe('confirmed');expect(f.currentSha).toHaveBeenCalledTimes(1);
+});
+it('declining replacement finds a free name and creates without a SHA',async()=>{
+ const f=fakeClient();f.currentSha.mockResolvedValueOnce('existing').mockResolvedValueOnce('also-existing').mockResolvedValueOnce(undefined);vi.stubGlobal('confirm',vi.fn().mockReturnValue(false));
+ expect(await uploadImage(f.client,file('photo.png'))).toBe('/images/uploads/photo-3.png');expect(f.uploadBinary.mock.calls[0]![3]).toBeUndefined();
+});
+it.each([409,422])('does not turn an upload conflict %s into an overwrite',async status=>{
+ const fetch=vi.fn().mockResolvedValue(new Response(JSON.stringify({message:'Conflict'}),{status}));vi.stubGlobal('fetch',fetch);
+ await expect(new GitHubClient().uploadBinary('public/images/uploads/photo.png','AQID','upload')).rejects.toThrow();
+ expect(fetch).toHaveBeenCalledTimes(1);const body=JSON.parse(fetch.mock.calls[0]![1].body);expect(body.sha).toBeUndefined();
+});
+it('passes an explicit replacement SHA through to the single write',async()=>{
+ const fetch=vi.fn().mockResolvedValue(new Response(JSON.stringify({content:{sha:'next'}}),{status:200}));vi.stubGlobal('fetch',fetch);
+ await new GitHubClient().uploadBinary('public/images/uploads/photo.png','AQID','upload','confirmed');
+ expect(fetch).toHaveBeenCalledTimes(1);expect(JSON.parse(fetch.mock.calls[0]![1].body).sha).toBe('confirmed');
 });

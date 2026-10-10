@@ -43,16 +43,17 @@ function fileToBase64(file: File): Promise<string> {
 // "my_photo.jpg" both → my-photo.jpg). When the slug already exists, ask whether
 // to replace it; if not, append -2, -3… until a free name is found so an upload
 // never silently clobbers an unrelated image.
-async function resolveName(client: GitHubClient, base: string): Promise<string> {
-  if (!(await client.exists(`${MEDIA.dir}/${base}`))) return base;
-  if (confirm(`An image named "${base}" already exists. Replace it?`)) return base;
+async function resolveName(client: GitHubClient, base: string): Promise<{ name: string; sha?: string }> {
+  const sha = await client.currentSha(`${MEDIA.dir}/${base}`);
+  if (sha === undefined) return { name: base };
+  if (confirm(`An image named "${base}" already exists. Replace it?`)) return { name: base, sha };
 
   const dot = base.lastIndexOf(".");
   const stem = dot > 0 ? base.slice(0, dot) : base;
   const ext = dot > 0 ? base.slice(dot) : "";
   for (let n = 2; ; n++) {
     const candidate = `${stem}-${n}${ext}`;
-    if (!(await client.exists(`${MEDIA.dir}/${candidate}`))) return candidate;
+    if ((await client.currentSha(`${MEDIA.dir}/${candidate}`)) === undefined) return { name: candidate };
   }
 }
 
@@ -77,8 +78,8 @@ export async function uploadImage(client: GitHubClient, file: File): Promise<str
     );
   }
   const base64 = await fileToBase64(file);
-  const name = await resolveName(client, fileSlug(file.name));
+  const { name, sha } = await resolveName(client, fileSlug(file.name));
   const path = `${MEDIA.dir}/${name}`;
-  await client.uploadBinary(path, base64, `lanza: upload ${name}`);
+  await client.uploadBinary(path, base64, `lanza: upload ${name}`, sha);
   return `${MEDIA.publicPrefix}/${name}`;
 }

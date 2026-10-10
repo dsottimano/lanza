@@ -574,3 +574,24 @@ validation (zero errors/warnings), and the 15-page public build passed. Compiled
 admin smoke checks at desktop/mobile sizes passed with no overflow, errors or
 writes; delayed-upload behavior is covered by component/composable tests rather
 than live writes. Existing build warnings remain and deployment is unverified.
+
+## Media filename collision preconditions
+
+uploadBinary previously retried a 422 by reading the existing file SHA and
+writing the same payload over it. A file created after the naming check could
+therefore be overwritten without confirmation. Binary writes now make exactly
+one attempt: an omitted SHA means create, and an explicit SHA means replace the
+confirmed version. Conflicts propagate without fetching a newer version/retrying.
+
+The name resolver captures the existing SHA before asking about replacement.
+Declining still chooses the next free suffixed name, saved with no replacement
+SHA. A concurrent upload or edit now fails rather than overwriting that content.
+The existing extension allowlist remains unchanged.
+
+Five added regressions cover confirmed versions, declined replacement, both
+409/422 no-retry behavior, and the actual write precondition. All 441
+Functions/script and 539 CMS tests passed. Admin typecheck/build, site validation
+(zero errors/warnings), and the 15-page public build passed. Compiled desktop/mobile
+admin smoke checks passed without overflow, page errors or writes. Upload races
+are verified with simulated GitHub responses, not live media writes. Existing
+build warnings remain and deployment is unverified.

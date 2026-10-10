@@ -224,22 +224,10 @@ export class GitHubClient {
     return this.putFile(path, text, message, sha);
   }
 
-  /**
-   * Upload a binary file (image) given its raw base64 content. Creates the file,
-   * or overwrites in place if a file with the same path already exists (a
-   * re-upload of the same name replaces it). Its own commit — see Phase 4 notes.
-   */
-  async uploadBinary(path: string, base64: string, message: string): Promise<void> {
-    try {
-      await this.putRaw(path, base64, message);
-    } catch (e) {
-      if (e instanceof GitHubError && e.status === 422) {
-        const existing = (await this.req(this.contentsUrl(path))) as { sha: string };
-        await this.putRaw(path, base64, message, existing.sha);
-        return;
-      }
-      throw e;
-    }
+  /** Upload one version: omit sha to create, pass the confirmed SHA to replace.
+   * A collision or stale replacement fails without retrying over newer data. */
+  async uploadBinary(path: string, base64: string, message: string, sha?: string): Promise<void> {
+    await this.putRawOnce(path, base64, message, sha);
   }
 
   private async putFile(
@@ -276,7 +264,7 @@ export class GitHubClient {
   }
 
   /** Current blob sha of a file, or undefined if it doesn't exist. */
-  private async currentSha(path: string): Promise<string | undefined> {
+  async currentSha(path: string): Promise<string | undefined> {
     try {
       const file = (await this.req(this.contentsUrl(path))) as { sha: string };
       return file.sha;
