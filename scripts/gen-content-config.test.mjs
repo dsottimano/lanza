@@ -7,7 +7,7 @@
 // no content.config.ts was written.
 //
 // Run: node --test scripts/gen-content-config.test.mjs
-// (Not covered by `npm test`, whose glob is functions/_lib/*.test.mjs.)
+// Included in npm test.
 import { test } from "node:test";
 import assert from "node:assert/strict";
 import { spawnSync } from "node:child_process";
@@ -66,10 +66,11 @@ function run(schema, { execute = false } = {}) {
         result.config
           .replace('from "astro:content"', 'from "./astro-stub.mjs"')
           .replace('from "astro:schema"', 'from "./astro-stub.mjs"')
-          .replace('from "astro/loaders"', 'from "./astro-stub.mjs"'),
+          .replace('from "astro/loaders"', 'from "./astro-stub.mjs"') + '\nconsole.log(JSON.stringify(Object.keys(collections)));',
       );
       const run = spawnSync(process.execPath, [runnable], { cwd: dir, encoding: "utf8" });
       result.imported = run.status === 0;
+      result.collectionKeys = run.status === 0 ? JSON.parse(run.stdout.trim()) : null;
       result.importError = run.stderr ?? "";
       result.pwnedAfterImport = existsSync(pwned);
     }
@@ -91,8 +92,7 @@ test("the real content model still generates", () => {
 });
 
 test("a hostile collection name fails the build and writes nothing", () => {
-  // Emitted as a `const` binding: `const <name> = defineCollection({`. Nothing but
-  // a plain identifier can be made safe in that position.
+  // Keep the declared identifier contract even though names are now quoted.
   const r = run(collection({ name: 'a = (await import("node:child_process")).execSync("id")' }));
   assert.notEqual(r.status, 0);
   assert.match(r.stderr, /illegal collection name/);
@@ -182,4 +182,13 @@ test("a nested field name is quoted too", () => {
   assert.equal(r.imported, true, `generated config must still import: ${r.importError}`);
   assert.equal(r.pwnedAfterImport, false, "the nested payload must not execute");
   assert.doesNotMatch(r.config, /^\s*\[/m);
+});
+
+
+test("collection identifiers cannot collide with generated bindings or keywords", () => {
+  const names = ["class", "default", "await", "collections", "defineCollection", "glob", "z", "collection_0", "__proto__"];
+  const r = run(names.map(name => collection({ name, folder: `content/${name}` })[0]), { execute: true });
+  assert.equal(r.status, 0, r.stderr);
+  assert.equal(r.imported, true, r.importError);
+  assert.deepEqual(r.collectionKeys, names);
 });

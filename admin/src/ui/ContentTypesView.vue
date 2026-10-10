@@ -29,7 +29,7 @@ import { isDirty } from "./dirty";
 const props = defineProps<{ client: GitHubClient }>();
 const emit = defineEmits<{ (e: "back"): void }>();
 
-const SLUG = /^[a-z0-9-]+$/;
+const COLLECTION_NAME = /^[A-Za-z_$][A-Za-z0-9_$]*$/;
 // Stored field keys include camelCase (featuredImage) and underscores. They
 // are identifiers, not URL slugs, and must not be renamed to pass validation.
 const FIELD_NAME = /^[A-Za-z_][A-Za-z0-9_-]*$/;
@@ -112,7 +112,7 @@ const draft = reactive({ name: "", label: "", labelSingular: "", body: "none" as
 const newTypeError = computed(() => {
   const name = draft.name.trim();
   if (!name) return "";
-  if (!SLUG.test(name)) return "Use lowercase letters, numbers and hyphens only.";
+  if (!COLLECTION_NAME.test(name)) return "Start with a letter, underscore or $; use letters, numbers, underscores or $.";
   if (collections.some((c) => c.name === name)) return `A content type named "${name}" already exists.`;
   return "";
 });
@@ -260,9 +260,9 @@ async function save() {
           <h2 class="mb-4 font-serif text-xl font-semibold text-zinc-900">New content type</h2>
           <div class="grid gap-4">
             <label class="block">
-              <span class="mb-1 block text-xs font-semibold text-zinc-600">Name (slug)</span>
+              <span class="mb-1 block text-xs font-semibold text-zinc-600">Name (identifier)</span>
               <input v-model="draft.name" placeholder="e.g. events" class="input font-mono" />
-              <span class="mt-1 block text-xs text-zinc-500">Lowercase letters, numbers, hyphens. Sets the folder content/{{ draft.name || "…" }}.</span>
+              <span class="mt-1 block text-xs text-zinc-500">Letters, numbers, underscores or $; cannot start with a number. Sets the folder content/{{ draft.name || "…" }}.</span>
             </label>
             <p v-if="newTypeError" class="text-xs font-medium text-red-600">{{ newTypeError }}</p>
             <div class="grid gap-4 sm:grid-cols-2">

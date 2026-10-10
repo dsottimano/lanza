@@ -4,7 +4,7 @@ import ContentTypesView from "./ContentTypesView.vue";
 import EditingExperience from "./content-types/EditingExperience.vue";
 import SaveButton from "./SaveButton.vue";
 import { saveSchema } from "../backend/schema";
-import { COLLECTIONS } from "../schema";
+import { COLLECTIONS, setCollections } from "../schema";
 import type { GitHubClient } from "../backend/github";
 import { isDirty } from "./dirty";
 
@@ -42,4 +42,40 @@ describe("Content type editing", () => {
     expect(wrapper.findComponent(EditingExperience).text()).toContain("live preview");
     wrapper.unmount();
   });
+});
+
+
+it("rejects names that break generation and accepts identifier names", async () => {
+  const wrapper = mount(ContentTypesView, { props: { client: {} as GitHubClient } });
+  await wrapper.findAll("button").find(b => b.text() === "+ New content type")!.trigger("click");
+  await wrapper.find('input[placeholder="Events"]').setValue("Events");
+  await wrapper.find('input[placeholder="Event"]').setValue("Event");
+  const name = wrapper.find('input[placeholder="e.g. events"]');
+  const create = () => wrapper.findAll("button").find(b => b.text() === "Create")!;
+  for (const invalid of ["my-events", "123events", "../events", "posts"]) {
+    await name.setValue(invalid);
+    expect(create().attributes("disabled")).toBeDefined();
+  }
+  for (const valid of ["my_events", "Events2", "$events", "class", "collections"]) {
+    await name.setValue(valid);
+    expect(create().attributes("disabled")).toBeUndefined();
+  }
+  await name.setValue("my_events");
+  await create().trigger("click");
+  await wrapper.findComponent(SaveButton).props("action")();
+  expect(vi.mocked(saveSchema).mock.calls[0]![1].find(c => c.name === "my_events"))
+    .toMatchObject({ folder: "content/my_events", fields: [{ name: "title" }] });
+  wrapper.unmount();
+});
+
+it("preserves custom route declarations when saving content type settings", async () => {
+  const original = JSON.parse(JSON.stringify(COLLECTIONS));
+  const route = { base: "calendar", template: "event", list: { template: "event-index", sortBy: "date", order: "desc" as const } };
+  try {
+    setCollections([...original, { kind: "folder", name: "events", label: "Events", labelSingular: "Event", folder: "content/events", body: "none", localized: true, route, fields: [{ name: "title", label: "Title", widget: "string" }] }]);
+    const wrapper = mount(ContentTypesView, { props: { client: {} as GitHubClient } });
+    await wrapper.findComponent(SaveButton).props("action")();
+    expect(vi.mocked(saveSchema).mock.calls[0]![1].find(c => c.name === "events")).toMatchObject({ route });
+    wrapper.unmount();
+  } finally { setCollections(original); }
 });

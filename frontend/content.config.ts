@@ -11,7 +11,7 @@ import { defineCollection } from "astro:content";
 import { z } from "astro:schema";
 import { glob } from "astro/loaders";
 
-const posts = defineCollection({
+const collection_0 = defineCollection({
   loader: glob({ pattern: "**/*.{md,mdx}", base: "./content/posts" }),
   schema: z.object({
     "title": z.string(),
@@ -39,7 +39,7 @@ const posts = defineCollection({
   }),
 });
 
-const pages = defineCollection({
+const collection_1 = defineCollection({
   loader: glob({ pattern: "**/*.{md,mdx}", base: "./content/pages" }),
   schema: z.object({
     "title": z.string(),
@@ -60,7 +60,7 @@ const pages = defineCollection({
   }),
 });
 
-const categories = defineCollection({
+const collection_2 = defineCollection({
   loader: glob({ pattern: "**/*.{md,mdx}", base: "./content/categories" }),
   schema: z.object({
     "title": z.string(),
@@ -69,7 +69,7 @@ const categories = defineCollection({
   }),
 });
 
-const tags = defineCollection({
+const collection_3 = defineCollection({
   loader: glob({ pattern: "**/*.{md,mdx}", base: "./content/tags" }),
   schema: z.object({
     "title": z.string(),
@@ -77,7 +77,7 @@ const tags = defineCollection({
   }),
 });
 
-const authors = defineCollection({
+const collection_4 = defineCollection({
   loader: glob({ pattern: "**/*.{md,mdx}", base: "./content/authors" }),
   schema: z.object({
     "title": z.string(),
@@ -86,4 +86,4 @@ const authors = defineCollection({
   }),
 });
 
-export const collections = { posts, pages, categories, tags, authors };
+export const collections = { ["posts"]: collection_0, ["pages"]: collection_1, ["categories"]: collection_2, ["tags"]: collection_3, ["authors"]: collection_4 };
