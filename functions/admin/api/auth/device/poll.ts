@@ -12,7 +12,7 @@
 // only that it worked. Nothing token-shaped is ever returned to JavaScript.
 import {
   pollDeviceFlow,
-  authCookies,
+  signInCookies,
   readCookie,
   DEVICE_COOKIE,
 } from "../../../../_lib/device-flow";
@@ -53,7 +53,7 @@ export const onRequest = async (context: {
     "content-type": "application/json",
     "cache-control": "no-store",
   });
-  for (const set of authCookies(result.tokens)) headers.append("set-cookie", set);
+  for (const set of signInCookies(result.tokens)) headers.append("set-cookie", set);
   return new Response(JSON.stringify({ status: "ok" }), { status: 200, headers });
 };
 

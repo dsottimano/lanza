@@ -40,7 +40,7 @@ for(const status of [200,400]) test(`explicit bad refresh token (${status}) clea
  const {response,reached}=await gate(t,()=>Response.json({error:'bad_refresh_token'},{status}));
  assert.equal(response.status,401);assert.equal(reached,false);
  const cookies=response.headers.getSetCookie();
- assert.equal(cookies.length,3);assert.ok(cookies.every(c=>c.includes('Max-Age=0')));
+ assert.equal(cookies.length,4);assert.ok(cookies.every(c=>c.includes('Max-Age=0')));
 });
 for(const status of [400,500]) test(`an HTTP ${status} body cannot issue tokens`,async()=>{
  const result=await refreshTokens('client','refresh',async()=>Response.json({access_token:'do-not-use'},{status}));

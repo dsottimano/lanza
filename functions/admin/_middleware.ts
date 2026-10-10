@@ -179,7 +179,7 @@ async function githubAuth(cookies: string | null, env: Env): Promise<GhAuth> {
       token = refreshed.tokens.accessToken;
       result = await identityFor(token, repo.owner, repo.name);
     } else if (refreshed.status === "error" && refreshed.error === "bad_refresh_token") {
-      // The refresh token is spent or revoked. Drop all three cookies so the browser
+      // The refresh token is spent or revoked. Drop all auth cookies so the browser
       // stops presenting a credential that can never work again — leaving them would
       // send a dead token to GitHub on every future request.
       setCookies = clearAuthCookies();

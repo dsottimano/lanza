@@ -25,6 +25,7 @@ import {
   ACCESS_COOKIE,
   REFRESH_COOKIE,
   DEVICE_COOKIE,
+  AGENT_DEVICE_COOKIE,
   DEVICE_CODE_URL,
   ACCESS_TOKEN_URL,
 } from "./device-flow.ts";
@@ -211,9 +212,9 @@ test("a successful sign-in spends the device cookie", () => {
   assert.ok(set.some((c) => c.startsWith(`${DEVICE_COOKIE}=;`) && c.includes("Max-Age=0")));
 });
 
-test("sign-out clears all three", () => {
+test("sign-out clears the session and pending agent authorization", () => {
   const names = clearAuthCookies().map((c) => c.split("=")[0]);
-  assert.deepEqual(names.sort(), [ACCESS_COOKIE, DEVICE_COOKIE, REFRESH_COOKIE].sort());
+  assert.deepEqual(names.sort(), [ACCESS_COOKIE, DEVICE_COOKIE, REFRESH_COOKIE, AGENT_DEVICE_COOKIE].sort());
   for (const c of clearAuthCookies()) assert.ok(c.includes("Max-Age=0"));
 });
 

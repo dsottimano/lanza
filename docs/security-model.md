@@ -67,6 +67,11 @@ repository access before any downstream handler runs. Concurrent refreshes of a
 rotating token across requests still need separate review; this handling does not
 introduce a credential store or claim to coordinate requests across isolates.
 
+Logout clears pending agent-authorization cookies as well as the CMS session.
+A new sign-in also cancels any old agent flow and removes the previous refresh
+cookie if GitHub did not issue a replacement. Ordinary refresh retains an active
+agent flow; changing accounts and refreshing the same session are distinct.
+
 ### I2 — Validate the URL you are about to fetch, not the string you were given
 
 A path allowlist inspects a string; what leaves the Worker is a **parsed URL**, and only

@@ -174,3 +174,23 @@ Validation: 429 Functions/script tests and 469 CMS tests passed. Site validation
 reported zero errors/warnings. The public build and a fresh packed-package tenant
 each built 15 pages; both Pages Functions bundles compiled using the required
 Wrangler version. Existing public build warnings remain. Deployment is unverified.
+
+## Account-switch cookie cleanup
+
+Logout previously omitted the pending agent-device cookie. A new sign-in also
+reused refresh-oriented cookie handling, which could retain an old account's
+refresh credential if the new response omitted one. Logout now clears all auth
+cookies. Successful new sign-ins clear the old agent flow and either replace or
+remove the refresh credential. Ordinary token refresh preserves an agent flow in
+progress. This is cookie cleanup, not revocation of already exported agent tokens.
+
+Four regressions drive the real sign-in/logout/agent-poll handlers with a cookie
+jar: logout, new sign-ins with/without refresh tokens, and ordinary rotation. A
+post-cleanup agent poll requires restarting and never calls GitHub with the old
+code. Live multi-account authentication and concurrent response ordering remain
+unverified.
+
+Validation: 433 Functions/script tests and 469 CMS tests passed. Site validation
+reported zero errors/warnings. Public and fresh packed-tenant builds generated
+15 pages each, and both Pages Functions bundles compiled. Existing public build
+warnings remain; no live sign-in, account switch or deployment was verified.

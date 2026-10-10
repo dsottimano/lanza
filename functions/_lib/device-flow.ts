@@ -243,9 +243,19 @@ export function authCookies(tokens: Tokens): string[] {
   return out;
 }
 
+/** A new sign-in replaces the previous account's session, unlike a refresh.
+ * Never retain its refresh credential or an unfinished agent authorization. */
+export function signInCookies(tokens: Tokens): string[] {
+  return [
+    ...authCookies(tokens),
+    ...(tokens.refreshToken ? [] : [cleared(REFRESH_COOKIE)]),
+    clearAgentDeviceCookie(),
+  ];
+}
+
 /** Sign out: drop everything this module ever set. */
 export function clearAuthCookies(): string[] {
-  return [cleared(ACCESS_COOKIE), cleared(REFRESH_COOKIE), cleared(DEVICE_COOKIE)];
+  return [cleared(ACCESS_COOKIE), cleared(REFRESH_COOKIE), cleared(DEVICE_COOKIE), clearAgentDeviceCookie()];
 }
 
 export function readCookie(header: string | null, name: string): string | undefined {
