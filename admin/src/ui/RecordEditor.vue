@@ -13,6 +13,7 @@ import { slugify } from "../backend/slug";
 import { entryRoute } from "../router";
 import { reportError, clearError } from "../errors";
 import { useEntryEditor } from "./useEntryEditor";
+import { isDirty } from "./dirty";
 import { refreshPending } from "./staging";
 
 const props = defineProps<{
@@ -38,23 +39,23 @@ const { data, loading, loadFailed, save, markDirty } = useEntryEditor(props, {
   onLoaded: (loadedBody) => (body = loadedBody),
   getBody: () => body,
   getSlug: () => slug.value,
+  onSaved: syncSavedPath,
 });
 
 const slugPlaceholder = computed(() => slugify(String(data.title ?? "")));
-// The slug actually saved (matches useEntryEditor): typed → slugified, else title.
-const effectiveSlug = computed(() =>
-  slug.value.trim() ? slugify(slug.value) : slugPlaceholder.value,
-);
+// Follow the path returned by the completed save, not the current slug input.
+// Remounting a record while newer edits are dirty would discard those edits.
+function syncSavedPath(path: string) {
+  if (isDirty.value) return;
+  const saved = path.replace(/\.md$/, "").split("/").pop()!;
+  if (route.params.slug !== saved) {
+    void router.replace(entryRoute(props.collection.name, props.locale, saved));
+  }
+}
 
-// A slug change renamed the file → keep the URL in sync (existing entries only).
-// Saving also commits to staging, so refresh the shared "to publish" count.
 function onSaved() {
   clearError();
-  refreshPending(props.client);
-  const saved = effectiveSlug.value;
-  if (props.path && route.params.slug !== saved) {
-    router.replace(entryRoute(props.collection.name, props.locale, saved));
-  }
+  void refreshPending(props.client);
 }
 </script>
 
@@ -77,7 +78,7 @@ function onSaved() {
       <h1 class="mb-2 font-serif text-3xl font-bold tracking-tight text-zinc-900">
         {{ path ? "Edit" : "New" }} {{ collection.labelSingular.toLowerCase() }}
       </h1>
-      <div v-if="!loading" class="mb-6" @input="markDirty">
+      <div v-if="!loading && !loadFailed" class="mb-6" @input="markDirty">
         <SlugField
           v-model="slug"
           prefix=""
@@ -91,6 +92,9 @@ function onSaved() {
         <div class="skeleton h-9 w-full" />
         <div class="skeleton h-4 w-28" />
         <div class="skeleton h-9 w-full" />
+      </div>
+      <div v-else-if="loadFailed" class="card p-6" role="alert">
+        This entry could not be loaded. Reload before editing it.
       </div>
       <div
         v-else

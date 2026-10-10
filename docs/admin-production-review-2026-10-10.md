@@ -536,3 +536,20 @@ Site validation again reported zero errors/warnings and the public build produce
 968-test and admin-build results still apply to that code. Existing build warnings
 remain. Exact-commit deployment, authenticated live writes, and the remaining
 review scope are still unverified.
+
+## Record editor saved-path navigation
+
+The form-only record editor previously derived post-save navigation from the
+current slug input. If the user changed it while saving, the editor could
+navigate to an unsaved filename and discard newer edits. It now follows the
+actual path reported by useEntryEditor and only navigates when the record is
+clean. New records also acquire their saved edit URL. A later save of retained
+edits uses the composable's current path/version before navigation resumes.
+
+Failed reads now hide both the slug and field form, showing an error state with
+saving disabled. Three regressions cover in-flight slug edits, new-record
+navigation, and failed reads. All 441 Functions/script and 530 CMS tests passed.
+Admin typecheck/build, site validation (zero errors/warnings), and the 15-page
+public build passed. Chromium verified the compiled failed-load state through
+mocked reads with no page errors or writes. Existing build warnings remain;
+production record writes and deployment are unverified.
