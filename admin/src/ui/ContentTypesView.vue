@@ -11,7 +11,7 @@ import SettingsHeader from "./SettingsHeader.vue";
 // Scope (v1): folder collections only. The system "settings" files collection is
 // carried through untouched but never shown. Nested object.fields / list.types
 // are preserved but not editable here (see FieldEditor's v2 TODO).
-import { computed, onUnmounted, reactive, ref } from "vue";
+import { computed, onUnmounted, reactive, ref, watch } from "vue";
 import { GitHubClient } from "../backend/github";
 import {
   COLLECTIONS,
@@ -51,8 +51,12 @@ const folderNames = computed(() => folderTypes.value.map((t) => t.name));
 const selectedName = ref<string | null>(folderTypes.value[0]?.name ?? null);
 const selected = computed(() => folderTypes.value.find((t) => t.name === selectedName.value) ?? null);
 
-const markDirty = () => (isDirty.value = true);
-onUnmounted(() => (isDirty.value = false));
+let active = true;
+let baseline = JSON.stringify(serialize());
+const saving = ref(false);
+const markDirty = () => (isDirty.value = JSON.stringify(serialize()) !== baseline);
+watch(collections, markDirty, { deep: true, flush: "sync" });
+onUnmounted(() => { active = false; isDirty.value = false; });
 
 function select(name: string) {
   selectedName.value = name;
@@ -209,9 +213,17 @@ function serialize(): Collection[] {
 }
 
 async function save() {
-  if (!valid.value) return;
-  await saveSchema(props.client, serialize());
-  isDirty.value = false;
+  if (!valid.value || saving.value) return;
+  const snapshot = JSON.stringify(serialize());
+  saving.value = true;
+  try {
+    await saveSchema(props.client, JSON.parse(snapshot));
+    if (!active) return;
+    baseline = snapshot;
+    markDirty();
+  } finally {
+    saving.value = false;
+  }
 }
 </script>
 
@@ -222,7 +234,7 @@ async function save() {
         <span v-if="isDirty" class="text-sm text-zinc-500">Unsaved changes</span>
       <SaveButton
         :action="save"
-        :disabled="!valid"
+        :disabled="!valid || saving"
         @saved="clearError"
         @error="(e) => reportError(e, 'Save failed.')"
       />

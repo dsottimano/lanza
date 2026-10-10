@@ -305,3 +305,27 @@ compiled settings failure/retry state through mocked API reads, with no browser
 errors or writes. Existing build warnings remain. This pass covers the generic
 settings editor; specialized settings panels still require equivalent race
 review. Authenticated production writes and this deployment remain unverified.
+
+## Content type and language save snapshots
+
+Content type saves now detach their serialized snapshot from the reactive form.
+This prevents nested edits during a request from being applied to the live schema
+as though those edits were committed. Successful completion only clears dirty
+state when the current serialized form matches the submitted snapshot. Reactive
+tracking also catches nested field changes. Completion after unmount leaves the
+new editor's dirty flag alone.
+
+Language saves freeze both the selected languages and default before the merge
+read. Previously that read could combine the earlier language list with a later
+default selection. Completion retains newer edits as unsaved, and an unmounted
+panel no longer emits saved or clears another editor's dirty flag. Both save
+functions guard against concurrent invocation.
+
+Four regressions cover in-flight edits, the next save, immutable language/default
+pairs, preservation of unrelated site settings, and unmount behavior. All 441
+Functions/script and 493 CMS tests passed. Admin typecheck/build, site validation
+(zero errors/warnings), and the 15-page public build passed. The compiled content
+type form loaded and passed browser creation/validation checks using mocked API
+reads with no writes or page errors. Existing build warnings remain; live saves
+and deployment are unverified. Other specialized settings panels remain in scope
+for the ongoing review.

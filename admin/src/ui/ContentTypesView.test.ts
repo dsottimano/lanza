@@ -79,3 +79,30 @@ it("preserves custom route declarations when saving content type settings", asyn
     wrapper.unmount();
   } finally { setCollections(original); }
 });
+
+
+it("captures a detached schema and keeps edits made during saving dirty", async () => {
+  let finish!: () => void;
+  vi.mocked(saveSchema).mockImplementationOnce(() => new Promise<void>(resolve => { finish = resolve; }));
+  const wrapper = mount(ContentTypesView, { props: { client: {} as GitHubClient } });
+  const label = wrapper.findAll('input').find(input => (input.element as HTMLInputElement).value === "Posts")!;
+  await label.setValue("Articles");
+  const saving = wrapper.findComponent(SaveButton).props("action")();
+  await label.setValue("Stories");
+  const saved = vi.mocked(saveSchema).mock.calls[0]![1];
+  expect(saved.find(c => c.name === "posts")?.label).toBe("Articles");
+  finish(); await saving;
+  expect(isDirty.value).toBe(true);
+  await wrapper.findComponent(SaveButton).props("action")();
+  expect(vi.mocked(saveSchema).mock.calls[1]![1].find(c => c.name === "posts")?.label).toBe("Stories");
+  expect(isDirty.value).toBe(false); wrapper.unmount();
+});
+
+it("does not clear a new editor's dirty flag after a schema save finishes", async () => {
+  let finish!: () => void;
+  vi.mocked(saveSchema).mockImplementationOnce(() => new Promise<void>(resolve => { finish = resolve; }));
+  const wrapper = mount(ContentTypesView, { props: { client: {} as GitHubClient } });
+  const saving = wrapper.findComponent(SaveButton).props("action")();
+  wrapper.unmount(); isDirty.value = true; finish(); await saving;
+  expect(isDirty.value).toBe(true);
+});

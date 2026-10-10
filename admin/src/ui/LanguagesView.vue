@@ -20,24 +20,35 @@ const chosen = ref<string[]>(site.locales.map((l) => l.code));
 const defaultLocale = ref(site.defaultLocale);
 const snapshot = () => JSON.stringify([chosen.value, defaultLocale.value]);
 let baseline = snapshot();
-watch([chosen, defaultLocale], () => { isDirty.value = snapshot() !== baseline; }, { deep: true });
-onBeforeUnmount(() => { isDirty.value = false; });
+let active = true;
+const saving = ref(false);
+watch([chosen, defaultLocale], () => { isDirty.value = snapshot() !== baseline; }, { deep: true, flush: "sync" });
+onBeforeUnmount(() => { active = false; isDirty.value = false; });
 
 const valid = computed(() => chosen.value.length >= 1 && chosen.value.includes(defaultLocale.value));
 
 async function save() {
-  // Preserve LANG_CATALOG order so the rail reads consistently.
+  if (!valid.value || saving.value) return;
+  const savedSnapshot = snapshot();
+  const savedDefault = defaultLocale.value;
+  // Freeze both locale choices and default before the merge-read starts.
   const locales = LANG_CATALOG.filter((l) => chosen.value.includes(l.code)) as LocaleDef[];
-  await putJsonSafe(
-    props.client,
-    SITE_CONFIG_PATH,
-    (cur) => ({ ...cur, defaultLocale: defaultLocale.value, locales, onboarded: cur.onboarded ?? true }),
-    "lanza: update languages",
-  );
-  await loadSiteConfig(props.client);
-  baseline = snapshot();
-  isDirty.value = false;
-  emit("saved");
+  saving.value = true;
+  try {
+    await putJsonSafe(
+      props.client,
+      SITE_CONFIG_PATH,
+      (cur) => ({ ...cur, defaultLocale: savedDefault, locales, onboarded: cur.onboarded ?? true }),
+      "lanza: update languages",
+    );
+    await loadSiteConfig(props.client);
+    if (!active) return;
+    baseline = savedSnapshot;
+    isDirty.value = snapshot() !== baseline;
+    emit("saved");
+  } finally {
+    saving.value = false;
+  }
 }
 </script>
 
@@ -47,7 +58,7 @@ async function save() {
       <template #actions>
         <SaveButton
           :action="save"
-          :disabled="!valid"
+          :disabled="!valid || saving"
           @saved="clearError"
           @error="(e) => reportError(e, 'Save failed.')"
         />
