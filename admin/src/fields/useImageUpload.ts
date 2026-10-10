@@ -1,4 +1,4 @@
-import { ref } from "vue";
+import { onScopeDispose, ref } from "vue";
 import type { GitHubClient } from "../backend/github";
 import { uploadImage } from "../backend/media";
 
@@ -13,6 +13,8 @@ import { uploadImage } from "../backend/media";
  */
 export function useImageUpload(client: GitHubClient | undefined) {
   const uploading = ref(false);
+  let active = true;
+  onScopeDispose(() => { active = false; });
 
   async function pick(
     e: Event,
@@ -21,12 +23,13 @@ export function useImageUpload(client: GitHubClient | undefined) {
   ): Promise<void> {
     const input = e.target as HTMLInputElement;
     const file = input.files?.[0];
-    if (!file || !client) return;
+    if (!file || !client || uploading.value || !active) return;
     uploading.value = true;
     try {
-      onUploaded(await uploadImage(client, file));
+      const url = await uploadImage(client, file);
+      if (active) onUploaded(url);
     } catch (err) {
-      onError(err);
+      if (active) onError(err);
     } finally {
       uploading.value = false;
       input.value = ""; // allow re-picking the same file

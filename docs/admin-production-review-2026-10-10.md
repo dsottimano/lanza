@@ -553,3 +553,24 @@ Admin typecheck/build, site validation (zero errors/warnings), and the 15-page
 public build passed. Chromium verified the compiled failed-load state through
 mocked reads with no page errors or writes. Existing build warnings remain;
 production record writes and deployment are unverified.
+
+## Upload callbacks and concurrent controls
+
+The shared image-upload composable now guards duplicate calls and suppresses
+success/error callbacks after its owning component is disposed. Inputs are still
+cleared and uploading state released after failures so a file can be retried.
+Form image and rich-text figure callbacks only apply the uploaded URL if their
+original image value is still current. A review revert or other intervening
+change is no longer replaced by the late upload response.
+
+This does not cancel a GitHub upload already underway; its media file may still
+be committed after leaving the editor. No rollback or cancellation guarantee is
+claimed. Four regressions cover duplicate calls, failure/retry, late success and
+failure, and replacement of a form value during upload. Filename collision and
+replacement preconditions remain a separate backend review item.
+
+All 441 Functions/script and 534 CMS tests passed. Admin typecheck/build, site
+validation (zero errors/warnings), and the 15-page public build passed. Compiled
+admin smoke checks at desktop/mobile sizes passed with no overflow, errors or
+writes; delayed-upload behavior is covered by component/composable tests rather
+than live writes. Existing build warnings remain and deployment is unverified.

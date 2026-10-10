@@ -17,9 +17,10 @@ const { uploading, pick } = useImageUpload(inject(CLIENT_KEY));
 const safeSrc = computed(() => safeImageUrl(model.value));
 
 function onPick(e: Event) {
+  const previous = model.value;
   pick(
     e,
-    (url) => (model.value = url),
+    (url) => { if (model.value === previous) model.value = url; },
     (err) => reportError(err, "Image upload failed."),
   );
 }

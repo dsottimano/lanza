@@ -18,10 +18,11 @@ function setAlt() {
 }
 
 function onPick(e: Event) {
+  const previous = props.node.attrs.src;
   error.value = "";
   pick(
     e,
-    (url) => props.updateAttributes({ src: url }),
+    (url) => { if (props.node.attrs.src === previous) props.updateAttributes({ src: url }); },
     (err) => (error.value = err instanceof Error ? err.message : "Upload failed."),
   );
 }
