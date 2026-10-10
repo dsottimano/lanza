@@ -36,6 +36,7 @@ import { entryPathFrame } from "../backend/site-urls";
 import { stemOf, takeTranslationSeed } from "../backend/translations";
 import { reportError, clearError } from "../errors";
 import { useEntryEditor } from "./useEntryEditor";
+import { useEditorSiteTools } from "./useEditorSiteTools";
 import { useEntryReview } from "./useEntryReview";
 import { pendingCount, refreshPending } from "./staging";
 
@@ -53,6 +54,8 @@ const editorRef = useTemplateRef<InstanceType<typeof Editor>>("editorRef");
 
 const bodyHtml = ref("<p></p>");
 const titleInput = ref<HTMLTextAreaElement>();
+const pageTitleInput = ref<HTMLInputElement>();
+const siteToolsRoot = ref<HTMLElement>();
 function growTitle() {
   const el = titleInput.value;
   if (!el) return;
@@ -63,6 +66,8 @@ const { preferences, focusMode } = useWritingPreferences();
 const editorProblem = ref("");
 const pagePanel = ref<"content" | "details" | "changes">("content");
 const templateEditor = ref<InstanceType<typeof TemplateEditor>>();
+const siteToolsField = ref<string | null>(null);
+const siteToolsSession = crypto.randomUUID();
 const focusFormatting = ref(false);
 onMounted(() => window.addEventListener("resize", growTitle));
 onUnmounted(() => window.removeEventListener("resize", growTitle));
@@ -125,7 +130,7 @@ const urlLabel = computed(() => urlFrame.value
 // `dirty`/`markDirty` are the shared unsaved-changes signal (see useEntryEditor).
 const { data, loading, loadFailed, saving, saveError, savedAt, pauseReason,
   recovery, localCopy, currentPath, save, dirty, markDirty, pauseAutosave,
-  restoreRecovery, discardRecovery } = useEntryEditor(props, {
+  restoreRecovery, discardRecovery, getRevision, getBaseSha } = useEntryEditor(props, {
   autosave: true,
   onSaved,
   restore: (body, restoredSlug) => {
@@ -208,6 +213,43 @@ watchEffect(() => { if (templated.value) focusMode.value = false; });
 
 const slotsData = computed(() => (data.slots as Record<string, unknown>) ?? {});
 
+useEditorSiteTools({
+  data,
+  fields: () => props.collection.fields.map(field => field.widget === "slots"
+    ? { ...field, widget: "object", fields: selectedTemplate.value?.fields ?? [] } : field),
+  context: () => ({ repository: access.repo, collection: props.collection.name, locale: props.locale,
+    path: currentPath.value, selectedField: siteToolsField.value, dirty: dirty.value, baseSha: getBaseSha() }),
+  revision: () => `${siteToolsSession}:${getRevision()}:${getBaseSha() ?? "new"}`,
+  ready: () => access.loaded && !editorLoading.value && !loadFailed.value && !saving.value && !recovery.value && !saveError.value,
+  canEdit: () => access.loaded && (access.role === "owner" || access.role === "editor"),
+  pauseAutosave,
+  focus: async path => {
+    focusMode.value = false;
+    if (path === "title") {
+      if (templated.value) pagePanel.value = "details";
+      await nextTick();
+      const input = templated.value ? pageTitleInput.value : titleInput.value;
+      input?.focus(); siteToolsField.value = path;
+      return !!input;
+    }
+    pagePanel.value = "content";
+    preferences.options = true;
+    await nextTick();
+    if (await templateEditor.value?.focusField(path)) { onFocusField(path); return true; }
+    if (templated.value) { pagePanel.value = "details"; await nextTick(); }
+    // Generic metadata fields retain their ordinary DOM/input behavior. Matching
+    // an attribute value avoids interpreting an agent path as a CSS selector.
+    const node = [...(siteToolsRoot.value?.querySelectorAll<HTMLElement>("[data-field-path]") ?? [])]
+      .find(element => element.dataset.fieldPath === path);
+    const input = node?.querySelector<HTMLElement>("input,textarea,select");
+    if (!input) return false;
+    for (let ancestor = input.parentElement; ancestor; ancestor = ancestor.parentElement) {
+      if (ancestor.tagName === "DETAILS") (ancestor as HTMLDetailsElement).open = true;
+    }
+    input.focus(); onFocusField(path); return true;
+  },
+});
+
 // ── field grouping ──────────────────────────────────────────────────────────
 // Title + draft are in the chrome; preset + slots are the Template surface. SEO/
 // meta collapse into their own disclosure; whatever's left is "details".
@@ -265,6 +307,7 @@ function onRowSelect(path: string): void {
 }
 
 async function onPreviewSelect(path: string): Promise<void> {
+  siteToolsField.value = path;
   review.select(path);
   pagePanel.value = "content";
   await nextTick();
@@ -277,6 +320,7 @@ async function onPreviewSelect(path: string): Promise<void> {
 // scrollToField declines to move for a field the template doesn't place, so tabbing
 // through SEO fields leaves the page where it is rather than jumping to the top.
 function onFocusField(path: string): void {
+  siteToolsField.value = path;
   if (templated.value) review.select(path);
   previewRef.value?.scrollToField(path);
 }
@@ -324,7 +368,7 @@ onMounted(async () => {
 </script>
 
 <template>
-  <div class="writing-workspace flex min-h-screen flex-col" :class="{ 'writing-workspace--focus': focusMode && !templated && !editorLoading, 'page-editing-workspace': templated || (editorLoading && hasTemplate) }">
+  <div ref="siteToolsRoot" class="writing-workspace flex min-h-screen flex-col" :class="{ 'writing-workspace--focus': focusMode && !templated && !editorLoading, 'page-editing-workspace': templated || (editorLoading && hasTemplate) }">
     <header class="toolbar writing-header flex flex-wrap items-center justify-between gap-3 px-5 py-3">
       <button
         class="text-sm text-zinc-600 transition hover:text-zinc-900"
@@ -430,7 +474,7 @@ onMounted(async () => {
               <div class="page-identity">
                 <IdentityField label="Page name" class="page-identity__name">
                   <template #default="{ inputId }">
-                    <input :id="inputId" v-model="title" placeholder="Page name" class="identity-name-input" />
+                    <input ref="pageTitleInput" :id="inputId" v-model="title" placeholder="Page name" class="identity-name-input" @focus="siteToolsField = 'title'" />
                   </template>
                 </IdentityField>
                 <div class="page-identity__url">
@@ -485,6 +529,7 @@ onMounted(async () => {
               <span class="sr-only">Title</span>
               <textarea
                 ref="titleInput"
+                @focus="siteToolsField = 'title'"
                 rows="1"
                 v-model="title"
                 class="writing-title mb-5 resize-none overflow-hidden mt-1 block w-full border-none bg-transparent font-serif font-bold leading-tight tracking-tight text-zinc-900 outline-none placeholder:text-zinc-300"

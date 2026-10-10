@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { computed, defineAsyncComponent, h, nextTick, ref, shallowRef, watch } from "vue";
+import { computed, defineAsyncComponent, h, nextTick, onMounted, onUnmounted, ref, shallowRef, watch } from "vue";
 import { useRoute, useRouter } from "vue-router";
 // Eager: the shell that's always on screen at boot.
 import Sidebar from "./ui/Sidebar.vue";
@@ -58,7 +58,8 @@ import { loadSchema } from "./backend/schema";
 import { refreshVersionState } from "./backend/version";
 import { access, loadAccess } from "./backend/access";
 import { reportError } from "./errors";
-import { confirmDiscard } from "./ui/dirty";
+import { confirmDiscard, hasUnsavedChanges } from "./ui/dirty";
+import { registerSiteTools } from "./backend/site-tools";
 import { focusMode } from "./ui/writing-preferences";
 import {
   getCollection,
@@ -206,6 +207,24 @@ const editingPath = computed<string | null>(() => {
   const slug = route.params.slug as string;
   return slug === "new" ? null : `${entryFolder(collection.value, locale.value)}/${slug}.md`;
 });
+
+let removeSiteTools = () => {};
+onMounted(() => {
+  removeSiteTools = registerSiteTools([{
+    name: "get_cms_context",
+    description: "Read which Lanza CMS screen is open, its account/repository/locale and unsaved status. Entry editors offer separate context, focus and text proposal tools; other screens currently provide context only. Never returns tokens or private content from other entries.",
+    inputSchema: { type: "object", properties: {}, additionalProperties: false },
+    annotations: { readOnlyHint: true },
+    execute: async input => {
+      if (!input || Object.keys(input).length) throw new Error("This tool takes no arguments.");
+      return { ready: ready.value && access.loaded, repository: access.repo, account: access.login,
+        role: access.role, screen: pane.value, locale: locale.value,
+        entryPath: editingPath.value, unsavedChanges: hasUnsavedChanges.value,
+        note: "Use the current screen's tools. Saving drafts and publishing are separate actions." };
+    },
+  }]);
+});
+onUnmounted(() => removeSiteTools());
 
 // A first save or explicit rename changes the address, not the editor session.
 // Keep its Vue key while replacing the route so focus and undo history survive.

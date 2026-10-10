@@ -15,6 +15,8 @@ import { reportError, clearError } from "../errors";
 import { useEntryEditor } from "./useEntryEditor";
 import { isDirty } from "./dirty";
 import { refreshPending } from "./staging";
+import { access } from "../backend/access";
+import { useEditorSiteTools } from "./useEditorSiteTools";
 
 const props = defineProps<{
   client: GitHubClient;
@@ -35,11 +37,28 @@ const slug = ref(originalSlug);
 // Body-less collection: keep whatever body the file already had and re-commit it
 // untouched (this editor only edits frontmatter fields).
 let body = "";
-const { data, loading, loadFailed, save, markDirty } = useEntryEditor(props, {
+const { data, loading, loadFailed, saving, saveError, currentPath, save, markDirty, pauseAutosave,
+  getRevision, getBaseSha } = useEntryEditor(props, {
   onLoaded: (loadedBody) => (body = loadedBody),
   getBody: () => body,
   getSlug: () => slug.value,
   onSaved: syncSavedPath,
+});
+
+const form = ref<InstanceType<typeof FieldForm>>();
+const selectedField = ref<string | null>(null);
+const siteToolsSession = crypto.randomUUID();
+useEditorSiteTools({
+  data, fields: () => props.collection.fields,
+  context: () => ({ repository: access.repo, collection: props.collection.name, locale: props.locale,
+    path: currentPath.value, selectedField: selectedField.value, dirty: isDirty.value, baseSha: getBaseSha() }),
+  revision: () => `${siteToolsSession}:${getRevision()}:${getBaseSha() ?? "new"}`,
+  ready: () => access.loaded && !loading.value && !loadFailed.value && !saving.value && !saveError.value,
+  canEdit: () => access.loaded && (access.role === "owner" || access.role === "editor"),
+  pauseAutosave,
+  focus: async path => { const focused = await form.value?.focusField(path) ?? false;
+    if (focused) selectedField.value = path;
+    return focused; },
 });
 
 const slugPlaceholder = computed(() => slugify(String(data.title ?? "")));
@@ -102,7 +121,8 @@ function onSaved() {
         @input="markDirty"
         @change="markDirty"
       >
-        <FieldForm :fields="collection.fields" :data="data" :client="client" :locale="locale" dense />
+        <FieldForm ref="form" :fields="collection.fields" :data="data" :client="client" :locale="locale" dense
+          @focus-field="selectedField = $event" />
       </div>
     </main>
   </div>

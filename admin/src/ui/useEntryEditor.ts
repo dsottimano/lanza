@@ -251,5 +251,6 @@ export function useEntryEditor(props: EntryEditorProps, hooks: EntryEditorHooks)
   }
 
   return { data, loading, loadFailed, saving, saveError, savedAt, pauseReason, recovery,
-    localCopy, currentPath, save, dirty: isDirty, markDirty, pauseAutosave, restoreRecovery, discardRecovery };
+    localCopy, currentPath, save, dirty: isDirty, markDirty, pauseAutosave, restoreRecovery, discardRecovery,
+    getRevision: () => revision, getBaseSha: () => sha };
 }
