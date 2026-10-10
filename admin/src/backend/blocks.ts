@@ -20,23 +20,22 @@ export interface LoadedBlocks {
 }
 
 function coerceBlocks(v: unknown): Block[] {
-  if (!Array.isArray(v)) return [];
-  return v
-    .filter(
-      (b): b is Block =>
-        !!b &&
-        typeof b === "object" &&
-        typeof (b as Block).id === "string" &&
-        typeof (b as Block).name === "string" &&
-        typeof (b as Block).html === "string",
-    )
-    .map((b) => ({ id: b.id, name: b.name, html: b.html }));
+  if (!Array.isArray(v)) throw new Error("The snippets file must contain a blocks list.");
+  const ids = new Set<string>();
+  for (const item of v) {
+    if (!item || typeof item !== "object" || typeof item.id !== "string" || !item.id.trim() ||
+        typeof item.name !== "string" || typeof item.html !== "string" || ids.has(item.id)) {
+      throw new Error("The snippets file contains an invalid or duplicate snippet. Repair it before editing to preserve all content.");
+    }
+    ids.add(item.id);
+  }
+  return v.map(b => ({ ...b }));
 }
 
 export async function loadBlocks(client: GitHubClient): Promise<LoadedBlocks> {
   try {
     const { data, sha } = await client.loadJson(BLOCKS_PATH);
-    return { blocks: coerceBlocks(data.blocks), sha };
+    return { blocks: coerceBlocks(data?.blocks), sha };
   } catch (e) {
     if (e instanceof GitHubError && e.status === 404) return { blocks: [] };
     throw e;

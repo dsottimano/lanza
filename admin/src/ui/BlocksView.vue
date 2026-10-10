@@ -23,8 +23,12 @@ const editorRef = useTemplateRef<InstanceType<typeof Editor>>("editorRef");
 
 const activeBlock = computed(() => blocks.find((b) => b.id === activeId.value) ?? null);
 
-const markDirty = () => (isDirty.value = true);
-onUnmounted(() => (isDirty.value = false));
+let active = true;
+let revision = 0;
+const loadFailed = ref(false);
+const saving = ref(false);
+const markDirty = () => { revision++; isDirty.value = true; };
+onUnmounted(() => { active = false; isDirty.value = false; });
 
 // Pull the live editor HTML back into the active block before we switch away
 // from it or save — the editor holds the unsaved edits until then.
@@ -35,16 +39,19 @@ function flushActive() {
 
 async function load() {
   loading.value = true;
+  loadFailed.value = false;
   try {
     const loaded = await loadBlocks(props.client);
+    if (!active) return;
     blocks.splice(0, blocks.length, ...loaded.blocks);
     sha = loaded.sha;
     activeId.value = blocks[0]?.id ?? null;
   } catch (e) {
+    if (!active) return;
+    loadFailed.value = true;
     reportError(e, "Failed to load snippets.");
   } finally {
-    loading.value = false;
-    isDirty.value = false;
+    if (active) { loading.value = false; isDirty.value = false; }
   }
 }
 load();
@@ -80,9 +87,19 @@ function remove(block: Block) {
 }
 
 async function save() {
+  if (loading.value || loadFailed.value || saving.value) return;
   flushActive();
-  sha = await saveBlocks(props.client, [...blocks], sha);
-  isDirty.value = false;
+  const submittedRevision = revision;
+  const snapshot: Block[] = JSON.parse(JSON.stringify(blocks));
+  saving.value = true;
+  try {
+    const nextSha = await saveBlocks(props.client, snapshot, sha);
+    if (!active) return;
+    sha = nextSha;
+    isDirty.value = revision !== submittedRevision;
+  } finally {
+    saving.value = false;
+  }
 }
 
 // Plain-text preview for the list (strip tags; the content is the author's own).
@@ -99,7 +116,7 @@ function preview(html: string): string {
   <span v-if="isDirty" class="text-xs text-zinc-500">Unsaved changes</span>
         <SaveButton
           :action="save"
-          :disabled="loading"
+          :disabled="loading || loadFailed || saving"
           @saved="clearError"
           @error="(e) => reportError(e, 'Save failed.')"
         />
@@ -116,6 +133,10 @@ function preview(html: string): string {
         <div class="skeleton h-9 w-2/3" />
       </div>
 
+      <div v-else-if="loadFailed" class="card p-6" role="alert">
+        <p>Snippets could not be loaded. Retry before editing.</p>
+        <button class="btn btn-ghost mt-3" @click="load">Retry loading</button>
+      </div>
       <div v-else class="grid gap-5 md:grid-cols-[16rem_1fr]">
         <!-- Block list -->
         <aside class="card flex h-max flex-col gap-1 p-3">

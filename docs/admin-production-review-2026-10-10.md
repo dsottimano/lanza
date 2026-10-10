@@ -350,3 +350,23 @@ Functions/script and 499 CMS tests passed. Admin typecheck/build, site validatio
 the compiled redirect editor blocks save after a mocked read outage and recovers
 on retry, with no page errors or writes. Existing build warnings remain; actual
 production redirect writes and deployment of this commit are unverified.
+
+## Saved snippets read/save handling
+
+Saved snippets now blocks editing after a failed read and provides retry. The
+loader rejects malformed lists, invalid entries and duplicate IDs instead of
+silently filtering them out and allowing the remaining subset to overwrite the
+file. A genuine missing file still starts an empty library. Valid entry metadata
+is retained when loading.
+
+Saves flush the current editor into a detached snapshot and track edit revisions,
+including editor change events. Completion updates the SHA but leaves subsequent
+edits dirty; after unmount it cannot clear another editor's warning. Concurrent
+saves are guarded. Eight regressions cover failed reads/retry, malformed entries,
+duplicate IDs, first use, in-flight edits and unmount behavior.
+
+All 441 Functions/script and 507 CMS tests passed. Admin typecheck/build, site
+validation (zero errors/warnings), and the 15-page public build passed. Chromium
+verified failed-read blocking and retry in the compiled snippet manager through
+mocked reads, without page errors or writes. Existing build warnings remain;
+authenticated production writes and deployment of this change are unverified.
