@@ -126,7 +126,10 @@ export async function planRevert(
         "It may have already been reverted or rewritten.",
     );
   }
-  const changedSince = new Set((diff.files ?? []).map((f) => f.filename));
+  // A later rename changes both paths. Restoring the old name also affects work
+  // the owner moved elsewhere, so it must appear in the overwrite warning.
+  const changedSince = new Set((diff.files ?? []).flatMap(f =>
+    f.previous_filename ? [f.filename, f.previous_filename] : [f.filename]));
 
   // The parent's tree gives the pre-apply blob sha for every restored path.
   const parentCommit = await client.getCommit(parent.sha);

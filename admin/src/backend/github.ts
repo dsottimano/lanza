@@ -536,11 +536,32 @@ export class GitHubClient {
     return (await this.req(`/commits?${parts.join("&")}`)) as CommitListItem[];
   }
 
-  /** One commit via the REST API — includes parents and per-file statuses. */
+  /** Read every file page for one immutable commit. A partial list is unsafe
+   * for theme undo, which would otherwise silently leave half a theme installed. */
   async getCommit(sha: string): Promise<CommitDetail> {
-    return (await this.req(
-      `/commits/${sha}`,
-    )) as CommitDetail;
+    let first: CommitDetail | undefined;
+    const files: CommitFile[] = [];
+    const seen = new Set<string>();
+    for (let page = 1; page <= 30; page++) {
+      const result = await this.req(`/commits/${encodeURIComponent(first?.sha ?? sha)}?per_page=100&page=${page}`) as CommitDetail;
+      if (!result || typeof result.sha !== 'string' || !/^[a-f0-9]{40}$/.test(result.sha) ||
+          (first && result.sha !== first.sha) || !Array.isArray(result.files)) {
+        throw new Error('Could not read the complete commit. Try again before reverting.');
+      }
+      first ??= result;
+      for (const file of result.files) {
+        if (!file || typeof file.filename !== 'string' || typeof file.status !== 'string' || seen.has(file.filename)) {
+          throw new Error('Could not read the complete commit. Try again before reverting.');
+        }
+        seen.add(file.filename);
+        files.push(file);
+      }
+      // GitHub caps the entire response at 3,000 files. At the cap, absence of a
+      // next page cannot prove completeness. Refuse rather than plan a partial undo.
+      if (files.length >= 3000) break;
+      if (result.files.length < 100) return { ...first, files };
+    }
+    throw new Error('This commit is too large to review completely through GitHub. Ask your agent to review and revert it from a local Git checkout. Nothing was changed.');
   }
 
   /** Diff base…head. `status` tells us whether base is an ancestor of head. */
@@ -594,7 +615,7 @@ export interface CommitDetail {
 
 export interface CompareResult {
   status: string; // ahead | behind | identical | diverged
-  files?: { filename: string; status: string }[];
+  files?: CommitFile[];
 }
 
 // GitHub caps comparison files at 300; commit pagination cannot recover the rest.

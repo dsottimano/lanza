@@ -59,7 +59,7 @@ build and Git push do not establish Cloudflare deployment success.
 This pass does not complete the original request for a full code/security review
 of every admin surface. In particular, authenticated production owner/editor flows,
 concurrent production publishing, deployment completion tracking,
-large-commit file pagination for theme reverts, custom collection URL helpers, recipe
+theme-undo edge cases and history error states, custom collection URL helpers, recipe
 atomicity, session-refresh races and the rest of the settings/editor interactions
 still need current-state review and verification. Prior reports are evidence to
 recheck, not proof these areas are either vulnerable or already safe. No production
@@ -103,8 +103,8 @@ npm release or a deployment verification.
   instead of claiming the current version is latest. Refreshing the selected
   version also refreshes the publishing security-floor state.
 
-The single-commit file list used by theme reverts still needs a separate
-pagination review. These comparison safeguards do not prove that list complete.
+Single-commit file pagination was reviewed separately in the follow-up below.
+The comparison guard alone does not prove a commit file list complete.
 
 Validation: 413 Functions/script tests and 455 CMS tests passed. Admin typecheck
 and build, site validation (zero errors/warnings), and the 15-page public build
@@ -114,3 +114,23 @@ version issued only a simulated staging package write, linked to the publish
 review, and refused a 300-file review with the explanatory error and disabled
 publish button. All API writes were intercepted; no production data was changed
 by browser testing. No browser page errors occurred. Deployment remains unverified.
+
+## Theme undo pagination follow-up
+
+Theme undo previously read only one page of the apply commit's changed files.
+The GitHub client now reads all pages, pins subsequent requests to the returned
+commit SHA, and refuses missing file lists, changed commit IDs, duplicate files,
+failed pages and GitHub's 3,000-file ceiling. At the ceiling, a complete local Git
+review is required because the API cannot prove the list is complete. Later
+renames now flag both the old and new path in overwrite warnings.
+
+Eight new regressions cover multi-page lists, exact page boundaries, failures,
+the total-file cap, and a real-client theme plan containing the final file on
+page four. No UI layout changed. Live account theme rollback remains unverified.
+
+Contract: [GitHub Get a commit](https://docs.github.com/en/rest/commits/commits#get-a-commit)
+documents file pagination and the total limit.
+
+Validation: 413 Functions/script tests and 463 CMS tests passed. Admin typecheck
+and build, site validation (zero errors/warnings), and the 15-page public build
+passed. Existing empty-collection and animation chunk warnings remain.
