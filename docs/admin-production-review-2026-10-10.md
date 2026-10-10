@@ -506,3 +506,33 @@ picker and mobile preview with its empty sandbox permission set, without page
 errors or writes. CLI recipe filesystem application remains a separate review
 item. Existing build warnings remain; production installation and deployment are
 unverified.
+
+## Current deployment observation (code commit ffe7f29)
+
+Cloudflare's production deployment listing reports `ffe7f29` active at deployment
+`f0354574-f117-4682-926a-d16f3f95f412`. GitHub's Cloudflare Pages check remains
+in-progress, while Socket's project report is successful. Chromium at the
+commit-specific URL returned Cloudflare's Deployment Not Found page (404), both
+at `/` and `/admin/`. This contradicts treating the listing alone as proof of an
+accessible commit-specific deployment. No deployment restart or configuration
+change was made.
+
+At `https://lanzacms.com/admin/`, Chromium checks at 390px and 1440px passed:
+working sign-in control, no horizontal overflow or page errors, no-store, nonce
+CSP, DENY framing, nosniff, and a 401 JSON unauthenticated API response. These
+prove the current public authentication gate works, not the deployed code SHA or
+authenticated owner/editor behavior. Python urllib requests to both hosts
+returned 403 responses, unlike Chromium on the custom domain; those responses
+were not used as evidence of application headers or behavior.
+
+The GitHub Actions failures listed most recently are September 7 tag-triggered
+npm publication attempts, not builds of this October code. Run 34079412508 failed
+with npm ENEEDAUTH. The current workflow already upgrades npm for trusted
+publishing; this read-only check neither reran publication nor proved that
+release authentication is now configured. No npm release was attempted.
+
+Site validation again reported zero errors/warnings and the public build produced
+15 pages. Application code is unchanged by this evidence-only pass; the preceding
+968-test and admin-build results still apply to that code. Existing build warnings
+remain. Exact-commit deployment, authenticated live writes, and the remaining
+review scope are still unverified.
