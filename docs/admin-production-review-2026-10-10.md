@@ -194,3 +194,20 @@ Validation: 433 Functions/script tests and 469 CMS tests passed. Site validation
 reported zero errors/warnings. Public and fresh packed-tenant builds generated
 15 pages each, and both Pages Functions bundles compiled. Existing public build
 warnings remain; no live sign-in, account switch or deployment was verified.
+
+## Atomic software version saves
+
+Software updates previously removed package-lock.json and saved package.json as
+two separate commits. A failure between them left a partial update. The version
+save now reads an immutable staging head and submits the package edit and any
+existing lockfile removal in one checked Git tree/commit, with a non-force branch
+update. Only a 404 means the lockfile is absent; other read failures stop the save.
+Unrelated package fields and dependencies remain intact.
+
+Seven new real-client tests cover lockfile presence/absence, failures at each
+pre-publication stage, and a racing branch edit. 433 Functions/script tests and
+476 CMS tests passed. Admin typecheck/build, site validation (zero errors/warnings)
+and the 15-page public build passed. Chromium exercised the compiled Software
+screen with intercepted API traffic: one synthetic staging ref update, no
+production update, then the existing publication review. Existing build warnings
+remain. Live software installation/deployment is unverified.

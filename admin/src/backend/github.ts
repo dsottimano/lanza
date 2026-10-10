@@ -311,7 +311,17 @@ export class GitHubClient {
     return ref.object.sha;
   }
 
-  async commitChecked(head: string, files: { path: string; text: string; sha?: string }[], message: string): Promise<Record<string, string>> {
+  async commitChecked(head: string, files: { path: string; text: string; sha?: string }[], message: string, removePaths: string[] = []): Promise<Record<string, string>> {
+    const tree: TreeEntry[] = [];
+    for (const path of removePaths) {
+      if (files.some(file => file.path === path)) throw new Error('Cannot save and remove the same file.');
+      try {
+        await this.req(this.contentsUrl(path, true, head));
+        tree.push({ path, mode: "100644", type: "blob", sha: null });
+      } catch (e) {
+        if (!(e instanceof GitHubError && e.status === 404)) throw e;
+      }
+    }
     for (const file of files) {
       let actual: string | undefined;
       try {
@@ -322,7 +332,6 @@ export class GitHubClient {
       if (actual !== file.sha) throw new GitHubError(409, "A file changed elsewhere. Reload before saving.");
     }
     const result: Record<string, string> = {};
-    const tree: TreeEntry[] = [];
     for (const file of files) {
       const blob = await this.req("/git/blobs", { method: "POST",
         body: JSON.stringify({ content: utf8ToB64(file.text), encoding: "base64" }) }) as { sha: string };

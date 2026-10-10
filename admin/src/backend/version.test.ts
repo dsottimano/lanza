@@ -218,11 +218,13 @@ function spyClient(pkg: Record<string, unknown>) {
   const writes: string[] = [];
   const client = {
     loadJson: async () => ({ data: structuredClone(pkg), sha: "sha1" }),
-    saveJson: async (path: string) => {
-      writes.push(`save ${path}`);
-    },
-    deleteFileIfExists: async (path: string) => {
-      writes.push(`delete ${path}`);
+    workingHead: async () => "reviewed-head",
+    commitChecked: async (head: string, files: {path: string; text: string; sha: string}[], _message: string, removals: string[]) => {
+      expect(head).toBe("reviewed-head");
+      expect(files[0]?.sha).toBe("sha1");
+      expect(JSON.parse(files[0]!.text).dependencies["lanza-site"]).toBe("0.1.10");
+      expect(removals).toEqual(["package-lock.json"]);
+      writes.push("atomic version update");
     },
     listCommits: async () => [],
   } as unknown as GitHubClient;
@@ -244,7 +246,7 @@ describe("setPinnedVersion", () => {
   it("still pins a real version", async () => {
     const { client, writes } = spyClient(pkg);
     await setPinnedVersion(client, "0.1.10");
-    expect(writes).toEqual(["delete package-lock.json", "save package.json"]);
+    expect(writes).toEqual(["atomic version update"]);
   });
 });
 
