@@ -145,6 +145,7 @@ export const onRequest = async (context: { request: Request }): Promise<Response
   // because on a custom domain it can only be derived from the repo identity — which
   // this module holds (lanza.config.json) and mcp-core deliberately does not.
   const site = {
+    login: identity.identity.login,
     origin,
     stagingUrl: await stagingUrlFor(origin, WORKING_BRANCH, repo),
   };

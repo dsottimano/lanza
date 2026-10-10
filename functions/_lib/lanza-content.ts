@@ -111,6 +111,31 @@ export class ContentClient {
     this.token = token;
   }
 
+  // Internal transport for the private request archive. It deliberately cannot
+  // address website refs or arbitrary Contents paths, and is not a proxy route.
+  async agentRequestArchive(method: string, path: string, body?: unknown): Promise<unknown> {
+    const id = "[a-f0-9]{8}-[a-f0-9]{4}-[a-f0-9]{4}-[a-f0-9]{4}-[a-f0-9]{12}";
+    const allowed = method === "GET"
+      ? path === "" || path === "git/ref/heads/lanza-agent-requests" || new RegExp(`^contents/requests(?:/${id}\\.json)?\\?ref=lanza-agent-requests$`).test(path)
+      : method === "POST" ? ["git/trees", "git/commits", "git/refs"].includes(path)
+      : method === "PUT" && new RegExp(`^contents/requests/${id}\\.json$`).test(path);
+    if (!allowed) throw new GitHubError(403, "Invalid agent request archive operation.");
+    if (!/^[a-zA-Z0-9-]+$/.test(this.repo.owner) || !/^[a-zA-Z0-9_.-]+$/.test(this.repo.name) || [".", ".."].includes(this.repo.name)) throw new GitHubError(403, "Invalid repository identity.");
+    const value = body as Record<string, unknown> | undefined;
+    if (method === "PUT" && value?.branch !== "lanza-agent-requests") throw new GitHubError(403, "Invalid archive branch.");
+    if (path === "git/refs" && value?.ref !== "refs/heads/lanza-agent-requests") throw new GitHubError(403, "Invalid archive ref.");
+    const response = await this.gh(path, { method, redirect: "error", signal: AbortSignal.timeout(15000), cache: "no-store", ...(body === undefined ? {} : { body: JSON.stringify(body) }) });
+    if (response.status === 404 && method === "GET") { await response.body?.cancel(); return null; }
+    if (!response.ok) throw await this.fail(response, "access private agent requests");
+    const reader = response.body?.getReader();
+    let text = ""; let size = 0; const decoder = new TextDecoder();
+    if (!reader) throw new GitHubError(502, "Empty request archive response.");
+    try {
+      for (;;) { const { done, value } = await reader.read(); if (done) break; size += value.byteLength; if (size > 1024 * 1024) { await reader.cancel(); throw new GitHubError(502, "Request archive response exceeds its limit."); } text += decoder.decode(value, { stream: true }); }
+    } finally { reader.releaseLock(); }
+    return JSON.parse(text + decoder.decode());
+  }
+
   private async gh(path: string, init?: RequestInit): Promise<Response> {
     return fetch(`${GITHUB_API}/repos/${this.repo.owner}/${this.repo.name}/${path}`, {
       ...init,
