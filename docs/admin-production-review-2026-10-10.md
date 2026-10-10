@@ -370,3 +370,25 @@ validation (zero errors/warnings), and the 15-page public build passed. Chromium
 verified failed-read blocking and retry in the compiled snippet manager through
 mocked reads, without page errors or writes. Existing build warnings remain;
 authenticated production writes and deployment of this change are unverified.
+
+## Atomic header/footer/navigation saves
+
+The header/footer editor previously committed the menu and each changed template
+separately. A failure midway left a partial update. It now captures all changed
+files before awaiting and uses the existing checked Git transaction to validate
+loaded SHAs and commit the entire change at once. Only changed files are included.
+On success it advances their SHAs and compares current values with the submitted
+snapshot so later edits remain dirty. Failed commits retain all pending changes.
+
+Load results carry a generation guard, so older locale reads and responses after
+unmount cannot replace the current form or clear its dirty state. Save completion
+uses the same guard. Tests retain real header/footer markup and cover localized
+menu isolation, atomic submission, newer edits, conflict retention, unmount and
+superseded locale loads.
+
+All 441 Functions/script and 511 CMS tests passed, along with admin typecheck/build,
+site validation (zero errors/warnings), and the 15-page public build. Chromium
+verified the compiled editor loads and tracks template edits with mocked API
+reads and no page errors or writes. The transaction helper's existing regression
+suite passed; this pass did not execute authenticated production writes. Existing
+build warnings remain and deployment of this change is unverified.

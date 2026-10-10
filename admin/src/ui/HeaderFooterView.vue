@@ -32,6 +32,9 @@ function selectLocale(event: Event) {
   select.value = props.locale;
 }
 
+let active = true;
+let generation = 0;
+const saving = ref(false);
 const loading = ref(true);
 const loadFailed = ref(false);
 const previewSiteName = ref("Your site");
@@ -52,30 +55,34 @@ const activeSections = computed(() => sections[activePart.value]);
 
 watch([menuDirty, () => partDirty.header, () => partDirty.footer], () => {
   isDirty.value = menuDirty.value || partDirty.header || partDirty.footer;
-});
-onUnmounted(() => (isDirty.value = false));
+}, { flush: "sync" });
+onUnmounted(() => { active = false; generation++; isDirty.value = false; });
 
 // ── load ─────────────────────────────────────────────────────────────────────
-async function loadMenu() {
+async function loadMenu(request: number) {
   try {
     const { data, sha } = await props.client.loadJson(menuPath.value);
+    if (!active || request !== generation) return;
     Object.assign(menu, normalizeMenu(data));
     menuSha = sha;
   } catch (e) {
+    if (!active || request !== generation) return;
     if (e instanceof GitHubError && e.status === 404) {
       Object.assign(menu, emptyMenu());
       menuSha = undefined;
     } else throw e;
   }
 }
-async function loadParts() {
+async function loadParts(request: number) {
   await Promise.all(
     PARTS.map(async (p) => {
       try {
         const f = await props.client.loadText(partPath(p.name));
+        if (!active || request !== generation) return;
         sections[p.name] = parseSections(f.text);
         partSha[p.name] = f.sha;
       } catch (e) {
+        if (!active || request !== generation) return;
         sections[p.name] = [];
         partSha[p.name] = undefined;
         if (!(e instanceof GitHubError && e.status === 404)) throw e;
@@ -84,29 +91,35 @@ async function loadParts() {
   );
 }
 async function load() {
+  const request = ++generation;
   loading.value = true;
   loadFailed.value = false;
   try {
-    await Promise.all([loadMenu(), loadParts(), loadPreviewName()]);
+    await Promise.all([loadMenu(request), loadParts(request), loadPreviewName(request)]);
+    if (!active || request !== generation) return;
     clearError();
   } catch (e) {
+    if (!active || request !== generation) return;
     loadFailed.value = true;
     reportError(e, "Failed to load the header & footer.");
   } finally {
-    menuDirty.value = false;
-    partDirty.header = false;
-    partDirty.footer = false;
-    loading.value = false;
-    isDirty.value = false;
+    if (active && request === generation) {
+      menuDirty.value = false;
+      partDirty.header = false;
+      partDirty.footer = false;
+      loading.value = false;
+      isDirty.value = false;
+    }
   }
 }
-async function loadPreviewName() {
+async function loadPreviewName(request: number) {
   previewSiteName.value = "Your site";
   const settings = COLLECTIONS.find(c => c.kind === "files");
   const seo = settings?.kind === "files" ? settings.files.find(f => f.name === "seo_defaults") : undefined;
   if (!seo) return;
   try {
     const { data } = await props.client.loadJson(fileEntryPath(seo, props.locale));
+    if (!active || request !== generation) return;
     const name = (data as { siteName?: unknown })?.siteName;
     if (typeof name === "string" && name.trim()) previewSiteName.value = name;
   } catch { /* Site name is advisory; unavailable SEO must not block navigation editing. */ }
@@ -158,27 +171,34 @@ const hasSwitcher = computed(() => activeSections.value.some(s => s.kind === "sw
 
 // ── save (only changed parts + the menu) ──────────────────────────────────────
 async function save() {
-  if (loading.value || loadFailed.value) return;
-  if (menuDirty.value) {
-    menuSha = await props.client.saveJson(
-      menuPath.value,
-      serializeMenu(menu),
-      `lanza: update ${menuPath.value}`,
-      menuSha,
-    );
-    menuDirty.value = false;
+  if (loading.value || loadFailed.value || saving.value) return;
+  const request = generation;
+  const target = menuPath.value;
+  const menuText = JSON.stringify(serializeMenu(menu), null, 2) + "\n";
+  const files: { path: string; text: string; sha?: string }[] = [];
+  if (menuDirty.value) files.push({ path: target, text: menuText, sha: menuSha });
+  const changedParts = PARTS.filter(p => partDirty[p.name]).map(p => ({
+    name: p.name, path: partPath(p.name), text: serializeSections(sections[p.name]), sha: partSha[p.name],
+  }));
+  files.push(...changedParts);
+  if (!files.length) return;
+  saving.value = true;
+  try {
+    const head = await props.client.workingHead();
+    const saved = await props.client.commitChecked(head, files, "lanza: update header, footer and navigation");
+    if (!active || request !== generation) return;
+    if (files.some(f => f.path === target)) {
+      menuSha = saved[target];
+      menuDirty.value = JSON.stringify(serializeMenu(menu), null, 2) + "\n" !== menuText;
+    }
+    for (const part of changedParts) {
+      partSha[part.name] = saved[part.path];
+      partDirty[part.name] = serializeSections(sections[part.name]) !== part.text;
+    }
+    isDirty.value = menuDirty.value || partDirty.header || partDirty.footer;
+  } finally {
+    saving.value = false;
   }
-  for (const p of PARTS) {
-    if (!partDirty[p.name]) continue;
-    partSha[p.name] = await props.client.saveText(
-      partPath(p.name),
-      serializeSections(sections[p.name]),
-      `Edit ${p.name} part`,
-      partSha[p.name],
-    );
-    partDirty[p.name] = false;
-  }
-  isDirty.value = false;
 }
 
 </script>
@@ -188,7 +208,7 @@ async function save() {
     <SettingsHeader title="Header &amp; footer" @back="emit('back')">
       <template #actions>
       <span class="flex-1 text-center text-sm text-zinc-500" role="status">{{ loading ? 'Loading…' : loadFailed ? 'Couldn’t load' : isDirty ? 'Unsaved changes' : 'All changes saved' }}</span>
-      <SaveButton :action="save" :disabled="loading || loadFailed || !isDirty" @saved="clearError" @error="(e) => reportError(e, 'Save failed.')" />
+      <SaveButton :action="save" :disabled="loading || loadFailed || saving || !isDirty" @saved="clearError" @error="(e) => reportError(e, 'Save failed.')" />
       </template>
       <template #description><p>Help visitors find their way. Manage the links that appear across your site.</p></template>
     </SettingsHeader>

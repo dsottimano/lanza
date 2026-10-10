@@ -1,6 +1,7 @@
-import { describe, it, expect } from "vitest";
+import { describe, it, expect, vi } from "vitest";
 import { mount, flushPromises } from "@vue/test-utils";
 import HeaderFooterView from "./HeaderFooterView.vue";
+import { isDirty } from "./dirty";
 import SaveButton from "./SaveButton.vue";
 import { site } from "../backend/site";
 import type { FileEntry } from "../schema";
@@ -36,21 +37,23 @@ function makeClient() {
     async loadJson() {
       return { data: menuData, sha: "m1" };
     },
-    async saveText(path: string, text: string) {
-      saves.push({ path, text });
-      return "new-sha";
-    },
-    async saveJson(path: string, data: unknown) {
-      menuSaves.push({ path, data: JSON.parse(JSON.stringify(data)) });
-      return "new-menu-sha";
-    },
+    workingHead: vi.fn().mockResolvedValue("head"),
+    commitChecked: vi.fn(async (_head: string, files: { path: string; text: string; sha?: string }[]) => {
+      const result: Record<string, string> = {};
+      for (const file of files) {
+        if (file.path.endsWith(".json")) menuSaves.push({ path: file.path, data: JSON.parse(file.text) });
+        else saves.push({ path: file.path, text: file.text });
+        result[file.path] = "new-sha";
+      }
+      return result;
+    }),
   };
-  return { client: client as never, saves, menuSaves };
+  return { client, saves, menuSaves };
 }
 
 async function mountView() {
   const { client, saves, menuSaves } = makeClient();
-  const w = mount(HeaderFooterView, { props: { client, menuFile, locale: "en" } });
+  const w = mount(HeaderFooterView, { props: { client: client as never, menuFile, locale: "en" } });
   await flushPromises();
   return { w, saves, menuSaves };
 }
@@ -70,7 +73,7 @@ describe("HeaderFooterView — visual builder", () => {
 
   it("saves translated links only to the selected language file", async () => {
     const { client, menuSaves, saves } = makeClient();
-    const w = mount(HeaderFooterView, { props: { client, menuFile, locale: "es" } });
+    const w = mount(HeaderFooterView, { props: { client: client as never, menuFile, locale: "es" } });
     await flushPromises();
     const label = w.findAll("input").find(i => (i.element as HTMLInputElement).value === "Blog")!;
     await label.setValue("Noticias");
@@ -147,4 +150,56 @@ describe("HeaderFooterView — visual builder", () => {
     } });
     expect(saves).toHaveLength(0);
   });
+});
+
+
+it("submits menu and part changes atomically and preserves in-flight edits", async () => {
+ const { client } = makeClient();
+ let finish!: (shas: Record<string, string>) => void;
+ client.commitChecked.mockImplementationOnce(() => new Promise(resolve => { finish = resolve; }));
+ const w = mount(HeaderFooterView, { props: { client: client as never, menuFile, locale: "en" } }); await flushPromises();
+ const label = w.findAll("input").find(i => (i.element as HTMLInputElement).value === "Blog")!;
+ await label.setValue("Submitted"); await w.get("textarea").setValue(headerHtml + "<!--first-->");
+ const saving = w.findComponent(SaveButton).props("action")(); await flushPromises();
+ expect(client.commitChecked.mock.calls[0]![1].map(f => f.path)).toEqual(["data/menu.en.json", "templates/parts/header.html"]);
+ await label.setValue("Later"); await w.get("textarea").setValue(headerHtml + "<!--later-->");
+ finish({"data/menu.en.json":"new-menu", "templates/parts/header.html":"new-header"}); await saving;
+ expect(isDirty.value).toBe(true);
+ await w.findComponent(SaveButton).props("action")();
+ expect(client.commitChecked.mock.calls[1]![1].map(f => f.sha)).toEqual(["new-menu","new-header"]);
+ expect(isDirty.value).toBe(false); w.unmount();
+});
+
+it("retains all dirty changes when the atomic commit fails", async () => {
+ const { client } = makeClient(); client.commitChecked.mockRejectedValueOnce(new Error("conflict"));
+ const w = mount(HeaderFooterView, { props: { client: client as never, menuFile, locale: "en" } }); await flushPromises();
+ await w.get("textarea").setValue(headerHtml + "<!--keep-->");
+ await expect(w.findComponent(SaveButton).props("action")()).rejects.toThrow("conflict");
+ expect(isDirty.value).toBe(true); expect((w.get("textarea").element as HTMLTextAreaElement).value).toContain("<!--keep-->"); w.unmount();
+});
+
+it("does not clear another editor after an unmounted save", async () => {
+ const { client } = makeClient(); let finish!: (shas: Record<string,string>) => void;
+ client.commitChecked.mockImplementationOnce(() => new Promise(resolve => {finish=resolve;}));
+ const w = mount(HeaderFooterView, { props: { client: client as never, menuFile, locale: "en" } }); await flushPromises();
+ await w.get("textarea").setValue(headerHtml + "<!--saved-->");
+ const saving = w.findComponent(SaveButton).props("action")(); await flushPromises();
+ w.unmount(); isDirty.value=true; finish({}); await saving; expect(isDirty.value).toBe(true); isDirty.value=false;
+});
+
+
+it("ignores a superseded locale load", async () => {
+ const {client}=makeClient(); let finish!: (value: {data: typeof menuData; sha:string})=>void;
+ const originalLoad=client.loadJson;
+ client.loadJson=vi.fn().mockImplementation((path:string)=>path==='data/menu.en.json'
+   ? new Promise(resolve=>{finish=resolve;})
+   : originalLoad());
+ const w=mount(HeaderFooterView,{props:{client:client as never,menuFile,locale:'en'}});
+ await w.setProps({locale:'es'}); await flushPromises();
+ const label=w.findAll('input').find(i=>(i.element as HTMLInputElement).value==='Blog')!;
+ await label.setValue('Noticias');
+ finish({data:menuData,sha:'stale'});await flushPromises();
+ expect((label.element as HTMLInputElement).value).toBe('Noticias');expect(isDirty.value).toBe(true);
+ await w.findComponent(SaveButton).props('action')();
+ expect(client.commitChecked.mock.calls[0]![1][0]).toMatchObject({path:'data/menu.es.json',sha:'m1'});w.unmount();
 });
