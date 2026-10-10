@@ -329,3 +329,24 @@ type form loaded and passed browser creation/validation checks using mocked API
 reads with no writes or page errors. Existing build warnings remain; live saves
 and deployment are unverified. Other specialized settings panels remain in scope
 for the ongoing review.
+
+## Redirect settings failure and save handling
+
+Redirects now blocks editing/saving after failed reads or malformed redirect-list
+shapes and provides retry. A genuine 404 still allows creation. Successful reads
+retain unrelated top-level settings for the next write. Saves capture the form
+snapshot, advance the SHA, and keep subsequent edits dirty; completion after
+unmount cannot clear another editor's warning. Concurrent saves are guarded.
+
+The status copy previously said Save would publish and labeled the latest
+Cloudflare deployment as proof the rules were live. It now explains staging and
+review/publish, and identifies the deployment as context rather than confirmation
+that the current rules are deployed. No visual redesign was added.
+
+Six regressions cover read failures, malformed files, retry, first creation,
+in-flight edits, preserved metadata, SHA advancement and unmount. All 441
+Functions/script and 499 CMS tests passed. Admin typecheck/build, site validation
+(zero errors/warnings), and the 15-page public build passed. Chromium confirmed
+the compiled redirect editor blocks save after a mocked read outage and recovers
+on retry, with no page errors or writes. Existing build warnings remain; actual
+production redirect writes and deployment of this commit are unverified.

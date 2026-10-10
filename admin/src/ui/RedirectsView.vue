@@ -6,7 +6,7 @@ import SettingsHeader from "./SettingsHeader.vue";
 // public/_redirects. This screen mirrors that validation live (see
 // ../backend/redirect-rules.ts) so what you see flagged here is what the build
 // will keep or skip. The file is NOT localized — one list for the whole site.
-import { computed, onMounted, onUnmounted, reactive, ref } from "vue";
+import { computed, onMounted, onUnmounted, reactive, ref, watch } from "vue";
 import SaveButton from "./SaveButton.vue";
 import { GitHubClient, GitHubError } from "../backend/github";
 import { CloudflareClient, NotConfiguredError } from "../backend/cloudflare";
@@ -32,29 +32,46 @@ const loading = ref(true);
 const rows = reactive<RedirectRule[]>([]);
 let sha: string | undefined;
 
-const markDirty = () => (isDirty.value = true);
-onUnmounted(() => (isDirty.value = false));
+const loadFailed = ref(false);
+const saving = ref(false);
+let active = true;
+let baseline = "[]";
+let extra: Record<string, unknown> = {};
+const markDirty = () => {
+  if (!loading.value && !loadFailed.value) isDirty.value = JSON.stringify(rows) !== baseline;
+};
+watch(rows, markDirty, { deep: true, flush: "sync" });
+onUnmounted(() => { active = false; isDirty.value = false; });
 
 async function load() {
   loading.value = true;
+  loadFailed.value = false;
   rows.splice(0, rows.length);
+  sha = undefined;
+  extra = {};
   try {
     let raw: unknown[] = [];
     try {
       const loaded = await props.client.loadJson(REDIRECTS_PATH);
+      if (!active) return;
+      if (!loaded.data || !Array.isArray(loaded.data.redirects)) throw new Error("The redirects file must contain a redirects list.");
       sha = loaded.sha;
-      if (Array.isArray(loaded.data.redirects)) raw = loaded.data.redirects as unknown[];
+      extra = { ...loaded.data };
+      raw = loaded.data.redirects as unknown[];
     } catch (e) {
-      // No redirects file yet — start empty and create it on first save.
       if (e instanceof GitHubError && e.status === 404) sha = undefined;
       else throw e;
     }
+    if (!active) return;
     rows.push(...raw.map(normalizeRule));
+    baseline = JSON.stringify(rows);
+    isDirty.value = false;
   } catch (e) {
+    if (!active) return;
+    loadFailed.value = true;
     reportError(e, "Failed to load redirects.");
   } finally {
-    loading.value = false;
-    isDirty.value = false;
+    if (active) loading.value = false;
   }
 }
 
@@ -97,6 +114,7 @@ function move(i: number, delta: number) {
 
 // ── save ────────────────────────────────────────────────────────────────────
 async function save() {
+  if (loading.value || loadFailed.value || saving.value) return;
   if (invalidCount.value > 0) {
     const n = invalidCount.value;
     const ok = confirm(
@@ -106,12 +124,21 @@ async function save() {
   }
   // Persist trimmed, non-blank rows in order. Trimming matches what the editor
   // validated and what gen-redirects will accept.
+  const snapshot = JSON.stringify(rows);
   const redirects = rows
     .filter((r) => !isBlank(r))
     .map((r) => ({ from: r.from.trim(), to: r.to.trim(), status: r.status }));
-  sha = await props.client.saveJson(REDIRECTS_PATH, { redirects }, `lanza: update ${REDIRECTS_PATH}`, sha);
-  isDirty.value = false;
-  void loadDeploy(); // reflect that a new build is (soon) publishing
+  saving.value = true;
+  try {
+    const nextSha = await props.client.saveJson(REDIRECTS_PATH, { ...extra, redirects }, `lanza: update ${REDIRECTS_PATH}`, sha);
+    if (!active) return;
+    sha = nextSha;
+    baseline = snapshot;
+    markDirty();
+    void loadDeploy();
+  } finally {
+    saving.value = false;
+  }
 }
 
 // ── deploy status (Cloudflare Pages) ────────────────────────────────────────
@@ -184,11 +211,11 @@ const deployTone = computed(() => {
   }
 });
 const deployText = computed(() => {
-  if (isDirty.value) return "You have unsaved changes — Save to publish.";
+  if (isDirty.value) return "You have unsaved changes — Save to staging, then review and publish.";
   const s = deploy.value;
   switch (s.kind) {
     case "loading":
-      return "Checking publish status…";
+      return "Checking latest deployment…";
     case "not-configured":
       return "Connect Cloudflare in Site Health to see publish status here.";
     case "error":
@@ -196,11 +223,11 @@ const deployText = computed(() => {
     case "none":
       return "No published deploy yet.";
     case "live":
-      return `Live — last published ${timeAgo(s.at)}.`;
+      return `Latest deployment completed ${timeAgo(s.at)}.`;
     case "publishing":
-      return "Publishing now…";
+      return "A deployment is running…";
     case "failed":
-      return `Last publish failed (${s.detail}).`;
+      return `Latest deployment failed (${s.detail}).`;
   }
   return "";
 });
@@ -229,7 +256,7 @@ const toneRing: Record<string, string> = {
       <template #actions>
         <SaveButton
           :action="save"
-          :disabled="loading"
+          :disabled="loading || loadFailed || saving"
           @saved="clearError"
           @error="(e) => reportError(e, 'Save failed.')"
         />
@@ -251,9 +278,9 @@ const toneRing: Record<string, string> = {
           <p class="text-sm font-medium text-zinc-800">{{ deployText }}</p>
         </div>
         <p class="mt-2 text-xs leading-relaxed text-zinc-500">
-          Rules are saved to your site’s repository, then published as Cloudflare’s native
-          <code class="rounded bg-zinc-100 px-1 py-0.5 font-mono text-[11px]">_redirects</code> file when
-          the site rebuilds (usually a minute or two).
+          Save stages your rules for review. Use Publish to make the reviewed changes live.
+          Cloudflare applies the <code class="rounded bg-zinc-100 px-1 py-0.5 font-mono text-[11px]">_redirects</code>
+          file after a successful build. The latest deployment status does not confirm that these rules are live.
         </p>
         <div class="mt-3 flex flex-wrap items-center gap-x-4 gap-y-1 text-xs text-zinc-500">
           <span><strong class="font-semibold text-zinc-700">{{ activeCount }}</strong> active</span>
@@ -271,6 +298,10 @@ const toneRing: Record<string, string> = {
         <div class="skeleton h-8 w-5/6" />
       </div>
 
+      <div v-else-if="loadFailed" class="card p-6" role="alert">
+        <p>Redirects could not be loaded. Retry before editing.</p>
+        <button class="btn btn-ghost mt-3" @click="load">Retry loading</button>
+      </div>
       <!-- Rules table -->
       <div v-else class="card overflow-x-auto">
         <table class="w-full border-collapse text-left">
