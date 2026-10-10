@@ -79,3 +79,31 @@ source/packed-tenant builds passed. Real Chrome on the production origin confirm
 desktop placement, scrolling,390px mobile containment, exact passage capture and
 Cancel without modifying the article. No browser errors or write attempts. Existing
 build warnings and the private-package/reviewed-publication workflow above remain.
+
+## Clipboard image upload follow-up
+
+Private package 0.1.21 (source `0297fcf`, tenant rollout `e48ba43`, staging
+`fa466e0`) adds Ctrl/Cmd+V image upload at the cursor or into a focused empty
+image block. Clipboard files receive unique names, upload through the existing
+staging media client, and display a local preview immediately. Completion follows
+the original figure through edits; deleted figures are not resurrected. Transient
+preview/upload attributes never serialize into article HTML. Errors leave a
+retryable placeholder. PNG/JPEG/GIF/WebP/AVIF are supported, maximum 10 files per
+paste and 20 MB each. Ordinary text paste remains native.
+
+Production deployment `288e6804-7869-4825-b883-7b6ab34aeac0` is confirmed canonical
+and successful. Public content is the latest published `326f916`; software-only
+staging changes preserve all editorial files from `9529e19` byte-for-byte. The
+first upload attached to an in-progress Git preview for the same commit; repeating
+after that finished created the intended ad-hoc production deployment.
+
+26 relevant regression tests passed, including asynchronous cursor edits, deletion,
+retry, multiple images, serialization and undo/redo. CMS typecheck/build, site
+validation and source/production/staging builds passed. Real Chrome clipboard
+pasting of the user's supplied PNG map filled the existing empty image block and
+showed a decoded image, both before rollout and on production. Browser upload
+writes were intercepted with successful fixtures and all other mutations blocked:
+this verifies the actual clipboard/UI/upload payload without changing the user's
+article or uploading test media. Existing media backend regressions cover shared
+upload handling. Zero browser page errors. Build warnings remain the empty
+collections, large public chunk, and sibling Wrangler Astro tsconfig warning.
