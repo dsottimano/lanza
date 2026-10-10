@@ -65,3 +65,17 @@ Wrangler invoked from the sibling installation warns about its root Astro tsconf
 Functions compilation, deployment and actual browser/MCP behavior succeeded.
 Actual ChatGPT.com installation/automatic wake-up and a deployed research cron
 remain outside this feature; do not advertise them as verified.
+
+## Selection-menu visibility follow-up
+
+Delivered private package0.1.20 (tenant rollout `bdabae1`, staging `2f7c158`) at
+`https://e5504d9f.pananomica-95335bfcac19.pages.dev`. The menu is anchored12px
+below the highlighted range, follows captured scroll/resize events, stays within
+the viewport and flips above when necessary. Dark navy surface, white text,44px
+buttons and stronger shadow make the actions prominent.
+
+Ten relevant request/editor regressions, CMS typecheck/build, site validation and
+source/packed-tenant builds passed. Real Chrome on the production origin confirmed
+desktop placement, scrolling,390px mobile containment, exact passage capture and
+Cancel without modifying the article. No browser errors or write attempts. Existing
+build warnings and the private-package/reviewed-publication workflow above remain.
