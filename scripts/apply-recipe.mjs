@@ -17,8 +17,8 @@
 // NOTHING IS WRITTEN UNTIL EVERY CHECK PASSES. A recipe that half-applies leaves a
 // content type whose template does not exist, which is worse than no recipe at all —
 // so validation runs first, over the whole set, and the writes happen at the end.
-import { readFileSync, writeFileSync, mkdirSync, existsSync, readdirSync, statSync } from "node:fs";
-import { join, dirname, relative } from "node:path";
+import { readFileSync, writeFileSync, mkdirSync, existsSync, readdirSync, statSync, lstatSync } from "node:fs";
+import { join, dirname, relative, resolve, sep } from "node:path";
 import { checkTemplate } from "../functions/_lib/site-system.mjs";
 
 const argv = process.argv.slice(2);
@@ -121,14 +121,28 @@ for (const c of collections) {
   }
 }
 
-// ── 4. write ─────────────────────────────────────────────────────────────────
-const wrote = [];
-const write = (rel, body) => {
-  wrote.push(rel);
-  if (DRY) return;
-  const abs = join(ROOT, rel);
-  mkdirSync(dirname(abs), { recursive: true });
-  writeFileSync(abs, body);
+// ── 4. prepare every read and destination before writing ────────────────────
+const planned = new Map();
+const write = (rel, body, replace = false) => {
+  const abs = resolve(ROOT, rel);
+  const root = resolve(ROOT);
+  if (!abs.startsWith(root + sep)) fail(`destination escapes the target: ${rel}`);
+  // Refuse symlinked destinations, including dangling links and parent folders.
+  // They can redirect otherwise confined recipe paths outside the tenant.
+  for (let path = abs; path !== root; path = dirname(path)) {
+    let entry;
+    try { entry = lstatSync(path); } catch (error) {
+      if (error.code === "ENOENT") continue;
+      throw error;
+    }
+    if (entry.isSymbolicLink()) fail(`symlink destination: ${rel}`);
+    if (path === abs ? !entry.isFile() : !entry.isDirectory()) fail(`invalid destination: ${rel}`);
+  }
+  if (planned.has(rel)) fail(`duplicate destination: ${rel}`);
+  if (existsSync(abs) && !replace && !FORCE) {
+    fail(`the target already has "${rel}". Re-run with --force to replace it.`);
+  }
+  planned.set(rel, body);
 };
 
 for (const name of templateNames) {
@@ -138,7 +152,7 @@ for (const name of templateNames) {
 }
 
 const merged = schema.filter((c) => !collections.some((n) => n.name === c.name)).concat(collections);
-write("data/schema.json", `${JSON.stringify(merged, null, 2)}\n`);
+write("data/schema.json", `${JSON.stringify(merged, null, 2)}\n`, true);
 
 const seedRoot = join(recipeDir, "content");
 if (existsSync(seedRoot)) {
@@ -155,7 +169,11 @@ if (existsSync(seedRoot)) {
 // Style variants — the looks the owner picks between at /style-preview/ before any
 // of them is live. Copied verbatim; the preview route exists only when this file does.
 const stylesSrc = join(recipeDir, "styles.json");
-if (existsSync(stylesSrc)) write("data/styles.json", readFileSync(stylesSrc, "utf8"));
+if (existsSync(stylesSrc)) {
+  const styles = readFileSync(stylesSrc, "utf8");
+  JSON.parse(styles);
+  write("data/styles.json", styles);
+}
 
 // Menu links, per locale, appended if not already present.
 if (recipe.menu?.length) {
@@ -173,11 +191,21 @@ if (recipe.menu?.length) {
         changed = true;
       }
     }
-    if (changed) write(rel, `${JSON.stringify({ ...menu, header }, null, 2)}\n`);
+    if (changed) write(rel, `${JSON.stringify({ ...menu, header }, null, 2)}\n`, true);
+  }
+}
+
+// Validation/read failures above leave the target untouched. This is not a
+// filesystem transaction: an I/O failure during this loop can still partly apply.
+if (!DRY) {
+  for (const [rel, body] of planned) {
+    const abs = join(ROOT, rel);
+    mkdirSync(dirname(abs), { recursive: true });
+    writeFileSync(abs, body);
   }
 }
 
 console.log(`apply-recipe: "${recipe.label}" → ${ROOT}`);
-for (const w of wrote) console.log(`  ${DRY ? "would write" : "wrote"} ${w}`);
+for (const w of planned.keys()) console.log(`  ${DRY ? "would write" : "wrote"} ${w}`);
 if (recipe.styles?.length) console.log(`  styles offered: ${recipe.styles.join(", ")} — compare them at /style-preview/`);
 if (DRY) console.log("  (dry run — nothing changed)");

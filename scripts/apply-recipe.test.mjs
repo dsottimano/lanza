@@ -6,7 +6,7 @@
 // which is worse than the recipe having failed outright.
 import { test, describe, before, after } from "node:test";
 import assert from "node:assert/strict";
-import { mkdtempSync, mkdirSync, writeFileSync, readFileSync, existsSync, rmSync, cpSync } from "node:fs";
+import { mkdtempSync, mkdirSync, writeFileSync, readFileSync, existsSync, rmSync, cpSync, readdirSync, symlinkSync, lstatSync, readlinkSync } from "node:fs";
 import { execFileSync } from "node:child_process";
 import { tmpdir } from "node:os";
 import { join, dirname } from "node:path";
@@ -122,5 +122,66 @@ describe("a broken recipe is refused whole", () => {
 
     rmSync(fresh, { recursive: true, force: true });
     rmSync(broken, { recursive: true, force: true });
+  });
+});
+
+// Compare all files, including existing content, after a refused installation.
+function snapshot(dir) {
+  return Object.fromEntries(readdirSync(dir).sort().map((name) => {
+    const path = join(dir, name);
+    const stat = lstatSync(path);
+    return [name, stat.isSymbolicLink() ? { link: readlinkSync(path) }
+      : stat.isDirectory() ? snapshot(path) : readFileSync(path, "utf8")];
+  }));
+}
+
+describe("recipe preflight preserves the whole tenant", () => {
+  for (const problem of ["menu", "site", "styles", "template collision", "seed collision", "style collision", "destination directory", "destination symlink"]) {
+    test(`${problem} refuses before any write, including in dry run`, () => {
+      const fresh = makeTenant();
+      const recipe = mkdtempSync(join(tmpdir(), "lanza-preflight-"));
+      try {
+        cpSync(RECIPE, recipe, { recursive: true });
+        if (problem === "menu") writeFileSync(join(fresh, "data/menu.en.json"), "{broken");
+        if (problem === "site") writeFileSync(join(fresh, "data/site.json"), "{broken");
+        if (problem === "styles") writeFileSync(join(recipe, "styles.json"), "{broken");
+        const collisions = {
+          "template collision": "templates/event/template.html",
+          "seed collision": "content/events/en/makers-market.md",
+          "style collision": "data/styles.json",
+        };
+        if (collisions[problem]) {
+          const file = join(fresh, collisions[problem]);
+          mkdirSync(dirname(file), { recursive: true });
+          writeFileSync(file, "Human edits must survive");
+        }
+        if (problem === "destination directory") mkdirSync(join(fresh, "data/styles.json"));
+        if (problem === "destination symlink") symlinkSync(recipe, join(fresh, "templates"), "dir");
+        const original = snapshot(fresh);
+        const source = snapshot(recipe);
+        for (const flags of [["--dry-run"], []]) {
+          assert.throws(() => run([recipe, "--into", fresh, ...flags], { stdio: "pipe" }));
+          assert.deepEqual(snapshot(fresh), original);
+          assert.deepEqual(snapshot(recipe), source);
+        }
+      } finally {
+        rmSync(fresh, { recursive: true, force: true });
+        rmSync(recipe, { recursive: true, force: true });
+      }
+    });
+  }
+
+  test("explicit --force still replaces recipe files and retains unrelated content", () => {
+    const fresh = makeTenant();
+    try {
+      run([RECIPE, "--into", fresh]);
+      writeFileSync(join(fresh, "templates/event/template.html"), "Old template");
+      writeFileSync(join(fresh, "content/events/en/private-draft.md"), "Human draft");
+      run([RECIPE, "--into", fresh, "--force"]);
+      assert.equal(readFileSync(join(fresh, "templates/event/template.html"), "utf8"), readFileSync(join(RECIPE, "templates/event/template.html"), "utf8"));
+      assert.equal(readFileSync(join(fresh, "content/events/en/private-draft.md"), "utf8"), "Human draft");
+    } finally {
+      rmSync(fresh, { recursive: true, force: true });
+    }
   });
 });

@@ -114,6 +114,12 @@ node scripts/apply-recipe.mjs recipes/event-site
 type whose template does not exist — broken in a way neither the owner nor the agent can
 see, which is worse than the apply having failed outright.
 
+The CLI preflights remaining input reads and destination checks before writes.
+Existing templates, seed entries and styles require explicit `--force` to replace;
+invalid and symlinked destinations are refused. This is not a filesystem
+transaction: disk failures or concurrent filesystem changes during writing may
+still leave a partial installation.
+
 ## Style, before it is live
 
 Setting the brand shows one look at a time and asks the owner to imagine the others.

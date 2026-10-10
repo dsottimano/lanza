@@ -595,3 +595,27 @@ Functions/script and 539 CMS tests passed. Admin typecheck/build, site validatio
 admin smoke checks passed without overflow, page errors or writes. Upload races
 are verified with simulated GitHub responses, not live media writes. Existing
 build warnings remain and deployment is unverified.
+
+
+## Resumed review: CLI recipe preflight
+
+After the crash, fetched main and staging; both still pointed to c17fec4 and the
+working tree was clean. The configured pre-push hook remains .githooks.
+
+The recipe CLI wrote templates/schema before reading seed files, styles, site
+configuration and menus. A malformed later input could leave a partial install.
+All reads and destination checks now finish before writes begin, including dry
+runs. Existing templates, seed entries and styles require explicit --force;
+schema/menu merges retain unrelated entries. Invalid and symlinked destinations
+are refused. This does not provide rollback for disk failures or protect against
+concurrent filesystem mutation during the write phase; full transaction behavior
+remains open. No complete recipe schema/route validation claim is made.
+
+Nine new regressions compare the whole tenant after refusal for malformed late
+inputs, file collisions, directory and symlink destinations, and verify explicit
+replacement preserves unrelated human content. All 450 Functions/script and 539
+CMS tests passed. Site validation reported zero errors/warnings and the public
+build produced 15 pages. Existing empty taxonomy/author and large JavaScript chunk
+warnings remain. No browser or deployment verification was performed in this
+CLI-only pass; authenticated production flows and the other documented review
+items remain open. Changes have not been pushed or deployed.
