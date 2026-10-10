@@ -74,7 +74,7 @@ async function github(env: Config, path: string, method = 'GET', body?: unknown)
   if (!/^[A-Za-z0-9-]+\/[A-Za-z0-9_.-]+$/.test(env.REPOSITORY) || env.REPOSITORY.split('/').some(s => s === '.' || s === '..')) fail('invalid_repository');
   if (!env.GITHUB_TOKEN) fail('missing_github_secret');
   const response = await fetch(`https://api.github.com/repos/${env.REPOSITORY}${path}`, {
-    method, redirect: 'error', signal: AbortSignal.timeout(15000),
+    method, redirect: 'manual', signal: AbortSignal.timeout(15000),
     headers: { Authorization: `Bearer ${env.GITHUB_TOKEN}`, Accept: 'application/vnd.github+json', 'X-GitHub-Api-Version': '2022-11-28', 'User-Agent': 'LanzaResearchCollector', 'Content-Type': 'application/json' },
     body: body === undefined ? undefined : JSON.stringify(body),
   });
@@ -108,7 +108,7 @@ export async function collect(env: Config) {
       await privateRepo(env);
       const old = await github(env, `${pathFor(source.id)}?ref=${BRANCH}`);
       const previous = old ? JSON.parse(decode(old.content)) : null;
-      const response = await fetch(sourceURL(source.url), { redirect: 'error', signal: AbortSignal.timeout(15000), headers: { 'User-Agent': 'LanzaResearchCollector/1.0', Accept: source.format === 'json' ? 'application/json' : source.format === 'html' ? 'text/html' : 'text/plain' } });
+      const response = await fetch(sourceURL(source.url), { redirect: 'manual', signal: AbortSignal.timeout(15000), headers: { 'User-Agent': 'LanzaResearchCollector/1.0', Accept: source.format === 'json' ? 'application/json' : source.format === 'html' ? 'text/html' : 'text/plain' } });
       if (!response.ok) { await response.body?.cancel(); fail('source_unavailable'); }
       const content = await extract(source, response);
       const hash = await digest(JSON.stringify({ url: source.url, format: source.format, selector: source.selector || null, content }));

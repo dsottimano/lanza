@@ -8,6 +8,9 @@ function fakeGitHub(options: { public?: boolean; conflict?: boolean; old?: unkno
   let privacyChecks = 0;
   const writes: { url: string; body: Record<string, unknown> }[] = [];
   const fetcher = vi.fn(async (input: RequestInfo | URL, init?: RequestInit) => {
+    // Exercise real workerd Request construction: Node accepts redirect:error,
+    // but Workers rejects it before fetch. Manual redirects remain refused below.
+    new Request(input, init);
     const url = String(input);
     if (url === source.url) { if (options.sourceError) throw new TypeError('Redirect refused'); return new Response('<main><h1>Evidence</h1><p>Two &amp; three.</p><script>secret script</script></main>', { headers: { 'Content-Type': 'text/html' } }); }
     if (url.endsWith('/example/private-site')) { privacyChecks++; return response({ private: !options.public && !(options.privatize && privacyChecks >= 3), permissions: { push: true } }); }
@@ -60,7 +63,7 @@ describe('private collection', () => {
     const saved = JSON.parse(atob(String(writes[0].body.content)));
     expect(saved).toMatchObject({ source: source.url, verified: false, origin: 'imported-source', previousHash: null });
     expect(saved.hash).toMatch(/^[a-f0-9]{64}$/); expect(Date.parse(saved.fetchedAt)).not.toBeNaN();
-    expect(fetcher.mock.calls.find(([url]) => String(url) === source.url)?.[1]?.redirect).toBe('error');
+    expect(fetcher.mock.calls.find(([url]) => String(url) === source.url)?.[1]?.redirect).toBe('manual');
   });
   it('does not commit unchanged content', async () => {
     const first = fakeGitHub(); await collect(config);
