@@ -206,7 +206,11 @@ export class GitHubClient {
     const file = (await this.req(this.contentsUrl(path, true, ref))) as {
       content: string;
       sha: string;
+      encoding?: string;
     };
+    if (file.encoding && file.encoding !== "base64") {
+      throw new Error("This file is too large to load safely in the editor. Its stored content has not been changed.");
+    }
     return { path, sha: file.sha, text: b64ToUtf8(file.content) };
   }
 

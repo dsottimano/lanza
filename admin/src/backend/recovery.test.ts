@@ -3,6 +3,12 @@ import { GitHubClient } from './github';
 import { planRevert, executeRevert, type RevertPlan } from './themeHistory';
 const review={productionSha:'a'.repeat(40),stagingSha:'b'.repeat(40)};
 afterEach(()=>vi.unstubAllGlobals());
+it('refuses an omitted large-file body instead of opening a blank editable template',async()=>{
+ const fetcher=vi.fn(async(_url:string,_init?:RequestInit)=>Response.json({content:'',encoding:'none',sha:'large-file'}));vi.stubGlobal('fetch',fetcher);
+ await expect(new GitHubClient().loadText('templates/large/template.html')).rejects.toThrow('too large to load safely');
+ expect(fetcher).toHaveBeenCalledTimes(1);
+ expect(fetcher.mock.calls[0]![1]?.method).toBeUndefined();
+});
 function api(options:{head?:string;race?:boolean}={}) {
  const fetcher=vi.fn(async(url:string,init?:RequestInit):Promise<Response>=>{
   if(init?.method==='PATCH')return Response.json({}, {status:options.race?422:200});

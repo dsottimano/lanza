@@ -1,6 +1,7 @@
-import { describe, it, expect, beforeEach } from "vitest";
+import { describe, it, expect, beforeEach, vi } from "vitest";
 import { mount, flushPromises } from "@vue/test-utils";
 import { createRouter, createMemoryHistory } from "vue-router";
+import { clearError, errorState } from "../errors";
 import CollectionList from "./CollectionList.vue";
 import type { FolderCollection } from "../schema";
 import { site } from "../backend/site";
@@ -116,5 +117,57 @@ describe("CollectionList — which language of this collection", () => {
     const w = mountList("en", [], shared);
     await flushPromises();
     expect(localeLinks(w)).toEqual([]);
+  });
+});
+
+
+describe("CollectionList request ownership", () => {
+  it("reloads the same collection when its locale changes", async () => {
+    const listDir = vi.fn(async (folder: string) => [{ name: folder.endsWith('/es') ? 'spanish.md' : 'english.md', path: folder + '/entry.md', sha: 'x' }]);
+    const w = mount(CollectionList, { props: { client: { listDir } as never, collection: pages, locale: 'en' }, global: { plugins: [router] } });
+    await flushPromises();
+    await w.setProps({ locale: 'es' });
+    await flushPromises();
+    expect(listDir).toHaveBeenLastCalledWith('content/pages/es');
+    expect(w.find('li a').attributes('aria-label')).toBe('Edit spanish');
+    w.unmount();
+  });
+
+  it.each(['resolve', 'reject'])("ignores a stale request that later %ss", async (outcome) => {
+    clearError();
+    let resolve!: (v: unknown[]) => void;
+    let reject!: (e: Error) => void;
+    const first = new Promise<unknown[]>((yes, no) => { resolve = yes; reject = no; });
+    const listDir = vi.fn().mockReturnValueOnce(first).mockResolvedValueOnce([{ name: 'spanish.md', path: 'content/pages/es/spanish.md', sha: 'x' }]);
+    const w = mount(CollectionList, { props: { client: { listDir } as never, collection: pages, locale: 'en' }, global: { plugins: [router] } });
+    await w.setProps({ locale: 'es' });
+    await flushPromises();
+    if (outcome === 'resolve') resolve([{ name: 'english.md', path: 'content/pages/en/english.md', sha: 'y' }]);
+    else reject(new Error('Old request failed'));
+    await flushPromises();
+    expect(w.find('li a').attributes('aria-label')).toBe('Edit spanish');
+    expect(errorState.message).toBeNull();
+    w.unmount();
+  });
+});
+
+
+describe('CollectionList search', () => {
+  it('filters filenames without fetching more content and clears an empty result', async () => {
+    const listDir = vi.fn(async () => [
+      { name: 'Welcome.md', path: 'content/pages/en/Welcome.md', sha: 'a' },
+      { name: 'about.md', path: 'content/pages/en/about.md', sha: 'b' },
+    ]);
+    const w = mount(CollectionList, { props: { client: { listDir } as never, collection: pages, locale: 'en' }, global: { plugins: [router] } });
+    await flushPromises();
+    await w.get('input[type="search"]').setValue(' WELCOME ');
+    expect(w.findAll('.collection-entry')).toHaveLength(1);
+    expect(w.get('.collection-entry').attributes('aria-label')).toBe('Edit Welcome');
+    await w.get('input[type="search"]').setValue('missing');
+    expect(w.text()).toContain('No filenames match');
+    await w.findAll('button').find(button => button.text() === 'Clear search')!.trigger('click');
+    expect(w.findAll('.collection-entry')).toHaveLength(2);
+    expect(listDir).toHaveBeenCalledTimes(1);
+    w.unmount();
   });
 });

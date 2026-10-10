@@ -34,3 +34,7 @@ lanza-broker/
 # local dev secrets & wrangler cache
 .dev.vars
 .wrangler/
+
+# Superdesign generated source snapshots and transient render inputs
+.superdesign/init/
+.superdesign/tmp/

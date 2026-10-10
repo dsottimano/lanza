@@ -1,0 +1,46 @@
+{
+  "schemaVersion": 1,
+  "targets": {
+    "/posts/:locale": {
+      "targetKind": "existing-ui",
+      "projectId": "5e9a2a54-6f5f-4552-ae6e-e7a07f9586fc",
+      "baselineDraftId": "1786ad38-9843-4216-9100-7f446eade03e",
+      "activeDraftId": "1786ad38-9843-4216-9100-7f446eade03e",
+      "designSystemPath": ".superdesign/design-system.md",
+      "contextFiles": [
+        ".superdesign/design-system.md",
+        "admin/src/App.vue",
+        "admin/src/ui/Sidebar.vue",
+        "admin/src/ui/SidebarIcon.vue",
+        "admin/src/ui/CollectionList.vue",
+        "admin/src/styles.css"
+      ],
+      "referenceIds": [
+        "5c0def1a-e252-4099-a9b9-b7a4a891757f"
+      ],
+      "fingerprints": {
+        ".superdesign/design-system.md": "3fc1d6995f02c5bf6a9ad7d00e3599f26501d7072bb849bee36a289ff5fa6f22",
+        "admin/src/App.vue": "3122f6dd129d50e15fba2f5f8623634cb998a63612bd7891ac74db46ef386ca4",
+        "admin/src/ui/Sidebar.vue": "e7d309ee4744a4538799efb7152f4b25f6369a780e1fd3fc9c9c6205900653d1",
+        "admin/src/ui/SidebarIcon.vue": "0b5256eb0ba347e70f0add1159610a5187d91d4cf6c93d945499e852ddad4baf",
+        "admin/src/ui/CollectionList.vue": "16af839cb09e8d5a4221e342777d7a16d523f03faa58d805d2365ce307fcc788",
+        "admin/src/styles.css": "59fb3e49b3166f38645bf9ee51f3caef2b9fb2fabeb7a34c7fe232f1c798b658"
+      },
+      "components": [
+        {
+          "name": "Sidebar",
+          "id": "5d32063d-abdd-4c44-8d49-759ec1af6cd9",
+          "sourcePath": "admin/src/ui/Sidebar.vue"
+        }
+      ],
+      "drafts": {
+        "1786ad38-9843-4216-9100-7f446eade03e": {
+          "title": "Lanza Admin - Posts Workspace Redesign",
+          "visualDirection": "Approved neutral palette and muted blue workspace; implemented in Vue",
+          "currentVersion": 3
+        }
+      },
+      "updatedAt": "2026-10-10T14:02:26.069593+00:00"
+    }
+  }
+}

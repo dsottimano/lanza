@@ -210,8 +210,10 @@ export class CloudflareClient {
   }
 
   /** List recent deployments, newest first. `limit` maps to CF's `per_page`. */
-  async listDeployments(limit?: number): Promise<Deployment[]> {
-    const q = limit ? `?per_page=${limit}` : "";
-    return this.get<Deployment[]>(`/${PROJECT}/deployments${q}`);
+  async listDeployments(limit?: number, environment?: "production" | "preview"): Promise<Deployment[]> {
+    const q = new URLSearchParams();
+    if (limit) q.set("per_page", String(limit));
+    if (environment) q.set("env", environment);
+    return this.get<Deployment[]>(`/${PROJECT}/deployments${q.size ? `?${q}` : ""}`);
   }
 }

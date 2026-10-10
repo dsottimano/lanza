@@ -314,7 +314,7 @@ export function useHealthChecks(github: GitHubClient) {
     //    between the Pages card and the service cards.
     const [projectRes, deploysRes, kvRes, d1Res, r2Res] = await Promise.allSettled([
       cf.getPagesProject(),
-      cf.listDeployments(1),
+      cf.listDeployments(1, "production"),
       cf.listKvNamespaces(),
       cf.listD1Databases(),
       cf.listR2Buckets(),
@@ -386,7 +386,9 @@ export function useHealthChecks(github: GitHubClient) {
     pagesCard.detail = "";
 
     const deploy =
-      deploysRes.status === "fulfilled" ? deploysRes.value[0] : undefined;
+      deploysRes.status === "fulfilled"
+        ? deploysRes.value.find((item) => item.environment === "production")
+        : undefined;
     if (!deploy) {
       pagesCard.deployStatus = "unknown";
       pagesCard.deployWhen = null;
@@ -401,10 +403,10 @@ export function useHealthChecks(github: GitHubClient) {
     const status = stage?.status ?? "";
     pagesCard.deployWhen = relativeTime(deploy.created_on);
     pagesCard.deployUrl = deploy.url;
-    if (status === "success") {
+    if (status === "success" && stage?.name === "deploy") {
       pagesCard.deployStatus = "live";
       pagesCard.summary = `Live — last deploy ${pagesCard.deployWhen}.`;
-    } else if (status === "failure" || status === "canceled") {
+    } else if (status === "failure" || status === "canceled" || status === "skipped") {
       pagesCard.deployStatus = "failed";
       pagesCard.summary = `Last deploy ${status} ${pagesCard.deployWhen}.`;
     } else {

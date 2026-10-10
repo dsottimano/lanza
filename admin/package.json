@@ -22,9 +22,9 @@
     "@tiptap/starter-kit": "3.31.3",
     "@tiptap/suggestion": "3.31.3",
     "@tiptap/vue-3": "3.31.3",
-    "js-yaml": "5.2.2",
+    "js-yaml": "5.4.3",
     "marked": "18.0.5",
-    "vue": "3.5.39",
+    "vue": "3.5.43",
     "vue-router": "4.6.4"
   },
   "devDependencies": {
@@ -36,7 +36,7 @@
     "tailwindcss": "4.3.1",
     "typescript": "6.0.3",
     "vite": "8.1.0",
-    "vitest": "4.1.9",
+    "vitest": "4.1.11",
     "vue-tsc": "3.3.5"
   }
 }

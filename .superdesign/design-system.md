@@ -1,0 +1,7 @@
+# Lanza admin design direction
+A calm, accessible workspace for an independent website owner to write, organize, review and publish. Vue 3 with custom primitives. Keep existing information architecture and roles; do not invent analytics, collaborators, statuses or features.
+
+Redesign palette: warm white background #f7f8fa, white panels #ffffff, ink #202733, secondary #536172, border #dce1e8, soft surface #eef1f5. Muted blue accent #315c91, hover #254973, selection #eaf0f8. Primary button white text on #263d58. Error #a62e35. Focus #315c91.
+Keep self-hosted Jost and JetBrains Mono, but increase normal control readability: 14px body, 13px secondary, 32px semibold headings. Rounded corners: 6px compact, 8px controls, 12px panels. Spacing scale 4,8,12,16,24,32,48. Subtle panel shadows only; no gradients or decorative visuals. Focus ring 2px with 3px offset. Controls >=40px tall; mobile targets 44px.
+
+Collection page: title and description grouped with creation action; separated toolbar with clearly labeled language tabs and working filename search; readable content list with neutral icons, filename identity, explicit edit affordance and staging preview link. Show real empty/loading/error states. Do not fabricate publication status: saved staging entries are not necessarily published. Responsive navigation must leave mobile content full width. Preserve existing Lanza text wordmark; no new logo.

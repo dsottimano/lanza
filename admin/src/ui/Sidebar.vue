@@ -401,9 +401,9 @@ const itemActive = "nav-item--active";
   display: flex;
   align-items: center;
   gap: 10px;
-  min-height: 38px;
+  min-height: 42px;
   line-height: 1.35;
-  border-radius: 5px;
+  border-radius: 8px;
   text-decoration: none;
 }
 .sidebar :deep(.sidebar-icon) {
@@ -413,8 +413,8 @@ const itemActive = "nav-item--active";
   opacity: 0.75;
 }
 .sidebar .nav-item--active {
-  background: #f6e8de;
-  color: #923617;
+  background: var(--selection);
+  color: var(--accent);
   font-weight: 600;
   box-shadow: inset 3px 0 0 var(--accent);
 }

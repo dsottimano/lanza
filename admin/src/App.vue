@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { computed, defineAsyncComponent, h, ref, shallowRef, watch } from "vue";
+import { computed, defineAsyncComponent, h, nextTick, ref, shallowRef, watch } from "vue";
 import { useRoute, useRouter } from "vue-router";
 // Eager: the shell that's always on screen at boot.
 import Sidebar from "./ui/Sidebar.vue";
@@ -92,7 +92,13 @@ type Pane =
 const route = useRoute();
 const router = useRouter();
 const settingsNavigationOpen = ref(false);
-watch(() => route.fullPath, () => { settingsNavigationOpen.value = false; });
+const navigationToggle = ref<HTMLButtonElement>();
+function closeNavigation() {
+  if (!settingsNavigationOpen.value) return;
+  settingsNavigationOpen.value = false;
+  void nextTick(() => navigationToggle.value?.focus());
+}
+watch(() => route.fullPath, closeNavigation);
 
 // The token lives server-side (the /admin/api/gh proxy). Past Cloudflare Access
 // the CMS just boots — no sign-in screen, no localStorage PAT.
@@ -213,23 +219,27 @@ function onEntrySaved(path: string) {
 }
 
 // ── navigation (push the URL; the beforeEach guard handles unsaved changes) ──
+function navigate(path: string) {
+  if (route.fullPath === path) closeNavigation();
+  else void router.push(path);
+}
 function selectCollection(name: string) {
-  router.push(listRoute(name, locale.value));
+  navigate(listRoute(name, locale.value));
 }
 function openSettings(file: FileEntry) {
-  router.push(`/settings/${file.name}`);
+  navigate(`/settings/${file.name}`);
 }
 function openPanel(panel: string) {
-  router.push(`/settings/${panel}`);
+  navigate(`/settings/${panel}`);
 }
 function openPublish() {
-  router.push("/publish");
+  navigate("/publish");
 }
 function openPending() {
-  router.push("/pending");
+  navigate("/pending");
 }
 function openHelp() {
-  router.push("/help");
+  navigate("/help");
 }
 function backToList() {
   router.push(listRoute(collection.value.name, locale.value));
@@ -260,12 +270,14 @@ function onOnboarded() {
   <OnboardingWizard v-else-if="!site.onboarded" :client="client" @done="onOnboarded" />
 
   <!-- The collection rail is permanent; only the main column swaps. -->
-  <div v-else class="flex min-h-screen" :class="{ 'editing-shell': pane === 'editRich', 'theme-shell': pane === 'brandThemes', 'settings-shell': route.name === 'settings', 'settings-shell--nav-open': settingsNavigationOpen }">
-    <button v-if="route.name === 'settings'" class="settings-mobile-navigation" :aria-expanded="settingsNavigationOpen" @click="settingsNavigationOpen = !settingsNavigationOpen">
-      {{ settingsNavigationOpen ? 'Close navigation ×' : '☰ Site navigation' }}
+  <div v-else class="admin-shell flex min-h-screen" :class="{ 'editing-shell': pane === 'editRich', 'theme-shell': pane === 'brandThemes', 'admin-shell--nav-open': settingsNavigationOpen }" @keydown.esc="closeNavigation">
+    <button ref="navigationToggle" class="admin-mobile-navigation" aria-controls="admin-navigation" :aria-expanded="settingsNavigationOpen" @click="settingsNavigationOpen = !settingsNavigationOpen">
+      <span aria-hidden="true">{{ settingsNavigationOpen ? '×' : '☰' }}</span>
+      {{ settingsNavigationOpen ? 'Close navigation' : 'Site navigation' }}
     </button>
     <Sidebar
-      v-show="!(pane === 'editRich' && focusMode)"
+      id="admin-navigation"
+      v-show="settingsNavigationOpen || !(pane === 'editRich' && focusMode)"
       :active-collection="collection.name"
       :active-settings="
         pane === 'settings' || pane === 'redirects'

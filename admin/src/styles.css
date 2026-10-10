@@ -1,26 +1,8 @@
 @import "tailwindcss";
 
-/* ── Design tokens (Lanza admin — the Freehold identity) ───────────────────
-   The CMS now wears the same design as the default public theme: monochrome
-   Ink (#201d1b) on Paper (#f3f1ea), set in Jost (Futura-like geometric sans),
-   plus ONE hot "launch" accent (#e4431b) — the colour of the wordmark's ↗
-   arrow. JetBrains Mono carries the machine truth (repo paths, hashes). Sharp
-   2px corners, hairline rules, flat surfaces — no glass, no blur, no drop
-   shadows, no gradient mesh. The whole system is defined once here (CSS vars +
-   component classes) so views compose it instead of hand-rolling wrappers:
-     .glass / .glass-strong   quiet Paper surfaces (legacy names, now flat)
-     .rail-glass              the sidebar shell (legacy name, now a flat panel)
-     .card                    Paper panel (cards, tables, forms)
-     .toolbar                 sticky Paper header bar
-     .btn / .btn-primary / .btn-ghost / .btn-danger
-     .input                   shared control surface (see fields/styles.ts)
-     .nav-item                sidebar / TOC rows (+ --active pressed state)
-     .segment                 segmented control (language / location tabs)
-     .skeleton                layout-stable loading placeholder
-   Self-hosted fonts (public/fonts/*.woff2) — no CDN, loads offline. Fonts and
-   the corner scale are wired through Tailwind's @theme so `font-serif`,
-   `font-sans` and every `rounded-*` utility already in the markup snap to the
-   Freehold look with no per-file edits (rounded-full stays circular). */
+/* Shared admin design system. Keep this workspace independent of the public
+   site's brand: neutral surfaces, readable slate text and one muted blue accent.
+   Legacy surface class names stay compatible with existing screens. */
 
 /* Self-hosted variable fonts. Served from /admin/fonts/ (Vite publicDir under
    the /admin/ base) — no external request, works offline. */
@@ -40,46 +22,42 @@
 }
 
 @theme {
-  /* Jost is the identity everywhere — headings, brand, body. The legacy
-     `serif` utility (used on every view heading) is remapped to Jost so the
-     admin matches the site without touching 36 files. JetBrains Mono carries
-     machine truth. */
+  /* Self-hosted type; preserve the existing heading utility across screens. */
   --font-sans: "Jost", ui-sans-serif, system-ui, -apple-system, "Segoe UI",
     Roboto, Helvetica, Arial, sans-serif;
   --font-serif: "Jost", ui-sans-serif, system-ui, -apple-system, sans-serif;
   --font-mono: "JetBrains Mono", ui-monospace, "SFMono-Regular", Menlo, monospace;
 
-  /* Sharp corners. Remapping Tailwind's radius scale turns every rounded-sm..3xl
-     in the markup into a 2px hairline corner; rounded-full is calc-based and
-     stays circular (avatars, toggles, dots). */
-  --radius-xs: 2px;
-  --radius-sm: 2px;
-  --radius-md: 2px;
-  --radius-lg: 2px;
-  --radius-xl: 2px;
-  --radius-2xl: 2px;
-  --radius-3xl: 2px;
-  --radius-4xl: 2px;
+  --radius-xs: 4px;
+  --radius-sm: 6px;
+  --radius-md: 8px;
+  --radius-lg: 10px;
+  --radius-xl: 12px;
+  --radius-2xl: 14px;
+  --radius-3xl: 16px;
+  --radius-4xl: 20px;
 }
 
 :root {
-  /* the monochrome + launch palette (mirrors the site's site.css :root) */
-  --paper: #f3f1ea;
-  --paper-card: #fbf9f3;
-  --ink: #201d1b;
-  --ink-deep: #17140f;
-  --ink-soft: #4a453f;
-  --muted: #6b655e;
-  --accent: #e4431b; /* launch — links, primary CTAs, focus, the live dot */
-  --accent-bright: #ff5a2c;
+  /* Admin-only palette; public brand settings never change these controls. */
+  --paper: #f7f8fa;
+  --paper-card: #ffffff;
+  --ink: #202733;
+  --ink-deep: #18212e;
+  --ink-soft: #465366;
+  --muted: #536172;
+  --accent: #315c91; /* links, selection and keyboard focus */
+  --accent-bright: #254973;
 
   --bg: var(--paper);
-  --surface: #eae7dd;
-  --border: #ddd8cc;
-  --rule: #ddd8cc;
+  --surface: #eef1f5;
+  --border: #dce1e8;
+  --rule: #dce1e8;
 
-  --focus-ring: 0 0 0 3px rgba(228, 67, 27, 0.35);
-  --radius: 2px;
+  --focus-ring: 0 0 0 2px #ffffff, 0 0 0 4px #315c91;
+  --selection: #eaf0f8;
+  --primary: #263d58;
+  --radius: 8px;
   --spring: cubic-bezier(0.2, 0.8, 0.3, 1);
 
   /* fonts referenced inline by a few Vue components */
@@ -92,7 +70,7 @@ body {
   margin: 0;
 }
 
-/* Flat Paper ground — no ambient gradient mesh. Editorial and static. */
+/* Calm workspace ground. */
 body {
   min-height: 100vh;
   color: var(--ink);
@@ -106,9 +84,11 @@ body {
   min-height: 100vh;
 }
 
-a {
-  color: var(--accent);
-  text-underline-offset: 2px;
+@layer base {
+  a {
+    color: var(--accent);
+    text-underline-offset: 2px;
+  }
 }
 
 @layer components {
@@ -124,7 +104,7 @@ a {
 
   .card {
     position: relative;
-    border-radius: var(--radius);
+    border-radius: 12px;
     background: var(--paper-card);
     border: 1px solid var(--border);
   }
@@ -155,7 +135,8 @@ a {
     justify-content: center;
     gap: 0.4rem;
     border-radius: var(--radius);
-    padding: 0.5rem 0.9rem;
+    min-height: 2.75rem;
+    padding: 0.65rem 1rem;
     font-size: 0.875rem;
     font-weight: 500;
     line-height: 1.2;
@@ -174,11 +155,11 @@ a {
 
   /* Primary CTA — solid Ink, Paper text (the site's dark-band button). */
   .btn-primary {
-    background: var(--ink);
-    color: var(--paper);
+    background: var(--primary);
+    color: #ffffff;
   }
   .btn-primary:not(:disabled):hover {
-    background: var(--ink-deep);
+    background: var(--accent-bright);
   }
 
   /* Ghost — Paper with a hairline; the quiet default action. */
@@ -194,11 +175,11 @@ a {
 
   /* Destructive — a deep red distinct from the launch accent. */
   .btn-danger {
-    background: #c1121f;
+    background: #a62e35;
     color: #fff;
   }
   .btn-danger:not(:disabled):hover {
-    background: #a20e19;
+    background: #852129;
   }
 
   /* ── Inputs (shared via fields/styles.ts) ───────────────────────────────
@@ -327,11 +308,15 @@ a {
     border: 1px solid var(--border);
   }
   .segment-btn {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    min-height: 2.5rem;
     flex: 1;
     border-radius: var(--radius);
-    padding: 0.25rem 0.5rem;
-    font-size: 0.75rem;
-    font-weight: 600;
+    padding: 0.4rem 0.85rem;
+    font-size: 0.875rem;
+    font-weight: 500;
     color: var(--muted);
     transition: background-color 0.15s ease, color 0.15s ease;
   }
@@ -342,7 +327,7 @@ a {
   .segment-btn--active:hover {
     background: var(--paper-card);
     color: var(--ink);
-    box-shadow: inset 0 0 0 1px var(--border);
+    box-shadow: 0 1px 3px #20273312;
   }
   .segment-btn:focus-visible {
     outline: none;
@@ -386,7 +371,7 @@ a {
     background: linear-gradient(
       90deg,
       transparent,
-      rgba(251, 249, 243, 0.85),
+      rgba(255, 255, 255, 0.85),
       transparent
     );
     animation: skeleton-shimmer 1.4s ease-in-out infinite;
@@ -570,12 +555,14 @@ a {
   .settings-tabs { gap: 1.25rem; }
   .brand-palettes { grid-template-columns: 1fr 1fr; }
 }
-.settings-mobile-navigation { display: none; }
-@media (max-width: 700px) {
-  .settings-mobile-navigation { display: flex; align-items: center; position: fixed; inset: 0 0 auto; z-index: 60; height: 2.75rem; padding: 0 1.25rem; background: var(--paper); border-bottom: 1px solid var(--border); font-size: .8rem; }
-  .settings-shell > main { padding-top: 2.75rem; }
-  .settings-shell > nav { display: none; }
-  .settings-shell--nav-open > nav { display: flex; position: fixed; z-index: 55; top: 2.75rem; left: 0; height: calc(100dvh - 4.25rem); max-width: calc(100vw - 1.5rem); box-shadow: 8px 0 25px #201d1b18; }
+.admin-mobile-navigation { display: none; }
+@media (max-width: 1023px) {
+  .admin-shell { display: block; }
+  .admin-mobile-navigation { display: flex; align-items: center; gap: .65rem; width: 100%; position: sticky; top: 0; z-index: 40; min-height: 3rem; padding: .75rem 1.25rem; background: var(--paper-card); border-bottom: 1px solid var(--border); font-size: .875rem; text-align: left; }
+  .admin-mobile-navigation:focus-visible { outline: 2px solid var(--accent); outline-offset: -4px; }
+  .admin-shell > nav { display: none; }
+  .admin-shell--nav-open > nav { display: flex; position: static; width: calc(100% - 1.5rem); height: calc(100dvh - 4.5rem); }
+  .admin-shell--nav-open > main { display: none; }
 }
 
 /* Designed pages: a stable canvas and a readable inspector. */
@@ -611,4 +598,15 @@ a {
   .page-loading__workspace { display: flex; flex-direction: column-reverse; height: auto; }
   .page-loading__preview { height: 50dvh; min-height: 20rem; }
   .page-loading__identity { flex-wrap: wrap; }
+}
+
+/* Shared keyboard affordance also covers links and controls outside primitives. */
+@layer base {
+  :where(a, button, input, select, textarea, summary):focus-visible {
+    outline: 2px solid var(--accent);
+    outline-offset: 3px;
+  }
+}
+@media (pointer: coarse) {
+  .segment-btn { min-height: 2.75rem; }
 }
