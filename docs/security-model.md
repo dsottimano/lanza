@@ -59,6 +59,14 @@ The 60-second cache is also the answer to revocation: removing someone's repo ac
 takes effect within a minute. The session it replaced was a 7-day bearer that could not
 be revoked at all.
 
+Token-refresh failures preserve this distinction too: network failures, malformed
+responses, upstream outages, throttling and unknown/configuration errors refuse
+API access with 503 while retaining browser cookies. Only an explicit
+`bad_refresh_token` refusal clears them. Refreshed credentials are checked for
+repository access before any downstream handler runs. Concurrent refreshes of a
+rotating token across requests still need separate review; this handling does not
+introduce a credential store or claim to coordinate requests across isolates.
+
 ### I2 — Validate the URL you are about to fetch, not the string you were given
 
 A path allowlist inspects a string; what leaves the Worker is a **parsed URL**, and only

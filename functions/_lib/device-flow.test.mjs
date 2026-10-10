@@ -41,13 +41,7 @@ function stubFetch(body, { status = 200, json = true } = {}) {
       headers: init.headers,
       fields: Object.fromEntries(new URLSearchParams(init.body)),
     });
-    return {
-      status,
-      json: async () => {
-        if (!json) throw new SyntaxError("not json");
-        return body;
-      },
-    };
+    return json ? Response.json(body, { status }) : new Response("not json", { status });
   };
   impl.calls = calls;
   return impl;

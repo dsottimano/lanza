@@ -149,3 +149,28 @@ errors/warnings), and the 15-page public build passed; existing public build
 warnings remain. Chromium exercised the real component's failed-load retry,
 cancel and uncertain-write recovery with synthetic client methods and blocked
 API traffic. No live rollback or deployment verification was performed.
+
+## Authentication refresh failure handling
+
+A GitHub outage during refresh previously cleared sign-in cookies as though the
+refresh token had been revoked; a thrown network error could escape middleware.
+OAuth response parsing now handles transport/malformed failures, refuses token
+bodies on failed HTTP requests, and treats throttling/server errors as unavailable.
+The gate preserves cookies and returns 503 for unproven credential failures, while
+an explicit bad refresh token still clears them and denies access. Successful
+refreshes still require repository authorization before downstream execution.
+
+Sixteen new regressions drive the real gate and cover outage formats, throttling,
+malformed bodies, configuration errors, pending responses, explicit invalid-token
+responses, token-shaped HTTP errors and authorization after rotation. Existing
+request stubs now use real Response objects so HTTP status handling is exercised.
+Cross-request refresh races remain open; no broader credential or token store was
+introduced. No live sign-in or token rotation was performed.
+
+Contract: [GitHub user-token errors](https://docs.github.com/en/apps/creating-github-apps/authenticating-with-a-github-app/generating-a-user-access-token-for-a-github-app)
+documents the bad-refresh-token response.
+
+Validation: 429 Functions/script tests and 469 CMS tests passed. Site validation
+reported zero errors/warnings. The public build and a fresh packed-package tenant
+each built 15 pages; both Pages Functions bundles compiled using the required
+Wrangler version. Existing public build warnings remain. Deployment is unverified.

@@ -83,9 +83,16 @@ async function post(
   url: string,
   fields: Record<string, string>,
 ): Promise<Record<string, unknown>> {
-  const res = await fetchImpl(url, form(fields));
   try {
-    return (await res.json()) as Record<string, unknown>;
+    const res = await fetchImpl(url, form(fields));
+    if (res.status === 429 || res.status >= 500) return { error: "github_unavailable" };
+    const data: unknown = await res.json();
+    if (!data || typeof data !== "object" || Array.isArray(data)) return { error: "github_unavailable" };
+    const body = data as Record<string, unknown>;
+    // OAuth refusals may use 200 or 400, but a failed HTTP request can never
+    // issue usable credentials, even if its body happens to contain a token.
+    if (!res.ok) return { error: typeof body.error === "string" ? body.error : "github_unavailable", interval: body.interval };
+    return body;
   } catch {
     return { error: "github_unavailable" };
   }
