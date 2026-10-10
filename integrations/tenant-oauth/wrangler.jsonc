@@ -1,0 +1,16 @@
+{
+  "$schema": "node_modules/wrangler/config-schema.json",
+  "name": "lanza-tenant-oauth",
+  "main": "src/index.ts",
+  "compatibility_date": "2026-10-10",
+  "compatibility_flags": ["global_fetch_strictly_public"],
+  "workers_dev": false,
+  "observability": { "enabled": true, "traces": { "enabled": true } },
+  "vars": {
+    "OAUTH_ORIGIN": "https://oauth.example.com",
+    "SITE_ORIGIN": "https://site.example.com"
+  },
+  "kv_namespaces": [
+    { "binding": "OAUTH_KV", "id": "REPLACE_WITH_TENANT_KV_ID" }
+  ]
+}

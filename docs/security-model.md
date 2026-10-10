@@ -29,6 +29,16 @@ accepts nothing the broker signs.
 That last sentence is the release bar. It is I3 below, and it is the one to check any
 change against.
 
+**Optional integration source, 2026-10-10:** `integrations/tenant-oauth` adds an
+opt-in OAuth/MCP Worker in the customer's own Cloudflare account. The default Pages
+installation remains store-free. The optional Worker uses encrypted customer KV
+for upstream GitHub credentials and OAuth state; the broker holds none of it and
+Pages accepts no new broker proof. It reuses the existing owner-only MCP handler
+and separately enforces consented read/content/design/publish scopes. Its exact
+deployment requirements, GitHub nonexpiring-token constraint, KV consistency and
+revocation limits are in [its setup](../integrations/tenant-oauth/README.md).
+Source tests are not proof of deployment or real ChatGPT registration.
+
 ---
 
 ## 1. The invariants
@@ -46,6 +56,7 @@ calls: `GET /user` is who, `GET /repos/{owner}/{name}` → `permissions` is what
 | `/admin/api/gh/*` | `functions/admin/api/gh/[[path]].ts` | inherited | ✅ re-asked per request |
 | `/admin/api/auth/agent/*` | `agent/{start,poll}.ts` | inherited | ✅ owner only |
 | `/api/mcp` | `functions/api/mcp.ts` | ✅ | ✅ owner only |
+| optional OAuth Worker `/mcp` | `integrations/tenant-oauth/src/index.ts` | ✅ tenant OAuth plus upstream GitHub | ✅ owner only, plus per-tool OAuth scopes |
 
 `functions/admin/api/cf/[[path]].ts` performs **no check of its own** — it trusts the
 middleware completely and then attaches an account-scoped Cloudflare API token.

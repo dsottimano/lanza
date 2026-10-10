@@ -1,0 +1,6 @@
+{
+  "$schema": "https://agent-plugins.org/schemas/1.0.0/plugin.schema.json",
+  "name": "lanza-site",
+  "version": "0.1.0",
+  "description": "Review and edit one tenant's Lanza CMS content through tenant-owned OAuth."
+}

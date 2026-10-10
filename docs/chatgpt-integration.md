@@ -2,7 +2,9 @@
 
 Status: the first WebMCP editor implementation is in source. A real ChatGPT
 desktop/browser/account connection and production deployment have not been verified.
-Remote ChatGPT OAuth remains a separate implementation phase.
+An optional tenant-owned remote OAuth Worker and plugin template are also in
+source; their deployment, resource provisioning and real client registration
+remain unverified. See [tenant OAuth setup](../integrations/tenant-oauth/README.md).
 
 ## Live page tools
 
@@ -73,11 +75,13 @@ the live editor's unsaved text or selection. Current ChatGPT custom MCP setup
 documents OAuth/noauth/mixed authentication, not a fixed bearer-token input.
 Do not claim its existing manual bearer setup is verified in ChatGPT web.
 
-The next remote integration needs an authorization server owned by the tenant,
-with protected-resource/OAuth discovery, S256 PKCE, one-time codes, exact callbacks,
-resource/audience checks and narrow scopes. Its credentials, keys, grants and
-revocation state must remain in that tenant's Cloudflare account. Reintroducing a
-broker credential store or a broker signing key would violate security invariant I3.
+The optional remote Worker wraps the existing MCP handler with Cloudflare's OAuth
+provider: protected-resource/OAuth discovery, S256 PKCE, exact callbacks, encrypted
+grants, resource/audience checks and separately enforced read/content/design/publish
+scopes. Its GitHub device flow runs after client consent and verifies the owner.
+ChatGPT receives an opaque OAuth bearer while the upstream credential stays in the
+customer's KV. KV consistency/concurrent-use limits are documented in its setup.
+Reintroducing a broker credential store or signing key would violate invariant I3.
 
 Sign in with ChatGPT (SIWC) is a separate path for identity and eligible inference.
 The open-source plan-usage flow requires a local `127.0.0.1` callback and protected
