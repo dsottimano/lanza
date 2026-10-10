@@ -12,6 +12,29 @@ const { uploading, pick } = useImageUpload(client);
 const safeSrc = computed(() => props.node.attrs.pastePreview || safeImageUrl(props.node.attrs.src));
 const error = ref("");
 
+async function pasteFromClipboard(event: MouseEvent) {
+  const target = (event.currentTarget as HTMLElement).closest(".figure");
+  error.value = "";
+  try {
+    if (!navigator.clipboard?.read) throw new Error("Clipboard access is unavailable. Click the image area and press Ctrl/Cmd+V.");
+    const items = await navigator.clipboard.read();
+    const data = new DataTransfer();
+    for (const item of items) {
+      const type = item.types.find(type => type.startsWith("image/"));
+      if (type) data.items.add(new File([await item.getType(type)], "clipboard-image", { type }));
+    }
+    if (!data.files.length) throw new Error("No image found. Copy the image itself, then paste again.");
+    if (target?.isConnected) target.dispatchEvent(new ClipboardEvent("paste", { bubbles: true, cancelable: true, clipboardData: data }));
+  } catch (err) {
+    error.value = err instanceof Error && err.name !== "NotAllowedError" ? err.message : "Clipboard access was blocked. Click the image area and press Ctrl/Cmd+V.";
+  }
+}
+
+function removeImage() {
+  props.deleteNode();
+  props.editor.commands.focus();
+}
+
 function setAlt() {
   const next = window.prompt("Alt text (describe the image for screen readers)", props.node.attrs.alt || "");
   if (next !== null) props.updateAttributes({ alt: next.trim() });
@@ -30,15 +53,19 @@ function onPick(e: Event) {
 
 <template>
   <NodeViewWrapper class="figure" data-drag-handle>
+    <div class="figure-tools" contenteditable="false">
+      <button type="button" class="figure-remove" @click.stop="removeImage">Remove image</button>
+    </div>
     <template v-if="safeSrc">
       <img :src="safeSrc" :alt="node.attrs.alt" contenteditable="false" />
       <button class="figure-alt" contenteditable="false" @click="setAlt">
         {{ node.attrs.alt ? "Alt: " + node.attrs.alt : "+ Add alt text" }}
       </button>
     </template>
-    <div v-else class="figure-empty" contenteditable="false" tabindex="0" aria-label="Image upload. Choose a file or paste an image.">
+    <div v-else class="figure-empty" contenteditable="false" tabindex="0" @click.self="($event.currentTarget as HTMLElement).focus()" @keydown.delete.prevent.stop="removeImage" aria-label="Image upload. Choose a file or paste an image.">
       <span class="figure-emoji">🖼️</span>
       <div class="figure-actions">
+        <button type="button" class="figure-btn" @click.stop="pasteFromClipboard">Paste image</button>
         <label class="figure-btn" :class="{ busy: uploading }">
           {{ uploading ? "Uploading…" : "Upload image" }}
           <input type="file" accept="image/*" :disabled="uploading" @change="onPick" />
@@ -53,6 +80,10 @@ function onPick(e: Event) {
 </template>
 
 <style scoped>
+.figure-tools { display: flex; justify-content: flex-end; margin-bottom: .4rem; }
+.figure-remove { background: #fff; border: 1px solid var(--border); border-radius: 6px; padding: .4rem .65rem; font-size: .8rem; color: var(--ink-soft); cursor: pointer; }
+.figure-remove:hover { color: #b42318; border-color: #b42318; }
+.figure-empty:focus { outline: 2px solid var(--accent); outline-offset: 3px; }
 .figure {
   margin: 1.6em 0;
   text-align: center;
