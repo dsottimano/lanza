@@ -84,8 +84,10 @@ staging, so review and trust their source before applying, not just before Publi
 ## The content model (same as the CMS)
 
 Every write lands on the **`staging`** branch — invisible to the public and visible in
-your `/admin` editor and staging preview. The `publish` tool merges `staging → main` to
-go live. New entries are written `draft: false` (visible once published); pass
+your `/admin` editor and staging preview. The `publish` tool requires the `productionSha` and `stagingSha` returned by
+`list_changes` and fast-forwards main to that reviewed staging commit. If branches
+diverge, use `update_drafts`, validate and review again. Git success does not prove
+deployment completion. New entries are written `draft: false` (visible once published); pass
 `draft: true` to stage a hidden draft.
 
 ## Tools
@@ -110,8 +112,9 @@ go live. New entries are written `draft: false` (visible once published); pass
 | `set_brand` | Colours, corner radius, fonts, motion, light/dark. Merges. An unknown font or a non-hex colour is **refused, not ignored** — `resolveBrand` silently drops what it does not recognise, which is right for rendering an old site and wrong for a writer. |
 | `set_menu` | Header/footer navigation for one locale. Replaces the list you pass. URLs go through `frontend/lib/url.ts` — the one safe-URL policy — because HTML-escaping does not stop `javascript:` in an `href`. |
 | `set_seo` | Site name, tagline, title template, share image, per locale. |
-| `list_changes` | What's staged but not yet published. |
-| `publish` | Merge staging → main to go live. |
+| `list_changes` | Immutable branch IDs, branch status, changed files and completeness. |
+| `update_drafts` | Merge reviewed production into staging; validate and review again. |
+| `publish` | Publish reviewed commit IDs with a non-force fast-forward; refuses stale or incomplete reviews. |
 
 ### Why the site-system tools exist
 

@@ -8,7 +8,7 @@ import { AGENT_INSTRUCTIONS } from "./agent-authoring.mjs";
 // in functions/api/mcp.ts.
 //
 // Tools mirror the Vue CMS (admin/src/backend/github.ts): every write lands on the
-// `staging` branch; `publish` merges staging→main to go live.
+// `staging` branch; `publish` fast-forwards main to a reviewed staging commit.
 import { ContentClient, GitHubError, slugify, assertSafePath } from "./lanza-content";
 import { BRANCH, WORKING_BRANCH } from "./gh-proxy";
 // The site-system checker, shared verbatim with `npm run check:site`. Plain .mjs, and
@@ -628,11 +628,12 @@ export const TOOLS: ToolDef[] = [
   {
     name: "list_changes",
     description:
-      "List entries changed on staging but not yet published — the pending diff between staging and the live site.",
+      "Review all files changed on staging, including unrelated work. Returns immutable productionSha and stagingSha for publish/update_drafts, branch status, and complete:false if GitHub may have truncated the file list. Diverged or behind drafts need update_drafts and a fresh review. A file list is not a content diff: inspect the changed content and validate_site before authorized publication.",
     inputSchema: obj({}),
     run: async (_args, client) => {
-      const files = await client.pendingChanges();
-      return { pending: files.length, files };
+      const review = await client.pendingChanges();
+      return { ...review, pending: review.complete ? review.files.length : null,
+        ...(review.complete ? {} : { note: "At least 300 changed files. The list may be incomplete; MCP publishing is blocked. Review and publish from a local Git checkout." }) };
     },
   },
   {
@@ -1264,14 +1265,25 @@ export const TOOLS: ToolDef[] = [
     },
   },
   {
+    name: "update_drafts",
+    description:
+      "Merge the reviewed production commit into staging without publishing. Pass productionSha and stagingSha from list_changes. Preserves both branches on conflict. Afterwards run validate_site and inspect list_changes again before requesting authorized publication.",
+    inputSchema: obj({ productionSha: str("Reviewed production commit from list_changes."), stagingSha: str("Reviewed staging commit from list_changes.") }, ["productionSha", "stagingSha"]),
+    run: async (args, client) => ({
+      updated: await client.updateDrafts({ productionSha: String(args.productionSha ?? ""), stagingSha: String(args.stagingSha ?? "") }),
+      published: false,
+      note: "Production was not changed. Validate the combined drafts and call list_changes for a fresh review before publishing.",
+    }),
+  },
+  {
     name: "publish",
     description:
-      "Publish only within the user’s authorization. Run validate_site and inspect list_changes first: this includes unrelated staged work. Publish: merge staging into main to make all staged changes live. Returns whether a merge happened (false = nothing to publish). A merge conflict is reported so it can be resolved on GitHub.",
-    inputSchema: obj({ message: str("Optional publish commit message.") }, []),
+      "Publish only within the user's authorization. Run validate_site and review list_changes, including unrelated staged work. Pass its productionSha and stagingSha. Publishes exactly that reviewed staging commit with a non-force fast-forward; rejects stale, divergent or incomplete reviews. For divergence, update_drafts and review again. Git success does not prove deployment completion.",
+    inputSchema: obj({ productionSha: str("Reviewed production commit from list_changes."), stagingSha: str("Reviewed staging commit from list_changes.") }, ["productionSha", "stagingSha"]),
     run: async (args, client) => {
-      const merged = await client.publish(args.message ? String(args.message) : "Publish via MCP");
+      const merged = await client.publish({ productionSha: String(args.productionSha ?? ""), stagingSha: String(args.stagingSha ?? "") });
       return merged
-        ? { published: true, note: "Staged changes merged into main; the live site rebuilds shortly." }
+        ? { published: true, commit: args.stagingSha, note: "Production now points to the reviewed staging commit. Deployment completion has not been verified." }
         : { published: false, note: "Nothing to publish — staging matches the live site." };
     },
   },

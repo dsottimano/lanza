@@ -6,7 +6,7 @@ export const AGENT_INSTRUCTIONS =
   "then follow its humanEditing workflow and examples. Read its themes section for brand, starters and bundles. Choose rich-body writing for articles and grouped " +
   "template slots for designed landing pages. Preserve existing human edits and translation identities. " +
   "Changes are staged; validate_site and list_changes precede handoff or publish. Publish affects ALL staged " +
-  "changes and must be within the user's authorization; do not ask again if already authorized. " +
+  "changes at its reviewed stagingSha; pass both commit IDs from list_changes. Diverged drafts need update_drafts and a fresh review. Publication must be within the user's authorization; do not ask again if already authorized. " +
   "Explain what the human can edit, where to find it, what you verified and any remaining limitations.";
 
 export function humanEditingGuide() {
@@ -29,8 +29,8 @@ export function humanEditingGuide() {
         action: "Use real user-provided content or clearly identified drafts. Match stored fields to declared fields. Set navigation and SEO for each required locale. Read before replacing menus, arrays or body_html. Set draft:true explicitly for content that should stay hidden after Publish; create_content defaults to draft:false." },
       { step: "Verify", tools: ["validate_site", "read_content", "list_changes"],
         action: "Fix validation errors, assess warnings, and run validate_site with template for every skipped folder. Read back saved content. Check public rendering and CMS editing at desktop/mobile widths when browser access exists. Otherwise state that visual/editor checks are unverified. Test longer text, missing optional content and image replacements." },
-      { step: "Hand off or publish", tools: ["get_site", "list_changes", "publish"],
-        action: "Provide the actual available staging URL and CMS editing locations, summarize changes and any outstanding checks. Do not invent a preview URL when stagingUrl is null. Publish only within the user's authorization, accounting for all staged changes, including unrelated work. A merge response is not proof that deployment finished." },
+      { step: "Hand off or publish", tools: ["get_site", "list_changes", "update_drafts", "publish"],
+        action: "Provide the actual available staging URL and CMS editing locations, summarize changes and any outstanding checks. Do not invent a preview URL when stagingUrl is null. Publish only within the user's authorization, accounting for all staged changes, including unrelated work. Pass productionSha and stagingSha from the reviewed list_changes. Reconcile diverged drafts with update_drafts, then validate and review again. A branch update is not proof that deployment finished." },
     ],
     surfaces: {
       article: {

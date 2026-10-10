@@ -1,6 +1,6 @@
 // Content operations against the tenant's own GitHub repo, mirroring the exact
 // endpoints the Vue CMS uses (admin/src/backend/github.ts): the Contents API on the
-// WORKING_BRANCH (staging) for reads/writes, and `merges` (staging→main) to publish.
+// WORKING_BRANCH (staging) for reads/writes, and reviewed fast-forwards to publish.
 // Repo identity (owner/name) is passed in from lanza.config.json — deliberately NOT
 // hard-coded here, the same discipline as gh-proxy.ts, so this ships tenant-agnostic
 // in lanza-site. Consumed by the MCP server (functions/api/mcp.ts).
@@ -24,6 +24,23 @@ export interface Entry {
 export interface ChangedFile {
   path: string;
   status: string;
+}
+
+export interface PublishHeads {
+  productionSha: string;
+  stagingSha: string;
+}
+
+export interface PublishReview extends PublishHeads {
+  status: "ahead" | "behind" | "diverged" | "identical";
+  files: ChangedFile[];
+  complete: boolean;
+}
+
+function assertPublishHeads(review: PublishHeads): void {
+  if (!review || !/^[a-f0-9]{40}$/.test(review.productionSha) || !/^[a-f0-9]{40}$/.test(review.stagingSha)) {
+    throw new GitHubError(400, "Pass the productionSha and stagingSha returned by list_changes. Review the changes before publishing or updating drafts.");
+  }
 }
 
 // A GitHub error the MCP layer can surface verbatim to the calling agent.
@@ -252,31 +269,80 @@ export class ContentClient {
     if (!res.ok) throw await this.fail(res, `delete ${path}`);
   }
 
-  // Files changed on staging but not yet in main — the pending-publish diff.
-  async pendingChanges(): Promise<ChangedFile[]> {
-    const res = await this.gh(`compare/${BRANCH}...${WORKING_BRANCH}`);
-    if (!res.ok) throw await this.fail(res, "compare staging against main");
-    const data = (await res.json()) as { files?: Array<{ filename: string; status: string }> };
-    return (data.files ?? []).map((f) => ({ path: f.filename, status: f.status }));
+  private async publishHeads(): Promise<PublishHeads> {
+    const readHead = async (branch: string): Promise<string> => {
+      const res = await this.gh(`git/ref/heads/${branch}`);
+      if (!res.ok) throw await this.fail(res, `read the ${branch} branch`);
+      return ((await res.json()) as { object?: { sha?: string } }).object?.sha ?? "";
+    };
+    const [productionSha, stagingSha] = await Promise.all([readHead(BRANCH), readHead(WORKING_BRANCH)]);
+    const heads = { productionSha, stagingSha };
+    assertPublishHeads(heads);
+    return heads;
   }
 
-  // Publish: merge staging into main. Returns whether a merge commit was created
-  // (false = already up to date). A merge conflict surfaces as a clear 409.
-  async publish(message: string): Promise<boolean> {
+  private async requireReviewedHeads(review: PublishHeads): Promise<void> {
+    assertPublishHeads(review);
+    const current = await this.publishHeads();
+    if (current.productionSha !== review.productionSha || current.stagingSha !== review.stagingSha) {
+      throw new GitHubError(409, "The site or drafts changed since review. Call list_changes and review the new changes before continuing.");
+    }
+  }
+
+  private async compareReview(heads: PublishHeads): Promise<PublishReview> {
+    assertPublishHeads(heads);
+    const res = await this.gh(`compare/${heads.productionSha}...${heads.stagingSha}?per_page=1`);
+    if (!res.ok) throw await this.fail(res, "compare staging against main");
+    const data = (await res.json()) as { status?: string; files?: Array<{ filename: string; status: string }> };
+    if (!Array.isArray(data.files) || !["ahead", "behind", "diverged", "identical"].includes(data.status ?? "") ||
+        data.files.some(file => !file || typeof file.filename !== "string" || typeof file.status !== "string")) {
+      throw new GitHubError(502, "Could not verify the comparison. No branch was changed; retry list_changes.");
+    }
+    // GitHub returns at most 300 changed files, regardless of commit pagination.
+    // At the limit we cannot prove the list is complete. Never bless a partial review.
+    return { ...heads, status: data.status as PublishReview["status"],
+      files: data.files.map(file => ({ path: file.filename, status: file.status })),
+      complete: data.files.length < 300 };
+  }
+
+  async pendingChanges(): Promise<PublishReview> {
+    return this.compareReview(await this.publishHeads());
+  }
+
+  // Reconcile only into drafts. A normal merge preserves concurrent staging work;
+  // the resulting combined tree must be reviewed again before publication.
+  async updateDrafts(review: PublishHeads): Promise<boolean> {
+    await this.requireReviewedHeads(review);
     const res = await this.gh("merges", {
       method: "POST",
-      body: JSON.stringify({ base: BRANCH, head: WORKING_BRANCH, commit_message: message }),
+      body: JSON.stringify({ base: WORKING_BRANCH, head: review.productionSha,
+        commit_message: "lanza: bring published changes into drafts via MCP" }),
     });
-    if (res.status === 204) return false; // nothing to merge
+    if (res.status === 204) return false;
     if (res.status === 409) {
-      throw new GitHubError(
-        409,
-        "Publish blocked by a merge conflict between staging and main. Resolve it on GitHub, then publish again.",
-      );
+      throw new GitHubError(409, "Draft reconciliation has a merge conflict. Both branches are preserved. Resolve the conflict on staging, then call list_changes and review again.");
     }
-    if (!res.ok) throw await this.fail(res, "publish (merge staging into main)");
-    const data = (await res.json()) as { merged?: boolean } | null;
-    return data?.merged !== false;
+    if (!res.ok) throw await this.fail(res, "update drafts");
+    return true;
+  }
+
+  // Never trust a caller-supplied comparison status or publish a moving branch.
+  async publish(review: PublishHeads): Promise<boolean> {
+    await this.requireReviewedHeads(review);
+    const diff = await this.compareReview(review);
+    if (!diff.complete) throw new GitHubError(409, "The changed-file list may be truncated at GitHub's 300-file limit. Review and publish this change from a local Git checkout; MCP cannot verify a complete review.");
+    if (diff.status === "diverged" || diff.status === "behind") {
+      throw new GitHubError(409, "Production changed separately from drafts. Call update_drafts with the reviewed commits, then validate and review list_changes again before publishing.");
+    }
+    if (diff.status === "identical") return false;
+    // Recheck after the comparison. GitHub's fast-forward check also protects the
+    // final write from a concurrent production commit; later drafts remain drafts.
+    await this.requireReviewedHeads(review);
+    const res = await this.gh(`git/refs/heads/${BRANCH}`, {
+      method: "PATCH", body: JSON.stringify({ sha: review.stagingSha, force: false }),
+    });
+    if (!res.ok) throw await this.fail(res, "publish the reviewed commit; call list_changes and review again");
+    return true;
   }
 }
 

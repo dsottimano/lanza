@@ -72,8 +72,8 @@ See [Publishing and reconciliation](publishing.md) for the incident and workflow
   conflict recovery inline. Distinguish Review & publish from the final Publish site.
 - [x] Test duplicate clicks, stale tips, production races, conflicts and load errors.
 - [x] Add and enable the local pre-push guard against stranding pending CMS commits.
-- [ ] Give MCP publishing the same reviewed-commit and reconciliation safeguards;
-  `functions/_lib/lanza-content.ts` still uses its separate merge implementation.
+- [x] Give MCP publishing reviewed-commit and reconciliation safeguards, including
+  stale-review refusal, non-force publication and incomplete-comparison blocking.
 - [ ] Browser-check the deployed publishing flow, including concurrent editing.
 - [ ] Show deployment completion/failure after publishing, separately from Git success.
 - [ ] Evaluate server-side protection for writers outside this checkout. The local

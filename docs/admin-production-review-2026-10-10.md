@@ -58,8 +58,8 @@ build and Git push do not establish Cloudflare deployment success.
 
 This pass does not complete the original request for a full code/security review
 of every admin surface. In particular, authenticated production owner/editor flows,
-concurrent publishing, deployment completion tracking, MCP publishing parity,
-large compare/commit-list completeness, custom collection URL helpers, recipe
+concurrent production publishing, deployment completion tracking,
+CMS large compare/commit-list completeness, custom collection URL helpers, recipe
 atomicity, session-refresh races and the rest of the settings/editor interactions
 still need current-state review and verification. Prior reports are evidence to
 recheck, not proof these areas are either vulnerable or already safe. No production
@@ -69,3 +69,23 @@ penetration test, account configuration audit or deployment verification was don
 
 - [Cloudflare deployment listing](https://developers.cloudflare.com/api/resources/pages/subresources/projects/subresources/deployments/methods/list/): production filter and deployment-stage fields.
 - [GitHub repository contents](https://docs.github.com/en/rest/repos/contents#get-repository-content): omitted content for large files.
+
+## MCP publishing follow-up
+
+The subsequent code-only pass closes the separate MCP publishing gap. Both
+`publish` and the new `update_drafts` require the branch commit IDs returned by
+`list_changes`. Publishing rejects stale or diverged reviews and uses a non-force
+update to the reviewed staging commit. Reconciliation only changes staging and
+requires a fresh review. A possibly truncated comparison (300 files) blocks MCP
+publication. Tool descriptions and the agent authoring guide describe the new
+contract; existing MCP callers must supply both commit IDs.
+
+Validation: 413 Functions/script tests and 445 CMS tests passed, including 20 new
+MCP publishing regressions. Site validation reported zero errors/warnings, Astro
+check reported zero errors/warnings and 62 hints, the public build generated 15
+pages, and the pinned Pages Functions bundler passed. The public build warnings
+listed above remain. No live GitHub mutations were used in the regression tests.
+
+A fresh tenant installed the packed package, built all 15 pages, and compiled its
+copied Pages Functions successfully. This was local package validation, not an
+npm release or a deployment verification.

@@ -1,8 +1,7 @@
 # Publishing and CMS branch reconciliation
 
-Updated 2026-09-07. The CMS reads and writes `staging`; production builds from `main`.
-This document describes the current CMS and repository workflow. MCP publishing
-still uses its older implementation; see the open work below.
+Updated 2026-10-10. The CMS reads and writes `staging`; production builds from `main`.
+This document describes the current CMS, MCP and repository workflow.
 
 ## September 7 incident
 
@@ -49,6 +48,29 @@ The implementation is in `admin/src/backend/github.ts` and `PublishView.vue`.
 Tests cover immutable review/publish targets, stale tips, a production race after
 preflight, duplicate clicks, divergence, conflict handling, and failed refreshes.
 
+## MCP publishing
+
+`list_changes` returns the immutable `productionSha` and `stagingSha`, branch
+status, changed files and whether the list is complete. Inspect the content,
+including unrelated staged work, and run `validate_site` before publication.
+`publish` now requires both commit IDs; the former optional `message` argument
+is no longer used. A stale review is refused, and publication uses the reviewed
+staging commit with `force:false` rather than merging a moving branch.
+
+If drafts are behind or diverged, call `update_drafts` with those reviewed IDs.
+This merges only into staging. Resolve conflicts there, validate the combined
+result, and call `list_changes` for a fresh review before publishing.
+
+GitHub comparison responses contain at most 300 changed files. At that limit,
+`list_changes` returns `complete:false` and `pending:null`; MCP publication is
+blocked because completeness cannot be established. Review and publish from a
+local Git checkout instead. Commit IDs bind the operation to a snapshot; they do
+not prove human approval or that every file was read. The owner-only authorization
+boundary is unchanged. Git success does not verify Cloudflare deployment.
+
+Regression tests cover stale heads, races, conflicts, incomplete comparisons,
+immutable targets and the tool schemas in `scripts/mcp-publishing.test.mjs`.
+
 ## Repository-agent workflow
 
 Before work, fetch both branches and inspect pending CMS changes. Implement against
@@ -76,8 +98,6 @@ checkouts, APIs, and edits after its final fetch are outside its enforcement.
 
 ## Remaining work and limits
 
-- Give MCP publishing the same reviewed-commit contract; its separate client still
-  merges a moving staging branch into main.
 - Browser-verify the deployed review/update/publish flow and error recovery, including
   narrow screens and two concurrently open editors. Unit tests are not a browser test.
 - A successful branch update is not deployment completion. Surface deployment status

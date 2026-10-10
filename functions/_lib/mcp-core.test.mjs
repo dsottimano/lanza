@@ -42,7 +42,7 @@ function fakeGitHub(seed = {}) {
     const body = init.body ? JSON.parse(init.body) : {};
 
     // Branch head (ensureWorkingBranch): staging + main both exist.
-    if (method === "GET" && path.startsWith("git/ref/heads/")) return res(200, { object: { sha: "base-sha" } });
+    if (method === "GET" && path.startsWith("git/ref/heads/")) return res(200, { object: { sha: path.endsWith("/main") ? "a".repeat(40) : "b".repeat(40) } });
 
     if (method === "GET" && path.startsWith("contents/")) {
       const p = path.replace(/^contents\//, "");
@@ -71,12 +71,14 @@ function fakeGitHub(seed = {}) {
       return res(200, { commit: { sha: "commit-sha" } });
     }
     if (method === "POST" && path === "git/refs") return res(201, {});
-    if (method === "POST" && path === "merges") {
+    if (method === "PATCH" && path === "git/refs/heads/main") {
+      assert.equal(body.sha, "b".repeat(40));
+      assert.equal(body.force, false);
       published = true;
-      return res(201, { merged: true, sha: "merge-sha" });
+      return res(200, { object: { sha: body.sha } });
     }
     if (method === "GET" && path.startsWith("compare/"))
-      return res(200, { files: [{ filename: "content/pages/en/hello.md", status: "added" }] });
+      return res(200, { status: "ahead", files: [{ filename: "content/pages/en/hello.md", status: "added" }] });
 
     return res(599, { message: `unmocked ${method} ${path}` });
   };
@@ -349,9 +351,9 @@ test("list_content lists a localized folder", async () => {
   assert.deepEqual(data.paths.sort(), ["content/pages/en/a.md", "content/pages/en/b.md"]);
 });
 
-test("publish merges staging into main", async () => {
+test("publish fast-forwards main to a reviewed staging commit", async () => {
   const gh = fakeGitHub();
-  const r = await handleMessage({ jsonrpc: "2.0", id: 9, method: "tools/call", params: { name: "publish" } }, client());
+  const r = await handleMessage({ jsonrpc: "2.0", id: 9, method: "tools/call", params: { name: "publish", arguments: { productionSha: "a".repeat(40), stagingSha: "b".repeat(40) } } }, client());
   assert.equal(toolData(r).published, true);
   assert.equal(gh.published, true);
 });
@@ -1288,7 +1290,7 @@ test("an LLM builds a pottery studio's site from a conversation, and the owner c
   assert.ok(pending.pending > 0);
 
   // "Yes. Ship it."
-  const out = await callData("publish");
+  const out = await callData("publish", { productionSha: pending.productionSha, stagingSha: pending.stagingSha });
   assert.equal(out.published, true);
   assert.equal(gh.published, true);
 });
