@@ -7,6 +7,8 @@ import { crossOriginBlocked, isAllowed } from "../functions/_lib/gh-proxy";
 import repo from "../lanza.config.json";
 import { identityFor } from "../functions/_lib/gh-identity";
 import { onRequest as githubProxy } from "../functions/admin/api/gh/[[path]]";
+import { onRequest as agentRequests } from "../functions/admin/api/agent-requests";
+import { REQUEST_BODY_LIMIT } from "../functions/_lib/agent-requests";
 import {
   isAllowed as cfIsAllowed,
   resolveProject as cfResolveProject,
@@ -114,6 +116,50 @@ function githubProxyDev(token: string | undefined): Plugin {
             }),
           );
         }
+      });
+    },
+  };
+}
+
+// Use the production private-request handler in dev too: the server-held user's
+// token still faces repository privacy, owner, Origin and archive-path checks.
+function agentRequestsDev(token: string | undefined): Plugin {
+  return {
+    name: "lanza-agent-requests-dev",
+    configureServer(server) {
+      server.middlewares.use("/admin/api/agent-requests", async (req, res) => {
+        const incoming = req as unknown as { url?: string; method?: string; headers: Record<string, string | undefined> };
+        const outgoing = res as unknown as { statusCode: number; setHeader(name: string, value: string): void; end(body: string): void };
+        const reject = (status: number, error: string) => {
+          outgoing.statusCode = status; outgoing.setHeader("content-type", "application/json");
+          outgoing.setHeader("cache-control", "no-store"); outgoing.end(JSON.stringify({ error }));
+        };
+        try {
+          if (!token) { reject(503, "Dev GitHub token is missing from admin/.env."); return; }
+          const suffix = incoming.url ?? "/";
+          if (suffix !== "/" && !suffix.startsWith("?" ) && !suffix.startsWith("/?")) { reject(404, "Unknown request endpoint."); return; }
+          const identity = await identityFor(token, repo.owner, repo.name);
+          if (identity.status !== "ok") { reject(identity.status === "unavailable" ? 503 : 403, "GitHub could not authorize this repository access."); return; }
+          const method = incoming.method ?? "GET";
+          const chunks: Uint8Array[] = []; let size = 0;
+          if (method !== "GET" && method !== "HEAD") {
+            for await (const chunk of req as AsyncIterable<Uint8Array>) {
+              size += chunk.byteLength;
+              if (size > REQUEST_BODY_LIMIT) { reject(413, "Request is too large."); return; }
+              chunks.push(chunk);
+            }
+          }
+          const bytes = new Uint8Array(size); let offset = 0;
+          for (const chunk of chunks) { bytes.set(chunk, offset); offset += chunk.byteLength; }
+          const headers = new Headers();
+          for (const [key, value] of Object.entries(incoming.headers)) if (typeof value === "string") headers.set(key, value);
+          const query = suffix.includes("?") ? suffix.slice(suffix.indexOf("?")) : "";
+          const url = new URL(`/admin/api/agent-requests${query}`, `http://${incoming.headers.host ?? "localhost"}`);
+          const response = await agentRequests({ request: new Request(url, { method, headers, ...(size ? { body: bytes } : {}) }), data: { ...identity.identity, token } });
+          outgoing.statusCode = response.status;
+          response.headers.forEach((value, name) => outgoing.setHeader(name, value));
+          outgoing.end(await response.text());
+        } catch { reject(502, "The private request service could not be reached."); }
       });
     },
   };
@@ -264,6 +310,7 @@ export default defineConfig(({ mode }) => {
       tailwindcss(),
       authBypassDev(),
       githubProxyDev(env.GITHUB_TOKEN),
+      agentRequestsDev(env.GITHUB_TOKEN),
       cloudflareProxyDev({
         token: env.CLOUDFLARE_API_TOKEN,
         accountId: env.CLOUDFLARE_ACCOUNT_ID,

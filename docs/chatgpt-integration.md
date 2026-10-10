@@ -78,6 +78,17 @@ revision/permission changes during review, real-template rendering, explicit sav
 body preservation and reload. This is not proof of the desktop client's live API.
 Voice tool access is also unverified. A successful package/build does not prove a live account connection.
 
+## Saved selection requests
+
+The CMS can save a selected passage and an instruction on the private repository's
+separate request branch. This is an asynchronous handoff: ask the connected
+assistant to retrieve the saved request. Submission does not send an autonomous
+notification, start ChatGPT or expose unsaved editor state beyond the captured
+passage/context. MCP responses are stored proposals, not article edits or
+publication. The human reviews a replacement against current text; stale anchors
+need fresh context. See [Agent requests](agent-requests.md) for storage, privacy,
+version checks and the tool workflow.
+
 ## Other connection paths
 
 Remote MCP at `/api/mcp` still uses the owner's GitHub bearer token, acquired via

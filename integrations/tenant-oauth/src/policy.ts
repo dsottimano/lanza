@@ -2,8 +2,8 @@ import { TOOL_LIST } from "../../../functions/_lib/mcp-core";
 
 export const SCOPES = ["content.read", "content.write", "site.design", "site.publish", "offline_access"];
 export const SCOPE_LABELS: Record<string, string> = {
-  "content.read": "Read this site's content, settings, templates and pending changes",
-  "content.write": "Create, change and delete content in staging",
+  "content.read": "Read this site's content, settings, templates, pending changes and private agent requests",
+  "content.write": "Create, change and delete content in staging; answer private agent requests",
   "site.design": "Change templates, the content model, brand, navigation and SEO in staging",
   "site.publish": "Reconcile and publish reviewed staging commits",
   "offline_access": "Keep this connection for up to 30 days",
@@ -15,6 +15,8 @@ export const TOOL_SCOPES: Record<string, string> = {
   get_site: "content.read", list_collections: "content.read",
   get_schema: "content.read", list_content: "content.read", read_content: "content.read",
   list_changes: "content.read",
+  list_agent_requests: "content.read", read_agent_request: "content.read",
+  respond_to_agent_request: "content.write",
   describe_site_system: "content.read", get_settings: "content.read", validate_site: "content.read",
   create_content: "content.write", update_content: "content.write", delete_content: "content.write",
   write_template: "site.design", create_content_type: "site.design",

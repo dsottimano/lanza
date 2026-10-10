@@ -2,7 +2,7 @@ import { createExecutionContext, waitOnExecutionContext } from "cloudflare:test"
 import { env as bindings } from "cloudflare:workers";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import worker, { type Env } from "./index";
-import { OAUTH_TOOLS, TOOL_SCOPES } from "./policy";
+import { OAUTH_TOOLS, TOOL_SCOPES, missingScopes } from "./policy";
 import { TOOL_LIST } from "../../../functions/_lib/mcp-core";
 import { resetIdentityCache } from "../../../functions/_lib/gh-identity";
 import repo from "../../../lanza.config.json";
@@ -150,6 +150,18 @@ describe("tenant OAuth MCP service in workerd", () => {
     const unauth = await call(browser, "", "tools/list");
     expect(unauth.status).toBe(401);
     expect(unauth.headers.get("www-authenticate")).toContain("oauth-protected-resource/mcp");
+  });
+
+  it("requires write consent to answer requests while read consent can inspect them", () => {
+    for (const name of ["list_agent_requests", "read_agent_request"]) {
+      expect(missingScopes({ method: "tools/call", params: { name } }, ["content.read"])).toEqual([]);
+      expect(OAUTH_TOOLS.find(tool => tool.name === name)?.annotations.readOnlyHint).toBe(true);
+    }
+    const answer = { method: "tools/call", params: { name: "respond_to_agent_request" } };
+    expect(missingScopes(answer, ["content.read"])).toEqual(["content.write"]);
+    expect(missingScopes(answer, ["content.read", "content.write"])).toEqual([]);
+    expect(OAUTH_TOOLS.find(tool => tool.name === "respond_to_agent_request")?.securitySchemes)
+      .toEqual([{ type: "oauth2", scopes: ["content.read", "content.write"] }]);
   });
 
   it("classifies every existing tool and advertises explicit scopes and read hints", () => {
