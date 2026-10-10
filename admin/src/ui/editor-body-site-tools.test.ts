@@ -34,7 +34,7 @@ function open(body = "<p>Original article</p><p>Keep this legal paragraph.</p>")
     loadJson: vi.fn().mockResolvedValue({ data: {} }), saveEntry: vi.fn().mockResolvedValue("saved") };
   const wrapper = mount(EditorView, { attachTo: document.body,
     props: { client: client as unknown as GitHubClient, collection: posts, locale: "en", path: "content/posts/en/article.md" },
-    global: { stubs: { EntryLocaleBar: true, Toolbar: true } } }); wrappers.push(wrapper);
+    global: { stubs: { EntryLocaleBar: true, Toolbar: true, AgentRequests: true } } }); wrappers.push(wrapper);
   return { wrapper, client, editor: () => wrapper.findComponent(Editor).vm.editor!,
     context: () => tools.get("get_editor_context")!.execute({ includeBody: true }) as Promise<{ revision: string; body: { html: string; selection: { text: string } | null } }> };
 }
@@ -76,7 +76,7 @@ it("selection changes since context was read invalidate the proposal before revi
   await expect(tools.get("propose_editor_body_change")!.execute({ target: "selection", expectedRevision: context.revision, html: "New" })).rejects.toThrow("editor changed");
   expect(f.wrapper.findComponent(AgentBodyReview).exists()).toBe(false);
 });
-it.each(["typing", "selection", "access", "save"])("rejects %s during pending body review", async change => {
+it.each(["typing", "selection", "access"])("rejects %s during pending body review", async change => {
   const f = open(); await flushPromises(); f.editor().commands.setTextSelection({ from: 1, to: 9 });
   const context = await f.context();
   const pending = tools.get("propose_editor_body_change")!.execute({ target: "selection", expectedRevision: context.revision, html: "New" });
@@ -84,9 +84,15 @@ it.each(["typing", "selection", "access", "save"])("rejects %s during pending bo
   if (change === "typing") f.editor().commands.insertContent("Human");
   if (change === "selection") f.editor().commands.setTextSelection({ from: 2, to: 9 });
   if (change === "access") access.role = "viewer";
-  if (change === "save") { await f.wrapper.findAll("button").find(b => b.text() === "Save")!.trigger("click"); await flushPromises(); }
   await decision(f.wrapper, true); await refused;
   expect(f.editor().getHTML()).not.toContain("New");
+});
+it("disables Save while a body proposal awaits approval", async () => {
+  const f = open(); await flushPromises(); const context = await f.context();
+  const pending = tools.get("propose_editor_body_change")!.execute({ target: "body", expectedRevision: context.revision, html: "<p>New</p>" });
+  await flushPromises(); const save = f.wrapper.findAll("button").find(button => button.text() === "Save")!;
+  expect(save.attributes("disabled")).toBeDefined(); await save.trigger("click"); expect(f.client.saveEntry).not.toHaveBeenCalled();
+  await decision(f.wrapper, false); expect(await pending).toMatchObject({ accepted: false });
 });
 it("unmount dismisses pending review without applying or leaving an unresolved promise", async () => {
   const f = open(); await flushPromises(); const context = await f.context();

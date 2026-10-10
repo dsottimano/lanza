@@ -37,6 +37,8 @@ import { useEntryEditor } from "./useEntryEditor";
 import { useEditorSiteTools } from "./useEditorSiteTools";
 import { bodyContext, prepareBodyProposal, type BodyTarget } from "../editor/body-proposal";
 import AgentBodyReview from "./AgentBodyReview.vue";
+import AgentRequests from "./AgentRequests.vue";
+import { prepareRequestReplacement, type RequestAnchor } from "../backend/agent-requests";
 import { access } from "../backend/access";
 import { useEntryReview } from "./useEntryReview";
 import { refreshPending } from "./staging";
@@ -71,6 +73,7 @@ const siteToolsField = ref<string | null>(null);
 const siteToolsSession = crypto.randomUUID();
 const focusFormatting = ref(false);
 const bodyReview = ref<{ before: string; after: string; target: BodyTarget } | null>(null);
+const requestBusy = ref(false);
 let bodyReviewDecision: ((accepted: boolean) => void) | null = null;
 function finishBodyReview(accepted: boolean) {
   const decision = bodyReviewDecision;
@@ -194,7 +197,7 @@ let editorActive = true;
 onUnmounted(() => { editorActive = false; });
 const canDelete = computed(() => access.loaded && (access.role === "owner" || access.role === "editor") && !!currentPath.value);
 async function deleteCurrentEntry() {
-  if (!canDelete.value || deleting.value || saving.value || preparingPublication.value || editorLoading.value || loadFailed.value || recovery.value || bodyReview.value) return;
+  if (!canDelete.value || deleting.value || saving.value || preparingPublication.value || editorLoading.value || loadFailed.value || recovery.value || bodyReview.value || requestBusy.value) return;
   const unsaved = dirty.value ? " Your unsaved changes will also be discarded." : "";
   if (!window.confirm(`Delete "${String(data.title || props.collection.labelSingular)}" (${props.locale})?${unsaved} This removes only this entry from drafts. The live site changes only after Review & publish.`)) return;
   deleteError.value = "";
@@ -248,7 +251,7 @@ useEditorSiteTools({
   context: () => ({ repository: access.repo, collection: props.collection.name, locale: props.locale,
     path: currentPath.value, selectedField: siteToolsField.value, dirty: dirty.value, baseSha: getBaseSha() }),
   revision: () => `${siteToolsSession}:${getRevision()}:${getBaseSha() ?? "new"}:${editorRef.value?.editor?.state.selection.from ?? "none"}:${editorRef.value?.editor?.state.selection.to ?? "none"}`,
-  ready: () => access.loaded && !editorLoading.value && !loadFailed.value && !saving.value && !deleting.value && !recovery.value && !saveError.value && !editorProblem.value,
+  ready: () => access.loaded && !editorLoading.value && !loadFailed.value && !saving.value && !deleting.value && !recovery.value && !saveError.value && !editorProblem.value && !requestBusy.value,
   canEdit: () => access.loaded && (access.role === "owner" || access.role === "editor"),
   pauseAutosave,
   body: {
@@ -289,6 +292,24 @@ useEditorSiteTools({
   },
 });
 
+async function reviewRequestReplacement(anchor: RequestAnchor, html: string): Promise<boolean> {
+  const ready = () => editorActive && isOwner() && !editorLoading.value && !loadFailed.value && !saving.value && !deleting.value && !recovery.value && !saveError.value && !editorProblem.value;
+  if (!ready() || bodyReviewDecision || !editorRef.value?.editor) throw new Error("Finish the current editor operation before reviewing a response.");
+  const editor = editorRef.value.editor;
+  const path = currentPath.value;
+  const baseSha = getBaseSha();
+  const proposal = await prepareRequestReplacement(editor, anchor, html);
+  if (!ready() || currentPath.value !== path || getBaseSha() !== baseSha || bodyReviewDecision) throw new Error("The editor changed. Review the response again.");
+  bodyReview.value = { before: proposal.before, after: proposal.after, target: "selection" };
+  const accepted = await new Promise<boolean>(resolve => { bodyReviewDecision = resolve; });
+  if (!accepted) return false;
+  if (!ready() || currentPath.value !== path || getBaseSha() !== baseSha) throw new Error("The editor changed during review. Nothing was applied.");
+  if (!proposal.changed) return false;
+  pauseAutosave("Accepted an agent response in your editor. Save to keep the draft and resume autosave.");
+  proposal.apply();
+  return true;
+}
+
 // ── field grouping ──────────────────────────────────────────────────────────
 // Title is in the chrome; preset + slots are the Template surface. SEO/
 // meta collapse into their own disclosure; whatever's left is "details".
@@ -317,7 +338,7 @@ const writingDetailFields = computed(() => detailFields.value.filter(f => !["upd
 
 const preparingPublication = ref(false);
 async function reviewAndPublish() {
-  if (!isOwner() || preparingPublication.value || saving.value || deleting.value || editorLoading.value || loadFailed.value || recovery.value || editorProblem.value) return;
+  if (!isOwner() || preparingPublication.value || saving.value || deleting.value || editorLoading.value || loadFailed.value || recovery.value || editorProblem.value || bodyReview.value || requestBusy.value) return;
   preparingPublication.value = true;
   try {
     pauseAutosave("Preparing this entry for publication review.");
@@ -446,12 +467,12 @@ onMounted(async () => {
           :aria-expanded="preferences.options" aria-controls="writing-options"
           @click="preferences.options = !preferences.options">Details</button>
         <button v-if="canDelete" type="button" class="btn btn-ghost text-red-700"
-          :disabled="editorLoading || loadFailed || saving || deleting || preparingPublication || !!recovery || !!bodyReview"
+          :disabled="editorLoading || loadFailed || saving || deleting || preparingPublication || !!recovery || !!bodyReview || requestBusy"
           @click="deleteCurrentEntry">{{ deleting ? 'Deleting…' : `Delete ${collection.labelSingular.toLowerCase()}` }}</button>
-        <button type="button" class="btn btn-ghost" :disabled="editorLoading || loadFailed || saving || deleting || preparingPublication || !!recovery || !!editorProblem"
+        <button type="button" class="btn btn-ghost" :disabled="editorLoading || loadFailed || saving || deleting || preparingPublication || !!recovery || !!editorProblem || !!bodyReview"
           @click="saveNow">{{ saving ? "Saving…" : saveError ? "Retry save" : "Save" }}</button>
         <button v-if="isOwner()" type="button" class="btn btn-primary"
-          :disabled="editorLoading || loadFailed || saving || deleting || preparingPublication || !!recovery || !!editorProblem"
+          :disabled="editorLoading || loadFailed || saving || deleting || preparingPublication || !!recovery || !!editorProblem || !!bodyReview || requestBusy"
           title="Save this entry for publication, then review all saved site changes"
           @click="reviewAndPublish">{{ preparingPublication ? "Preparing review…" : "Review & publish" }}</button>
       </div>
@@ -567,6 +588,9 @@ onMounted(async () => {
                 @input="markDirty(); growTitle()"
               />
             </label>
+            <AgentRequests :editor="editorRef?.editor" :path="currentPath" :enabled="isOwner()"
+              :locked="editorLoading || loadFailed || saving || deleting || preparingPublication || !!recovery || !!editorProblem || !!saveError || !!bodyReview"
+              :review-replacement="reviewRequestReplacement" @busy="requestBusy = $event" />
             <Editor ref="editorRef" :initial-html="bodyHtml" :client="client" :show-inspector="false" @change="markDirty" @invalid="editorProblem = $event" />
           </div>
         </div>
