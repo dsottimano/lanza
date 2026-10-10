@@ -1,0 +1,15 @@
+{
+  "$schema": "node_modules/wrangler/config-schema.json",
+  "name": "lanza-research-collector",
+  "main": "src/worker.ts",
+  "compatibility_date": "2026-10-10",
+  "workers_dev": false,
+  "preview_urls": false,
+  "triggers": { "crons": [] },
+  "observability": { "enabled": true, "traces": { "enabled": true } },
+  "vars": {
+    "REPOSITORY": "owner/private-site",
+    "SCHEDULE_ENABLED": "false",
+    "SOURCES_JSON": "[]"
+  }
+}
