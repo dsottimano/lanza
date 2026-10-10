@@ -211,3 +211,37 @@ and the 15-page public build passed. Chromium exercised the compiled Software
 screen with intercepted API traffic: one synthetic staging ref update, no
 production update, then the existing publication review. Existing build warnings
 remain. Live software installation/deployment is unverified.
+
+## Identity cache and throttling
+
+GitHub can return 403 for throttling. The identity helper previously cached that
+as a permission denial. Recognized primary/secondary rate limits now return
+unavailable, so the API gate responds 503 without clearing cookies or running
+protected handlers. No automatic retries were added. Genuine 403/404 access
+refusals retain their existing behavior.
+
+The cache key now includes the repository as well as the token hash. Tests show
+that cached owner/denied results for one repository cannot answer another's check;
+case-only variations of the same repository still share the answer. Normal tenant
+handlers use one configured repository, so this is helper-level isolation rather
+than evidence of a demonstrated cross-tenant exploit.
+
+Seven regressions cover rate-limit formats, cache recovery and repository scope,
+and refusal through the real middleware. Contract: [GitHub rate-limit troubleshooting](https://docs.github.com/en/rest/using-the-rest-api/troubleshooting-the-rest-api).
+
+## Live deployment evidence from the preceding pass
+
+Cloudflare's production deployment listing identified code commit `6f9a7e1` as
+active at deployment `6a384c42-2017-4770-ad53-33294bea364d`. Live Chromium checks at
+390px and 1440px found a working sign-in screen, no overflow or page errors, and
+401 responses from the unauthenticated admin API. Headers retained admin no-store,
+CSP and frame restrictions; the public homepage remained cacheable. Live logout
+cleared all four auth cookies. GitHub check 114234552044 still showed in-progress
+when inspected, so its state lagged/disagreed with Cloudflare's active listing.
+These checks do not verify authenticated owner/editor writes or later deployments.
+
+Identity-pass validation: 440 Functions/script tests and 476 CMS tests passed.
+Site validation reported zero errors/warnings; public and fresh packed-tenant
+builds each generated 15 pages, and both Pages Functions bundles compiled.
+Existing build warnings remain. No live throttling or multi-repository access
+test was performed.

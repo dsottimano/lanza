@@ -38,7 +38,7 @@ change against.
 A token proves identity. Whether that identity may touch *this* site is a second,
 separate question, and both must be asked. GitHub answers both, but they are different
 calls: `GET /user` is who, `GET /repos/{owner}/{name}` → `permissions` is what
-(`functions/_lib/gh-identity.ts`, cached 60s).
+(`functions/_lib/gh-identity.ts`, cached 60s per repository and token hash).
 
 | Gate | File | Identity | Authorization |
 |---|---|---|---|
@@ -54,6 +54,9 @@ Anything that weakens the middleware hands out that token. Do not add a route un
 
 > The review found the middleware checking identity only. Any GitHub user could log in
 > and reach `/admin/api/cf/*`.
+
+Recognized GitHub rate limits (429, or 403 with rate-limit headers/message) are
+unavailable checks, never cached permission denials. Access is still refused.
 
 The 60-second cache is also the answer to revocation: removing someone's repo access
 takes effect within a minute. The session it replaced was a 7-day bearer that could not

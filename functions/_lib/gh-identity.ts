@@ -31,7 +31,7 @@ export type IdentityResult =
 
 type Fetch = typeof globalThis.fetch;
 
-// Per-isolate, 60-second cache of the answer, keyed by a hash of the access token.
+// Per-isolate, 60-second cache of the answer, keyed by repository and token hash.
 // One `GET /repos` + `GET /user` per request is a round-trip the CMS does not need
 // on every call, and 60s is the deliberate ceiling on how long a removal of access
 // keeps working — against 7 days for the session it replaces. Keyed by a HASH so
@@ -74,7 +74,7 @@ export async function identityFor(
   name: string,
   fetchImpl: Fetch = globalThis.fetch,
 ): Promise<IdentityResult> {
-  const key = await cacheKey(token);
+  const key = JSON.stringify([owner.toLowerCase(), name.toLowerCase(), await cacheKey(token)]);
   const hit = cache.get(key);
   if (hit && hit.expires > Date.now()) return hit.result;
 
@@ -104,6 +104,7 @@ async function ask(
 
   // 401 is the token, not the person: it expired or was revoked. The caller refreshes.
   if (repoRes.status === 401 || userRes.status === 401) return { status: "expired" };
+  if (await rateLimited(repoRes) || await rateLimited(userRes)) return { status: "unavailable" };
   // GitHub answers 404 — not 403 — for a private repo you cannot see, so the two mean
   // the same thing here: this account has no access.
   if (repoRes.status === 403 || repoRes.status === 404) return { status: "denied" };
@@ -123,4 +124,18 @@ async function ask(
   // omits `permissions` we must not invent a role from the absence of one.
   if (!role || typeof login !== "string" || !login) return { status: "denied" };
   return { status: "ok", identity: { login, role } };
+}
+
+// GitHub uses 403 for rate limits as well as permission refusals. Do not cache
+// throttling as a revoked permission or tell the owner to reinstall the app.
+async function rateLimited(response: Response): Promise<boolean> {
+  if (response.status === 429) return true;
+  if (response.status !== 403) return false;
+  if (response.headers.get("x-ratelimit-remaining") === "0" || response.headers.has("retry-after")) return true;
+  try {
+    const body = await response.clone().json() as { message?: unknown };
+    return typeof body?.message === "string" && /rate limit|abuse detection/i.test(body.message);
+  } catch {
+    return false;
+  }
 }
