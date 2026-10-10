@@ -16,6 +16,8 @@ export const Figure = Node.create({
   addAttributes() {
     return {
       src: { default: null },
+      pasteUploadId: { default: null, rendered: false, parseHTML: () => null },
+      pastePreview: { default: null, rendered: false, parseHTML: () => null },
       alt: { default: "" },
     };
   },

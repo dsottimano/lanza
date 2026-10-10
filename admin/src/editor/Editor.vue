@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { onMounted, provide, ref, shallowRef } from "vue";
+import { onMounted, onBeforeUnmount, provide, ref, shallowRef } from "vue";
 import { useEditor, EditorContent } from "@tiptap/vue-3";
 import type { GitHubClient } from "../backend/github";
 import { CLIENT_KEY } from "../fields/context";
@@ -21,6 +21,8 @@ import { SlashCommand, filterSlashItems, type SlashItem } from "./extensions/sla
 import { loadBlocks, blockSlashItems } from "../backend/blocks";
 import SlashMenu from "./SlashMenu.vue";
 import { safeLinkUrl } from "./url";
+import { uploadImage } from "../backend/media";
+import { pasteImage } from "./paste-image";
 
 const props = withDefaults(
   defineProps<{ initialHtml?: string; client?: GitHubClient; showInspector?: boolean }>(),
@@ -28,6 +30,21 @@ const props = withDefaults(
 );
 const emit = defineEmits<{ (e: "change"): void; (e: "invalid", message: string): void }>();
 const contentProblem = ref("");
+const pasteError = ref("");
+const pastePreviews = new Set<string>();
+onBeforeUnmount(() => { for (const url of pastePreviews) URL.revokeObjectURL(url); });
+function onPaste(event: ClipboardEvent) {
+  const instance = editor.value;
+  if (!instance || !props.client || contentProblem.value || !instance.isEditable || !instance.view.dom.contains(event.target as globalThis.Node)) return;
+  const clipboard = event.clipboardData;
+  const files = clipboard?.files?.length ? Array.from(clipboard.files) : Array.from(clipboard?.items ?? []).flatMap(item => item.kind === "file" ? [item.getAsFile()].filter((file): file is File => !!file) : []);
+  const images = files.filter(file => file.type.startsWith("image/"));
+  if (!images.length) return;
+  event.preventDefault(); event.stopPropagation(); pasteError.value = "";
+  const client = props.client;
+  void pasteImage(instance, images, event.target as globalThis.Node, file => uploadImage(client, file), url => pastePreviews.add(url))
+    .catch(error => { if (!instance.isDestroyed) pasteError.value = error instanceof Error ? error.message : "Image upload failed. Paste again to retry."; });
+}
 
 // Expose the client to node views (Figure upload). TipTap vue-3 mounts node
 // views with this component's app context, so inject() reaches them here.
@@ -208,7 +225,8 @@ function link() {
 </script>
 
 <template>
-  <div class="sheet">
+  <div class="sheet" @paste.capture="onPaste">
+    <p v-if="pasteError" role="alert" class="paste-error">{{ pasteError }}</p>
     <EditorContent :editor="editor" class="prose" />
 
     <SlashMenu
@@ -227,6 +245,7 @@ function link() {
 </template>
 
 <style scoped>
+.paste-error { color: #b42318; padding: .75rem; background: #fff1f0; border-radius: 8px; margin-bottom: 1rem; }
 .sheet {
   width: 100%;
   max-width: 100%;

@@ -9,7 +9,7 @@ const props = defineProps<NodeViewProps>();
 const client = inject(CLIENT_KEY);
 const { uploading, pick } = useImageUpload(client);
 
-const safeSrc = computed(() => safeImageUrl(props.node.attrs.src));
+const safeSrc = computed(() => props.node.attrs.pastePreview || safeImageUrl(props.node.attrs.src));
 const error = ref("");
 
 function setAlt() {
@@ -36,7 +36,7 @@ function onPick(e: Event) {
         {{ node.attrs.alt ? "Alt: " + node.attrs.alt : "+ Add alt text" }}
       </button>
     </template>
-    <div v-else class="figure-empty" contenteditable="false">
+    <div v-else class="figure-empty" contenteditable="false" tabindex="0" aria-label="Image upload. Choose a file or paste an image.">
       <span class="figure-emoji">🖼️</span>
       <div class="figure-actions">
         <label class="figure-btn" :class="{ busy: uploading }">
@@ -44,8 +44,10 @@ function onPick(e: Event) {
           <input type="file" accept="image/*" :disabled="uploading" @change="onPick" />
         </label>
       </div>
+      <small>or paste an image (Ctrl/Cmd+V)</small>
       <small v-if="error" class="figure-error">{{ error }}</small>
     </div>
+    <p v-if="node.attrs.pasteUploadId" class="figure-caption" role="status" contenteditable="false">Uploading pasted image…</p>
     <NodeViewContent class="figure-caption" as="figcaption" />
   </NodeViewWrapper>
 </template>
