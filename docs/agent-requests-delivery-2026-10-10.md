@@ -107,3 +107,23 @@ this verifies the actual clipboard/UI/upload payload without changing the user's
 article or uploading test media. Existing media backend regressions cover shared
 upload handling. Zero browser page errors. Build warnings remain the empty
 collections, large public chunk, and sibling Wrangler Astro tsconfig warning.
+
+## Image controls follow-up
+
+Package 0.1.22 (source `42e70a5`, rollout `dca87d0`) adds visible Paste image and
+Remove image controls, keyboard deletion on focused empty images, a focus ring,
+and editor focus after removal so Undo works. Paste image uses the browser's
+clipboard permission and gives an actionable fallback to Ctrl/Cmd+V if denied.
+The reported screenshot lacked the new paste hint and showed the older UI; a
+fresh production session passed clipboard testing before and after this fix.
+
+Production deployment `c1cbc537` was verified through the canonical deployment
+API and real Chrome. This time the browser made an actual successful staging
+image upload through the authenticated CMS proxy, using the supplied map; it
+also verified image decoding, filling the existing block, removal and undo.
+Article PUT requests were blocked during this check, preserving the human's
+writing. The uploaded test map remains a staged media asset. No article was
+published. Software updates were rebased onto intervening human staging edits.
+
+26 relevant regressions, CMS typecheck/build, check:site, source build, and packed
+production/staging builds passed. Previously documented build warnings remain.
