@@ -18,18 +18,23 @@ The tools use the same local editor and GitHub cookie proxy as human editing:
 | Tool | Behavior |
 | --- | --- |
 | `get_cms_context` | Current screen, repository/account/role, locale and unsaved status. Available throughout the CMS. |
-| `get_editor_context` | Open entry identity, base SHA, local revision, selected text and declared text field paths. `fieldPath` selects a value; other fields' values are not returned. |
+| `get_editor_context` | Open entry identity, base SHA, local revision, selected text and declared text field paths. `fieldPath` selects a value; `includeBody:true` includes the live rich body HTML and current text selection. Other fields' values are not returned. |
 | `focus_editor_field` | Focus a declared text field in the open editor and its preview. Returns whether focus succeeded. |
 | `propose_editor_change` | Show one text replacement for human confirmation. Require the exact current revision, then pause autosave and apply only to the local editor. Save remains explicit. |
+| `propose_editor_body_change` | Propose supported HTML for the whole visible body or current text selection. Require the exact revision (including selection), parse against the live TipTap schema without changing the document, then show readable inert before/after previews and exact HTML for explicit acceptance. Acceptance pauses autosave and remains local; normal Undo and explicit Save remain available. |
 
 The first write scope is string/text fields and existing string list items in
 entry editors. Template slot declarations come from the selected template's
 `fields.json`. Numeric list paths use the same field-path helper as the forms.
-Structural/list changes, images, rich body edits, raw template HTML, publishing
+The rich body tool is bounded to 100,000 HTML characters and retains the current
+editor schema. It rejects unsupported/active markup before opening review, so a
+refused proposal cannot damage or invalidate the existing article. Selection
+replacements preserve other paragraphs; body replacements show the whole article.
+Image uploading, structural/list metadata changes, raw template HTML, publishing
 and settings writes are not offered by these browser tools. Other CMS screens
 currently expose context only.
 
-Loading, recovery, active saves and save conflicts block editor tools. Viewers
+Loading, recovery, unsupported current body formatting, active saves and save conflicts block editor tools. Viewers
 may inspect but cannot propose. After confirmation, the tool rechecks readiness,
 permission and revision before applying. Navigation unregisters the tools and
 invalidates retained execution handles. GitHub still enforces all stored writes;
@@ -46,16 +51,22 @@ remain separate. No browser tool saves or publishes on its own.
 Use an explicitly selected synthetic/disposable entry in a private test tenant;
 do not test private thought content in this public product repository.
 
-1. Update the ChatGPT desktop app. Confirm Site tools are available for the
-   account/workspace and supported model, then open `/admin` in its built-in browser.
+1. Use the ChatGPT desktop app’s built-in browser with ChatGPT Work or Codex,
+   using GPT-5.6 Sol or GPT-6 Sol. Confirm Site tools are available for the
+   account/workspace (Enterprise needs admin policy; Edu is unsupported), then
+   open `/admin` there. An ordinary browser tab and Codex TUI session do not share this live
+   document or its unsaved values; installing a remote MCP server cannot add that
+   browser host. No live host was available in the implementation session.
 2. Sign into the tenant normally with GitHub. Inspect Available site tools in the
    browser address bar. `get_cms_context` should identify the real tenant and screen.
-3. Open an existing designed page. Ask the assistant to read a declared heading
-   with `get_editor_context`, focus it, and propose a specific replacement using
-   the returned revision.
+3. Open a post. Ask the assistant to read `get_editor_context` with
+   `includeBody:true`, then propose supported HTML using `propose_editor_body_change`
+   and the exact returned revision. Test the whole body and a selected phrase.
+   Also test a designed page heading with `propose_editor_change`.
 4. Decline first and verify the field and stored Git content stay unchanged.
-   Accept a second proposal and verify the preview changes while Git stays unchanged
-   beyond the normal autosave interval. Review the before/after confirmation.
+   Accept a second proposal and verify the article changes while Git stays unchanged
+   beyond the normal autosave interval. Inspect readable before/after and exact HTML.
+   Normal Undo should restore the article without writing Git.
 5. Save explicitly, reload, and verify the selected value renders and unrelated
    fields/body remain intact. Do not Publish as part of this connection proof.
 6. Verify that typing after context was read rejects the old proposal. Navigate
@@ -65,7 +76,7 @@ do not test private thought content in this public product repository.
 Automation covers registration lifecycle, prototype/undeclared path refusal,
 revision/permission changes during review, real-template rendering, explicit save,
 body preservation and reload. This is not proof of the desktop client's live API.
-Voice tool access is also unverified.
+Voice tool access is also unverified. A successful package/build does not prove a live account connection.
 
 ## Other connection paths
 

@@ -15,6 +15,7 @@ import SettingsHeader from "./SettingsHeader.vue";
 // not us. Losing it costs one more authorization; keeping a copy of it costs more.
 import { computed, ref } from "vue";
 import { access } from "../backend/access";
+import { codexSetupCommand } from "../backend/agent-setup";
 
 defineEmits<{ (e: "back"): void }>();
 
@@ -28,9 +29,12 @@ const expiring = ref(false);
 const ready = ref(true);
 const message = ref("");
 const copied = ref(false);
+const commandCopied = ref(false);
+const commandCopyError = ref(false);
 
 const installUrl = "https://github.com/apps/lanza-agents/installations/new";
 const mcpUrl = computed(() => `${window.location.origin}/api/mcp`);
+const setupCommand = computed(() => codexSetupCommand(mcpUrl.value, token.value, access.repo || "site"));
 
 let cancelled = false;
 
@@ -51,6 +55,8 @@ function fail(text: string) {
 async function start() {
   cancelled = false;
   copied.value = false;
+  commandCopied.value = false;
+  commandCopyError.value = false;
   token.value = "";
   message.value = "";
   try {
@@ -118,15 +124,26 @@ async function copy() {
     copied.value = false;
   }
 }
+
+async function copyCommand() {
+  commandCopyError.value = false;
+  try {
+    await navigator.clipboard.writeText(setupCommand.value);
+    commandCopied.value = true;
+  } catch {
+    commandCopied.value = false;
+    commandCopyError.value = true;
+  }
+}
 </script>
 
 <template>
   <div class="settings-page">
     <SettingsHeader title="Connect an agent" @back="$emit('back')">
       <template #description><p>
-        Let Claude, ChatGPT or another agent read and edit this site's content directly.
-        You authorize it once with your own GitHub account, then paste one token into the
-        agent's settings. Nothing else holds a key to your site.
+        Let an agent read and edit this site's content directly.
+        Authorize it with your GitHub account, then copy the setup command for Codex CLI
+        or configure an MCP client that supports bearer tokens.
       </p></template>
     </SettingsHeader>
 
@@ -201,10 +218,33 @@ async function copy() {
       <!-- Step 3: paste -->
       <section class="mb-10">
         <h2 class="mb-1 text-sm font-semibold text-zinc-900">3. Add it to your agent</h2>
+        <div v-if="step === 'done' && ready && token" class="mb-6">
+          <h3 class="mb-2 text-sm font-medium text-zinc-900">Codex CLI · macOS / Linux (Bash or Zsh)</h3>
+          <p class="mb-3 max-w-prose text-sm text-zinc-600">
+            Copy both lines into your terminal. Your token and this site's address are already included.
+            Then run <code>codex</code> in that same terminal so it can read the token.
+          </p>
+          <pre class="mb-3 overflow-x-auto rounded bg-zinc-100 px-3 py-2 text-xs text-zinc-900"><code>{{ setupCommand }}</code></pre>
+          <button class="btn btn-primary px-4" @click="copyCommand">
+            {{ commandCopied ? "Copied" : "Copy setup command" }}
+          </button>
+          <p v-if="commandCopyError" role="alert" class="mt-2 text-sm text-red-700">
+            Could not copy. Select and copy both lines above.
+          </p>
+          <p class="mt-3 max-w-prose text-sm text-zinc-500">
+            The server configuration is saved, but the token is available only in this terminal session.
+            A new terminal needs the export line again. The command contains your credential and may be saved in shell history.
+          </p>
+        </div>
         <p class="mb-3 max-w-prose text-sm text-zinc-600">
-          Add a remote MCP server with this address, and the token as a bearer token.
+          For other clients that support bearer tokens, add a remote MCP server with this address
+          and the token from step 2 as its bearer credential.
         </p>
         <p class="break-all rounded bg-zinc-100 px-3 py-2 font-mono text-xs text-zinc-900">{{ mcpUrl }}</p>
+        <p class="mt-3 max-w-prose text-sm text-zinc-500">
+          ChatGPT's web connection requires OAuth. This token setup does not connect ChatGPT;
+          OAuth support for this site is not available yet.
+        </p>
       </section>
 
       <aside class="border-l-2 border-zinc-400 bg-zinc-50 px-4 py-3">

@@ -5,6 +5,7 @@ import { useRoute, useRouter } from "vue-router";
 import Sidebar from "./ui/Sidebar.vue";
 import CollectionList from "./ui/CollectionList.vue";
 import ErrorDialog from "./ui/ErrorDialog.vue";
+import PublicationTask from "./ui/PublicationTask.vue";
 
 // Lazy: every other pane is its own chunk, split out of the entry bundle. The
 // big win is EditorView, which pulls the whole TipTap/ProseMirror stack; HelpView
@@ -335,7 +336,14 @@ function onOnboarded() {
       @help="openHelp"
     />
     <main class="min-w-0 flex-1">
-      <div v-show="!(pane === 'editRich' && focusMode)" class="flex flex-wrap justify-end gap-4 border-b border-[var(--border)] px-5 py-2 text-xs text-zinc-600" aria-label="Site links">
+      <div v-show="!(pane === 'editRich' && focusMode)" class="flex flex-wrap items-center justify-end gap-4 border-b border-[var(--border)] px-5 py-2 text-xs text-zinc-600" aria-label="Site tasks and links">
+        <PublicationTask
+          :is-owner="ownerView"
+          :count="pendingCount"
+          :check-failed="pendingCheckFailed"
+          @review="openPending"
+          @retry="retryPending"
+        />
         <a v-if="stagingOrigin" :href="stagingOrigin" target="_blank" rel="noopener noreferrer" title="Saved changes appear after the staging build finishes">View staging ↗</a>
         <a v-if="liveOrigin" :href="liveOrigin" target="_blank" rel="noopener noreferrer">View live site ↗</a>
       </div>

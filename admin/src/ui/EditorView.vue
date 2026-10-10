@@ -6,8 +6,7 @@
 //     slot fields on the left, a LIVE PREVIEW of the rendered template on the right.
 //   • Everything else (posts, plain pages, body-using templates) → the writing
 //     canvas stays the centre of gravity with a details rail beside it.
-// Shared chrome (title, the Draft⟷Ready state, Save, the "N to publish" pending
-// count) lives in the header for both.
+// Shared chrome offers Save and an explicit save-to-review publication action.
 import { publicSlug } from "../backend/site-urls";
 import { saveUrlChange } from "../backend/url-changes";
 import { isOwner } from "../backend/access";
@@ -25,7 +24,6 @@ import EntryLocaleBar from "./EntryLocaleBar.vue";
 import ChangeList from "./ChangeList.vue";
 import { useWritingPreferences } from "./writing-preferences";
 import WritingPanel from "./WritingPanel.vue";
-import { access } from "../backend/access";
 import { GitHubClient } from "../backend/github";
 import { type FolderCollection, type Field } from "../schema";
 import type { Locale } from "../backend/config";
@@ -37,8 +35,11 @@ import { stemOf, takeTranslationSeed } from "../backend/translations";
 import { reportError, clearError } from "../errors";
 import { useEntryEditor } from "./useEntryEditor";
 import { useEditorSiteTools } from "./useEditorSiteTools";
+import { bodyContext, prepareBodyProposal, type BodyTarget } from "../editor/body-proposal";
+import AgentBodyReview from "./AgentBodyReview.vue";
+import { access } from "../backend/access";
 import { useEntryReview } from "./useEntryReview";
-import { pendingCount, refreshPending } from "./staging";
+import { refreshPending } from "./staging";
 
 const props = defineProps<{
   client: GitHubClient;
@@ -69,6 +70,15 @@ const templateEditor = ref<InstanceType<typeof TemplateEditor>>();
 const siteToolsField = ref<string | null>(null);
 const siteToolsSession = crypto.randomUUID();
 const focusFormatting = ref(false);
+const bodyReview = ref<{ before: string; after: string; target: BodyTarget } | null>(null);
+let bodyReviewDecision: ((accepted: boolean) => void) | null = null;
+function finishBodyReview(accepted: boolean) {
+  const decision = bodyReviewDecision;
+  bodyReviewDecision = null;
+  bodyReview.value = null;
+  decision?.(accepted);
+}
+onUnmounted(() => finishBodyReview(false));
 onMounted(() => window.addEventListener("resize", growTitle));
 onUnmounted(() => window.removeEventListener("resize", growTitle));
 const saveLabel = computed(() => {
@@ -219,10 +229,21 @@ useEditorSiteTools({
     ? { ...field, widget: "object", fields: selectedTemplate.value?.fields ?? [] } : field),
   context: () => ({ repository: access.repo, collection: props.collection.name, locale: props.locale,
     path: currentPath.value, selectedField: siteToolsField.value, dirty: dirty.value, baseSha: getBaseSha() }),
-  revision: () => `${siteToolsSession}:${getRevision()}:${getBaseSha() ?? "new"}`,
-  ready: () => access.loaded && !editorLoading.value && !loadFailed.value && !saving.value && !recovery.value && !saveError.value,
+  revision: () => `${siteToolsSession}:${getRevision()}:${getBaseSha() ?? "new"}:${editorRef.value?.editor?.state.selection.from ?? "none"}:${editorRef.value?.editor?.state.selection.to ?? "none"}`,
+  ready: () => access.loaded && !editorLoading.value && !loadFailed.value && !saving.value && !recovery.value && !saveError.value && !editorProblem.value,
   canEdit: () => access.loaded && (access.role === "owner" || access.role === "editor"),
   pauseAutosave,
+  body: {
+    available: () => showBody.value && !!editorRef.value?.editor && !editorProblem.value,
+    context: () => bodyContext(editorRef.value!.editor!),
+    prepare: (target, html) => prepareBodyProposal(editorRef.value!.editor!, target, html),
+    focus: () => { editorRef.value?.focus(); return !!editorRef.value?.editor; },
+    review: proposal => {
+      if (bodyReviewDecision) throw new Error("Review or cancel the current body proposal first.");
+      bodyReview.value = proposal;
+      return new Promise<boolean>(resolve => { bodyReviewDecision = resolve; });
+    },
+  },
   focus: async path => {
     focusMode.value = false;
     if (path === "title") {
@@ -251,15 +272,16 @@ useEditorSiteTools({
 });
 
 // ── field grouping ──────────────────────────────────────────────────────────
-// Title + draft are in the chrome; preset + slots are the Template surface. SEO/
+// Title is in the chrome; preset + slots are the Template surface. SEO/
 // meta collapse into their own disclosure; whatever's left is "details".
-const CHROME = new Set(["title", "draft", "preset", "slots"]);
+const CHROME = new Set(["title", "preset", "slots"]);
 const SEO = new Set(["seo", "description", "featuredImage"]);
 const seoFields = computed<Field[]>(() =>
   props.collection.fields.filter((f) => SEO.has(f.name)),
 );
 const detailFields = computed<Field[]>(() =>
-  props.collection.fields.filter((f) => !CHROME.has(f.name) && !SEO.has(f.name)),
+  props.collection.fields.filter((f) => !CHROME.has(f.name) && !SEO.has(f.name))
+    .map(f => f.name === "draft" ? { ...f, label: "Keep unpublished" } : f),
 );
 
 const summaryOpen = ref(true);
@@ -275,8 +297,25 @@ const advancedSearchFields = computed(() => seoFields.value.filter(f => f.name =
 })));
 const writingDetailFields = computed(() => detailFields.value.filter(f => !["updatedDate", "template"].includes(f.name)));
 
-function goPublish() {
-  router.push("/publish");
+const preparingPublication = ref(false);
+async function reviewAndPublish() {
+  if (!isOwner() || preparingPublication.value || saving.value || editorLoading.value || loadFailed.value || recovery.value || editorProblem.value) return;
+  preparingPublication.value = true;
+  try {
+    pauseAutosave("Preparing this entry for publication review.");
+    if (props.collection.fields.some(field => field.name === "draft")) data.draft = false;
+    markDirty();
+    await save();
+    if (dirty.value) {
+      pauseAutosave("The entry changed while saving. Review your latest edits, then choose Review & publish again.");
+      return;
+    }
+    await router.push("/publish");
+  } catch (error) {
+    reportError(error, "Could not save this entry for publication review.");
+  } finally {
+    preparingPublication.value = false;
+  }
 }
 
 // ── review: what publishing this entry would change ─────────────────────────
@@ -369,6 +408,7 @@ onMounted(async () => {
 
 <template>
   <div ref="siteToolsRoot" class="writing-workspace flex min-h-screen flex-col" :class="{ 'writing-workspace--focus': focusMode && !templated && !editorLoading, 'page-editing-workspace': templated || (editorLoading && hasTemplate) }">
+    <AgentBodyReview v-if="bodyReview" v-bind="bodyReview" @decision="finishBodyReview" />
     <header class="toolbar writing-header flex flex-wrap items-center justify-between gap-3 px-5 py-3">
       <button
         class="text-sm text-zinc-600 transition hover:text-zinc-900"
@@ -387,44 +427,12 @@ onMounted(async () => {
         <button v-if="!editorLoading && !templated && !focusMode" type="button" class="btn btn-ghost"
           :aria-expanded="preferences.options" aria-controls="writing-options"
           @click="preferences.options = !preferences.options">Details</button>
-        <!-- Pending: saved-to-staging but not yet published. Click → the Publish pane. -->
-        <button
-          v-if="!editorLoading && !templated && access.role === 'owner' && pendingCount && !focusMode"
-          class="flex items-center gap-1.5 rounded-full border border-amber-300 bg-amber-50 px-2.5 py-1 text-xs font-medium text-amber-800 transition hover:bg-amber-100"
-          :title="`${pendingCount} change${pendingCount === 1 ? '' : 's'} saved to staging, not yet published`"
-          @click="goPublish"
-        >
-          <span class="size-1.5 rounded-full bg-amber-500" />
-          {{ pendingCount }} to publish
-        </button>
-
-        <!-- Draft ⟷ Ready. Off = draft (hidden from the live site); on = will go
-             public on the next publish. Saving only commits to staging, so this is
-             intent, not "live". -->
-        <label class="flex cursor-pointer items-center gap-2 text-sm">
-          <span
-            class="relative inline-flex h-5 w-9 items-center rounded-full transition-colors"
-            :class="data.draft === false ? 'bg-emerald-500' : 'bg-zinc-300'"
-          >
-            <input
-              type="checkbox"
-              class="sr-only"
-              :disabled="editorLoading || loadFailed"
-              :checked="data.draft === false"
-              @change="data.draft = !($event.target as HTMLInputElement).checked; markDirty()"
-            />
-            <span
-              class="size-4 rounded-full bg-white shadow transition-transform"
-              :class="data.draft === false ? 'translate-x-4' : 'translate-x-0.5'"
-            />
-          </span>
-          <span :class="data.draft === false ? 'font-medium text-emerald-700' : 'text-zinc-500'">
-            {{ data.draft === false ? "Ready" : "Draft" }}
-          </span>
-        </label>
-
-        <button type="button" class="btn btn-primary" :disabled="editorLoading || loadFailed || saving || !!recovery || !!editorProblem"
+        <button type="button" class="btn btn-ghost" :disabled="editorLoading || loadFailed || saving || preparingPublication || !!recovery || !!editorProblem"
           @click="saveNow">{{ saving ? "Saving…" : saveError ? "Retry save" : "Save" }}</button>
+        <button v-if="isOwner()" type="button" class="btn btn-primary"
+          :disabled="editorLoading || loadFailed || saving || preparingPublication || !!recovery || !!editorProblem"
+          title="Save this entry for publication, then review all saved site changes"
+          @click="reviewAndPublish">{{ preparingPublication ? "Preparing review…" : "Review & publish" }}</button>
       </div>
     </header>
 
