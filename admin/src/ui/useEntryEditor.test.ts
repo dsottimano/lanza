@@ -167,3 +167,41 @@ afterEach(() => { wrappers.splice(0).forEach(w => w.unmount()); vi.useRealTimers
   });
 
 });
+
+
+describe("entry deletion", () => {
+  it("blocks saves during deletion and prevents autosave resurrection afterwards", async () => {
+    let finish!: () => void;
+    const { state, client } = setup({ client: { deleteFile: vi.fn(() => new Promise<void>(resolve => { finish = resolve; })) } });
+    await flushPromises(); state.data.title = "Unsaved changes";
+    const deletion = state.deleteEntry();
+    await expect(state.save()).rejects.toThrow("deletion");
+    await expect(state.deleteEntry()).rejects.toThrow("before deleting");
+    await vi.advanceTimersByTimeAsync(3000); expect(client.saveEntry).not.toHaveBeenCalled();
+    finish(); await deletion;
+    await expect(state.save()).rejects.toThrow("before saving");
+    await vi.advanceTimersByTimeAsync(3000); expect(client.saveEntry).not.toHaveBeenCalled();
+    expect(sessionStorage.length).toBe(0);
+  });
+  it("preserves unsaved content and its original base after a refused deletion", async () => {
+    const { state, client, slug } = setup({ client: { deleteFile: vi.fn().mockRejectedValue(new GitHubError(409, "Changed elsewhere")) } });
+    await flushPromises(); slug.value = "story"; state.data.title = "Keep this writing";
+    await expect(state.deleteEntry()).rejects.toThrow("Changed elsewhere");
+    expect(state.data.title).toBe("Keep this writing"); expect(state.dirty.value).toBe(true);
+    await vi.advanceTimersByTimeAsync(3000); expect(client.saveEntry).not.toHaveBeenCalled();
+    await state.save(); expect(client.saveEntry).toHaveBeenCalledWith(PATH, expect.anything(), expect.anything(), expect.anything(), "base");
+  });
+  it("does not clear another editor's unsaved flag if navigation happens during deletion", async () => {
+    let finish!: () => void;
+    const { state, wrapper } = setup({ client: { deleteFile: vi.fn(() => new Promise<void>(resolve => { finish = resolve; })) } });
+    await flushPromises(); const deletion = state.deleteEntry();
+    wrapper.unmount(); wrappers.pop(); isDirty.value = true;
+    finish(); await deletion; expect(isDirty.value).toBe(true);
+    isDirty.value = false;
+  });
+  it("refuses a never-saved entry without a remote write", async () => {
+    const { state, client } = setup({ path: null }); await flushPromises();
+    await expect(state.deleteEntry()).rejects.toThrow("not been saved");
+    expect(client.deleteFile).not.toHaveBeenCalled();
+  });
+});

@@ -138,7 +138,7 @@ const urlLabel = computed(() => urlFrame.value
 
 // Frontmatter lives in `data`; the body is the live editor HTML, read at save.
 // `dirty`/`markDirty` are the shared unsaved-changes signal (see useEntryEditor).
-const { data, loading, loadFailed, saving, saveError, savedAt, pauseReason,
+const { data, loading, loadFailed, saving, deleting, deleteEntry, saveError, savedAt, pauseReason,
   recovery, localCopy, currentPath, save, dirty, markDirty, pauseAutosave,
   restoreRecovery, discardRecovery, getRevision, getBaseSha } = useEntryEditor(props, {
   autosave: true,
@@ -189,6 +189,24 @@ const { data, loading, loadFailed, saving, saveError, savedAt, pauseReason,
   },
 });
 
+const deleteError = ref("");
+let editorActive = true;
+onUnmounted(() => { editorActive = false; });
+const canDelete = computed(() => access.loaded && (access.role === "owner" || access.role === "editor") && !!currentPath.value);
+async function deleteCurrentEntry() {
+  if (!canDelete.value || deleting.value || saving.value || preparingPublication.value || editorLoading.value || loadFailed.value || recovery.value || bodyReview.value) return;
+  const unsaved = dirty.value ? " Your unsaved changes will also be discarded." : "";
+  if (!window.confirm(`Delete "${String(data.title || props.collection.labelSingular)}" (${props.locale})?${unsaved} This removes only this entry from drafts. The live site changes only after Review & publish.`)) return;
+  deleteError.value = "";
+  try {
+    await deleteEntry();
+    void refreshPending(props.client);
+    if (editorActive) emit("back");
+  } catch (error) {
+    deleteError.value = error instanceof Error ? error.message : "Deletion failed. Your writing is still here.";
+  }
+}
+
 const title = computed({ get: () => String(data.title ?? ""), set: (value: string) => { data.title = value; } });
 watch([() => data.title, titleInput], () => nextTick(growTitle), { flush: "post" });
 
@@ -230,7 +248,7 @@ useEditorSiteTools({
   context: () => ({ repository: access.repo, collection: props.collection.name, locale: props.locale,
     path: currentPath.value, selectedField: siteToolsField.value, dirty: dirty.value, baseSha: getBaseSha() }),
   revision: () => `${siteToolsSession}:${getRevision()}:${getBaseSha() ?? "new"}:${editorRef.value?.editor?.state.selection.from ?? "none"}:${editorRef.value?.editor?.state.selection.to ?? "none"}`,
-  ready: () => access.loaded && !editorLoading.value && !loadFailed.value && !saving.value && !recovery.value && !saveError.value && !editorProblem.value,
+  ready: () => access.loaded && !editorLoading.value && !loadFailed.value && !saving.value && !deleting.value && !recovery.value && !saveError.value && !editorProblem.value,
   canEdit: () => access.loaded && (access.role === "owner" || access.role === "editor"),
   pauseAutosave,
   body: {
@@ -299,7 +317,7 @@ const writingDetailFields = computed(() => detailFields.value.filter(f => !["upd
 
 const preparingPublication = ref(false);
 async function reviewAndPublish() {
-  if (!isOwner() || preparingPublication.value || saving.value || editorLoading.value || loadFailed.value || recovery.value || editorProblem.value) return;
+  if (!isOwner() || preparingPublication.value || saving.value || deleting.value || editorLoading.value || loadFailed.value || recovery.value || editorProblem.value) return;
   preparingPublication.value = true;
   try {
     pauseAutosave("Preparing this entry for publication review.");
@@ -412,7 +430,7 @@ onMounted(async () => {
     <header class="toolbar writing-header flex flex-wrap items-center justify-between gap-3 px-5 py-3">
       <button
         class="text-sm text-zinc-600 transition hover:text-zinc-900"
-        @click="emit('back')"
+        :disabled="deleting" @click="emit('back')"
       >
         ← {{ collection.label }}
       </button>
@@ -427,15 +445,19 @@ onMounted(async () => {
         <button v-if="!editorLoading && !templated && !focusMode" type="button" class="btn btn-ghost"
           :aria-expanded="preferences.options" aria-controls="writing-options"
           @click="preferences.options = !preferences.options">Details</button>
-        <button type="button" class="btn btn-ghost" :disabled="editorLoading || loadFailed || saving || preparingPublication || !!recovery || !!editorProblem"
+        <button v-if="canDelete" type="button" class="btn btn-ghost text-red-700"
+          :disabled="editorLoading || loadFailed || saving || deleting || preparingPublication || !!recovery || !!bodyReview"
+          @click="deleteCurrentEntry">{{ deleting ? 'Deleting…' : `Delete ${collection.labelSingular.toLowerCase()}` }}</button>
+        <button type="button" class="btn btn-ghost" :disabled="editorLoading || loadFailed || saving || deleting || preparingPublication || !!recovery || !!editorProblem"
           @click="saveNow">{{ saving ? "Saving…" : saveError ? "Retry save" : "Save" }}</button>
         <button v-if="isOwner()" type="button" class="btn btn-primary"
-          :disabled="editorLoading || loadFailed || saving || preparingPublication || !!recovery || !!editorProblem"
+          :disabled="editorLoading || loadFailed || saving || deleting || preparingPublication || !!recovery || !!editorProblem"
           title="Save this entry for publication, then review all saved site changes"
           @click="reviewAndPublish">{{ preparingPublication ? "Preparing review…" : "Review & publish" }}</button>
       </div>
     </header>
 
+    <p v-if="deleteError" class="writing-notice" role="alert">Deletion failed: {{ deleteError }} Your writing is still here.</p>
     <div v-if="recovery" class="writing-notice" role="status">
       <p>There is unfinished writing from this tab. Restore it to review and continue, or keep the saved version.</p>
       <div class="flex flex-wrap gap-2">
@@ -458,7 +480,7 @@ onMounted(async () => {
         <div class="page-loading__preview"><span>Loading {{ collection.labelSingular.toLowerCase() }}…</span></div>
       </div>
     </main>
-    <main v-else-if="templated && !loadFailed && !recovery" class="page-editor">
+    <main :inert="deleting" v-else-if="templated && !loadFailed && !recovery" class="page-editor">
       <div class="page-editor-heading">
         <div><p class="page-editor-eyebrow">Page editor</p><h1>{{ title || 'Untitled page' }}</h1><p class="page-editor-address">{{ urlPrefix }}{{ effectiveSlug }}{{ urlSuffix }}</p></div>
         <EntryLocaleBar :client="client" :collection="collection" :locale="locale" :slug="entryStem" :data="data" />
@@ -512,7 +534,7 @@ onMounted(async () => {
     </main>
 
     <!-- ── Writing canvas + details rail (posts, plain pages) ─────────────── -->
-    <main v-else-if="!loadFailed && !recovery" class="writing-main flex flex-1 justify-center px-5 pt-8 pb-24">
+    <main :inert="deleting" v-else-if="!loadFailed && !recovery" class="writing-main flex flex-1 justify-center px-5 pt-8 pb-24">
       <div class="writing-layout" :class="{ 'writing-layout--options': preferences.options && !focusMode, 'writing-layout--expanded': detailsExpanded && preferences.options && !focusMode }">
         <!-- Writing canvas -->
         <div v-show="!(detailsExpanded && preferences.options && !focusMode)" class="writing-document min-w-0">

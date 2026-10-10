@@ -39,6 +39,7 @@ export function useEntryEditor(props: EntryEditorProps, hooks: EntryEditorHooks)
   const loading = ref(true);
   const loadFailed = ref(false);
   const saving = ref(false);
+  const deleting = ref(false);
   const saveError = ref("");
   const pauseReason = ref("");
   const savedAt = ref<Date | null>(null);
@@ -178,6 +179,7 @@ export function useEntryEditor(props: EntryEditorProps, hooks: EntryEditorHooks)
   }
 
   function save(): Promise<string> {
+    if (deleting.value) return Promise.reject(new Error("Wait for deletion to finish before saving."));
     if (inFlight) return inFlight;
     clearTimeout(timer);
     inFlight = write().finally(() => {
@@ -250,7 +252,28 @@ export function useEntryEditor(props: EntryEditorProps, hooks: EntryEditorHooks)
     }
   }
 
-  return { data, loading, loadFailed, saving, saveError, savedAt, pauseReason, recovery,
+  async function deleteEntry(): Promise<void> {
+    if (!active || loading.value || loadFailed.value || saving.value || deleting.value || recovery.value) {
+      throw new Error("Finish loading, saving or recovering this entry before deleting it.");
+    }
+    if (!currentPath.value || !sha) throw new Error("This entry has not been saved yet.");
+    if (pendingRemoval) throw new Error("Resolve the incomplete rename before deleting this entry.");
+    deleting.value = true;
+    pauseAutosave("Deletion requested. If it fails, your writing stays here; Save resumes autosaving.");
+    try {
+      await props.client.deleteFile(currentPath.value, sha, `lanza: delete ${currentPath.value}`);
+      // Prevent a pending timer, later Save or unmount recovery copy from
+      // resurrecting the entry after its version-checked staging deletion.
+      tracking = false;
+      if (active) isDirty.value = false;
+      active = false;
+      discardRecovery();
+    } finally {
+      deleting.value = false;
+    }
+  }
+
+  return { data, loading, loadFailed, saving, deleting, deleteEntry, saveError, savedAt, pauseReason, recovery,
     localCopy, currentPath, save, dirty: isDirty, markDirty, pauseAutosave, restoreRecovery, discardRecovery,
     getRevision: () => revision, getBaseSha: () => sha };
 }
