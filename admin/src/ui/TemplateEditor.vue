@@ -117,29 +117,45 @@ function ensureSlots(): void {
 const sourceText = ref("");
 const sourceSha = ref<string>();
 const sourceLoading = ref(false);
+const sourceFailed = ref(false);
+const sourceSaving = ref(false);
+let sourceGeneration = 0;
+let active = true;
+onBeforeUnmount(() => { active = false; sourceGeneration++; });
 
 async function loadSource(): Promise<void> {
-  if (!data.preset) return;
+  if (!data.preset || sourceLoading.value) return;
+  const name = data.preset as string;
+  const request = ++sourceGeneration;
   sourceLoading.value = true;
+  sourceFailed.value = false;
   try {
-    const f = await props.client.loadText(templateHtmlPath(data.preset as string));
+    const f = await props.client.loadText(templateHtmlPath(name));
+    if (!active || request !== sourceGeneration) return;
     sourceText.value = f.text;
     sourceSha.value = f.sha;
   } catch (e) {
+    if (!active || request !== sourceGeneration) return;
+    sourceFailed.value = true;
     reportError(e, "Couldn't load the template HTML.");
   } finally {
-    sourceLoading.value = false;
+    if (active && request === sourceGeneration) sourceLoading.value = false;
   }
 }
 
-async function saveSource(): Promise<void> {
+async function saveSource(): Promise<boolean | void> {
+  if (!data.preset || sourceSha.value === undefined || sourceLoading.value || sourceFailed.value || sourceSaving.value) return false;
   const name = data.preset as string;
-  sourceSha.value = await props.client.saveText(
-    templateHtmlPath(name),
-    sourceText.value,
-    `Edit template ${name}`,
-    sourceSha.value,
-  );
+  const request = sourceGeneration;
+  const text = sourceText.value;
+  sourceSaving.value = true;
+  try {
+    const sha = await props.client.saveText(templateHtmlPath(name), text, `Edit template ${name}`, sourceSha.value);
+    if (!active || request !== sourceGeneration) return false;
+    sourceSha.value = sha;
+  } finally {
+    if (active && request === sourceGeneration) sourceSaving.value = false;
+  }
 }
 
 function onToggleSource(e: Event): void {
@@ -151,11 +167,15 @@ function onToggleSource(e: Event): void {
 watch(
   () => data.preset,
   () => {
+    sourceGeneration++;
+    sourceLoading.value = false;
+    sourceSaving.value = false;
+    sourceFailed.value = false;
     sourceText.value = "";
     sourceSha.value = undefined;
     ensureSlots();
   },
-  { immediate: true },
+  { immediate: true, flush: "sync" },
 );
 </script>
 
@@ -223,7 +243,7 @@ watch(
         </div>
 
         <!-- Power-user: edit the shared design HTML. -->
-        <details class="mt-4 border-t border-[var(--border)] pt-3" @toggle="onToggleSource">
+        <details :key="selected.name" class="mt-4 border-t border-[var(--border)] pt-3" @toggle="onToggleSource">
           <summary class="cursor-pointer text-xs font-semibold text-zinc-600">
             Advanced — edit template HTML
           </summary>
@@ -232,6 +252,10 @@ watch(
             Saved on its own, separate from this page.
           </p>
           <div v-if="sourceLoading" class="skeleton mt-2 h-40 w-full" />
+          <div v-else-if="sourceFailed" role="alert" class="mt-2">
+            <p class="text-sm">Template HTML could not be loaded.</p>
+            <button class="btn btn-ghost mt-2" @click="loadSource">Retry loading</button>
+          </div>
           <template v-else-if="sourceSha !== undefined">
             <textarea
               v-model="sourceText"
@@ -242,6 +266,7 @@ watch(
             <div class="mt-2 flex justify-end">
               <SaveButton
                 :action="saveSource"
+                :disabled="sourceSaving"
                 @saved="clearError"
                 @error="(e) => reportError(e, 'Template save failed.')"
               />

@@ -440,3 +440,22 @@ unsaved status remained, with no API writes or page errors. Existing warnings
 remain; production writes and deployment are unverified. Inspection also
 identified the advanced template-source editor's load/save lifecycle as requiring
 further review; this cancellation fix does not establish that editor's safety.
+
+## Advanced template source request isolation
+
+The advanced template editor previously accepted late source reads after a
+preset switch, allowing the old template's HTML and SHA into the new selection.
+Source requests now carry a generation tied to that selection and are ignored
+after switching or unmount. The disclosure resets with each template. Failed
+reads expose retry without an editable source or save action. Saves capture the
+selected file/text/version, guard concurrent invocation, and cannot apply their
+returned SHA to another template. Cancelled/superseded saves do not report success.
+
+Four regressions exercise failed read/retry, late reads, late saves, and unmount.
+All 441 Functions/script and 521 CMS tests passed. Admin typecheck/build, site
+validation (zero errors/warnings), and the 15-page public build passed. Compiled
+admin smoke checks at 1440px and 390px verified navigation/search without overflow,
+page errors, or writes. These smoke checks do not simulate template request races;
+the component tests do. Source-edit navigation/dirty warnings remain a separate
+open review item. Existing build warnings remain; live writes and deployment are
+unverified.
