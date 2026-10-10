@@ -85,6 +85,12 @@ export interface FolderCollection {
   // and the active locale (App.vue) scopes the list + new-entry path. When false/
   // omitted the collection is shared across languages (e.g. authors).
   localized?: boolean;
+  // Loaded from data/schema.json; the public route generator owns these routes.
+  route?: {
+    base: string;
+    template: string;
+    list?: { template: string; sortBy?: string; order?: "asc" | "desc"; slots?: Record<string, string | number | boolean | null> };
+  };
   fields: Field[]; // frontmatter fields (excludes the body)
 }
 

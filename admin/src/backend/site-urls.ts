@@ -13,6 +13,7 @@ import { computed, ref } from "vue";
 import type { GitHubClient } from "./github";
 import { REPO } from "./config";
 import { site } from "./site";
+import { getCollection } from "../schema";
 
 // Mirrors the broker's slug()/repoHash() budget. Kept as literals rather than shared
 // constants because the SPA and the broker are separate deployables.
@@ -95,9 +96,8 @@ export async function resolveStagingOrigin(client: GitHubClient): Promise<void> 
   }
 }
 
-// Public route per collection, mirroring frontend/pages/. A collection with no public
-// page (anything a tenant added in Settings → content types) returns null, and the
-// caller shows no link rather than a guess that 404s.
+// Built-in routes mirror frontend/pages/. Custom routes come from the same schema
+// declaration consumed by gen-routes.mjs; routeless collections have no View link.
 const ROUTES: Record<string, string> = {
   posts: "/posts/",
   pages: "/",
@@ -120,6 +120,10 @@ function localePrefix(locale: string): string {
 // and [locale]/index.astro build it, and [...slug].astro explicitly skips it), so it
 // contributes no segment — `/`, not `/home`, which does not exist.
 export function publicSlug(collection: string, slugName: string, locale: string): string {
+  const declared = getCollection(collection);
+  // The generator uses entry.id directly for shared custom collections, whereas
+  // localized custom entries pass through splitEntries and its URL mappings.
+  if (!ROUTES[collection] && declared?.kind === "folder" && declared.route && declared.localized !== true) return slugName;
   const override = site.urls[`${collection}/${locale}/${slugName}`];
   if (typeof override === "string") return override;
   return collection === "pages" && slugName === "home" ? "" : slugName;
@@ -135,10 +139,21 @@ export function entryPathFrame(
   slugName: string,
   locale: string,
 ): { prefix: string; suffix: string } | null {
-  const route = ROUTES[collection];
+  let route = ROUTES[collection];
+  let prefix = localePrefix(locale);
+  if (!route) {
+    const declared = getCollection(collection);
+    if (declared?.kind !== "folder" || !declared.route ||
+        !/^[a-z0-9]+(?:-[a-z0-9]+)*$/.test(declared.route.base) ||
+        !/^[a-z0-9]+(?:-[a-z0-9]+)*$/.test(declared.route.template)) return null;
+    if (declared.localized === true) {
+      if (!site.locales.some(language => language.code === locale)) return null;
+    } else prefix = "";
+    route = `/${declared.route.base}/`;
+  }
   if (!route) return null;
   return {
-    prefix: `${localePrefix(locale)}${route}`,
+    prefix: `${prefix}${route}`,
     // Entry paths end in a slash; the locale root already has one in its prefix.
     suffix: slugName ? "/" : "",
   };

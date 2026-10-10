@@ -245,3 +245,22 @@ Site validation reported zero errors/warnings; public and fresh packed-tenant
 builds each generated 15 pages, and both Pages Functions bundles compiled.
 Existing build warnings remain. No live throttling or multi-repository access
 test was performed.
+
+## Custom collection preview links
+
+The CMS now reads custom detail routes from the loaded schema instead of omitting
+links for every non-built-in collection. Localized routes follow the selected
+language and URL mappings; shared custom routes use their entry ID at the root,
+matching the public generator. Missing or malformed route declarations yield no
+link. This fixes navigation without adding design changes or altering content.
+
+Validation: 440 Functions/script tests and 480 CMS tests passed, including four
+new route regressions. Admin typecheck/build, site validation (zero errors or
+warnings), and the 15-page public build passed. A temporary packed tenant with
+localized and shared event collections built 23 pages. Chromium loaded the
+compiled admin with mocked read-only API data and verified both preview URLs
+against the generated files, with no page errors or writes. The first temporary
+fixture used an invalid hyphenated collection identifier; correcting that fixture
+to an underscore identifier allowed the build to pass. Existing empty-collection
+and large-chunk build warnings remain. Authenticated production writes and this
+commit's deployment are not verified.
