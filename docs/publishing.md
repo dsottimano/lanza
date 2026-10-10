@@ -44,6 +44,16 @@ The first code/content commit was `1bfafeb`; the publishing safeguards are in
    after preflight cannot be overwritten. Draft changes arriving after preflight are
    not included: the request targets a commit, not the moving staging branch.
 
+Software version changes also stay on staging until the owner opens Review &
+publish. Updating software no longer publishes unrelated drafts as a side effect.
+The client requires an explicit review object to publish; it cannot silently
+capture a new, unseen review when called.
+
+The CMS refuses malformed comparisons and comparisons at GitHub's 300-file limit,
+where completeness cannot be established. The review stays unavailable and the
+error asks for a complete local Git review. The same guard protects theme-revert
+conflict checks and prevents pending counts from treating a partial list as total.
+
 The implementation is in `admin/src/backend/github.ts` and `PublishView.vue`.
 Tests cover immutable review/publish targets, stale tips, a production race after
 preflight, duplicate clicks, divergence, conflict handling, and failed refreshes.

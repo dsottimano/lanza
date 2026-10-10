@@ -5,14 +5,13 @@ import SettingsHeader from "./SettingsHeader.vue";
 // version in the tenant's package.json (see backend/version.ts) — this pane reads
 // it, compares against the npm registry, and writes a new pin.
 //
-// Applying stages the bump like any other edit and then publishes, because it's
-// the merge into production that makes Cloudflare rebuild onto the new code. Any
-// other unpublished work rides along, so that is stated before the click, not after.
+// Updates are staged. The existing publish screen reviews the complete draft
+// before changing production.
 import { ref, computed, onMounted } from "vue";
 import { GitHubClient } from "../backend/github";
-import { REPO } from "../backend/config";
 import {
   loadVersionState,
+  versionState,
   setPinnedVersion,
   updateAvailable,
   unpublishedSource,
@@ -20,7 +19,6 @@ import {
   compareVersions,
   strandsOwner,
   isUnsafeVersion,
-  loadForcedUpdate,
   type VersionState,
 } from "../backend/version";
 import { reportError, clearError } from "../errors";
@@ -33,8 +31,7 @@ const loading = ref(true);
 const busy = ref<string | null>(null); // version currently being applied
 const doneMsg = ref<string | null>(null);
 const state = ref<VersionState | null>(null);
-const otherPending = ref(0);
-const forced = ref<{ version: string; date: string | null } | null>(null);
+const loadFailed = ref(false);
 
 const current = computed(() => state.value?.staged ?? state.value?.live ?? null);
 // This repo IS lanza-site (the release source), so it follows no pin. Not the same
@@ -50,12 +47,13 @@ const stagedOnly = computed(
 
 async function refresh() {
   loading.value = true;
+  loadFailed.value = false;
   try {
     state.value = await loadVersionState(props.client);
-    forced.value = await loadForcedUpdate(props.client, state.value.live);
-    const diff = await props.client.compare(REPO.productionBranch, REPO.branch);
-    otherPending.value = (diff.files ?? []).filter((f) => f.filename !== "package.json").length;
+    versionState.value = state.value;
   } catch (e) {
+    loadFailed.value = true;
+    state.value = null;
     reportError(e, "Couldn't check the software version.");
   } finally {
     loading.value = false;
@@ -63,7 +61,7 @@ async function refresh() {
 }
 
 async function apply(version: string) {
-  if (busy.value) return;
+  if (busy.value || loading.value || loadFailed.value || !state.value) return;
   // Belt and braces: the button for an unsafe version isn't rendered, so reaching
   // here means something else called it. Refuse rather than write a known-bad pin.
   if (state.value && isUnsafeVersion(version, state.value)) return;
@@ -84,8 +82,7 @@ async function apply(version: string) {
   clearError();
   try {
     await setPinnedVersion(props.client, version);
-    await props.client.publish(`lanza: update to ${version}`);
-    doneMsg.value = `Now on ${version}. Cloudflare is rebuilding your site — it goes live in a minute or two.`;
+    doneMsg.value = `Version ${version} is saved to drafts. Review and publish to apply it to your site.`;
     await refresh();
     await refreshPending(props.client);
   } catch (e) {
@@ -114,10 +111,10 @@ onMounted(refresh);
         <button
           v-if="hasUpdate && state?.registry"
           class="btn btn-primary"
-          :disabled="!!busy"
+          :disabled="!!busy || loading || loadFailed"
           @click="apply(state.registry.latest)"
         >
-          {{ busy ? "Updating…" : `Update to ${state.registry.latest}` }}
+          {{ busy ? "Updating…" : `Stage ${state.registry.latest}` }}
         </button>
       </template>
       <template #description><p>
@@ -131,20 +128,12 @@ onMounted(refresh);
         {{ doneMsg }}
       </p>
 
-      <!-- A change the owner didn't make needs explaining, or their site silently
-           differs from what they chose. -->
-      <div v-if="forced" class="card mb-4 border-red-200 bg-red-50 p-6">
-        <p class="mb-1 text-sm font-medium text-red-900">
-          We updated your site to {{ forced.version }}{{ forced.date ? ` on ${when(forced.date)}` : "" }}
-        </p>
-        <p class="text-sm text-red-800">
-          The version you were running was found to be unsafe, so it was replaced for you —
-          this is the only kind of change we make without asking. Your content was not
-          touched, and you can still move to a newer version whenever you like.
-        </p>
-      </div>
-
       <p v-if="loading" class="text-sm text-zinc-500">Checking your version…</p>
+
+      <p v-else-if="loadFailed" role="alert" class="text-sm text-red-700">
+        Couldn’t check the software version.
+        <button class="btn btn-ghost" @click="refresh">Try again</button>
+      </p>
 
       <!-- This repo IS lanza-site. Checked before `unmanaged`, which it would
            otherwise match: a source repo holds no pin either. -->
@@ -182,8 +171,9 @@ onMounted(refresh);
       </div>
 
       <template v-else>
+        <a v-if="stagedOnly" href="#/publish" class="btn btn-primary mb-4">Review &amp; publish</a>
         <div class="card mb-4 p-6">
-          <p class="text-sm text-zinc-600">This site runs</p>
+          <p class="text-sm text-zinc-600">{{ stagedOnly ? "Version selected for drafts" : "Published version" }}</p>
           <p class="font-mono text-2xl text-zinc-900">{{ current ?? "unknown" }}</p>
 
           <p v-if="stagedOnly" class="mt-3 text-sm text-amber-700">
@@ -203,7 +193,7 @@ onMounted(refresh);
           <p class="mb-1 text-sm font-medium text-red-900">A security update is available</p>
           <p class="text-sm text-red-800">
             Your version is older than the oldest one still considered safe. Update as soon as you
-            can — this is the one case where we may update your site for you.
+            can. Publishing stays blocked while the selected version is below the security floor.
           </p>
         </div>
 
@@ -212,12 +202,7 @@ onMounted(refresh);
             Version {{ state?.registry?.latest }} is available
           </p>
           <p class="text-sm text-zinc-600">
-            Updating publishes your site, so
-            <template v-if="otherPending">
-              your {{ otherPending }} other unpublished
-              {{ otherPending === 1 ? "change goes" : "changes go" }} live too.
-            </template>
-            <template v-else>your site rebuilds on the new code.</template>
+            Updating saves the version to drafts. Review all pending changes before publishing.
           </p>
         </div>
 
@@ -231,9 +216,8 @@ onMounted(refresh);
             >
               <span class="w-20 flex-shrink-0 font-mono text-xs text-zinc-900">{{ r.version }}</span>
               <span class="flex-1 text-xs text-zinc-500">{{ when(r.date) }}</span>
-              <span v-if="r.version === current" class="text-xs text-zinc-500">in use</span>
-              <!-- Below the safe floor: no button at all. Offering "go back" to a
-                   version we just force-updated someone off would undo the rescue. -->
+              <span v-if="r.version === current" class="text-xs text-zinc-500">selected</span>
+              <!-- Never offer a version below the declared security floor. -->
               <span
                 v-else-if="state && isUnsafeVersion(r.version, state)"
                 class="text-xs text-red-700"
@@ -244,15 +228,15 @@ onMounted(refresh);
               <button
                 v-else
                 class="btn btn-ghost text-xs"
-                :disabled="!!busy"
+                :disabled="!!busy || loading || loadFailed"
                 @click="apply(r.version)"
               >
                 {{
                   busy === r.version
                     ? "Switching…"
                     : compareVersions(r.version, current ?? "0.0.0") > 0
-                      ? "Update"
-                      : "Go back to this"
+                      ? "Stage update"
+                      : "Stage this version"
                 }}
               </button>
             </li>

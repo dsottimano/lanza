@@ -28,7 +28,7 @@ it.each(['staging','production'])('refuses a stale %s review without writing',as
 });
 it('requires reconciliation when both branches changed',async()=>{
   const fetcher=mockApi();
-  await expect(new GitHubClient().publish('publish',{...review,diff:{status:'diverged'}})).rejects.toMatchObject({code:'diverged'});
+  await expect(new GitHubClient().publish('publish',{...review,diff:{status:'diverged',files:[]}})).rejects.toMatchObject({code:'diverged'});
   expect(fetcher.mock.calls.some(([,init])=>init?.method==='POST')).toBe(false);
 });
 it('updates drafts using a normal merge without publishing or force-resetting',async()=>{
@@ -55,4 +55,24 @@ it('refuses a production race after preflight without forcing or retrying the wr
   await expect(new GitHubClient().publish('publish',review)).rejects.toMatchObject({code:'stale'});
   const writes=fetcher.mock.calls.filter(([,init])=>init?.method==='PATCH');expect(writes).toHaveLength(1);
   expect(JSON.parse(writes[0]![1]!.body as string).force).toBe(false);
+});
+it.each([null, {}, {status:'ahead'}, {status:'ahead',files:[null]}, {status:'unknown',files:[]}])('refuses malformed comparisons rather than reporting zero changes: %j',async diff=>{
+  vi.stubGlobal('fetch',vi.fn(async()=>Response.json(diff)));
+  await expect(new GitHubClient().compare('main','staging')).rejects.toMatchObject({code:'incomplete'});
+});
+it('refuses the comparison file limit before it can become a partial review or a write',async()=>{
+  const diff={status:'ahead',files:Array.from({length:300},(_,i)=>({filename:`${i}.md`,status:'modified'}))};
+  const fetcher=mockApi();const normal=fetcher.getMockImplementation()!;
+  fetcher.mockImplementation(async(url,init)=>url.includes('/compare/')?Response.json(diff):normal(url,init));
+  const client=new GitHubClient();
+  await expect(client.publishReview()).rejects.toMatchObject({code:'incomplete'});
+  await expect(client.publish('publish',{...review,diff})).rejects.toMatchObject({code:'incomplete'});
+  expect(fetcher.mock.calls.every(([,init])=>!init?.method || init.method==='GET')).toBe(true);
+});
+it('requires an explicit review instead of capturing an unseen snapshot at publish time',async()=>{
+  const fetcher=mockApi();
+  // Runtime callers also fail closed, not only TypeScript callers.
+  // @ts-expect-error review intentionally omitted
+  await expect(new GitHubClient().publish('publish')).rejects.toMatchObject({code:'stale'});
+  expect(fetcher).not.toHaveBeenCalled();
 });

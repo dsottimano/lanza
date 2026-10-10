@@ -59,7 +59,7 @@ build and Git push do not establish Cloudflare deployment success.
 This pass does not complete the original request for a full code/security review
 of every admin surface. In particular, authenticated production owner/editor flows,
 concurrent production publishing, deployment completion tracking,
-CMS large compare/commit-list completeness, custom collection URL helpers, recipe
+large-commit file pagination for theme reverts, custom collection URL helpers, recipe
 atomicity, session-refresh races and the rest of the settings/editor interactions
 still need current-state review and verification. Prior reports are evidence to
 recheck, not proof these areas are either vulnerable or already safe. No production
@@ -89,3 +89,28 @@ listed above remain. No live GitHub mutations were used in the regression tests.
 A fresh tenant installed the packed package, built all 15 pages, and compiled its
 copied Pages Functions successfully. This was local package validation, not an
 npm release or a deployment verification.
+
+## CMS publishing follow-up
+
+- Refused malformed comparisons and potentially truncated 300-file lists across
+  CMS publishing, pending counts and theme-revert conflict checks. Large reviews
+  currently require a complete local Git review; the CMS cannot paginate past
+  GitHub's comparison file limit.
+- Required an explicit review snapshot for every CMS publish call.
+- Software updates now save to staging and link to Review & publish. They do not
+  publish other drafts, claim the selected version is live, or advertise the
+  retired automatic security-update service. Failed version checks show retry
+  instead of claiming the current version is latest. Refreshing the selected
+  version also refreshes the publishing security-floor state.
+
+The single-commit file list used by theme reverts still needs a separate
+pagination review. These comparison safeguards do not prove that list complete.
+
+Validation: 413 Functions/script tests and 455 CMS tests passed. Admin typecheck
+and build, site validation (zero errors/warnings), and the 15-page public build
+passed. The existing public empty-collection and animation chunk warnings remain.
+Chromium exercised the compiled admin with synthetic tenant data: selecting a
+version issued only a simulated staging package write, linked to the publish
+review, and refused a 300-file review with the explanatory error and disabled
+publish button. All API writes were intercepted; no production data was changed
+by browser testing. No browser page errors occurred. Deployment remains unverified.

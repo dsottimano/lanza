@@ -473,8 +473,9 @@ export class GitHubClient {
     });
   }
 
-  async publish(_message: string, reviewed?: PublishReview): Promise<{ merged: boolean }> {
-    const review = reviewed ?? await this.publishReview();
+  async publish(_message: string, review: PublishReview): Promise<{ merged: boolean }> {
+    if (!review) throw new PublishReviewError('stale', 'Review the changes before publishing.');
+    assertCompleteComparison(review.diff);
     await this.requireReviewedHeads(review);
     if (review.diff.status === 'diverged') {
       throw new PublishReviewError('diverged', 'The live site changed separately from your drafts. Update drafts and review the combined changes before publishing.');
@@ -544,9 +545,11 @@ export class GitHubClient {
 
   /** Diff base…head. `status` tells us whether base is an ancestor of head. */
   async compare(base: string, head: string): Promise<CompareResult> {
-    return (await this.req(
+    const result = (await this.req(
       `/compare/${base}...${head}`,
     )) as CompareResult;
+    assertCompleteComparison(result);
+    return result;
   }
 
   /** Read a tree; recursive lists every blob path under it. */
@@ -594,6 +597,20 @@ export interface CompareResult {
   files?: { filename: string; status: string }[];
 }
 
+// GitHub caps comparison files at 300; commit pagination cannot recover the rest.
+// Every consumer (publishing, pending counts and theme reverts) needs a complete
+// list. Refuse rather than present partial information as a successful review.
+function assertCompleteComparison(result: CompareResult): void {
+  if (!result || !['ahead', 'behind', 'diverged', 'identical'].includes(result.status) ||
+      !Array.isArray(result.files) || result.files.some(file => !file ||
+        typeof file.filename !== 'string' || typeof file.status !== 'string')) {
+    throw new PublishReviewError('incomplete', 'Could not read the complete changes. Check again before continuing.');
+  }
+  if (result.files.length >= 300) {
+    throw new PublishReviewError('incomplete', 'GitHub may have omitted changes from this large review. Ask your agent to review the complete changes in a local Git checkout before publishing or reverting. Nothing was changed.');
+  }
+}
+
 export interface TreeResult {
   sha: string;
   tree: { path: string; type: string; sha: string; mode: string }[];
@@ -609,5 +626,5 @@ export interface BlobResult {
 export interface PublishHeads { productionSha: string; stagingSha: string; }
 export interface PublishReview extends PublishHeads { diff: CompareResult; }
 export class PublishReviewError extends Error {
-  constructor(public code: 'stale' | 'diverged', message: string) { super(message); }
+  constructor(public code: 'stale' | 'diverged' | 'incomplete', message: string) { super(message); }
 }

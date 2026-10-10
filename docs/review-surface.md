@@ -15,7 +15,9 @@ See [Publishing and reconciliation](publishing.md). The CMS review captures both
 branch tips, and Publish targets that exact staging commit with a fast-forward-only
 production update. Changed tips require a new review; divergent branches require
 Update drafts first. This is separate from field preview/revert behavior below.
-MCP publishing has not yet adopted this contract.
+MCP publishing uses the same reviewed-commit contract. The CMS refuses malformed
+or potentially truncated comparison lists rather than presenting a partial review
+as complete. Software updates are staged and use the existing review screen.
 
 ## Why this exists
 
