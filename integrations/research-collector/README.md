@@ -1,5 +1,9 @@
 # Private research collector
 
+For the **agent-callable deterministic Article 1 refresh CLI**, versioned manifest,
+private evidence reports and guarded local article-block updates, see
+[REFRESH.md](REFRESH.md). This README describes the separately deployable Worker.
+
 A portable, tenant-owned Lanza capability: a Cloudflare Worker collects selected
 public source pages or APIs into the owner's **private** GitHub repository. Copy
 this directory into that repository. There is no marketplace/plugin loader or CMS
