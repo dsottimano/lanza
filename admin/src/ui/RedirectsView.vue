@@ -120,7 +120,7 @@ async function save() {
     const ok = confirm(
       `${n} invalid rule${n === 1 ? "" : "s"} will be ignored by the build — save anyway?`,
     );
-    if (!ok) return;
+    if (!ok) return false;
   }
   // Persist trimmed, non-blank rows in order. Trimming matches what the editor
   // validated and what gen-redirects will accept.

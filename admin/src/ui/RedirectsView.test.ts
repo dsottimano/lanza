@@ -11,7 +11,7 @@ function fixture(loadJson = vi.fn().mockResolvedValue({ data: original, sha: "ol
  const w = mount(RedirectsView, { props: { client: { loadJson, saveJson } as unknown as GitHubClient } });
  return { w, saveJson, save: () => w.findComponent(SaveButton).props("action")() };
 }
-afterEach(() => { isDirty.value = false; vi.clearAllMocks(); });
+afterEach(() => { isDirty.value = false; vi.clearAllMocks(); vi.restoreAllMocks(); vi.unstubAllGlobals(); });
 it.each([new Error("offline"), null, { redirects: "broken" }])("blocks failed or malformed reads and supports retry", async failure => {
  const load = vi.fn();
  if (failure instanceof Error) load.mockRejectedValueOnce(failure); else load.mockResolvedValueOnce({ data: failure, sha: "bad" });
@@ -43,4 +43,17 @@ it("preserves the new editor's dirty state when a save completes after unmount",
  let finish!: (sha: string) => void;
  const f = fixture(undefined, vi.fn().mockReturnValue(new Promise<string>(resolve => { finish = resolve; }))); await flushPromises();
  const saving = f.save(); f.w.unmount(); isDirty.value = true; finish("saved"); await saving; expect(isDirty.value).toBe(true);
+});
+
+it("returns to Save without a success event when invalid-rule confirmation is cancelled", async () => {
+ const f=fixture();await flushPromises();await f.w.get('input[placeholder="/old-path"]').setValue('invalid');
+ vi.stubGlobal('confirm', vi.fn().mockReturnValue(false));
+ const button=f.w.findComponent(SaveButton);await button.get('button').trigger('click');await flushPromises();
+ expect(f.saveJson).not.toHaveBeenCalled();expect(button.text()).toBe('Save');expect(button.emitted('saved')).toBeUndefined();expect(isDirty.value).toBe(true);f.w.unmount();
+});
+it("can save after an earlier cancellation when the user confirms",async()=>{
+ const f=fixture();await flushPromises();await f.w.get('input[placeholder="/old-path"]').setValue('invalid');
+ const confirm=vi.fn().mockReturnValueOnce(false).mockReturnValueOnce(true); vi.stubGlobal('confirm', confirm);
+ const button=f.w.findComponent(SaveButton);await button.get('button').trigger('click');await flushPromises();await button.get('button').trigger('click');await flushPromises();
+ expect(confirm).toHaveBeenCalledTimes(2);expect(f.saveJson).toHaveBeenCalledTimes(1);expect(button.emitted('saved')).toHaveLength(1);f.w.unmount();
 });

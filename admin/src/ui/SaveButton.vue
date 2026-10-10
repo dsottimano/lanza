@@ -5,7 +5,7 @@
 // failure, and listens for `saved` / `error` to update its own status line.
 import { computed, onBeforeUnmount, ref } from "vue";
 
-// `action` may resolve to anything (e.g. the saved path) — the button ignores it.
+// Resolve false when the user cancels. Other resolved values mean success.
 const props = defineProps<{ action: () => Promise<unknown>; disabled?: boolean; label?: string }>();
 const emit = defineEmits<{
   (e: "saved"): void;
@@ -22,8 +22,9 @@ async function run() {
   clearTimeout(revertTimer);
   state.value = "saving";
   try {
-    await props.action();
+    const result = await props.action();
     if (!active) return;
+    if (result === false) { state.value = "idle"; return; }
     state.value = "saved";
     emit("saved");
     revertTimer = setTimeout(() => (state.value = "idle"), 1800);

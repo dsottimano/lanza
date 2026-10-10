@@ -423,3 +423,20 @@ session-refresh concurrency, starter/recipe installation atomicity, remaining
 editor/media interactions, and confirmation cancellation/accessibility. The
 current UI file inventory and these passing suites are an index for continued
 review, not proof that every control or security invariant is covered.
+
+## Save confirmation cancellation
+
+Cancelling the invalid-redirect confirmation previously resolved its save action
+normally, so SaveButton displayed Saved and emitted success despite no write.
+Save actions can now resolve false to signal cancellation. Redirects uses that
+result; the button returns to idle without emitting saved/error, and local edits
+remain dirty. A subsequent confirmed save still succeeds.
+
+Two regressions cover cancellation and a later confirmed save. All 441
+Functions/script and 517 CMS tests passed. Admin typecheck/build, site validation
+(zero errors/warnings), and the 15-page public build passed. Chromium dismissed
+the native confirmation in the compiled redirects panel and verified Save plus
+unsaved status remained, with no API writes or page errors. Existing warnings
+remain; production writes and deployment are unverified. Inspection also
+identified the advanced template-source editor's load/save lifecycle as requiring
+further review; this cancellation fix does not establish that editor's safety.
