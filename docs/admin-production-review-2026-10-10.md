@@ -481,3 +481,28 @@ mounted the actual Vue template editor through Vite with synthetic client method
 and verified page-save independence, native confirmation cancellation, and source
 save clearing its own warning. No actual API writes or page errors occurred.
 Existing build warnings remain; live writes and deployment are unverified.
+
+## Starter installation outcome reporting and transaction review
+
+Reviewed prepareStarter/installStarter and the shared planner against the current
+transaction helper. Preparation pins all reads to one working head, refuses a
+truncated tree, and carries loaded file SHAs. Installation requires owner access
+and submits the complete plan through commitChecked once. The planner refuses
+existing create targets, collection/route/URL collisions and unreadable update
+targets, and preserves an existing homepage. Existing backend and renderer
+regressions passed; this is code/test evidence, not a live installation.
+
+The UI previously caught post-commit refresh failures as installation failures.
+It now reports a completed install separately from an editor refresh failure.
+Uncertain commit outcomes clear the reviewed plan and tell the user to check
+staging before preparing again. Prepare/install guard duplicate invocation;
+completion after unmount cannot reuse the discarded component's plan.
+
+Three new UI regressions cover successful commit plus failed refresh, uncertain
+commit failure, and duplicate installation attempts. All 441 Functions/script
+and 527 CMS tests passed. Admin typecheck/build, site validation (zero errors or
+warnings), and the 15-page public build passed. Chromium verified the compiled
+picker and mobile preview with its empty sandbox permission set, without page
+errors or writes. CLI recipe filesystem application remains a separate review
+item. Existing build warnings remain; production installation and deployment are
+unverified.

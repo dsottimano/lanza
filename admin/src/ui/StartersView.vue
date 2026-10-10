@@ -1,7 +1,7 @@
 <script setup lang="ts">
 import SettingsHeader from "./SettingsHeader.vue";
 defineEmits<{ (e: "back"): void }>();
-import { computed, ref, shallowRef, watch } from 'vue';
+import { computed, onBeforeUnmount, ref, shallowRef, watch } from 'vue';
 import { render } from '../../../frontend/lib/template-render';
 import { resolveBrand } from '../../../frontend/lib/appearance';
 import { STARTERS } from '../../../recipes/catalog.mjs';
@@ -31,27 +31,42 @@ const preview = computed(() => {
   return `<!doctype html><html><head><meta name="viewport" content="width=device-width,initial-scale=1">${brand.fontHref ? `<link rel="stylesheet" href="${brand.fontHref}">` : ''}<style>body{margin:0;${brand.styleVars};background:var(--bg)}*{box-sizing:border-box}</style></head><body>${render(starter.templates[template].html, data)}</body></html>`;
 });
 watch(selected, () => { if (!current.value.looks.some(s => s.id === look.value)) look.value = current.value.looks[0].id; });
+let active = true;
+onBeforeUnmount(() => { active = false; });
 const busy = ref(false);
 const error = ref('');
 const success = ref('');
 const plan = shallowRef<Awaited<ReturnType<typeof prepareStarter>> | null>(null);
 watch([selected, look, locale, samples], () => { plan.value = null; error.value = ''; success.value = ''; });
 async function prepare() {
+  if (busy.value) return;
   busy.value = true; error.value = ''; success.value = ''; plan.value = null;
-  try { plan.value = await prepareStarter(props.client, { id: selected.value, look: look.value, locale: locale.value, includeSamples: samples.value }); }
-  catch (err) { error.value = err instanceof Error ? err.message : 'Could not prepare this starter.'; }
+  try { const prepared = await prepareStarter(props.client, { id: selected.value, look: look.value, locale: locale.value, includeSamples: samples.value }); if (active) plan.value = prepared; }
+  catch (err) { if (active) error.value = err instanceof Error ? err.message : 'Could not prepare this starter.'; }
   finally { busy.value = false; }
 }
 async function install() {
-  if (!plan.value) return;
-  busy.value = true; error.value = '';
+  if (!plan.value || busy.value) return;
+  const reviewed = plan.value;
+  busy.value = true; error.value = ''; success.value = '';
   try {
-    await installStarter(props.client, plan.value);
-    success.value = `${plan.value.label} installed to staging. Edit its content, preview the site, then publish when ready.`;
-    plan.value = null;
+    await installStarter(props.client, reviewed);
+  } catch (err) {
+    if (active) {
+      error.value = (err instanceof Error ? err.message : 'Installation could not be confirmed.') + ' Check staging before preparing another installation.';
+      plan.value = null;
+    }
+    busy.value = false;
+    return;
+  }
+  if (!active) return;
+  success.value = `${reviewed.label} installed to staging. Edit its content, preview the site, then publish when ready.`;
+  plan.value = null;
+  try {
     await loadSchema(props.client); await refreshPending(props.client);
-  } catch (err) { error.value = err instanceof Error ? err.message : 'Installation failed.'; plan.value = null; }
-  finally { busy.value = false; }
+  } catch {
+    if (active) error.value = 'The starter was installed, but the editor could not refresh. Reload the admin to see the updated content types.';
+  } finally { busy.value = false; }
 }
 </script>
 <template>
