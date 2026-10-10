@@ -10,6 +10,35 @@ const props = defineProps<{ editor?: Editor; path: string | null; enabled: boole
 const emit = defineEmits<{ busy: [value: boolean] }>();
 const open = ref(false);
 const selectedText = ref("");
+const selectionMenu = ref<HTMLElement>();
+const menuPosition = ref<{ left: string; top: string; visibility: "visible" | "hidden" }>({ left: "0px", top: "0px", visibility: "hidden" });
+let positioningFrame = 0;
+function positionSelectionMenu() {
+  const editor = props.editor;
+  const menu = selectionMenu.value;
+  if (!editor || editor.isDestroyed || !menu || editor.state.selection.empty) return;
+  try {
+    const selection = editor.view.dom.ownerDocument.getSelection();
+    if (!selection?.rangeCount || !editor.view.dom.contains(selection.anchorNode) || !editor.view.dom.contains(selection.focusNode)) return;
+    const rect = selection.getRangeAt(0).getBoundingClientRect();
+    const viewport = window.visualViewport;
+    const leftEdge = (viewport?.offsetLeft ?? 0) + 12;
+    const topEdge = (viewport?.offsetTop ?? 0) + 12;
+    const rightEdge = leftEdge + (viewport?.width ?? window.innerWidth) - 24;
+    const bottomEdge = topEdge + (viewport?.height ?? window.innerHeight) - 24;
+    if (rect.bottom < topEdge || rect.top > bottomEdge) { menuPosition.value.visibility = "hidden"; return; }
+    const size = menu.getBoundingClientRect();
+    const left = Math.max(leftEdge, Math.min(rect.left, rightEdge - size.width));
+    const below = rect.bottom + 12;
+    const top = below + size.height <= bottomEdge ? below : Math.max(topEdge, rect.top - size.height - 12);
+    menuPosition.value = { left: `${left}px`, top: `${top}px`, visibility: "visible" };
+  } catch { menuPosition.value.visibility = "hidden"; }
+}
+function scheduleMenuPosition() {
+  cancelAnimationFrame(positioningFrame);
+  positioningFrame = requestAnimationFrame(positionSelectionMenu);
+}
+watch(selectionMenu, () => { void nextTick(scheduleMenuPosition); });
 const requests = ref<SavedRequest[]>([]);
 const truncated = ref(false);
 const nextCursor = ref<string | null>(null);
@@ -39,6 +68,7 @@ function updateSelection() {
   const selection = editor.state.selection;
   selectedText.value = selection instanceof TextSelection && !selection.empty
     ? editor.state.doc.textBetween(selection.from, selection.to, "\n") : "";
+  void nextTick(scheduleMenuPosition);
 }
 watch(() => props.editor, (editor, previous) => {
   previous?.off("selectionUpdate", updateSelection); previous?.off("update", updateSelection);
@@ -78,9 +108,20 @@ watch([available, () => props.path], () => {
   if (available.value) void refresh(); updatePolling();
 }, { immediate: true });
 watch(open, updatePolling);
-onMounted(() => document.addEventListener("visibilitychange", updatePolling));
+onMounted(() => {
+  document.addEventListener("visibilitychange", updatePolling);
+  window.addEventListener("scroll", scheduleMenuPosition, true);
+  window.addEventListener("resize", scheduleMenuPosition);
+  window.visualViewport?.addEventListener("resize", scheduleMenuPosition);
+  window.visualViewport?.addEventListener("scroll", scheduleMenuPosition);
+});
 onBeforeUnmount(() => {
   alive = false; generation++; controller?.abort(); if (poll) clearInterval(poll);
+  cancelAnimationFrame(positioningFrame);
+  window.removeEventListener("scroll", scheduleMenuPosition, true);
+  window.removeEventListener("resize", scheduleMenuPosition);
+  window.visualViewport?.removeEventListener("resize", scheduleMenuPosition);
+  window.visualViewport?.removeEventListener("scroll", scheduleMenuPosition);
   props.editor?.off("selectionUpdate", updateSelection); props.editor?.off("update", updateSelection);
   document.removeEventListener("visibilitychange", updatePolling); dialog.value?.close(); emit("busy", false);
 });
@@ -146,7 +187,7 @@ async function copy(saved: SavedRequest) {
       <span v-if="!path" class="request-hint">Save your draft to attach a request.</span>
       <span v-else class="request-hint">Select text to ask your agent.</span>
     </div>
-    <div v-if="available && selectedText.trim() && !pending" class="selection-requests" role="toolbar" aria-label="Ask your agent about selected text">
+    <div v-if="available && selectedText.trim() && !pending" ref="selectionMenu" class="selection-requests" :style="menuPosition" role="toolbar" aria-label="Ask your agent about selected text">
       <span class="sr-only">Selected: {{ selectedText.slice(0, 160) }}</span>
       <button v-for="(label, action) in requestActions" :key="action" type="button" class="btn btn-ghost" :disabled="locked || working || capturing"
         @pointerdown.prevent @click="beginRequest(action)">{{ label }}</button>
@@ -188,6 +229,6 @@ async function copy(saved: SavedRequest) {
 </template>
 
 <style scoped>
-.request-heading,.request-actions{display:flex;align-items:center;gap:.5rem;justify-content:space-between;flex-wrap:wrap}.request-heading{margin-bottom:.7rem}.request-heading h2,.request-heading h3,.request-response h4{font-weight:600}.request-hint{font-size:.8rem;color:var(--ink-soft);line-height:1.5}.selection-requests{position:fixed;bottom:1rem;left:50%;transform:translateX(-50%);z-index:40;display:flex;flex-wrap:wrap;justify-content:center;gap:.2rem;width:max-content;max-width:calc(100vw - 2rem);padding:.4rem;background:var(--paper-card);border:1px solid var(--border);border-radius:var(--radius);box-shadow:0 4px 20px #0002}.request-panel{position:fixed;right:0;top:0;bottom:0;z-index:45;width:min(29rem,100vw);overflow:auto;padding:1.25rem;background:var(--paper-card);border-left:1px solid var(--border);box-shadow:-4px 0 24px #0001}.request-panel>p{margin:.75rem 0}.request-card{margin-top:1rem;padding:1rem;border:1px solid var(--border);border-radius:var(--radius)}blockquote{margin:.7rem 0;padding-left:.7rem;border-left:2px solid var(--border);white-space:pre-wrap;overflow-wrap:anywhere;max-height:12rem;overflow:auto}.request-status{font-size:.75rem;color:var(--ink-soft)}.request-message{white-space:pre-wrap;overflow-wrap:anywhere;margin:.6rem 0}.request-response{border-top:1px solid var(--border);padding-top:.7rem;margin:.7rem 0}pre{white-space:pre-wrap;overflow-wrap:anywhere;font-size:.75rem;max-height:16rem;overflow:auto;margin:.7rem 0}.request-card .request-actions{justify-content:flex-start;margin-top:.8rem}.request-dialog{margin:auto;padding:1.5rem;width:calc(100vw - 2rem);max-width:34rem;max-height:85dvh;overflow:auto;background:var(--paper-card);border:1px solid var(--border);border-radius:var(--radius)}.request-dialog::backdrop{background:#0005}.request-dialog h2{font-size:1.2rem;font-weight:600}.request-dialog label{display:block;margin-top:1rem}.request-dialog p{margin:.8rem 0}textarea{display:block;width:100%;border:1px solid var(--border);border-radius:var(--radius);padding:.7rem;margin:.5rem 0;background:var(--paper);font:inherit}.request-dialog .request-actions{justify-content:flex-end}
-@media(max-width:700px){.request-panel{position:relative;top:auto;right:auto;bottom:auto;width:100%;max-height:65dvh;border:1px solid var(--border);border-radius:var(--radius);margin:1rem 0;box-shadow:none}.selection-requests{bottom:.5rem;gap:0;padding:.2rem}.selection-requests .btn{font-size:.75rem;padding:.5rem}}
+.request-heading,.request-actions{display:flex;align-items:center;gap:.5rem;justify-content:space-between;flex-wrap:wrap}.request-heading{margin-bottom:.7rem}.request-heading h2,.request-heading h3,.request-response h4{font-weight:600}.request-hint{font-size:.8rem;color:var(--ink-soft);line-height:1.5}.selection-requests{position:fixed;z-index:40;display:flex;flex-wrap:wrap;justify-content:flex-start;gap:.4rem;width:max-content;max-width:calc(100vw - 24px);padding:.65rem;background:#203b5b;border:1px solid #45668c;border-radius:14px;box-shadow:0 10px 30px #142b4d40,0 0 0 3px #ffffff;isolation:isolate}.selection-requests .btn{min-height:44px;padding:.65rem 1rem;color:#fff;background:#ffffff12;border:1px solid #ffffff38;border-radius:8px;font-size:.875rem;font-weight:650;white-space:nowrap}.selection-requests .btn:hover{background:#ffffff2e}.selection-requests .btn:focus-visible{outline:3px solid #fff;outline-offset:2px}.selection-requests .btn:first-of-type{background:#fff;color:#203b5b;border-color:#fff}.selection-requests .btn:disabled{opacity:.55}.request-panel{position:fixed;right:0;top:0;bottom:0;z-index:45;width:min(29rem,100vw);overflow:auto;padding:1.25rem;background:var(--paper-card);border-left:1px solid var(--border);box-shadow:-4px 0 24px #0001}.request-panel>p{margin:.75rem 0}.request-card{margin-top:1rem;padding:1rem;border:1px solid var(--border);border-radius:var(--radius)}blockquote{margin:.7rem 0;padding-left:.7rem;border-left:2px solid var(--border);white-space:pre-wrap;overflow-wrap:anywhere;max-height:12rem;overflow:auto}.request-status{font-size:.75rem;color:var(--ink-soft)}.request-message{white-space:pre-wrap;overflow-wrap:anywhere;margin:.6rem 0}.request-response{border-top:1px solid var(--border);padding-top:.7rem;margin:.7rem 0}pre{white-space:pre-wrap;overflow-wrap:anywhere;font-size:.75rem;max-height:16rem;overflow:auto;margin:.7rem 0}.request-card .request-actions{justify-content:flex-start;margin-top:.8rem}.request-dialog{margin:auto;padding:1.5rem;width:calc(100vw - 2rem);max-width:34rem;max-height:85dvh;overflow:auto;background:var(--paper-card);border:1px solid var(--border);border-radius:var(--radius)}.request-dialog::backdrop{background:#0005}.request-dialog h2{font-size:1.2rem;font-weight:600}.request-dialog label{display:block;margin-top:1rem}.request-dialog p{margin:.8rem 0}textarea{display:block;width:100%;border:1px solid var(--border);border-radius:var(--radius);padding:.7rem;margin:.5rem 0;background:var(--paper);font:inherit}.request-dialog .request-actions{justify-content:flex-end}
+@media(max-width:700px){.request-panel{position:relative;top:auto;right:auto;bottom:auto;width:100%;max-height:65dvh;border:1px solid var(--border);border-radius:var(--radius);margin:1rem 0;box-shadow:none}.selection-requests{gap:.35rem;padding:.5rem}.selection-requests .btn{font-size:.8125rem;padding:.6rem .75rem}}
 </style>
