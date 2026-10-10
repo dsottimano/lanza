@@ -3,7 +3,7 @@
 // revert is one inverse commit computed from git history (backend/themeHistory).
 // This component lists recent applies and drives the plan → confirm → revert
 // flow entirely on its own; ThemesView mounts it with a single line.
-import { onMounted, ref, shallowRef } from "vue";
+import { onMounted, onUnmounted, ref, shallowRef } from "vue";
 import { GitHubClient } from "../backend/github";
 import {
   listAppliedThemes,
@@ -18,6 +18,9 @@ const props = defineProps<{ client: GitHubClient }>();
 
 const loading = ref(true);
 const themes = ref<AppliedTheme[]>([]);
+const loadFailed = ref(false);
+let disposed = false;
+onUnmounted(() => { disposed = true; });
 
 // Confirmation flow state.
 const target = shallowRef<AppliedTheme | null>(null); // theme awaiting confirmation
@@ -25,13 +28,20 @@ const plan = shallowRef<RevertPlan | null>(null);
 const planning = ref(false); // building the plan (fetching history)
 const reverting = ref(false); // committing the revert
 const revertedSha = ref<string | null>(null);
+const revertProblem = ref<string | null>(null);
 
 async function load() {
   loading.value = true;
+  loadFailed.value = false;
   try {
-    themes.value = await listAppliedThemes(props.client);
+    const result = await listAppliedThemes(props.client);
+    if (!disposed) themes.value = result;
   } catch (err) {
-    reportError(err, "Couldn't load theme history.");
+    if (!disposed) {
+      loadFailed.value = true;
+      themes.value = [];
+      reportError(err, "Couldn't load theme history.");
+    }
   } finally {
     loading.value = false;
   }
@@ -52,15 +62,19 @@ function relative(iso: string): string {
 }
 
 async function startRevert(theme: AppliedTheme) {
+  if (disposed || loading.value || loadFailed.value || planning.value || reverting.value) return;
   clearError();
+  revertedSha.value = null;
+  revertProblem.value = null;
   target.value = theme;
   plan.value = null;
   planning.value = true;
   try {
-    plan.value = await planRevert(props.client, theme.sha);
+    const result = await planRevert(props.client, theme.sha);
+    if (!disposed) plan.value = result;
   } catch (err) {
     target.value = null;
-    reportError(err, "Couldn't work out how to revert this theme.");
+    if (!disposed) reportError(err, "Couldn't work out how to revert this theme.");
   } finally {
     planning.value = false;
   }
@@ -72,16 +86,25 @@ function cancel() {
 }
 
 async function confirmRevert() {
-  if (!plan.value || reverting.value) return;
+  if (disposed || !plan.value || reverting.value) return;
   reverting.value = true;
   clearError();
   try {
-    revertedSha.value = await executeRevert(props.client, plan.value);
+    const sha = await executeRevert(props.client, plan.value);
+    if (disposed) return;
+    revertedSha.value = sha;
     target.value = null;
     plan.value = null;
     await load(); // the revert is itself a commit; refresh the list
   } catch (err) {
-    reportError(err, "Reverting the theme failed — no changes were committed.");
+    // A dropped response can follow a successful branch update. Do not promise
+    // that nothing changed, or allow another write using an uncertain old plan.
+    target.value = null;
+    plan.value = null;
+    if (!disposed) {
+      revertProblem.value = "Couldn't confirm the theme revert. Check staging and review a fresh revert plan before trying again.";
+      reportError(err, revertProblem.value);
+    }
   } finally {
     reverting.value = false;
   }
@@ -110,13 +133,20 @@ async function confirmRevert() {
       </p>
     </div>
 
+    <p v-if="revertProblem" role="alert" class="mb-4 text-sm text-red-700">{{ revertProblem }}</p>
+
     <p v-if="loading" class="text-sm text-zinc-500">Loading history…</p>
+
+    <p v-else-if="loadFailed" role="alert" class="text-sm text-red-700">
+      Couldn’t load theme history.
+      <button class="btn btn-ghost" @click="load">Try again</button>
+    </p>
 
     <p
       v-else-if="themes.length === 0"
       class="rounded-2xl border border-dashed border-[var(--border)] bg-[var(--paper-card)] px-5 py-8 text-center text-sm text-zinc-500"
     >
-      No themes have been applied yet.
+      No theme applications were found in the latest 30 commits.
     </p>
 
     <ul v-else class="space-y-2">

@@ -59,7 +59,7 @@ build and Git push do not establish Cloudflare deployment success.
 This pass does not complete the original request for a full code/security review
 of every admin surface. In particular, authenticated production owner/editor flows,
 concurrent production publishing, deployment completion tracking,
-theme-undo edge cases and history error states, custom collection URL helpers, recipe
+theme-undo edge cases and confirmation accessibility, custom collection URL helpers, recipe
 atomicity, session-refresh races and the rest of the settings/editor interactions
 still need current-state review and verification. Prior reports are evidence to
 recheck, not proof these areas are either vulnerable or already safe. No production
@@ -134,3 +134,18 @@ documents file pagination and the total limit.
 Validation: 413 Functions/script tests and 463 CMS tests passed. Admin typecheck
 and build, site validation (zero errors/warnings), and the 15-page public build
 passed. Existing empty-collection and animation chunk warnings remain.
+
+## Theme-history failure handling
+
+History load failures now show retry instead of an empty-history claim. The empty
+state describes its actual latest-30-commits window. Cancel discards the plan;
+uncertain revert failures also discard it and instruct the owner to check staging
+before a fresh review. The screen no longer claims that no commit occurred after
+a lost response. Late failures after leaving the screen do not open global errors.
+
+Validation: 413 Functions/script tests and 469 CMS tests passed, including six
+new state-transition regressions. Admin typecheck/build, site validation (zero
+errors/warnings), and the 15-page public build passed; existing public build
+warnings remain. Chromium exercised the real component's failed-load retry,
+cancel and uncertain-write recovery with synthetic client methods and blocked
+API traffic. No live rollback or deployment verification was performed.
