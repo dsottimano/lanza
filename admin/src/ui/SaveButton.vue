@@ -14,6 +14,7 @@ const emit = defineEmits<{
 
 type State = "idle" | "saving" | "saved" | "error";
 const state = ref<State>("idle");
+let active = true;
 let revertTimer: ReturnType<typeof setTimeout> | undefined;
 
 async function run() {
@@ -22,17 +23,19 @@ async function run() {
   state.value = "saving";
   try {
     await props.action();
+    if (!active) return;
     state.value = "saved";
     emit("saved");
     revertTimer = setTimeout(() => (state.value = "idle"), 1800);
   } catch (e) {
+    if (!active) return;
     state.value = "error";
     emit("error", e);
     revertTimer = setTimeout(() => (state.value = "idle"), 2800);
   }
 }
 
-onBeforeUnmount(() => clearTimeout(revertTimer));
+onBeforeUnmount(() => { active = false; clearTimeout(revertTimer); });
 
 const label = computed(() =>
   state.value === "saving"

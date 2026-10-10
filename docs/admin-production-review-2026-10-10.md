@@ -285,3 +285,23 @@ with an additional `class` collection passed. Chromium exercised the compiled
 new-type form through mocked read-only APIs, with no page errors or writes.
 Existing empty-collection and large-chunk build warnings remain; authenticated
 production saves and deployment of this change are unverified.
+
+## Generic settings read/save races
+
+The generic JSON settings editor exposed an empty form after a failed read and
+cleared the dirty flag unconditionally after saving. It now requires a successful
+read before editing/saving, offers retry, and ignores superseded or unmounted
+loads. Saves capture an immutable JSON snapshot; completion advances the SHA but
+leaves edits made during the request dirty. Dirty tracking observes the actual
+form data, including mutations that do not bubble an input event. Late saves do
+not clear a different editor's dirty state. The shared SaveButton also suppresses
+late success/error events and timers after unmount.
+
+Seven regressions cover failed read/retry, in-flight edits, SHA advancement,
+superseded loads, failed writes, unmount, and late save-button outcomes. All 441
+Functions/script and 489 CMS tests passed. Admin typecheck/build, site validation
+(zero errors/warnings), and the 15-page public build passed. Chromium verified the
+compiled settings failure/retry state through mocked API reads, with no browser
+errors or writes. Existing build warnings remain. This pass covers the generic
+settings editor; specialized settings panels still require equivalent race
+review. Authenticated production writes and this deployment remain unverified.
