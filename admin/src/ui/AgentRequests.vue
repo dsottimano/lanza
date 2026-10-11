@@ -138,7 +138,7 @@ async function beginRequest(action: RequestAction) {
   finally { if (epoch === generation) capturing.value = false; }
 }
 async function requestTranslation(code: string, label: string) {
-  if (!available.value || props.locked || working.value || capturing.value || pending.value) return;
+  if (!available.value || props.locked || working.value || capturing.value || pending.value) return false;
   const editor = props.editor!;
   const doc = editor.state.doc;
   const epoch = generation;
@@ -152,8 +152,8 @@ async function requestTranslation(code: string, label: string) {
     const anchor = { quote, from: 0, to, bodyHash, before: "", after: doc.textBetween(to, Math.min(doc.content.size, to + 120), "\n") };
     pending.value = { id: newRequestId(), action: "ask", anchor, title: `Translate to ${label}` };
     instruction.value = `Translate the entire saved entry at ${props.path} into ${label} (locale ${code}). The quote is only context, not the whole article. Use list_translations and read_content, then create_translation with the current source SHA and target_locale ${code}. Translate title, body, descriptions, captions and alt text faithfully; preserve citations, links, figures, quantities and layout. Keep the matching filename. Create a draft only; never overwrite an existing translation or publish. Reply to this request with the new CMS path, not replacementHtml for the source article. If the saved source differs from this request, ask for confirmation before proceeding.`;
-    await nextTick(); dialog.value?.showModal(); noteInput.value?.focus();
-  } catch (reason) { error.value = reason instanceof Error ? reason.message : "Could not prepare translation request."; open.value = true; }
+    await nextTick(); dialog.value?.showModal(); noteInput.value?.focus(); return true;
+  } catch (reason) { error.value = reason instanceof Error ? reason.message : "Could not prepare translation request."; open.value = true; return false; }
   finally { capturing.value = false; }
 }
 defineExpose({ requestTranslation });

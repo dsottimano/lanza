@@ -173,3 +173,16 @@ it("retains explicit blank-translation creation alongside the agent option", asy
   await flushPromises();
   expect(router.currentRoute.value.fullPath).toBe("/pages/es/new?slug=about");
 });
+it("can return to the current language or cancel while the editor is locked", async () => {
+  const { wrapper } = await bar({ requestTranslation: true });
+  await wrapper.findAll("button")[1].trigger("click");
+  await wrapper.setProps({ locked: true });
+  const english=wrapper.findAll("button").find(b=>b.text()==="English")!;
+  expect(english.attributes("disabled")).toBeUndefined();
+  await english.trigger("click");expect(wrapper.find('.translation-choice').exists()).toBe(false);
+  await wrapper.setProps({locked:false});await wrapper.findAll("button")[1].trigger("click");
+  await wrapper.setProps({locked:true});
+  const cancel=wrapper.findAll("button").find(b=>b.text()==="Cancel")!;
+  expect(cancel.attributes("disabled")).toBeUndefined();
+  await cancel.trigger("click");expect(wrapper.find('.translation-choice').exists()).toBe(false);
+});

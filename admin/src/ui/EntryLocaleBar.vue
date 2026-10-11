@@ -78,8 +78,8 @@ watch(
 );
 
 function open(code: Locale) {
+  if (code === props.locale) { translationTarget.value = null; return; }
   if (props.locked || !loaded.value) return;
-  if (code === props.locale) return;
   if (exists(code)) {
     router.push(entryRoute(props.collection.name, code, props.slug));
     return;
@@ -126,7 +126,7 @@ function hint(code: Locale, label: string): string {
         class="segment-btn whitespace-nowrap px-2.5"
         :class="{ 'segment-btn--active': l.code === locale }"
         :title="hint(l.code, l.label)"
-        :disabled="locked || (!loaded && l.code !== locale)"
+        :disabled="l.code !== locale && (locked || !loaded)"
         :aria-current="l.code === locale ? 'true' : undefined"
         @click="open(l.code)"
       >
@@ -135,10 +135,12 @@ function hint(code: Locale, label: string): string {
         <span v-if="showUrls && pathFor(l.code)" class="entry-language-path">{{ pathFor(l.code) }}</span>
       </button>
     </div>
-    <div v-if="translationTarget" class="translation-choice" role="group" aria-label="Create translation">
+    <div v-if="translationTarget" class="translation-choice" role="group" aria-label="Create translation" @keydown.esc.stop="translationTarget = null">
       <p>No {{ site.locales.find(l => l.code === translationTarget)?.label }} version yet.</p>
       <button type="button" class="btn btn-primary" :disabled="locked" @click="emit('translate', translationTarget, site.locales.find(l => l.code === translationTarget)?.label ?? translationTarget); translationTarget = null">Ask AI to translate</button>
       <button type="button" class="btn btn-ghost" :disabled="locked" @click="startBlank(translationTarget)">Start blank</button>
+      <button type="button" class="btn btn-ghost" @click="translationTarget = null">Cancel</button>
+      <p v-if="locked" role="status">Finish the current editor action or resolve its notice before creating a translation. You can cancel this chooser at any time.</p>
       <p>Your connected agent creates a draft for review. Sending a request does not start the agent.</p>
     </div>
   </div>

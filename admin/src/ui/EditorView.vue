@@ -136,10 +136,19 @@ const urlFrame = computed(() =>
 const urlPrefix = computed(() => urlFrame.value?.prefix ?? "");
 const urlSuffix = computed(() => urlFrame.value?.suffix ?? "");
 const agentRequestsRef = ref<InstanceType<typeof AgentRequests>>();
+const translationPreparing = ref(false);
+const translationIssue = ref("");
 async function askForTranslation(code: Locale, label: string) {
-  if (dirty.value || !currentPath.value) await saveNow();
-  if (dirty.value || saving.value || saveError.value || !currentPath.value) return;
-  await agentRequestsRef.value?.requestTranslation(code, label);
+  if (translationPreparing.value) return;
+  translationPreparing.value = true; translationIssue.value = "";
+  try {
+    if (dirty.value || saving.value || !currentPath.value) await save();
+    await nextTick();
+    if (dirty.value || saveError.value || !currentPath.value) throw new Error(saveError.value || "The article changed while saving. Save your latest edits, then request the translation again.");
+    const opened = await agentRequestsRef.value?.requestTranslation(code, label);
+    if (!opened) throw new Error("The translation request could not open. Finish any open review and resolve the editor's save notice, then try again.");
+  } catch (reason) { translationIssue.value = reason instanceof Error ? reason.message : "Could not prepare the translation request. Try again."; }
+  finally { translationPreparing.value = false; }
 }
 const languageLabel = computed(() => site.locales.find(language => language.code === props.locale)?.label ?? props.locale);
 const urlLabel = computed(() => urlFrame.value
@@ -574,13 +583,15 @@ onMounted(async () => {
           <div v-else class="editor-paper w-full">
             <div class="writing-document-bar">
               <EntryLocaleBar v-if="collection.localized && site.locales.length > 1 && entryStem" :client="client" :collection="collection" :locale="locale" :slug="entryStem" :data="data"
-                :request-translation="isOwner()" :locked="saving || deleting || requestBusy || !!bodyReview || loading || !!recovery" @translate="askForTranslation" />
+                :request-translation="isOwner()" :locked="deleting || !!bodyReview || loading || !!recovery" @translate="askForTranslation" />
               <span v-else>{{ languageLabel }} <span aria-hidden="true">·</span> {{ collection.labelSingular }}</span>
               <button type="button" class="writing-format-toggle" :aria-expanded="focusFormatting"
                 aria-controls="writing-formatting" @click="focusFormatting = !focusFormatting">
                 <span aria-hidden="true">Aa</span> {{ focusFormatting ? "Hide formatting" : "Format" }}
               </button>
             </div>
+            <p v-if="translationPreparing" role="status" class="writing-notice">Saving your latest edits for translation…</p>
+            <p v-if="translationIssue" role="alert" class="writing-notice">{{ translationIssue }}</p>
             <div v-if="editorRef?.editor && focusFormatting" id="writing-formatting">
               <Toolbar :editor="editorRef.editor" :on-link="editorRef.link" />
             </div>
