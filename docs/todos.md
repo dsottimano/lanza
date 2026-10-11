@@ -1,6 +1,6 @@
 # Lanza work list
 
-Updated 2026-09-07. Start here after clearing conversation context.
+Updated 2026-10-10. Start here after clearing conversation context.
 
 ## Read first
 
@@ -29,6 +29,29 @@ release old package versions, or treat old test counts as the current baseline.
 - Preserve sovereign auth: no broker-held customer credential.
 - Plugins are built by an agent for the human and owned in the human's repository.
   No third-party plugin installation or marketplace.
+
+## Optional domain and monetization setup
+
+- [ ] **Connect a domain without nagging.** Add Site settings → Domains with the
+  current address and an optional Connect a domain action. Offer a secondary
+  “Optional: connect your domain” link on onboarding success. No banners, badges
+  or pending tasks. Explain provider-specific DNS changes, check connection and
+  HTTPS status, and keep the existing address working during setup. Expose domain
+  status and setup guidance through MCP; require explicit authorization for DNS
+  changes. Verify Cloudflare's current custom-domain requirements before building.
+- [ ] **Evaluate Cloudflare Monetization Gateway as an opt-in integration.** Keep
+  Monetization off by default and independent of launching a site. Explore paid,
+  read-only access to selected datasets, APIs and MCP data tools (Pananómica's
+  economic and real-estate data is the initial use case). Separate paid data
+  endpoints from the authenticated CMS editing MCP; preserve private research.
+  Explain audiences, pricing, receiving wallet and payment verification, and expose
+  configuration/status through MCP with explicit approval before enabling charges.
+  Recheck eligibility before implementation: as checked on 2026-10-10, closed beta,
+  US-based buyers and sellers, account older than 60 days, Cloudflare-proxied zone
+  older than 30 days, plus account/security requirements. Do not promise immediate
+  activation for a newly connected domain. Sources: [overview](https://developers.cloudflare.com/monetization-gateway/),
+  [eligibility](https://developers.cloudflare.com/monetization-gateway/eligibility/),
+  [setup](https://developers.cloudflare.com/monetization-gateway/get-started/).
 
 ## Now: prove one complete thought workflow
 
