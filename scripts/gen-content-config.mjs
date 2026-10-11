@@ -204,7 +204,7 @@ const defs = collections
     return (
       `const collection_${i} = defineCollection({\n` +
       `  loader: glob({ pattern: "**/*.{md,mdx}", base: ${lit(`./${c.folder}`)} }),\n` +
-      `  schema: z.object({\n${fields}\n  }),\n});`
+      `  schema: z.object({\n${fields}\n    lanzaProvenance: z.object({ version: z.literal(1), fields: z.record(z.string(), z.object({ origin: z.literal("agent"), text: z.string() })) }).optional(),\n  }),\n});`
     );
   })
   .join("\n\n");

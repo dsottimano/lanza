@@ -229,7 +229,7 @@ test("create_content stages a new page with draft:false + derived slug", async (
   const written = gh.files.get("content/pages/en/hello-world.md");
   assert.match(written, /title: Hello World/);
   assert.match(written, /draft: false/);
-  assert.match(written, /<p>Hi<\/p>/);
+  assert.match(written, /<p><span data-lanza-origin="agent">Hi<\/span><\/p>/);
 });
 
 test("read_content round-trips frontmatter + body", async () => {
@@ -1338,7 +1338,7 @@ test("human editing examples build an editable landing page and article through 
   const revised = await callData("read_content", { path: "content/pages/en/studio.md" });
   assert.equal(revised.frontmatter.slots.introduction, page.frontmatter.slots.introduction);
   const article = await callData("read_content", { path: "content/posts/en/notes-from-the-studio.md" });
-  assert.match(article.body_html, /<h2>What we are making<\/h2>/);
+  assert.match(article.body_html, /<h2><span data-lanza-origin="agent">What we are making<\/span><\/h2>/);
   assert.equal(article.frontmatter.draft, true);
   assert.equal((await callData("validate_site")).ok, true);
   assert.equal(gh.published, false);

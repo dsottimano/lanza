@@ -20,7 +20,7 @@ it("restores captured text instead of a newer selection, validates detached and 
   const { editor, anchor } = await fixture(); editor.commands.setTextSelection({ from: 8, to: 13 });
   const original = editor.getHTML(); const proposal = await prepareRequestReplacement(editor, anchor, "<strong>Soil</strong>");
   expect(editor.getHTML()).toBe(original); expect(editor.state.selection.from).toBe(1);
-  proposal.apply(); expect(editor.getHTML()).toContain("<strong>Soil</strong> moves differently.");
+  proposal.apply(); expect(editor.getHTML()).toContain("<strong><span data-lanza-origin=\"agent\" title=\"Agent-written text\">Soil</span></strong> moves differently.");
   expect(editor.getHTML()).toContain("Keep this paragraph."); editor.commands.undo(); expect(editor.getHTML()).toBe(original);
 });
 it("refuses any body change, forged selection evidence, and unsupported or active replacement HTML", async () => {

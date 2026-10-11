@@ -13,6 +13,7 @@
 // Escaping alone is NOT the whole trust model, because escaping depends on where
 // the value lands — see "emitting position" below.
 
+import { fieldRecords, fieldAgentHtml } from "./provenance/text.mjs";
 import { isSafeUrl, safeHref } from "./url";
 
 type Scope = Record<string, unknown>;
@@ -688,7 +689,12 @@ function renderNodes(nodes: Node[], stack: Frame[], markers: boolean): string {
     if (node.t === "text") {
       out += node.v;
     } else if (node.t === "var") {
-      const value = stringify(resolve(node.path, stack), node.pos);
+      const rawValue = resolve(node.path, stack);
+      let value = stringify(rawValue, node.pos);
+      const path = qualify(node.path, stack);
+      if (node.pos.markable && typeof rawValue === 'string' && path && fieldRecords(stack[0].scope)[path]) {
+        value = fieldAgentHtml(stack[0].scope, path, rawValue);
+      }
       out += markers ? mark(value, qualify(node.path, stack), node.pos) : value;
     } else if (node.t === "raw") {
       const v = resolve(node.path, stack);
@@ -712,7 +718,7 @@ function renderNodes(nodes: Node[], stack: Frame[], markers: boolean): string {
       if (Array.isArray(items)) {
         // The loop's own qualified path, so a repeated slot is addressable per item
         // (`items.2.caption`). Computed once, and only when markers are on.
-        const base = markers ? qualify(node.path, stack) : null;
+        const base = qualify(node.path, stack);
         items.forEach((item, index) => {
           stack.push({ scope: item as Scope, index, base: base === null ? "" : `${base}.${index}` });
           out += renderNodes(node.body, stack, markers);

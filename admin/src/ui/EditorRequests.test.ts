@@ -36,7 +36,7 @@ async function fixture() {
 }
 const button = (wrapper: VueWrapper, text: string) => wrapper.findAll("button").find(node => node.text() === text)!;
 async function answered(editor: import("@tiptap/core").Editor) {
-  records = [{ sha: "a".repeat(40), task: { version: 1, id: "00000000-0000-7000-8000-000000000001", entryPath: "content/posts/en/article.md", action: "rewrite", instruction: "Clarify", anchor: await captureRequestAnchor(editor), status: "answered", createdAt: "2026-10-10T00:00:00Z", updatedAt: "2026-10-10T00:00:00Z", createdBy: "fixture", response: { message: "Suggested clarification", replacementHtml: "<strong>Soil</strong>", createdAt: "2026-10-10T00:00:00Z", createdBy: "fixture", origin: "assistant" } } }];
+  records = [{ sha: "a".repeat(40), task: { version: 1, id: "00000000-0000-7000-8000-000000000001", entryPath: "content/posts/en/article.md", action: "rewrite", instruction: "Clarify", anchor: await captureRequestAnchor(editor), status: "answered", createdAt: "2026-10-10T00:00:00Z", updatedAt: "2026-10-10T00:00:00Z", createdBy: "fixture", response: { message: "Suggested clarification", replacementHtml: "<strong><span data-lanza-origin=\"agent\" title=\"Agent-written text\">Soil</span></strong>", createdAt: "2026-10-10T00:00:00Z", createdBy: "fixture", origin: "assistant" } } }];
 }
 it("keeps note editing separate from article autosave and blocks deletion while the request dialog is open", async () => {
   const { wrapper, client } = await fixture(); await button(wrapper, "Verify").trigger("click");
@@ -55,11 +55,11 @@ it("reviews a saved response, applies only to captured text, pauses autosave and
   for (let n = 0; n < 4 && !wrapper.findComponent(AgentBodyReview).exists(); n++) await flushPromises();
   expect(wrapper.findComponent(AgentBodyReview).exists()).toBe(true); expect(editor.getHTML()).toBe("<p>Ground moves differently.</p>");
   await button(wrapper, "Accept in editor").trigger("click"); await flushPromises();
-  expect(editor.getHTML()).toBe("<p><strong>Soil</strong> moves differently.</p>");
+  expect(editor.getHTML()).toBe("<p><strong><span data-lanza-origin=\"agent\" title=\"Agent-written text\">Soil</span></strong> moves differently.</p>");
   expect(fetcher.mock.calls.filter(([, options]) => options?.method === "PATCH")).toHaveLength(1);
   await vi.advanceTimersByTimeAsync(5_000); expect(client.saveEntry).not.toHaveBeenCalled();
   await button(wrapper, "Save").trigger("click"); await flushPromises();
-  expect(client.saveEntry).toHaveBeenCalledWith("content/posts/en/article.md", expect.objectContaining({ draft: true }), expect.stringContaining("<p><strong>Soil</strong> moves differently.</p>"), expect.any(String), "original");
+  expect(client.saveEntry).toHaveBeenCalledWith("content/posts/en/article.md", expect.objectContaining({ draft: true }), expect.stringContaining("<p><strong><span data-lanza-origin=\"agent\" title=\"Agent-written text\">Soil</span></strong> moves differently.</p>"), expect.any(String), "original");
 });
 it("rejects an old response before review when any article content has changed", async () => {
   const { wrapper, editor } = await fixture(); await answered(editor);

@@ -53,7 +53,7 @@ it("reads unsaved live body, reviews readable previews, applies locally and save
   expect(f.wrapper.findComponent(AgentBodyReview).get('iframe[title="Proposed article after agent change"]').attributes("srcdoc")).toContain("qualified conclusion");
   expect(f.editor().getHTML()).toContain("Human unsaved text");
   await decision(f.wrapper, true); expect(await pending).toMatchObject({ accepted: true, saved: false, published: false });
-  expect(f.editor().getHTML()).toContain("<strong>qualified conclusion</strong>");
+  expect(f.editor().getHTML()).toContain("<strong><span data-lanza-origin=\"agent\" title=\"Agent-written text\">qualified conclusion</span></strong>");
   await vi.advanceTimersByTimeAsync(5_000); expect(f.client.saveEntry).not.toHaveBeenCalled();
   await f.wrapper.findAll("button").find(b => b.text() === "Save")!.trigger("click"); await flushPromises();
   expect(f.client.saveEntry).toHaveBeenCalledOnce();

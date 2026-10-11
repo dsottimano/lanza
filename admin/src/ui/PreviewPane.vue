@@ -161,6 +161,7 @@ export function needsScroll(top: number, height: number, viewportHeight: number)
 // click decision live in the plain <script> block above, where they can be tested
 // without a frame.
 import { ref, watch, onBeforeUnmount, shallowRef } from "vue";
+import { scopedProvenance } from "../../../frontend/lib/provenance/text.mjs";
 import { render } from "../../../frontend/lib/template-render";
 import { loadPageListing } from "../backend/page-listing";
 import { templateHtmlPath } from "../backend/templates";
@@ -171,6 +172,7 @@ const props = defineProps<{
   preset: string;
   locale?: string;
   slots: Record<string, unknown>;
+  provenance?: unknown;
   // The page's rich body, if the parent has it. Optional because the body is NOT part of
   // `slots` — production merges it in as a reserved root key (PageArticle.astro:35) and
   // the editor holds it separately. Without it a `{{{ body }}}` template previews with an
@@ -213,7 +215,7 @@ const HIGHLIGHT_STYLE_ID = "lz-preview-highlight";
 // What the engine renders: the same root production builds — slots plus the reserved
 // `body` key (frontend/components/PageArticle.astro:35).
 function renderData(): Record<string, unknown> {
-  const data: Record<string, unknown> = { ...props.slots, ...listingData.value };
+  const data: Record<string, unknown> = { ...props.slots, ...listingData.value, lanzaProvenance: scopedProvenance({lanzaProvenance:props.provenance}, "slots.") };
   if (typeof props.body === "string" && templateHtml.value !== null) {
     data.body = bodyForPreview(props.body, templateHtml.value);
   }
@@ -397,6 +399,7 @@ defineExpose({
 watch(() => [props.preset, props.locale], loadTemplate, { immediate: true });
 // Slot (or body) edits → cheap debounced body swap, no reload.
 watch(() => props.slots, scheduleBodyUpdate, { deep: true });
+watch(() => props.provenance, scheduleBodyUpdate, { deep: true });
 watch(() => props.body, scheduleBodyUpdate);
 </script>
 

@@ -13,6 +13,7 @@
 // data came from a page's freeform `slots`. Give it an ENTRY'S FRONTMATTER as the
 // scope and the same templates/<name>/ machinery renders a content type — so a
 // content type plus a template is a rendered page, with no new rendering path.
+import { fieldRecords } from "./provenance/text.mjs";
 import { getCollection, type CollectionEntry } from "astro:content";
 import { splitId, localeUrl, type Locale } from "./i18n";
 import { isPublished } from "./routing";
@@ -115,8 +116,11 @@ export function listScope(
   // `isEmpty` exists because the engine has no {{else}}: a template that wants an
   // empty state has to guard it with a second, opposite {{#if}}. Same reason
   // Base.astro pairs `active`/`inactive` on the locale switcher.
+  const fields = {...fieldRecords(list.slots)};
+  rows.forEach((row,index)=>Object.entries(fieldRecords(row.item)).forEach(([path,value])=>{fields[`entries.${index}.${path}`]=value;}));
   return {
     ...(list.slots ?? {}),
+    lanzaProvenance: {version:1,fields},
     entries: rows.map((r) => r.item),
     count: rows.length,
     isEmpty: rows.length === 0,

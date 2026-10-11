@@ -13,7 +13,7 @@ it("normalizes with the real schema without modifying the editor; applies as one
   const { editor } = await open();
   const proposal = prepareBodyProposal(editor, "body", "<h2>Research</h2><p>A <strong>careful</strong> article.</p>");
   expect(editor.getHTML()).toBe("<p>Original article</p>");
-  expect(proposal.after).toContain("<strong>careful</strong>"); proposal.apply();
+  expect(proposal.after).toContain("<strong><span data-lanza-origin=\"agent\" title=\"Agent-written text\">careful</span></strong>"); proposal.apply();
   expect(editor.getHTML()).toBe(proposal.after); editor.commands.undo();
   expect(editor.getHTML()).toBe("<p>Original article</p>");
 });
@@ -23,7 +23,7 @@ it("selection replacements preserve untouched paragraphs and reject a changed se
   expect(bodyContext(editor).selection?.text).toBe("First");
   const proposal = prepareBodyProposal(editor, "selection", "<strong>New</strong>");
   expect(proposal.after).toContain("Second paragraph"); proposal.apply();
-  expect(editor.getHTML()).toContain("<strong>New</strong> paragraph");
+  expect(editor.getHTML()).toContain("<strong><span data-lanza-origin=\"agent\" title=\"Agent-written text\">New</span></strong> paragraph");
   editor.commands.setTextSelection({ from: 1, to: 4 });
   const stale = prepareBodyProposal(editor, "selection", "Next");
   editor.commands.setTextSelection({ from: 2, to: 4 });

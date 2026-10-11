@@ -78,3 +78,7 @@ existing local work. Read `docs/review-surface.md` before changing CMS previews.
   other hooks path is configured. It checks the live remote staging tip before
   a main push and refuses to strand CMS work. Do not bypass it with `--no-verify`.
   This is a local guard, not server-side branch protection.
+
+## Text provenance
+
+All new agent-written prose must retain `data-lanza-origin="agent"` spans in rich bodies. Preserve human and unknown text. For plain fields, use the `lanzaProvenance` contract in `docs/agent-provenance.md`. Mark literal template prose explicitly; do not mark human slots just because an agent wrote the template. Acceptance and Git commit identity do not change origin.

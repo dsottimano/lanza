@@ -2,6 +2,7 @@
 // Journal teaser card. Posts aren't translated — both locales link to the ES
 // post detail at /posts/<stem>/ (see project rules; EN is UI-only). Posts are a
 // localized collection, so `id` is "<locale>/<stem>"; the route serves the stem.
+import { fieldAgentHtml } from "../lib/provenance/text.mjs";
 import { contentUrl } from "../lib/public-urls";
 import { splitId } from "../lib/i18n";
 interface Props {
@@ -19,8 +20,8 @@ const href = contentUrl("posts", post.id, "posts");
     </div>
   )}
   <div class="post-card__body">
-    <h3 class="post-card__title">{d.title}</h3>
-    {d.description && <p class="post-card__excerpt">{d.description}</p>}
+    <h3 class="post-card__title" set:html={fieldAgentHtml(d,"title",d.title)} />
+    {d.description && <p class="post-card__excerpt" set:html={fieldAgentHtml(d,"description",d.description)} />}
   </div>
 </a>
 

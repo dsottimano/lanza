@@ -1,6 +1,7 @@
 // Page presets may declare a listing using the same fields.json contract as
 // routed collection indexes. Copy stays in the page; entries remain in their
 // schema collection and use the shared publish gate and public URL resolver.
+import { fieldRecords } from "./provenance/text.mjs";
 import { getCollection } from "astro:content";
 import { splitId, type Locale } from "./i18n";
 import { isPublished } from "./routing";
@@ -33,8 +34,11 @@ export async function pageListingScope(name: string, locale: Locale, slots: Reco
         const value = (entry.data as Record<string, unknown>)[field];
         return [field, value instanceof Date ? value.toISOString().slice(0, 10) : value];
       })),
+      lanzaProvenance: (entry.data as Record<string, unknown>).lanzaProvenance,
       slug: splitId(entry.id).slug,
       url: contentUrl(listing.of, entry.id, base),
     }));
-  return { ...slots, entries, count: entries.length, isEmpty: entries.length === 0 };
+  const fields = { ...fieldRecords(slots) };
+  entries.forEach((entry,index) => Object.entries(fieldRecords(entry)).forEach(([path,value]) => { fields[`entries.${index}.${path}`] = value; }));
+  return { ...slots, lanzaProvenance: {version:1,fields}, entries, count: entries.length, isEmpty: entries.length === 0 };
 }

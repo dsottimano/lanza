@@ -3,6 +3,7 @@
 // localized mirror (/es/posts/x/). All internal links carry the locale prefix
 // via localeUrl, so the same markup serves every language.
 import type { CollectionEntry } from "astro:content";
+import { fieldAgentHtml, scopedProvenance } from "../lib/provenance/text.mjs";
 import { sanitizeBody } from "../lib/sanitize";
 // Build-time check on the sanitizer's OUTPUT. A post body is attacker-reachable (the
 // Telegram bot commits raw HTML; an MCP agent writes bodies) and DOMPurify being
@@ -32,7 +33,7 @@ const landing = isLanding(template);
 ---
 
 <main class={templateClass(template)}>
-  {!landing && <h1>{post.data.title}</h1>}
+  {!landing && <h1 set:html={fieldAgentHtml(post.data, "title", post.data.title)} />}
   {
     author?.name && (
       <p class="byline">

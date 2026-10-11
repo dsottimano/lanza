@@ -1,3 +1,12 @@
+# Current provenance delivery — October 11, 2026
+
+Shared source now implements agent text provenance; see [contract](agent-provenance.md).
+Verified 491 server/script tests and 639 CMS tests, CMS typecheck/build, site checker
+(0 errors/warnings), public build, legacy Pages Functions compilation and a real
+browser editor round-trip. Private package 0.1.26 is installed and built in Pananómica.
+Public npm release and merging this feature branch into product main are still separate.
+The existing task queue follows; these checks do not claim unrelated backlog completion.
+
 # Lanza work list
 
 Updated 2026-10-10. Start here after clearing conversation context.

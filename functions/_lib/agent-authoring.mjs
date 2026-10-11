@@ -1,6 +1,7 @@
 // Agent-facing product guidance. Shared by MCP discovery and the public site contract.
 // These are authoring recommendations, not additional server-side authorization rules.
 export const AGENT_INSTRUCTIONS =
+  "Agent-written text must retain provenance. MCP content writes and accepted body proposals mark additions with data-lanza-origin=agent. Preserve existing markers; acceptance is not human authorship. Repository edits must mark known agent prose with <span data-lanza-origin=\"agent\"> and record agent-written plain fields in lanzaProvenance version 1 (fields keyed by dot path with origin:agent and text snapshots). Unknown historical origins stay unknown; never infer human authorship from Git. Template structure is not prose: do not blanket-mark a container that includes human copy. " +
   "Build this Lanza site for the human who will maintain it. You own structure, templates, HTML and CSS; " +
   "the human edits text, images and content details in the CMS. Start with get_site and describe_site_system, " +
   "then follow its humanEditing workflow and examples. Read its themes section for brand, starters and bundles. Choose rich-body writing for articles and grouped " +

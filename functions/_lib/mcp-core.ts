@@ -1,3 +1,5 @@
+import { markAgentHtml } from "./agent-provenance";
+import { recordAgentFields } from "../../frontend/lib/provenance/text.mjs";
 import { PluginRuntime, catalog } from "./plugin-runtime.mjs";
 import { AGENT_INSTRUCTIONS } from "./agent-authoring.mjs";
 import { AgentRequests } from "./agent-requests";
@@ -680,7 +682,8 @@ export const TOOLS: ToolDef[] = [
       // Recheck after schema/target lookups. GitHub Contents cannot atomically bind
       // a create to another file SHA; a subsequent source edit remains possible.
       if ((await client.read(source.path)).sha !== args.source_sha) throw new GitHubError(409, "The source changed during translation preparation. Reread it.");
-      const commit = await client.save(path, data, String(args.body_html ?? ""), `Translate ${source.path} to ${args.target_locale} via MCP`, null);
+      data.lanzaProvenance = recordAgentFields(source.entry.data, data);
+      const commit = await client.save(path, data, markAgentHtml("", String(args.body_html ?? "")), `Translate ${source.path} to ${args.target_locale} via MCP`, null);
       return { created: path, source_path: source.path, source_sha: args.source_sha, locale: args.target_locale, draft: true, commit, ...stagedNote(site) };
     },
   },
@@ -722,7 +725,8 @@ export const TOOLS: ToolDef[] = [
       }
       // exists() just proved there's no sha; passing null skips save()'s own lookup
       // of the same endpoint.
-      const commit = await client.save(path, data, body, `Create ${path} via MCP`, null);
+      data.lanzaProvenance = recordAgentFields({}, data);
+      const commit = await client.save(path, data, markAgentHtml("", body), `Create ${path} via MCP`, null);
       return { created: path, commit, ...stagedNote(site) };
     },
   },
@@ -747,7 +751,8 @@ export const TOOLS: ToolDef[] = [
       const path = await assertEntryPath(client, String(args.path));
       const current = await client.read(path);
       const merged = mergeFrontmatter(current.data, (args.frontmatter as Record<string, unknown>) ?? {});
-      const body = args.body_html !== undefined ? String(args.body_html) : current.body;
+      merged.lanzaProvenance = recordAgentFields(current.data, merged);
+      const body = args.body_html !== undefined ? markAgentHtml(current.body, String(args.body_html)) : current.body;
       const commit = await client.save(path, merged, body, `Update ${path} via MCP`);
       return { updated: path, commit, ...stagedNote(site) };
     },

@@ -110,7 +110,7 @@ it("record tools retain owner/editor authorization and preserve hidden body on S
   await tools.get("propose_editor_change")!.execute({ fieldPath: "title", expectedRevision: context.revision, value: "Edited" });
   expect(client.saveEntry).not.toHaveBeenCalled();
   await wrapper.findComponent(SaveButton).props("action")();
-  expect(client.saveEntry).toHaveBeenCalledWith("content/authors/original.md", { title: "Edited" }, expect.stringContaining("Hidden body"), expect.any(String), "record-base");
+  expect(client.saveEntry).toHaveBeenCalledWith("content/authors/original.md", { title: "Edited", lanzaProvenance: {version:1,fields:{title:{origin:"agent",text:"Edited"}}} }, expect.stringContaining("Hidden body"), expect.any(String), "record-base");
   Object.assign(access, { role: "viewer" });
   const viewer = await tools.get("get_editor_context")!.execute({}) as { revision: string };
   await expect(tools.get("propose_editor_change")!.execute({ fieldPath: "title", expectedRevision: viewer.revision, value: "Forbidden" })).rejects.toThrow("cannot edit");

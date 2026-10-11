@@ -1,3 +1,4 @@
+import { recordAgentFields } from "../../../frontend/lib/provenance/text.mjs";
 import type { Field } from "../schema";
 import { childPath } from "../fields/field-paths";
 import type { SiteTool } from "./site-tools";
@@ -182,8 +183,10 @@ export function editorSiteTools(editor: EditorSiteTools): SiteTool[] {
         const target = field(input.fieldPath);
         if (target.value !== found.value) throw new Error("The field changed during review. Nothing was applied.");
         editor.pauseAutosave("Agent change applied in your editor. Review it, then Save to keep it and resume autosaving.");
+        const beforeData = JSON.parse(JSON.stringify(editor.data));
         if (Array.isArray(target.parent)) target.parent[Number(target.key)] = input.value;
         else target.parent[String(target.key)] = input.value;
+        editor.data.lanzaProvenance = recordAgentFields(beforeData, editor.data);
         return { accepted: true, changed: true, path: target.path, revision: editor.revision(), saved: false, published: false,
           note: "Applied only in your editor. Review and Save to keep it. Publication remains a separate reviewed action." };
       },

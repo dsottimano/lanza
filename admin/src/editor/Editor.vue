@@ -3,6 +3,7 @@ import { onMounted, onBeforeUnmount, provide, ref, shallowRef } from "vue";
 import { useEditor, EditorContent } from "@tiptap/vue-3";
 import type { GitHubClient } from "../backend/github";
 import { CLIENT_KEY } from "../fields/context";
+import { AgentOrigin, AgentCodeOrigin } from "./extensions/AgentOrigin";
 import StarterKit from "@tiptap/starter-kit";
 import { Table, TableKit } from "@tiptap/extension-table";
 import Link from "@tiptap/extension-link";
@@ -105,6 +106,8 @@ const editor = useEditor({
           : "",
     }),
     Highlight,
+    AgentOrigin,
+    AgentCodeOrigin,
     // Only text blocks carry alignment; it writes `style="text-align: …"`, which
     // survives the frontend sanitizer unchanged (verified round-trip).
     TextAlign.configure({ types: ["heading", "paragraph"] }),
@@ -423,4 +426,8 @@ function link() {
   white-space: pre-wrap;
   word-break: break-word;
 }
+</style>
+
+<style scoped>
+.prose :deep([data-lanza-origin="agent"]) { background-color: #eef0ff; text-decoration: underline dotted #7770a5; text-underline-offset: 4px; }
 </style>

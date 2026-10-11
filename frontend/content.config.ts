@@ -36,6 +36,7 @@ const collection_0 = defineCollection({
     "tags": z.array(z.string()).default([]),
     "author": z.string().optional(),
     "template": z.enum(["default", "full-width", "landing"]).default("default"),
+    lanzaProvenance: z.object({ version: z.literal(1), fields: z.record(z.string(), z.object({ origin: z.literal("agent"), text: z.string() })) }).optional(),
   }),
 });
 
@@ -57,6 +58,7 @@ const collection_1 = defineCollection({
     "template": z.enum(["default", "full-width", "landing"]).default("default"),
     "preset": z.string().optional(),
     "slots": z.record(z.string(), z.any()).optional(),
+    lanzaProvenance: z.object({ version: z.literal(1), fields: z.record(z.string(), z.object({ origin: z.literal("agent"), text: z.string() })) }).optional(),
   }),
 });
 
@@ -66,6 +68,7 @@ const collection_2 = defineCollection({
     "title": z.string(),
     "description": z.string().optional(),
     "parent": z.string().optional(),
+    lanzaProvenance: z.object({ version: z.literal(1), fields: z.record(z.string(), z.object({ origin: z.literal("agent"), text: z.string() })) }).optional(),
   }),
 });
 
@@ -74,6 +77,7 @@ const collection_3 = defineCollection({
   schema: z.object({
     "title": z.string(),
     "description": z.string().optional(),
+    lanzaProvenance: z.object({ version: z.literal(1), fields: z.record(z.string(), z.object({ origin: z.literal("agent"), text: z.string() })) }).optional(),
   }),
 });
 
@@ -83,6 +87,7 @@ const collection_4 = defineCollection({
     "title": z.string(),
     "bio": z.string().optional(),
     "avatar": z.string().optional(),
+    lanzaProvenance: z.object({ version: z.literal(1), fields: z.record(z.string(), z.object({ origin: z.literal("agent"), text: z.string() })) }).optional(),
   }),
 });
 

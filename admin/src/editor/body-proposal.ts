@@ -3,6 +3,8 @@ import { Fragment, Slice, type Node as ProseMirrorNode } from "@tiptap/pm/model"
 import { TextSelection } from "@tiptap/pm/state";
 import { safeEmbedUrl, safeImageUrl, safeLinkUrl } from "./url";
 
+import { markAgentHtml } from "./agent-provenance";
+
 export const MAX_BODY_HTML = 100_000;
 export type BodyTarget = "body" | "selection";
 
@@ -56,6 +58,7 @@ export function readableBodyHtml(html: string): string {
       element.appendChild(document.createTextNode(` [link: ${element.getAttribute("href")}]`));
     }
     for (const attribute of [...element.attributes]) {
+      if (attribute.name === "data-lanza-origin" && attribute.value === "agent") continue;
       if (!(element.matches("td,th") && /^(colspan|rowspan)$/.test(attribute.name) && /^[1-9][0-9]{0,2}$/.test(attribute.value))) {
         element.removeAttribute(attribute.name);
       }
@@ -90,6 +93,10 @@ export function prepareBodyProposal(editor: Editor, target: BodyTarget, html: st
   const transaction = target === "body"
     ? editor.state.tr.replaceWith(from, to, fragment)
     : editor.state.tr.replaceRange(from, to, Slice.maxOpen(fragment, false));
+  transaction.doc.check();
+  const proposedHtml = getHTMLFromFragment(transaction.doc.content, editor.schema);
+  const attributed = parseProposal(editor, markAgentHtml(before.html, proposedHtml));
+  transaction.replaceWith(0, transaction.doc.content.size, attributed);
   transaction.doc.check();
   const after = getHTMLFromFragment(transaction.doc.content, editor.schema);
   if (after.length > MAX_BODY_HTML) throw new Error("The proposed body would exceed the live tool size limit.");

@@ -35,6 +35,7 @@ import { stemOf, takeTranslationSeed } from "../backend/translations";
 import { reportError, clearError } from "../errors";
 import { useEntryEditor } from "./useEntryEditor";
 import { useEditorSiteTools } from "./useEditorSiteTools";
+import { fieldRecords } from "../../../frontend/lib/provenance/text.mjs";
 import { bodyContext, prepareBodyProposal, type BodyTarget } from "../editor/body-proposal";
 import AgentBodyReview from "./AgentBodyReview.vue";
 import AgentRequests from "./AgentRequests.vue";
@@ -562,6 +563,7 @@ onMounted(async () => {
           </div>
           <div class="page-inspector__body">
             <div v-show="pagePanel === 'content'">
+              <p v-if="Object.keys(fieldRecords(data)).length" class="writing-notice">Agent-origin fields are recorded in this entry’s provenance. Human acceptance does not change authorship.</p>
               <p class="page-edit-hint">Choose a section, or click text in the preview to edit it here.</p>
               <TemplateEditor ref="templateEditor" content-only :client="client" :data="data" :locale="locale"
                 :templates="templates" :loading="templatesLoading" :changed="review.changed.value" @focus-field="onFocusField" />
@@ -595,7 +597,7 @@ onMounted(async () => {
           </div>
         </aside>
         <PreviewPane ref="previewRef" class="page-preview" :client="client" :preset="(data.preset as string)"
-          :locale="locale" :slots="slotsData" :body="bodyHtml" @select="onPreviewSelect" />
+          :locale="locale" :slots="slotsData" :provenance="data.lanzaProvenance" :body="bodyHtml" @select="onPreviewSelect" />
       </div>
     </main>
 
@@ -620,6 +622,8 @@ onMounted(async () => {
                 <span aria-hidden="true">Aa</span> {{ focusFormatting ? "Hide formatting" : "Format" }}
               </button>
             </div>
+            <p class="writing-notice">Dotted highlights identify agent-written text. Unmarked text has no recorded origin; it is not certified human-written.</p>
+            <details v-if="Object.keys(fieldRecords(data)).length" class="writing-notice"><summary>Agent-origin fields</summary><ul><li v-for="(_, path) in fieldRecords(data)" :key="path">{{ path }}</li></ul></details>
             <p v-if="translationPreparing" role="status" class="writing-notice">Saving your latest edits for translation…</p>
             <p v-if="translationIssue" role="alert" class="writing-notice">{{ translationIssue }}</p>
             <div v-if="editorRef?.editor && focusFormatting" id="writing-formatting">
