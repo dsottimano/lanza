@@ -154,3 +154,29 @@ legacy Pages Functions compilation. Real production Chrome confirmed the visible
 language tabs, Spanish translation request instructions and cancellation without
 article mutation. Existing empty-collection, public bundle-size and sibling
 Wrangler tsconfig warnings remain. Latest human staging content was preserved.
+
+## Starter homepage and language chooser fixes
+
+0.1.24 added Use this as my homepage (selected by default) to starter preparation.
+The reviewed atomic commit creates a collision-safe unpublished backup of the old
+home entry and updates home to the starter. Unchecking retains the old behavior.
+Malformed/unreadable originals and conflicting URL mappings refuse preparation.
+45 planner/render and 8 CMS starter tests passed; actual Chrome verified both
+review choices without installing a starter. Production deployment `f683bf18`
+preserved published content from `3f03e5e`; it did not relocate the user's already
+installed Writer page. Source `871a032`, rollout `2e8e34a`.
+
+0.1.25 fixes the language chooser: clicking the current language dismisses it,
+Cancel is always available, Escape dismisses it, and autosave/request activity no
+longer disables language navigation. Translation preparation joins an in-flight
+save, shows progress and reports failure instead of silently returning. Necessary
+editor locks explain themselves while retaining Cancel/current-language escape.
+A fresh browser reproduced the English-dismiss failure, but not all buttons being
+disabled in the user's session.33 relevant CMS tests passed, including locked-state
+dismissal; actual production Chrome verified English, Cancel, Ask AI and Start
+blank navigation with all article writes blocked. Source `19043b7`, rollout
+`d955a92`, staging `cfd82bc`, production deployment `a49070ab`.
+
+Both changes passed CMS typecheck/build, check:site and source plus packed tenant
+builds. The starter change also passed legacy Functions compilation. Existing
+empty-collection, public bundle-size and sibling Wrangler tsconfig warnings remain.
