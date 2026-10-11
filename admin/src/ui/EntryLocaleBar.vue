@@ -26,6 +26,8 @@ import { reportError } from "../errors";
 
 const props = defineProps<{
   showUrls?: boolean;
+  requestTranslation?: boolean;
+  locked?: boolean;
   client: GitHubClient;
   collection: FolderCollection;
   locale: Locale;
@@ -35,6 +37,8 @@ const props = defineProps<{
   data: Record<string, unknown>;
 }>();
 
+const emit = defineEmits<{ translate: [code: Locale, label: string] }>();
+const translationTarget = ref<Locale | null>(null);
 const router = useRouter();
 
 // A single-language site has nothing to switch, and a shared collection (authors)
@@ -74,11 +78,17 @@ watch(
 );
 
 function open(code: Locale) {
+  if (props.locked || !loaded.value) return;
   if (code === props.locale) return;
   if (exists(code)) {
     router.push(entryRoute(props.collection.name, code, props.slug));
     return;
   }
+  if (props.requestTranslation) { translationTarget.value = code; return; }
+  startBlank(code);
+}
+function startBlank(code: Locale) {
+  if (props.locked) return;
   // Nothing is written here — the shell is parked for the new-entry editor, which
   // still refuses to save without a title. So "create" costs the user nothing until
   // they have actually written something.
@@ -106,7 +116,7 @@ function hint(code: Locale, label: string): string {
 </script>
 
 <template>
-  <div v-if="show" class="entry-language-bar flex items-center gap-2 text-xs" :class="{ 'entry-language-bar--urls': showUrls }">
+  <div v-if="show" class="entry-language-bar flex flex-wrap items-center gap-2 text-xs" :class="{ 'entry-language-bar--urls': showUrls }">
     <span class="uppercase tracking-wide text-zinc-400">Language</span>
     <div class="segment">
       <button
@@ -116,6 +126,7 @@ function hint(code: Locale, label: string): string {
         class="segment-btn whitespace-nowrap px-2.5"
         :class="{ 'segment-btn--active': l.code === locale }"
         :title="hint(l.code, l.label)"
+        :disabled="locked || (!loaded && l.code !== locale)"
         :aria-current="l.code === locale ? 'true' : undefined"
         @click="open(l.code)"
       >
@@ -124,5 +135,15 @@ function hint(code: Locale, label: string): string {
         <span v-if="showUrls && pathFor(l.code)" class="entry-language-path">{{ pathFor(l.code) }}</span>
       </button>
     </div>
+    <div v-if="translationTarget" class="translation-choice" role="group" aria-label="Create translation">
+      <p>No {{ site.locales.find(l => l.code === translationTarget)?.label }} version yet.</p>
+      <button type="button" class="btn btn-primary" :disabled="locked" @click="emit('translate', translationTarget, site.locales.find(l => l.code === translationTarget)?.label ?? translationTarget); translationTarget = null">Ask AI to translate</button>
+      <button type="button" class="btn btn-ghost" :disabled="locked" @click="startBlank(translationTarget)">Start blank</button>
+      <p>Your connected agent creates a draft for review. Sending a request does not start the agent.</p>
+    </div>
   </div>
 </template>
+<style scoped>
+.translation-choice { flex-basis: 100%; padding: .75rem; background: var(--surface); border: 1px solid var(--border); border-radius: 8px; }
+.translation-choice p { margin: .25rem 0 .6rem; }
+</style>

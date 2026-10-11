@@ -14,7 +14,7 @@ export const SCOPE_LABELS: Record<string, string> = {
 export const TOOL_SCOPES: Record<string, string> = {
   get_site: "content.read", list_collections: "content.read",
   get_schema: "content.read", list_content: "content.read", read_content: "content.read",
-  list_changes: "content.read",
+  list_changes: "content.read", list_translations: "content.read", create_translation: "content.write",
   list_agent_requests: "content.read", read_agent_request: "content.read",
   respond_to_agent_request: "content.write",
   describe_site_system: "content.read", get_settings: "content.read", validate_site: "content.read",

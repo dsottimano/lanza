@@ -153,12 +153,13 @@ describe("tenant OAuth MCP service in workerd", () => {
   });
 
   it("requires write consent to answer requests while read consent can inspect them", () => {
-    for (const name of ["list_agent_requests", "read_agent_request"]) {
+    for (const name of ["list_agent_requests", "read_agent_request", "list_translations"]) {
       expect(missingScopes({ method: "tools/call", params: { name } }, ["content.read"])).toEqual([]);
       expect(OAUTH_TOOLS.find(tool => tool.name === name)?.annotations.readOnlyHint).toBe(true);
     }
     const answer = { method: "tools/call", params: { name: "respond_to_agent_request" } };
     expect(missingScopes(answer, ["content.read"])).toEqual(["content.write"]);
+    expect(missingScopes({ method: "tools/call", params: { name: "create_translation" } }, ["content.read"])).toEqual(["content.write"]);
     expect(missingScopes(answer, ["content.read", "content.write"])).toEqual([]);
     expect(OAUTH_TOOLS.find(tool => tool.name === "respond_to_agent_request")?.securitySchemes)
       .toEqual([{ type: "oauth2", scopes: ["content.read", "content.write"] }]);

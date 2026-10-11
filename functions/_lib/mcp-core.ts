@@ -302,6 +302,68 @@ export async function assertEntryPath(client: ContentClient, path: string): Prom
   return path;
 }
 
+// Translation identity is the exact filename, never a newly translated title.
+async function translationSource(client: ContentClient, raw: unknown) {
+  const path = await assertEntryPath(client, String(raw));
+  const site = await readSiteFile(client);
+  const locales = site.locales.length ? site.locales : [site.defaultLocale];
+  if (locales.some(locale => !/^[A-Za-z0-9]+(?:-[A-Za-z0-9]+)*$/.test(locale))) {
+    throw new GitHubError(400, "The site declares an unsafe locale code.");
+  }
+  for (const col of await getCollections(client)) {
+    if (!col.localized) continue;
+    for (const locale of locales) {
+      const prefix = `${col.folder.replace(/\/+$/, "")}/${locale}/`;
+      if (!path.startsWith(prefix)) continue;
+      const filename = path.slice(prefix.length);
+      if (!filename || filename.includes("/") || filename === ".md") continue;
+      return { path, col, locale, filename, locales, entry: await client.read(path) };
+    }
+  }
+  throw new GitHubError(400, "Translations require a declared localized collection and a direct entry in an enabled locale.");
+}
+
+// Translation patches preserve omitted metadata, template identity and array
+// structure; null is not deletion here. Source assets are kept by their schema.
+function mergeTranslation(current: unknown, incoming: unknown, key = "frontmatter"): unknown {
+  if (incoming === null) throw new GitHubError(400, `Translation cannot remove ${key}.`);
+  if (Array.isArray(current)) {
+    if (!Array.isArray(incoming) || incoming.length !== current.length) throw new GitHubError(400, `Preserve the source list structure at ${key}.`);
+    return incoming.map((value, index) => mergeTranslation(current[index], value, `${key}[${index}]`));
+  }
+  if (isMapping(current)) {
+    if (!isMapping(incoming)) throw new GitHubError(400, `Preserve the source object at ${key}.`);
+    const out = { ...current };
+    for (const [name, value] of Object.entries(incoming)) {
+      if (["__proto__", "prototype", "constructor"].includes(name)) throw new GitHubError(400, "Unsafe translation field.");
+      out[name] = mergeTranslation(current[name], value, `${key}.${name}`);
+    }
+    return out;
+  }
+  return incoming;
+}
+
+async function preserveTranslationAssets(client: ContentClient, source: Record<string, unknown>, translated: Record<string, unknown>, collection: string) {
+  type Field = { name?: string; widget?: string; fields?: Field[]; field?: Field };
+  const schema = JSON.parse(await client.readRaw("data/schema.json") || "[]") as Array<{name?: string; fields?: Field[]}>;
+  const check = (before: Record<string, unknown>, after: Record<string, unknown>, fields: Field[]) => {
+    for (const field of fields) {
+      if (!field.name) continue;
+      const a = before[field.name], b = after[field.name];
+      if (["image", "file"].includes(field.widget || "") && JSON.stringify(a) !== JSON.stringify(b)) throw new GitHubError(400, `Preserve source asset ${field.name} when translating.`);
+      if (field.fields && isMapping(a) && isMapping(b)) check(a, b, field.fields);
+      if (field.fields && Array.isArray(a) && Array.isArray(b)) a.forEach((item, index) => { if (isMapping(item) && isMapping(b[index])) check(item, b[index], field.fields!); });
+      if (field.field && ["image", "file"].includes(field.field.widget || "") && JSON.stringify(a) !== JSON.stringify(b)) throw new GitHubError(400, `Preserve source assets ${field.name} when translating.`);
+    }
+  };
+  check(source, translated, schema.find(col => col.name === collection)?.fields || []);
+  if (typeof source.preset === "string" && /^[a-z0-9]+(?:-[a-z0-9]+)*$/.test(source.preset) && isMapping(source.slots) && isMapping(translated.slots)) {
+    const raw = await client.readRaw(`templates/${source.preset}/fields.json`);
+    if (!raw) throw new GitHubError(400, "Read the source template fields before translating its slots.");
+    check(source.slots, translated.slots, (JSON.parse(raw) as {fields?: Field[]}).fields || []);
+  }
+}
+
 // A template folder name. Identical to the pattern gen-routes.mjs enforces on
 // `route.template`, and for the same reason: it becomes a directory name and is
 // interpolated into generated code. Kept strict rather than merely safe — a name that
@@ -562,7 +624,51 @@ export const TOOLS: ToolDef[] = [
     inputSchema: obj({ path: str("Repo path, e.g. 'content/pages/en/about.md'.") }, ["path"]),
     run: async (args, client) => {
       const entry = await client.read(await assertEntryPath(client, String(args.path)));
-      return { path: entry.path, frontmatter: entry.data, body_html: entry.body };
+      return { path: entry.path, sha: entry.sha, frontmatter: entry.data, body_html: entry.body };
+    },
+  },
+  {
+    name: "list_translations",
+    description: "Discover linked saved translations for an entry. Returns source SHA and each enabled locale's same-filename path and existence. Reads staging, not unsaved editor text. Shared/non-localized collections cannot be translated.",
+    inputSchema: obj({ path: str("Saved source entry path in an enabled locale.") }, ["path"]),
+    run: async (args, client) => {
+      const source = await translationSource(client, args.path);
+      const translations = [];
+      for (const locale of source.locales) {
+        const path = `${source.col.folder.replace(/\/+$/, "")}/${locale}/${source.filename}`;
+        translations.push({ locale, path, exists: locale === source.locale || await client.exists(path) });
+      }
+      return { source_path: source.path, source_sha: source.entry.sha, collection: source.col.name, source_locale: source.locale, stem: source.filename.slice(0, -3), translations };
+    },
+  },
+  {
+    name: "create_translation",
+    description: "Create a missing linked translation on staging using translated fields/HTML supplied by the agent. No external model is invoked. Keeps the source filename, omitted metadata/assets and template/list structure; always draft:true. Requires the source SHA from read_content/list_translations, refuses stale source or existing target. Translate all prose, preserve facts, links and body assets, then ask the human to review. Does not switch the live editor, translate unsaved text, change URL mappings or publish.",
+    inputSchema: obj({
+      source_path: str("Saved source entry path."), source_sha: str("Source SHA read before translating."),
+      target_locale: str("Different enabled locale."),
+      frontmatter: { type: "object", description: "Translated title and other prose fields per schema, merged into source. Omitted values remain; no deletions, template/asset changes or list reshaping.", additionalProperties: true },
+      body_html: str("Complete translated HTML body; required when the source has a body. Preserve source links and media."),
+    }, ["source_path", "source_sha", "target_locale", "frontmatter"]),
+    run: async (args, client, site) => {
+      const source = await translationSource(client, args.source_path);
+      if (typeof args.source_sha !== "string" || args.source_sha !== source.entry.sha) throw new GitHubError(409, "The saved source changed. Reread it and translate the current version.");
+      if (typeof args.target_locale !== "string" || !source.locales.includes(args.target_locale) || args.target_locale === source.locale) throw new GitHubError(400, "Choose a different enabled target locale.");
+      if (!isMapping(args.frontmatter) || typeof args.frontmatter.title !== "string" || !args.frontmatter.title.trim()) throw new GitHubError(400, "Supply translated frontmatter with a non-empty title.");
+      for (const key of ["preset", "template"]) if (Object.hasOwn(args.frontmatter, key) && args.frontmatter[key] !== source.entry.data[key]) throw new GitHubError(400, `Preserve the source ${key} when translating.`);
+      if (source.entry.body.trim() && typeof args.body_html !== "string") throw new GitHubError(400, "Supply the translated body_html; the source body must not be silently copied.");
+      if (args.body_html !== undefined && typeof args.body_html !== "string") throw new GitHubError(400, "body_html must be a string.");
+      if (source.entry.body.trim() && !String(args.body_html).trim()) throw new GitHubError(400, "The translated body must not be empty.");
+      const data = mergeTranslation(source.entry.data, args.frontmatter) as Record<string, unknown>;
+      data.draft = true;
+      await preserveTranslationAssets(client, source.entry.data, data, source.col.name);
+      const path = await assertEntryPath(client, `${source.col.folder.replace(/\/+$/, "")}/${args.target_locale}/${source.filename}`);
+      if (await client.exists(path)) throw new GitHubError(409, "The target translation already exists. Read and review it instead of overwriting it.");
+      // Recheck after schema/target lookups. GitHub Contents cannot atomically bind
+      // a create to another file SHA; a subsequent source edit remains possible.
+      if ((await client.read(source.path)).sha !== args.source_sha) throw new GitHubError(409, "The source changed during translation preparation. Reread it.");
+      const commit = await client.save(path, data, String(args.body_html ?? ""), `Translate ${source.path} to ${args.target_locale} via MCP`, null);
+      return { created: path, source_path: source.path, source_sha: args.source_sha, locale: args.target_locale, draft: true, commit, ...stagedNote(site) };
     },
   },
   {

@@ -101,9 +101,23 @@ staging, so review and trust their source before applying, not just before Publi
   per-language mappings. The CMS saves a URL change and its 301s atomically. MCP has
   no URL migration tool yet; editing a title or inventing a frontmatter slug is not
   a URL migration.
-- `create_content` derives filenames from titles; it cannot independently specify a
-  translation identity. Start linked translations using the CMS language control,
-  then update their actual paths.
+- `list_translations({path})` discovers enabled-locale paths and the saved source
+  SHA. Read the source with `read_content` (now includes `sha`), then call
+  `create_translation({source_path, source_sha, target_locale, frontmatter, body_html})`
+  with translated prose supplied by the agent. Creation preserves the same filename,
+  omitted metadata, template/list structure and declared image assets; it always
+  sets `draft:true` and refuses existing targets. No model is invoked by the tool.
+  Translate all prose before review: omitted text is preserved in its source language.
+  A saved translation request does not start an autonomous agent.
+- Translation creation checks the source SHA on read and again immediately before
+  writing. GitHub Contents cannot atomically condition the new file on another
+  file's revision: an edit after that final check can still occur. The response
+  records the source SHA used; review source and target together before publication.
+  Concurrent target creation is protected by creating without a target SHA.
+- Translation tools operate on saved staging content, never unsaved editor text.
+  They do not switch the browser editor or migrate public URL mappings. Existing
+  translations require a separate reviewed edit; `create_content` is not a way to
+  create a linked translation because it derives filenames from titles.
 - No MCP tool currently reads raw templates or uploads images. Preserve existing
   templates unless their source can be inspected through repository access. Use
   approved existing assets rather than inventing successful upload results.

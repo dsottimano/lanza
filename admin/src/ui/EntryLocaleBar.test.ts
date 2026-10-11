@@ -155,3 +155,21 @@ it("uses the configured default locale when showing language URLs", async () => 
   expect(wrapper.findAll('.entry-language-path').map(el => el.text())).toEqual(['/en/about/', '/about/']);
   wrapper.unmount();
 });
+
+it("offers an agent request without navigating or creating a blank entry", async () => {
+  const { wrapper, router } = await bar({ requestTranslation: true });
+  await wrapper.findAll("button")[1].trigger("click");
+  expect(router.currentRoute.value.fullPath).toBe("/");
+  const ask = wrapper.findAll("button").find(b => b.text() === "Ask AI to translate")!;
+  await ask.trigger("click");
+  expect(wrapper.emitted("translate")).toEqual([["es", "Español"]]);
+  expect(router.currentRoute.value.fullPath).toBe("/");
+});
+
+it("retains explicit blank-translation creation alongside the agent option", async () => {
+  const { wrapper, router } = await bar({ requestTranslation: true });
+  await wrapper.findAll("button")[1].trigger("click");
+  await wrapper.findAll("button").find(b => b.text() === "Start blank")!.trigger("click");
+  await flushPromises();
+  expect(router.currentRoute.value.fullPath).toBe("/pages/es/new?slug=about");
+});

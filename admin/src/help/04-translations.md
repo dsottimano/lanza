@@ -22,16 +22,14 @@ site and the editor immediately — any content files already written for it sta
 the repo (ignored) unless you delete them, so you can re-enable it later without
 losing work.
 
-## The language switcher
+## Switching languages
 
-When more than one language is enabled, a **language toggle** appears at the top of
-the left rail. It sets the language you're *currently editing*. When you switch:
+For a localized entry, language tabs appear above the writing title and in
+**Details**. Choose a language to open its linked translation. Lanza asks you to
+save or discard unsaved changes before leaving the current entry.
 
-- Posts, Pages, Categories and Tags show **that language's** entries.
-- A new entry you create is saved into that language.
-- The **Menu** and **SEO defaults** settings edit that language's version.
-
-Authors and uploaded images are shared across languages, so they ignore the toggle.
+Collection lists also let you choose the language you are browsing. Authors and
+uploaded images are shared across languages.
 
 ## How a translation is linked
 
@@ -46,14 +44,21 @@ switcher** appears in the header linking the two, and search engines get correct
 
 ## Translating an entry
 
-1. Open or finish the entry in the default language (EN).
-2. Switch the rail toggle to **ES** (or FR).
-3. Create a new entry **with the same title/slug** as the original, and write the
-   translated content.
+1. Save the source entry, then choose another language using its language tab.
+2. If no translation exists, choose **Ask AI to translate** or **Start blank**.
+3. Ask AI saves a private request for your connected agent. Tell the agent to read
+   your saved translation request; submitting it does not automatically start a chat.
+   Private requests require a private repository and the site owner's access.
+4. The agent reads the saved source and creates a linked, unpublished translation.
+   Open its language tab to review the words, links and images before publishing.
 
-Tip: give the translation the **same filename** as the original so they link up.
-The filename comes from the title, so using the original title (or fixing the slug
-to match) keeps them paired.
+**Start blank** opens a linked draft for you to write yourself. Both paths retain
+the original filename even when the translated title is different. Do not create
+an unrelated post just to match a translated title.
+
+The agent works from the saved source, so save your latest edits first. Existing
+translations are opened for review and are never overwritten by translation
+creation. Saving and translating do not publish the site.
 
 ## Partial translations are fine
 

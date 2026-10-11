@@ -2,7 +2,7 @@
 import { computed, nextTick, onBeforeUnmount, onMounted, ref, watch, watchEffect } from "vue";
 import type { Editor } from "@tiptap/core";
 import { TextSelection } from "@tiptap/pm/state";
-import { captureRequestAnchor, createAgentRequest, listAgentRequests, newRequestId, requestActions, requestContext, requestInstructions, resolveAgentRequest,
+import { captureRequestAnchor, htmlHash, createAgentRequest, listAgentRequests, newRequestId, requestActions, requestContext, requestInstructions, resolveAgentRequest,
   type RequestAction, type RequestAnchor, type SavedRequest } from "../backend/agent-requests";
 
 const props = defineProps<{ editor?: Editor; path: string | null; enabled: boolean; locked: boolean;
@@ -49,7 +49,7 @@ const capturing = ref(false);
 const error = ref("");
 const notice = ref("");
 const copiedContext = ref("");
-const pending = ref<{ id: string; action: RequestAction; anchor: RequestAnchor; submittedInstruction?: string } | null>(null);
+const pending = ref<{ id: string; action: RequestAction; anchor: RequestAnchor; submittedInstruction?: string; title?: string } | null>(null);
 const instruction = ref("");
 const dialog = ref<HTMLDialogElement>();
 const noteInput = ref<HTMLTextAreaElement>();
@@ -137,6 +137,27 @@ async function beginRequest(action: RequestAction) {
   } catch (reason) { if (alive && epoch === generation) { error.value = String(reason instanceof Error ? reason.message : reason); open.value = true; } }
   finally { if (epoch === generation) capturing.value = false; }
 }
+async function requestTranslation(code: string, label: string) {
+  if (!available.value || props.locked || working.value || capturing.value || pending.value) return;
+  const editor = props.editor!;
+  const doc = editor.state.doc;
+  const epoch = generation;
+  capturing.value = true; error.value = "";
+  try {
+    const to = Math.min(doc.content.size, 4000);
+    const quote = doc.textBetween(0, to, "\n");
+    if (!quote.trim()) throw new Error("Write and save the source article before requesting a translation.");
+    const bodyHash = await htmlHash(editor.getHTML());
+    if (!alive || epoch !== generation || editor.isDestroyed || editor.state.doc !== doc) throw new Error("The article changed. Save it and request the translation again.");
+    const anchor = { quote, from: 0, to, bodyHash, before: "", after: doc.textBetween(to, Math.min(doc.content.size, to + 120), "\n") };
+    pending.value = { id: newRequestId(), action: "ask", anchor, title: `Translate to ${label}` };
+    instruction.value = `Translate the entire saved entry at ${props.path} into ${label} (locale ${code}). The quote is only context, not the whole article. Use list_translations and read_content, then create_translation with the current source SHA and target_locale ${code}. Translate title, body, descriptions, captions and alt text faithfully; preserve citations, links, figures, quantities and layout. Keep the matching filename. Create a draft only; never overwrite an existing translation or publish. Reply to this request with the new CMS path, not replacementHtml for the source article. If the saved source differs from this request, ask for confirmation before proceeding.`;
+    await nextTick(); dialog.value?.showModal(); noteInput.value?.focus();
+  } catch (reason) { error.value = reason instanceof Error ? reason.message : "Could not prepare translation request."; open.value = true; }
+  finally { capturing.value = false; }
+}
+defineExpose({ requestTranslation });
+
 function cancelRequest() {
   dialog.value?.close(); pending.value = null;
 }
@@ -194,7 +215,7 @@ async function copy(saved: SavedRequest) {
     </div>
 
     <dialog v-if="pending" ref="dialog" class="request-dialog" aria-labelledby="request-dialog-title" @cancel.prevent="!working && cancelRequest()">
-      <h2 id="request-dialog-title">{{ requestActions[pending.action] }}</h2>
+      <h2 id="request-dialog-title">{{ pending.title ?? requestActions[pending.action] }}</h2>
       <blockquote>{{ pending.anchor.quote }}</blockquote>
       <label for="agent-request-instruction">Anything to add? <span class="request-hint">Optional</span></label>
       <textarea id="agent-request-instruction" ref="noteInput" v-model="instruction" maxlength="4000" rows="4" placeholder="For example: verify against primary sources, or suggest an animated explanation of how the ground moves." :disabled="working || pending.submittedInstruction !== undefined" />

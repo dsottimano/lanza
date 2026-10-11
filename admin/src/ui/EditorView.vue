@@ -135,6 +135,12 @@ const urlFrame = computed(() =>
 );
 const urlPrefix = computed(() => urlFrame.value?.prefix ?? "");
 const urlSuffix = computed(() => urlFrame.value?.suffix ?? "");
+const agentRequestsRef = ref<InstanceType<typeof AgentRequests>>();
+async function askForTranslation(code: Locale, label: string) {
+  if (dirty.value || !currentPath.value) await saveNow();
+  if (dirty.value || saving.value || saveError.value || !currentPath.value) return;
+  await agentRequestsRef.value?.requestTranslation(code, label);
+}
 const languageLabel = computed(() => site.locales.find(language => language.code === props.locale)?.label ?? props.locale);
 const urlLabel = computed(() => urlFrame.value
   ? (props.collection.localized ? `${languageLabel.value} URL` : "URL") : "Slug");
@@ -567,7 +573,9 @@ onMounted(async () => {
           </div>
           <div v-else class="editor-paper w-full">
             <div class="writing-document-bar">
-              <span>{{ languageLabel }} <span aria-hidden="true">·</span> {{ collection.labelSingular }}</span>
+              <EntryLocaleBar v-if="collection.localized && site.locales.length > 1 && entryStem" :client="client" :collection="collection" :locale="locale" :slug="entryStem" :data="data"
+                :request-translation="isOwner()" :locked="saving || deleting || requestBusy || !!bodyReview || loading || !!recovery" @translate="askForTranslation" />
+              <span v-else>{{ languageLabel }} <span aria-hidden="true">·</span> {{ collection.labelSingular }}</span>
               <button type="button" class="writing-format-toggle" :aria-expanded="focusFormatting"
                 aria-controls="writing-formatting" @click="focusFormatting = !focusFormatting">
                 <span aria-hidden="true">Aa</span> {{ focusFormatting ? "Hide formatting" : "Format" }}
@@ -588,7 +596,7 @@ onMounted(async () => {
                 @input="markDirty(); growTitle()"
               />
             </label>
-            <AgentRequests :editor="editorRef?.editor" :path="currentPath" :enabled="isOwner()"
+            <AgentRequests ref="agentRequestsRef" :editor="editorRef?.editor" :path="currentPath" :enabled="isOwner()"
               :locked="editorLoading || loadFailed || saving || deleting || preparingPublication || !!recovery || !!editorProblem || !!saveError || !!bodyReview"
               :review-replacement="reviewRequestReplacement" @busy="requestBusy = $event" />
             <Editor ref="editorRef" :initial-html="bodyHtml" :client="client" :show-inspector="false" @change="markDirty" @invalid="editorProblem = $event" />

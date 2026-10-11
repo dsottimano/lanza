@@ -1352,3 +1352,76 @@ test("theme guidance is discoverable without granting installation tools", async
   assert.match(contract.themes.trust, /staging builds execute/);
   assert.match(contract.themes.agentWorkflow.join(" "), /no MCP starter-install/);
 });
+
+// Linked translations use source identity, not translated-title slugification.
+const translationFixture = (extra = {}) => fakeGitHub({
+  "data/site.json": SITE,
+  "data/schema.json": JSON.stringify([{kind:"folder", name:"pages", folder:"content/pages", localized:true, body:"rich", fields:[{name:"title",widget:"string"},{name:"featuredImage",widget:"image"},{name:"seo",widget:"object",fields:[{name:"ogImage",widget:"image"}]}]}, {kind:"folder",name:"authors",folder:"content/authors",localized:false}]),
+  "content/pages/en/about.md": "---\ntitle: About\ntemplate: article\nfeaturedImage: /images/photo.jpg\nseo:\n  metaDescription: English description\n  ogImage: /images/social.jpg\nitems:\n  - title: One\n    image: /images/one.jpg\n---\n<p>Source body</p>\n",
+  ...extra,
+});
+const translationCall = (name, args, c = client()) => handleMessage({jsonrpc:"2.0",id:1,method:"tools/call",params:{name,arguments:args}},c);
+const translationArgs = () => ({source_path:"content/pages/en/about.md",source_sha:"sha-content/pages/en/about.md",target_locale:"es",frontmatter:{title:"Acerca de",seo:{metaDescription:"Descripción"}},body_html:"<p>Cuerpo traducido</p>"});
+
+test("translation discovery returns declared locale paths and saved SHA", async () => {
+  translationFixture();
+  const result = toolData(await translationCall("list_translations", {path:"content/pages/en/about.md"}));
+  assert.equal(result.source_sha,"sha-content/pages/en/about.md");
+  assert.equal(result.stem,"about");
+  assert.deepEqual(result.translations,[{locale:"en",path:"content/pages/en/about.md",exists:true},{locale:"es",path:"content/pages/es/about.md",exists:false}]);
+  assert.equal(toolData(await translationCall("read_content",{path:result.source_path})).sha,result.source_sha);
+});
+
+test("translation creation preserves identity, assets and metadata and forces draft", async () => {
+  const gh = translationFixture(); const before=gh.files.get("content/pages/en/about.md");
+  const args=translationArgs(); args.frontmatter.draft=false;
+  const result=toolData(await translationCall("create_translation",args));
+  assert.equal(result.created,"content/pages/es/about.md"); assert.equal(result.draft,true);
+  const target=await client().read(result.created);
+  assert.equal(target.data.title,"Acerca de");assert.equal(target.data.draft,true);
+  assert.equal(target.data.template,"article");assert.equal(target.data.featuredImage,"/images/photo.jpg");
+  assert.equal(target.data.seo.ogImage,"/images/social.jpg");assert.equal(target.data.seo.metaDescription,"Descripción");
+  assert.equal(target.data.items[0].image,"/images/one.jpg");assert.match(target.body,/Cuerpo traducido/);
+  assert.equal(gh.files.get("content/pages/en/about.md"),before);assert.equal(gh.published,false);
+});
+
+test("translation refuses existing targets, stale source and invalid locale/path inputs without writes", async () => {
+  for (const patch of [{source_sha:"stale"},{target_locale:"en"},{target_locale:"../evil"},{target_locale:"fr"},{source_path:"data/site.json"},{source_path:"content/pages/fr/about.md"},{source_path:"content/pages/en/nested/about.md"},{source_path:"content/authors/about.md"}]) {
+    const gh=translationFixture({"content/authors/about.md":"---\ntitle: Person\n---\n"});const size=gh.files.size;
+    const response=await translationCall("create_translation",{...translationArgs(),...patch});
+    assert.equal(response.result.isError,true,JSON.stringify(patch));assert.equal(gh.files.size,size);
+  }
+  const gh=translationFixture({"content/pages/es/about.md":"Human translation"});
+  assert.equal((await translationCall("create_translation",translationArgs())).result.isError,true);
+  assert.equal(gh.files.get("content/pages/es/about.md"),"Human translation");
+});
+
+test("translation refuses missing prose, structural deletion and asset replacement", async () => {
+  for (const patch of [{body_html:undefined},{body_html:""},{frontmatter:{}},{frontmatter:{title:"Título",template:"other"}},{frontmatter:{title:"Título",featuredImage:"/other.jpg"}},{frontmatter:{title:"Título",seo:{ogImage:"/other.jpg"}}},{frontmatter:{title:"Título",seo:null}},{frontmatter:{title:"Título",items:[]}}]) {
+    const gh=translationFixture();
+    const result=await translationCall("create_translation",{...translationArgs(),...patch});
+    assert.equal(result.result.isError,true,JSON.stringify(patch));assert.equal(gh.files.has("content/pages/es/about.md"),false);
+  }
+});
+
+test("translation source change during preparation and concurrent target creation cannot overwrite", async () => {
+  for (const mode of ["source","target"]) {
+    const gh=translationFixture(); const fetch=globalThis.fetch;let reads=0;
+    globalThis.fetch=async (url,init={})=>{
+      if(String(url).includes("contents/content/pages/en/about.md") && (init.method||"GET")==="GET" && ++reads===2 && mode==="source") {
+        const response=await fetch(url,init); const body=await response.json(); body.sha="new-source-sha";return Response.json(body);
+      }
+      if(mode==="target" && init.method==="PUT" && String(url).includes("contents/content/pages/es/about.md")) {
+        assert.equal(JSON.parse(init.body).sha,undefined);return Response.json({message:"sha was not supplied"},{status:409});
+      }
+      return fetch(url,init);
+    };
+    assert.equal((await translationCall("create_translation",translationArgs())).result.isError,true);
+    assert.equal(gh.files.has("content/pages/es/about.md"),false);
+  }
+});
+
+test("translation refuses hostile locale declarations even if marked enabled", async () => {
+  translationFixture({"data/site.json":JSON.stringify({defaultLocale:"en",locales:[{code:"en"},{code:"../bad"}]})});
+  assert.equal((await translationCall("create_translation",{...translationArgs(),target_locale:"../bad"})).result.isError,true);
+});
