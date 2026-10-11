@@ -8,9 +8,9 @@ existing local work. Read `docs/review-surface.md` before changing CMS previews.
 - Read `docs/todos.md` and its current handoff before resuming. The queue, delivery
   evidence and historical backlog serve different purposes; do not repeat completed
   migrations or treat old test counts as a current verification result.
-- As of October 10, active product work is in sibling `lanza-agent-requests` on
-  `feat/agent-requests`; the original `lanza` checkout has retained local work.
-  Check actual branches/status before editing. See `docs/handoff-2026-10-10.md`.
+- Active plugin integration is in `lanza` on `feat/plugins-cms`, based on
+  `feat/agent-requests`. Retained local edits were reconciled; the pre-integration
+  stash and external recovery copy remain available. Check actual status before editing.
 - Keep general CMS behavior in shared Lanza source and tenant words/data in the
   tenant repository. A tenant workaround alone does not complete a product fix.
 - Read the latest saved content and requests before editing; preserve the author's
