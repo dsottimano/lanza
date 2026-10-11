@@ -1,0 +1,124 @@
+{
+  "version": 1,
+  "repository": "dsottimano/pananomica",
+  "article": {
+    "id": "how-earthquake-proof-is-panama-city",
+    "contentPath": "content/posts/en/how-earthquake-proof-is-panama-city.md",
+    "generatedFactIds": [
+      "oct9-main-magnitude",
+      "oct9-main-depth-km",
+      "oct9-main-origin-utc",
+      "oct9-main-status"
+    ]
+  },
+  "sources": [
+    {
+      "id": "usgs-oct9-catalog",
+      "url": "https://earthquake.usgs.gov/fdsnws/event/1/query?format=geojson&starttime=2026-10-09T00%3A00%3A00&endtime=2026-10-10T00%3A00%3A00&minlatitude=6&maxlatitude=10&minlongitude=-84&maxlongitude=-77&minmagnitude=6&orderby=time-asc",
+      "format": "json",
+      "requiredText": [
+        "us6000u18k"
+      ]
+    },
+    {
+      "id": "financial-park-case-study",
+      "url": "https://www.walterpmoore.com/projects/financial-park-office-towers",
+      "format": "html",
+      "selector": "body",
+      "requiredText": [
+        "Financial Park",
+        "site class E",
+        "site class C"
+      ]
+    },
+    {
+      "id": "usgs-panama-faults",
+      "url": "https://www.usgs.gov/publications/neotectonics-and-paleoseismology-limon-and-pedro-miguel-faults-panama-earthquake",
+      "format": "html",
+      "selector": "body",
+      "requiredText": [
+        "Neotectonics and paleoseismology",
+        "Pedro Miguel"
+      ]
+    },
+    {
+      "id": "rep2021-legal-index",
+      "url": "https://infojuridica.procuraduria-admon.gob.pa/norma_screen?numsec=58567",
+      "format": "html",
+      "selector": "body",
+      "requiredText": [
+        "REP-2021"
+      ]
+    },
+    {
+      "id": "panama-city-regulations",
+      "url": "https://doyc.mupa.gob.pa/publicaciones-y-normas/",
+      "format": "html",
+      "selector": "body",
+      "requiredText": [
+        "Reglamento",
+        "Estructural"
+      ]
+    }
+  ],
+  "facts": [
+    {
+      "id": "oct9-main-magnitude",
+      "label": "Mainshock magnitude",
+      "sourceId": "usgs-oct9-catalog",
+      "extract": {
+        "type": "json-pointer",
+        "select": {
+          "pointer": "/features",
+          "key": "/id",
+          "value": "us6000u18k"
+        },
+        "pointer": "/properties/mag"
+      }
+    },
+    {
+      "id": "oct9-main-depth-km",
+      "label": "Mainshock depth",
+      "sourceId": "usgs-oct9-catalog",
+      "extract": {
+        "type": "json-pointer",
+        "select": {
+          "pointer": "/features",
+          "key": "/id",
+          "value": "us6000u18k"
+        },
+        "pointer": "/geometry/coordinates/2"
+      },
+      "unit": "km"
+    },
+    {
+      "id": "oct9-main-origin-utc",
+      "label": "Mainshock origin time (UTC)",
+      "sourceId": "usgs-oct9-catalog",
+      "extract": {
+        "type": "json-pointer",
+        "select": {
+          "pointer": "/features",
+          "key": "/id",
+          "value": "us6000u18k"
+        },
+        "pointer": "/properties/time",
+        "transform": "epoch-ms-iso"
+      }
+    },
+    {
+      "id": "oct9-main-status",
+      "label": "USGS review status",
+      "sourceId": "usgs-oct9-catalog",
+      "extract": {
+        "type": "json-pointer",
+        "select": {
+          "pointer": "/features",
+          "key": "/id",
+          "value": "us6000u18k"
+        },
+        "pointer": "/properties/status"
+      }
+    }
+  ]
+}
