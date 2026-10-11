@@ -6,12 +6,75 @@ Updated 2026-10-10. Start here after clearing conversation context.
 
 1. [Product vision](product-vision.md): agreed direction and v1 boundaries.
 2. [Thoughts v1](thoughts-v1.md): implementation contract and unresolved mechanics.
-3. [September handoff](handoff-2026-09-07.md): local changes and verification.
-4. [Security model](security-model.md) before touching auth, repository access or MCP.
+3. [Current handoff](handoff-2026-10-10.md): worktrees, tenant state and next session.
+4. [Delivery evidence](agent-requests-delivery-2026-10-10.md): shipped CMS fixes and limits.
+5. [Security model](security-model.md) before touching auth, repository access or MCP.
 
 The previous 746-line list is preserved in [TODO history](todos-history.md).
 It is historical evidence, not the current queue. Do not repeat old auth migrations,
 release old package versions, or treat old test counts as the current baseline.
+
+## Next session: content first
+
+- [ ] Continue **Article 1 — How Earthquake-Proof Is Panama City?** with the human's
+  latest saved prose. Read current staging and private requests before changing
+  anything. Verify factual claims against primary sources; distinguish magnitude,
+  local shaking and building performance. Do not rewrite the author's voice wholesale.
+- [ ] Complete the requested research workflow: inspect the existing research
+  schema/UI and collector before adding more. Prove a deterministic refresh from
+  recorded sources, dated snapshots and a reviewable diff. Worker deployment and
+  cron execution are not established; do not mark them working from local tests.
+- [ ] Review the new staging homepage with the owner. Writer now owns `/` through
+  Pages → English → Home; starter copy is still placeholder copy. Old setup content
+  is a draft backup. Publication remains the owner's Review & publish action.
+- [ ] Create a Spanish article draft when requested, using the existing translation
+  tools and latest source SHA. No Spanish article was created as a test.
+
+## Product follow-ups from the real tenant
+
+- [ ] Make request status unambiguous: **Resolved is not Answered**. A request with
+  no reply must not suggest that the assistant supplied one. Preserve existing
+  requests; verify answer rendering and the no-answer state in the real browser.
+- [ ] Finish the real ChatGPT connection proof. Inspect existing OAuth Worker,
+  plugin template and MCP instructions first. Ordinary browser/terminal sessions
+  cannot read an unsaved live editor. Saved requests do not wake a chat. See
+  [connection status](chatgpt-integration.md); client setup remains unverified.
+- [ ] Audit privacy setup and public→private repository transitions. Preserve the
+  already-private tenant; check existing implementation before coding. Offer an
+  explained repository-visibility choice during onboarding and in Settings, with
+  clear consequences for public source versus a public website.
+- [ ] Verify owner/editor concurrent publishing, session-refresh races and remaining
+  media/editor cancellation/accessibility against the latest code. Existing live
+  tests cover specific interactions, not every workflow.
+- [ ] Show deployment completion/failure separately from successful Git publication.
+- [ ] Review CLI recipe write-phase failures and concurrent filesystem changes;
+  input preflight is not a rollback transaction.
+- [ ] Evaluate server-side publication protection; the local hook is not a
+  repository-wide policy.
+
+## Release and integration
+
+- [ ] Reconcile `feat/agent-requests` with current product main/staging and retained
+  work in the original checkout. Do not overwrite or blindly reapply those changes.
+- [ ] Run the full current suite and validate the final packed artifact before a
+  shared release. Rebuild CMS assets explicitly before packing when lifecycle
+  scripts are disabled. Run legacy Pages Functions compilation for Functions edits.
+- [ ] Release the shared npm package through the normal authenticated flow. Tenant
+  0.1.25 is a private tarball dependency; public npm publication previously hit
+  EOTP. Source branch, package, Git push and live deployment are distinct states.
+- [ ] Verify each intended deployment against its commit and actual URL, including
+  staging and production. Preserve CMS edits through every reconciliation.
+
+## Completed this session
+
+Implemented in the shared feature branch and delivered to Pananómica: highlighted
+text requests and replies, selection-anchored actions, Delete post, clearer
+publication controls, clipboard image upload/removal, language navigation,
+MCP translation tools, starter homepage choice with draft backup, and language
+chooser escape controls. The installed tenant homepage was separately corrected
+on staging. See [delivery evidence](agent-requests-delivery-2026-10-10.md) and the
+[current handoff](handoff-2026-10-10.md). This is not a public npm release or proof
+of automatic ChatGPT connection.
 
 ## Locked product decisions
 
@@ -53,7 +116,7 @@ release old package versions, or treat old test counts as the current baseline.
   [eligibility](https://developers.cloudflare.com/monetization-gateway/eligibility/),
   [setup](https://developers.cloudflare.com/monetization-gateway/get-started/).
 
-## Now: prove one complete thought workflow
+## Longer-term: prove one complete thought workflow
 
 - [ ] **Verify the real client path first.** On a disposable private tenant, prove
   the intended ChatGPT/Claude client can call connected tools in the intended
@@ -82,32 +145,15 @@ release old package versions, or treat old test counts as the current baseline.
   conversation, develop, review in CMS, publish a chosen derivative and verify the
   note stays private and survives website Discard.
 
-## Publishing reliability: September 7 repair
+## Earlier completed work
 
-See [Publishing and reconciliation](publishing.md) for the incident and workflow.
-
-- [x] Reconcile the homepage conflict while preserving the owner's latest English
-  headline and introduction in the new design. Restore the legal page's visible body.
-- [x] Push the reconciled code/content to main and staging together (`7239901`).
-- [x] Capture immutable branch tips for CMS review; reject stale reviews; publish
-  the reviewed SHA with a fast-forward-only update. Never force an overwrite.
-- [x] Require Update drafts and a fresh review when main/staging diverge; show
-  conflict recovery inline. Distinguish Review & publish from the final Publish site.
-- [x] Test duplicate clicks, stale tips, production races, conflicts and load errors.
-- [x] Add and enable the local pre-push guard against stranding pending CMS commits.
-- [x] Give MCP publishing reviewed-commit and reconciliation safeguards, including
-  stale-review refusal, non-force publication and incomplete-comparison blocking.
-- [ ] Browser-check the deployed publishing flow, including concurrent editing.
-- [ ] Show deployment completion/failure after publishing, separately from Git success.
-- [ ] Evaluate server-side protection for writers outside this checkout. The local
-  hook is not a repository-wide enforcement policy.
+September publishing reconciliation, schema/page contracts, starter expansion,
+brand preview and product-page migration are recorded in the
+[September handoff](handoff-2026-09-07.md), [publishing contract](publishing.md)
+and [October production review](admin-production-review-2026-10-10.md).
+Historical test counts are evidence for those checkpoints, not today's baseline.
 
 ## Finish the current product pass
-
-- [x] Retire the separate Pages content-block field. No repository entries used it.
-  Presets/slots and rich text are the authoring surfaces; legacy tenant rendering
-  stays compatible and undeclared legacy content blocks the build. Rename the
-  independent rich-text reuse feature to Saved snippets.
 
 - [ ] Align homepage copy, SEO and CMS guides with conversation-first GitHub v1.
   Preserve the owner's latest English hero text (“Your website, your rules. Free,
@@ -115,11 +161,6 @@ See [Publishing and reconciliation](publishing.md) for the incident and workflow
   do not replace approved copy or advertise the notebook as shipped.
 - [ ] Simplify designed-page settings: remove irrelevant block/image/excerpt controls
   where the chosen template does not use them. Page blocks are already retired.
-- [x] Brand changes now support preview, Cancel and Apply to staging; Cancel restores
-  the last loaded/applied brand. Starter installation review can also be canceled.
-- [x] Expand site starters to Portfolio, Real estate, Writer and Events with five
-  looks and introduction/listing/detail previews. Add optional first-party reading
-  progress and image zoom under Brand & themes → Plugins.
 - [ ] Layout/template switching for installed designs remains open.
 - [ ] Develop the agent-built plugin workflow: turn a human's requested feature
   into site-owned code and declared settings, with testing, review and reversible
@@ -128,19 +169,9 @@ See [Publishing and reconciliation](publishing.md) for the incident and workflow
 - [ ] Improve content-type deletion discoverability. It works under Advanced
   settings → Remove content type, but the user could not find it. No subsequent
   visibility improvement was implemented.
-- [x] Resolve the two header scope errors: `menuLabel` and
-  `primaryNavigationLabel` now match the actual Base render data.
-- [x] Wire How it works, Start, Agents, Architecture and Blog into Pages in both
-  languages. Add schema/slot/route build checks, edit-to-render regression tests,
-  and mandatory repository/MCP agent guidance. See `docs/site-system.md`.
 - [ ] Browser-check sidebar, content types and header/footer, including narrow
   widths, language switching with unsaved edits and owner/editor navigation. Tests
   and builds passed; no browser pass was performed for these September 7 changes.
-- [x] Full baseline after the publishing repair: 347 Node tests and 409 CMS tests
-  passed; CMS/public builds, type checks and site validation passed. Packed-tenant
-  and legacy-block rendering checks passed in the preceding schema/block pass.
-- [ ] Repeat packed-package validation for the final release artifact. No npm release
-  was performed. Git pushes have occurred; track Cloudflare deployment separately.
 
 ## Later
 

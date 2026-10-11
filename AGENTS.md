@@ -3,6 +3,38 @@
 Read `CLAUDE.md` and `docs/site-system.md` before changing this project. Preserve
 existing local work. Read `docs/review-surface.md` before changing CMS previews.
 
+## Resume and task scope
+
+- Read `docs/todos.md` and its current handoff before resuming. The queue, delivery
+  evidence and historical backlog serve different purposes; do not repeat completed
+  migrations or treat old test counts as a current verification result.
+- As of October 10, active product work is in sibling `lanza-agent-requests` on
+  `feat/agent-requests`; the original `lanza` checkout has retained local work.
+  Check actual branches/status before editing. See `docs/handoff-2026-10-10.md`.
+- Keep general CMS behavior in shared Lanza source and tenant words/data in the
+  tenant repository. A tenant workaround alone does not complete a product fix.
+- Read the latest saved content and requests before editing; preserve the author's
+  voice. Git authorship is not proof that prose was written by a human.
+- Keep CMS actions and MCP capabilities/instructions aligned. Document unsupported
+  operations and distinguish saved Git content from unsaved live-editor context.
+- Saved requests do not start an assistant. Resolved, answered, accepted, saved and
+  published are separate states; never report one as another.
+- Private research/requests must stay outside public build output and website
+  publication/discard flows. Read the security model before changing those paths.
+
+## Delivery evidence
+
+- Distinguish source implementation, tests, package release, Git push and deployment.
+  Verify the intended branch/commit and actual URL before claiming a live fix.
+- Fixing an installer does not migrate an already-installed tenant. Inspect actual
+  entries, URL mappings and navigation; preserve displaced content and verify the
+  user's existing site, including draft exclusion.
+- When npm lifecycle scripts are disabled, explicitly rebuild CMS assets before
+  packing. Verify the packed tenant, not only the source checkout.
+- At handoff, update the current queue and record exact known checkpoints, remaining
+  limitations and the next useful action. Do not store secrets or restart background
+  services merely to prepare the next session.
+
 ## Mandatory schema contract
 
 - `data/schema.json` is the content model. `admin/src/schema.ts` loads it; it is
