@@ -45,6 +45,7 @@ const HeaderFooterView = lazyPane(() => import("./ui/HeaderFooterView.vue"));
 const BrandThemesView = lazyPane(() => import("./ui/BrandThemesView.vue"));
 const ContentTypesView = lazyPane(() => import("./ui/ContentTypesView.vue"));
 const PeopleView = lazyPane(() => import("./ui/PeopleView.vue"));
+const PluginWorkspace = lazyPane(() => import("./ui/PluginWorkspace.vue"));
 const AgentView = lazyPane(() => import("./ui/AgentView.vue"));
 const PublishView = lazyPane(() => import("./ui/PublishView.vue"));
 const PendingView = lazyPane(() => import("./ui/PendingView.vue"));
@@ -87,6 +88,7 @@ type Pane =
   | "blocks"
   | "contentTypes"
   | "people"
+  | "plugins"
   | "agent"
   | "publish"
   | "pending";
@@ -161,6 +163,7 @@ const SPECIAL_PANELS: Record<string, Pane> = {
   languages: "languages",
   people: "people",
   agent: "agent",
+  plugins: "plugins",
 };
 function settingsFileByName(name: string): FileEntry | null {
   const fc = COLLECTIONS.find((c) => c.kind === "files");
@@ -313,6 +316,7 @@ function onOnboarded() {
       :content-types-open="pane === 'contentTypes'"
       :people-open="pane === 'people'"
       :agent-open="pane === 'agent'"
+      :plugins-open="pane === 'plugins'"
       :is-owner="ownerView"
       :pending-count="pendingCount"
       :pending-check-failed="pendingCheckFailed"
@@ -331,6 +335,7 @@ function onOnboarded() {
       @content-types="openPanel('contentTypes')"
       @people="openPanel('people')"
       @agent="openPanel('agent')"
+      @plugins="openPanel('plugins')"
       @publish="openPublish"
       @pending="openPending"
       @help="openHelp"
@@ -413,6 +418,7 @@ function onOnboarded() {
         @back="backToList"
       />
       <PeopleView v-else-if="pane === 'people'" @back="backToList" />
+      <PluginWorkspace v-else-if="pane === 'plugins' && ownerView" :client="client" @back="backToList" />
       <AgentView v-else-if="pane === 'agent'" @back="backToList" />
       <PublishView
         v-else-if="pane === 'publish'"

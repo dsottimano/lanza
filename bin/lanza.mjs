@@ -9,6 +9,7 @@
 // Codegen reads tenant data from cwd and writes content.config.ts into the
 // package's srcDir; see scripts/gen-*.mjs. Astro runs from cwd (the project
 // root) with the package's astro binary and config factory (astro-config.mjs).
+import { buildPlugins } from "../scripts/build-plugins.mjs";
 import { spawnSync } from "node:child_process";
 import { cpSync, existsSync, realpathSync } from "node:fs";
 import { createRequire } from "node:module";
@@ -69,6 +70,9 @@ run(process.execPath, [join(PKG_ROOT, "scripts/gen-content-config.mjs")]);
 run(process.execPath, [join(PKG_ROOT, "scripts/gen-routes.mjs")]);
 run(process.execPath, [join(PKG_ROOT, "scripts/gen-redirects.mjs")]);
 
+// Validate tenant extensions before the public build.
+await buildPlugins(process.cwd());
+
 // Astro, resolved wherever npm hoisted it (usually the tenant's node_modules, not
 // a fixed path under the package), run rooted at the tenant cwd.
 const astroBin = join(dirname(require.resolve("astro/package.json")), "bin/astro.mjs");
@@ -94,6 +98,8 @@ if (mode === "build") {
   if (realpathSync(PKG_ROOT) !== realpathSync(process.cwd())) {
     const pkgFns = join(PKG_ROOT, "functions");
     if (existsSync(pkgFns)) cpSync(pkgFns, join(process.cwd(), "functions"), { recursive: true });
+    // Re-generate AFTER copying shared code so tenant plugins survive upgrades.
+    await buildPlugins(process.cwd());
 
     // functions/_lib/mcp-core.ts imports `../../frontend/lib/*` — the render side's
     // own predicates for what a brand value and a link may be, imported rather than

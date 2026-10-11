@@ -40,6 +40,7 @@ import AgentBodyReview from "./AgentBodyReview.vue";
 import AgentRequests from "./AgentRequests.vue";
 import { prepareRequestReplacement, type RequestAnchor } from "../backend/agent-requests";
 import { access } from "../backend/access";
+import { pluginRequest } from "../backend/plugins";
 import { useEntryReview } from "./useEntryReview";
 import { refreshPending } from "./staging";
 
@@ -323,6 +324,35 @@ async function reviewRequestReplacement(anchor: RequestAnchor, html: string): Pr
   pauseAutosave("Accepted an agent response in your editor. Save to keep the draft and resume autosave.");
   proposal.apply();
   return true;
+}
+
+// A research proposal is reviewed against the current document, never written by
+// the collector. The editor's normal transaction guard and undo remain in force.
+const researchIssue = ref("");
+async function reviewResearchFacts() {
+  const ready = () => editorActive && isOwner() && !editorLoading.value && !loadFailed.value && !saving.value && !deleting.value && !recovery.value && !saveError.value && !editorProblem.value;
+  if (!ready() || bodyReviewDecision || requestBusy.value || !editorRef.value?.editor || !currentPath.value) return;
+  const editor = editorRef.value.editor, path = currentPath.value, baseSha = getBaseSha();
+  const originalDoc = editor.state.doc;
+  requestBusy.value = true; researchIssue.value = "";
+  try {
+    const archive = await pluginRequest("research");
+    if (archive.state.data?.manifest?.article.contentPath !== path) throw new Error("Configure Research for this article in Plugins first.");
+    const facts = await pluginRequest("research", "propose", { expectedSha: archive.sha });
+    if (!ready() || currentPath.value !== path || getBaseSha() !== baseSha || editor.state.doc !== originalDoc || bodyReviewDecision) throw new Error("The article changed. Review the facts again.");
+    // Selected text is replaced; otherwise facts are appended. The review shows
+    // the complete before/after article and requires a deliberate acceptance.
+    const target: BodyTarget = editor.state.selection.empty ? "body" : "selection";
+    const proposal = prepareBodyProposal(editor, target, target === "body" ? editor.getHTML() + "<h2>Research facts</h2>" + facts.html : facts.html);
+    bodyReview.value = { before: proposal.before, after: proposal.after, target };
+    const accepted = await new Promise<boolean>(resolve => { bodyReviewDecision = resolve; });
+    if (!accepted) return;
+    const latest = await pluginRequest("research");
+    if (!ready() || currentPath.value !== path || getBaseSha() !== baseSha || latest.sha !== archive.sha || !latest.state.enabled) throw new Error("The article or research changed during review. Nothing was applied.");
+    pauseAutosave("Accepted research facts in your editor. Save to keep the draft and resume autosave.");
+    proposal.apply();
+  } catch (error) { researchIssue.value = error instanceof Error ? error.message : "Could not review research facts."; }
+  finally { requestBusy.value = false; }
 }
 
 // ── field grouping ──────────────────────────────────────────────────────────
@@ -610,6 +640,11 @@ onMounted(async () => {
             <AgentRequests ref="agentRequestsRef" :editor="editorRef?.editor" :path="currentPath" :enabled="isOwner()"
               :locked="editorLoading || loadFailed || saving || deleting || preparingPublication || !!recovery || !!editorProblem || !!saveError || !!bodyReview"
               :review-replacement="reviewRequestReplacement" @busy="requestBusy = $event" />
+            <div v-if="isOwner() && currentPath && collection.name === 'posts'" class="my-3 text-sm">
+              <button type="button" class="btn btn-ghost" :disabled="requestBusy || editorLoading || saving || deleting || preparingPublication || !!recovery || !!bodyReview" @click="reviewResearchFacts">Review research facts</button>
+              <p>Select the facts section to replace it, or leave the selection empty to add facts at the end.</p>
+              <p v-if="researchIssue" role="alert">{{ researchIssue }}</p>
+            </div>
             <Editor ref="editorRef" :initial-html="bodyHtml" :client="client" :show-inspector="false" @change="markDirty" @invalid="editorProblem = $event" />
           </div>
         </div>

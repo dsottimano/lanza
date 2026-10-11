@@ -14,6 +14,12 @@ review and publishing contracts.
 
 ## Current implementation
 
+Administration → Plugins now lists installed manifests and provides the private
+Research workspace. API v1, tenant authoring, lifecycle, storage and limits are in
+[Plugin API v1](plugins-v1.md). The public browser controls below retain their
+existing staging/publication behavior.
+
+
 Settings → Brand & themes → Plugins currently offers two built-in browser features:
 
 | Plugin | Applies to | Behavior |
@@ -37,8 +43,8 @@ lives in `site-plugins-browser.ts`. Features use no server, account, telemetry o
 external service. Without JavaScript, ordinary images and reading continue to work.
 Older browsers without native dialog support keep ordinary images.
 
-The two built-in examples demonstrate the controls; a dedicated agent authoring
-workflow has not been implemented yet. An agent with repository access can build
-another capability through a code change, declared settings, review and tests.
+The browser examples retain built-in renderer adapters. Agents can now add private
+request plugins through a manifest and server module in the tenant repository.
+New browser adapters and custom Vue views still require a shared product change.
 The current MCP tools do not install executable plugin code. Theme exports include
 the frontend and appearance settings, so these choices travel with the design.

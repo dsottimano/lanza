@@ -14,6 +14,19 @@ The previous 746-line list is preserved in [TODO history](todos-history.md).
 It is historical evidence, not the current queue. Do not repeat old auth migrations,
 release old package versions, or treat old test counts as the current baseline.
 
+## Active plugin integration — October 11
+
+`lanza` on `feat/plugins-cms` now incorporates `feat/agent-requests` and all three
+research-collector commits. Retained local CMS changes were compared and reconciled;
+the pre-integration stash and `/home/dsottimano/source/lanza-recovery-20261011-105359`
+preserve the original files. No tenant publication or remote push occurred.
+
+Plugin API v1 and the manual Research workspace are implemented; see
+[plugin contract](plugins-v1.md). Remaining product expansion: scheduling with an
+explicit tenant runtime, multi-article research, historical snapshot browsing,
+custom CMS component adapters and reviewed data migrations. Do not claim that the
+old standalone collector cron drives the CMS refresh or its disable switch.
+
 ## Next session: content first
 
 - [ ] Continue **Article 1 — How Earthquake-Proof Is Panama City?** with the human's
@@ -162,10 +175,10 @@ Historical test counts are evidence for those checkpoints, not today's baseline.
 - [ ] Simplify designed-page settings: remove irrelevant block/image/excerpt controls
   where the chosen template does not use them. Page blocks are already retired.
 - [ ] Layout/template switching for installed designs remains open.
-- [ ] Develop the agent-built plugin workflow: turn a human's requested feature
-  into site-owned code and declared settings, with testing, review and reversible
-  enable/disable controls. The current two built-in plugins are examples; no
-  third-party installation is planned. See [site plugins](site-plugins.md).
+- [x] Implement the initial agent-built plugin contract: manifests, tenant server
+  modules, declared settings, shared CMS/MCP operations and private Research with
+  reviewable editor proposals. Verified locally, not deployed. See
+  [Plugin API v1](plugins-v1.md) for the explicit extension limits.
 - [ ] Improve content-type deletion discoverability. It works under Advanced
   settings → Remove content type, but the user could not find it. No subsequent
   visibility improvement was implemented.

@@ -1,3 +1,4 @@
+import { onRequest as pluginRequests } from "../functions/admin/api/plugins";
 import { defineConfig, loadEnv, type Plugin } from "vite";
 import vue from "@vitejs/plugin-vue";
 import tailwindcss from "@tailwindcss/vite";
@@ -123,11 +124,11 @@ function githubProxyDev(token: string | undefined): Plugin {
 
 // Use the production private-request handler in dev too: the server-held user's
 // token still faces repository privacy, owner, Origin and archive-path checks.
-function agentRequestsDev(token: string | undefined): Plugin {
+function agentRequestsDev(token: string | undefined, handler = agentRequests, endpoint = "agent-requests"): Plugin {
   return {
-    name: "lanza-agent-requests-dev",
+    name: `lanza-${endpoint}-dev`,
     configureServer(server) {
-      server.middlewares.use("/admin/api/agent-requests", async (req, res) => {
+      server.middlewares.use(`/admin/api/${endpoint}`, async (req, res) => {
         const incoming = req as unknown as { url?: string; method?: string; headers: Record<string, string | undefined> };
         const outgoing = res as unknown as { statusCode: number; setHeader(name: string, value: string): void; end(body: string): void };
         const reject = (status: number, error: string) => {
@@ -154,8 +155,8 @@ function agentRequestsDev(token: string | undefined): Plugin {
           const headers = new Headers();
           for (const [key, value] of Object.entries(incoming.headers)) if (typeof value === "string") headers.set(key, value);
           const query = suffix.includes("?") ? suffix.slice(suffix.indexOf("?")) : "";
-          const url = new URL(`/admin/api/agent-requests${query}`, `http://${incoming.headers.host ?? "localhost"}`);
-          const response = await agentRequests({ request: new Request(url, { method, headers, ...(size ? { body: bytes } : {}) }), data: { ...identity.identity, token } });
+          const url = new URL(`/admin/api/${endpoint}${query}`, `http://${incoming.headers.host ?? "localhost"}`);
+          const response = await handler({ request: new Request(url, { method, headers, ...(size ? { body: bytes } : {}) }), data: { ...identity.identity, token } });
           outgoing.statusCode = response.status;
           response.headers.forEach((value, name) => outgoing.setHeader(name, value));
           outgoing.end(await response.text());
@@ -311,6 +312,7 @@ export default defineConfig(({ mode }) => {
       authBypassDev(),
       githubProxyDev(env.GITHUB_TOKEN),
       agentRequestsDev(env.GITHUB_TOKEN),
+      agentRequestsDev(env.GITHUB_TOKEN, pluginRequests, "plugins"),
       cloudflareProxyDev({
         token: env.CLOUDFLARE_API_TOKEN,
         accountId: env.CLOUDFLARE_ACCOUNT_ID,

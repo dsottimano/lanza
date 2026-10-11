@@ -1,0 +1,14 @@
+{
+  "apiVersion": 1,
+  "version": "1.0.0",
+  "role": "owner",
+  "settings": [],
+  "workspace": "settings",
+  "id": "image-zoom",
+  "name": "Image zoom",
+  "description": "Enlarge article images in an accessible dialog.",
+  "scope": "site",
+  "runtime": "browser",
+  "appearanceKey": "imageZoom",
+  "operations": []
+}

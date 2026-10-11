@@ -316,5 +316,7 @@ Settings → Brand & themes → Plugins manages reading progress and image zoom.
 `data/appearance.json` stores explicit boolean choices; absent values are off.
 See [Site plugins](site-plugins.md). Plugins are built by an agent for the human's
 needs and owned in the human's repository. There is no third-party installation or
-marketplace planned. The current static renderer enables the two built-in examples;
-a dedicated agent authoring workflow remains to be built.
+marketplace planned. The static renderer retains its two built-in adapters.
+[Plugin API v1](plugins-v1.md) adds reviewed tenant server modules, private settings
+and a shared CMS/MCP Research workspace; custom browser adapters still require a
+shared renderer change.

@@ -1,6 +1,7 @@
 <script setup lang="ts">
 // One appearance workspace; tab switches retain the unsaved-change guard.
 import { ref } from "vue";
+import { useRoute } from "vue-router";
 import BrandView from "./BrandView.vue";
 import StartersView from "./StartersView.vue";
 import ThemesView from "./ThemesView.vue";
@@ -19,7 +20,8 @@ const TABS = [
 ] as const;
 type TabKey = (typeof TABS)[number]["key"];
 
-const tab = ref<TabKey>("brand");
+const route = useRoute();
+const tab = ref<TabKey>(route?.query.tab === "plugins" ? "plugins" : "brand");
 
 function select(key: TabKey) {
   if (key === tab.value) return;

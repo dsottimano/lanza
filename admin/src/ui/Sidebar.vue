@@ -30,6 +30,7 @@ const props = defineProps<{
   contentTypesOpen: boolean;
   peopleOpen: boolean;
   agentOpen: boolean;
+  pluginsOpen?: boolean;
   // Owner chrome. Publish, settings and hosting are structurally absent for an
   // editor rather than disabled — a greyed-out control that will never enable is
   // just a question the UI refuses to answer. Defaults to false so the rail is
@@ -53,6 +54,7 @@ const emit = defineEmits<{
   (e: "contentTypes"): void;
   (e: "people"): void;
   (e: "agent"): void;
+  (e: "plugins"): void;
   (e: "publish"): void;
   (e: "pending"): void;
   (e: "retryPending"): void;
@@ -118,7 +120,7 @@ const structureActive = computed(
   () => props.contentTypesOpen || props.languagesOpen || props.activeSettings !== null,
 );
 const siteActive = computed(
-  () => props.peopleOpen || props.agentOpen || props.healthOpen || props.updatesOpen,
+  () => props.pluginsOpen || props.peopleOpen || props.agentOpen || props.healthOpen || props.updatesOpen,
 );
 const activeGroup = computed<GroupId | null>(() => {
   if (props.publishOpen || props.pendingOpen || props.helpOpen) return null;
@@ -300,6 +302,7 @@ const itemActive = "nav-item--active";
           </button>
           <div class="group-body" :inert="!isOpen('site')" :class="{ 'group-body--open': isOpen('site') }">
             <div class="group-body__inner flex flex-col gap-0.5">
+              <button :class="[item, pluginsOpen ? itemActive : '']" :aria-current="pluginsOpen ? 'page' : undefined" @click="emit('plugins')"><SidebarIcon name="blocks" />Plugins</button>
               <button :class="[item, peopleOpen ? itemActive : '']" :aria-current="peopleOpen ? 'page' : undefined" @click="emit('people')">
                 <SidebarIcon name="authors" />People &amp; access
               </button>

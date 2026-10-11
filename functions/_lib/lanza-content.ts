@@ -136,6 +136,32 @@ export class ContentClient {
     return JSON.parse(text + decoder.decode());
   }
 
+  // Server-internal plugin transport. No website branches or caller-supplied paths.
+  async pluginArchive(id: string, method: string, path: string, body?: unknown): Promise<unknown> {
+    if (!/^[a-z][a-z0-9-]{0,47}$/.test(id)) throw new GitHubError(400, "Invalid plugin ID.");
+    const branch = id === "research" ? "lanza-research" : `lanza-plugin-${id}`;
+    const file = `plugins/${id}/state.json`;
+    const allowed = method === "GET" ? ["", `git/ref/heads/${branch}`, `contents/${file}?ref=${branch}`].includes(path)
+      : method === "POST" ? ["git/trees", "git/commits", "git/refs"].includes(path)
+      : method === "PUT" && path === `contents/${file}`;
+    const value = body as Record<string, unknown> | undefined;
+    if (!allowed || (method === "PUT" && value?.branch !== branch) ||
+        (path === "git/refs" && value?.ref !== `refs/heads/${branch}`) ||
+        (path === "git/commits" && (!Array.isArray(value?.parents) || value.parents.length !== 0))) throw new GitHubError(403, "Invalid private plugin operation.");
+    if (path === "git/trees" && (value?.base_tree || !Array.isArray(value?.tree) || value.tree.length !== 1 || value.tree[0]?.path !== "README.md")) throw new GitHubError(403, "Invalid plugin archive initialization.");
+    const response = await this.gh(path, { method, redirect: "manual", signal: AbortSignal.timeout(15000), headers: { "Cache-Control": "no-cache" }, ...(body === undefined ? {} : { body: JSON.stringify(body) }) });
+    if (method === "GET" && response.status === 404) { await response.body?.cancel(); return null; }
+    if (!response.ok) throw await this.fail(response, "access private plugin data");
+    const reader = response.body?.getReader(); if (!reader) throw new GitHubError(502, "Empty plugin response.");
+    let text = "", size = 0; const decoder = new TextDecoder();
+    try {
+      for (;;) { const {done,value} = await reader.read(); if(done) break; size += value.byteLength;
+        if(size > 1024 * 1024) { await reader.cancel(); throw new GitHubError(502,"Plugin response exceeds its limit."); }
+        text += decoder.decode(value,{stream:true}); }
+    } finally { reader.releaseLock(); }
+    return JSON.parse(text + decoder.decode());
+  }
+
   private async gh(path: string, init?: RequestInit): Promise<Response> {
     return fetch(`${GITHUB_API}/repos/${this.repo.owner}/${this.repo.name}${path ? `/${path}` : ""}`, {
       ...init,
