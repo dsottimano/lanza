@@ -127,3 +127,30 @@ published. Software updates were rebased onto intervening human staging edits.
 
 26 relevant regressions, CMS typecheck/build, check:site, source build, and packed
 production/staging builds passed. Previously documented build warnings remain.
+
+## Language switching and MCP translations
+
+Package 0.1.23 (source `daebab3`, rollout `4dd504b`, staging `b8d0510`) is live at
+production deployment `bce7f7ea-4d2d-4023-b588-600745dfc544`, confirmed canonical.
+The writing canvas now exposes enabled language tabs above the title. Missing
+versions offer Start blank or Ask AI to translate. The latter saves pending source
+edits and prepares a private agent request; it does not invoke an LLM or wake a
+conversation. Existing translations open directly. Other-language buttons wait
+for existence lookup, avoiding navigation to a nonexistent entry during loading.
+
+MCP exposes list_translations and create_translation; read_content returns SHA.
+Creation uses supplied translated prose, shares the filename, preserves omitted
+metadata/template/list structure/schema image assets, forces draft:true and refuses
+existing targets or stale source revisions. Instructions and help describe the
+agent-driven workflow and human publication. The source SHA recheck is not atomic
+with another file's create. OAuth scope mappings and tests were updated in source;
+the separate OAuth Worker was not deployed by this change. The tenant bearer MCP
+endpoint was verified live: both tools are listed and Article 1 reports English
+present, Spanish absent. No translation was created as an incidental test.
+
+471 Functions/script tests, 627 CMS tests and 22 OAuth tests passed, as did CMS
+and OAuth typechecks, sitecheck, source and packed production/staging builds, and
+legacy Pages Functions compilation. Real production Chrome confirmed the visible
+language tabs, Spanish translation request instructions and cancellation without
+article mutation. Existing empty-collection, public bundle-size and sibling
+Wrangler tsconfig warnings remain. Latest human staging content was preserved.
