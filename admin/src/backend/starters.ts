@@ -2,7 +2,7 @@ import { GitHubClient } from './github';
 import { isOwner } from './access';
 import { planStarter, starterReadPaths } from '../../../functions/_lib/site-starters.mjs';
 
-export async function prepareStarter(client: GitHubClient, options: { id: string; locale: string; look: string; includeSamples: boolean }) {
+export async function prepareStarter(client: GitHubClient, options: { id: string; locale: string; look: string; includeSamples: boolean; useAsHomepage?: boolean }) {
   if (!isOwner()) throw new Error('Only the site owner can install a starter.');
   const head = await client.workingHead();
   const tree = await client.getTree(head);

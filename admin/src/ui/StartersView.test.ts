@@ -31,3 +31,11 @@ it('prevents duplicate installs while the reviewed commit is pending',async()=>{
  const button=w.findAll('button').find(b=>b.text()==='Install to staging')!;await button.trigger('click');await button.trigger('click');expect(installStarter).toHaveBeenCalledTimes(1);
  finish({});await flushPromises();expect(w.get('[role="status"]').text()).toContain('installed to staging');w.unmount();
 });
+it('offers homepage installation by default and invalidates review when changed',async()=>{
+ const w=await fixture();
+ expect(prepareStarter).toHaveBeenCalledWith(expect.anything(),expect.objectContaining({useAsHomepage:true}));
+ const checkbox=w.findAll('input[type="checkbox"]')[0];await checkbox.setValue(false);
+ expect(w.find('.review').exists()).toBe(false);
+ await w.findAll('button').find(b=>b.text()==='Review installation →')!.trigger('click');await flushPromises();
+ expect(prepareStarter).toHaveBeenLastCalledWith(expect.anything(),expect.objectContaining({useAsHomepage:false}));w.unmount();
+});

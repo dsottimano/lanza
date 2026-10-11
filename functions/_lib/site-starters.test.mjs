@@ -35,3 +35,21 @@ for(const [name,extra] of Object.entries({
  overview:{'content/pages/en/home.md':'home','content/pages/portfolio.md':'legacy'},
  styles:{'data/styles.json':json({variants:[{id:'portfolio-editorial'}]})}
 }))test(`collision: ${name} refuses without mutating input`,()=>{const args=fixture(extra);const before=json(args);assert.throws(()=>planStarter(args));assert.equal(json(args),before);});
+test('explicit homepage choice preserves original content as a draft',()=>{
+ const original='---\ntitle: Existing\ndraft: false\n---\nHuman words and legal text.';
+ const args=fixture({'content/pages/en/home.md':original});
+ const plan=planStarter({...args,useAsHomepage:true});
+ assert.equal(plan.overview,'/');assert.equal(plan.homePreserved,false);
+ assert.equal(plan.homeBackup,'content/pages/en/home-before-portfolio.md');
+ const backup=plan.files.find(f=>f.path===plan.homeBackup);
+ assert.match(backup.text,/"draft": true/);assert.match(backup.text,/Human words and legal text/);
+ assert.equal(plan.files.find(f=>f.path==='content/pages/en/home.md').action,'update');
+ assert.equal(args.texts['content/pages/en/home.md'],original);
+});
+test('homepage backups never overwrite an existing saved page',()=>{
+ const plan=planStarter({...fixture({'content/pages/en/home.md':'---\ntitle: Old\n---\nText','content/pages/en/home-before-portfolio.md':'existing backup'}),useAsHomepage:true});
+ assert.equal(plan.homeBackup,'content/pages/en/home-before-portfolio-2.md');
+});
+test('unreadable homepage refuses replacement',()=>{
+ assert.throws(()=>planStarter({...fixture({'content/pages/en/home.md':'invalid'}),useAsHomepage:true}),/frontmatter/);
+});

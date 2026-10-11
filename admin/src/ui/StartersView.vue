@@ -15,6 +15,7 @@ const selected = ref(STARTERS[0].id);
 const look = ref('editorial');
 const locale = ref(site.defaultLocale);
 const samples = ref(true);
+const useAsHomepage = ref(true);
 const current = computed(() => STARTERS.find(s => s.id === selected.value)!);
 const previewPage = ref<'home' | 'listing' | 'detail'>('home');
 const viewport = ref<'desktop' | 'mobile'>('desktop');
@@ -37,11 +38,11 @@ const busy = ref(false);
 const error = ref('');
 const success = ref('');
 const plan = shallowRef<Awaited<ReturnType<typeof prepareStarter>> | null>(null);
-watch([selected, look, locale, samples], () => { plan.value = null; error.value = ''; success.value = ''; });
+watch([selected, look, locale, samples, useAsHomepage], () => { plan.value = null; error.value = ''; success.value = ''; });
 async function prepare() {
   if (busy.value) return;
   busy.value = true; error.value = ''; success.value = ''; plan.value = null;
-  try { const prepared = await prepareStarter(props.client, { id: selected.value, look: look.value, locale: locale.value, includeSamples: samples.value }); if (active) plan.value = prepared; }
+  try { const prepared = await prepareStarter(props.client, { id: selected.value, look: look.value, locale: locale.value, includeSamples: samples.value, useAsHomepage: useAsHomepage.value }); if (active) plan.value = prepared; }
   catch (err) { if (active) error.value = err instanceof Error ? err.message : 'Could not prepare this starter.'; }
   finally { busy.value = false; }
 }
@@ -107,8 +108,10 @@ async function install() {
       <p class="muted">Actual page templates with sample content. Your site's header and footer stay in place after installation. Detail previews always show an example.</p>
       <div class="setup">
         <label>Content language <select v-model="locale"><option v-for="language in site.locales" :key="language.code" :value="language.code">{{ language.label || language.code }}</option></select></label>
+        <label><input v-model="useAsHomepage" type="checkbox" /> Use this as my homepage</label>
         <label><input v-model="samples" type="checkbox" /> Include example entries</label>
       </div>
+      <p class="muted">When selected, this starter becomes the homepage for the chosen language after publication. Your previous homepage is kept as an unpublished page in Pages. Uncheck to keep your current homepage and add the starter as a separate page.</p>
       <p class="muted">Introductory copy and examples are in English. Replace or translate them before publishing. Contact links become active when you add your address or contact page.</p>
       <p class="muted">Not included: {{ current.notIncluded.join(', ') }}.</p>
       <button class="btn btn-primary" @click="prepare">{{ busy ? 'Working…' : 'Review installation →' }}</button>
@@ -117,7 +120,7 @@ async function install() {
     <p v-if="success" role="status" class="notice">{{ success }}</p>
     <section v-if="plan" class="review">
       <h2>Ready to add {{ plan.label }}</h2>
-      <p>{{ plan.homePreserved ? 'Your homepage stays as it is.' : 'This creates your homepage.' }} Overview: <code>{{ plan.overview }}</code> · Collection: <code>{{ plan.listingUrl }}</code></p>
+      <p>{{ plan.homeBackup ? 'This replaces your homepage after publication; the previous version is kept as an unpublished page.' : plan.homePreserved ? 'Your homepage stays as it is.' : 'This creates your homepage.' }} Overview: <code>{{ plan.overview }}</code> · Collection: <code>{{ plan.listingUrl }}</code></p>
       <ul><li v-for="note in plan.notes" :key="note">{{ note }}</li></ul>
       <details><summary>{{ plan.files.length }} files to add or update</summary><ul><li v-for="file in plan.files" :key="file.path">{{ file.action }} · {{ file.path }}</li></ul></details>
       <button class="btn btn-ghost mt-5" :disabled="busy" @click="plan = null">Cancel</button>

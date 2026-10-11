@@ -1,3 +1,4 @@
+import yaml from "js-yaml";
 import { STARTERS, starterSummary } from "../../recipes/catalog.mjs";
 import { checkTemplate, checkTemplateSafety } from "./site-system.mjs";
 import { resolveBrand } from "../../frontend/lib/appearance.ts";
@@ -15,12 +16,12 @@ export function getStarter(id) {
 export function starterReadPaths(id, locale) {
   if (!segment.test(locale)) throw new Error("Invalid language code.");
   getStarter(id);
-  return ["data/site.json", "data/schema.json", "data/styles.json", "data/starters.json", "data/redirects.json", `data/menu.${locale}.json`];
+  return ["data/site.json", "data/schema.json", "data/styles.json", "data/starters.json", "data/redirects.json", `data/menu.${locale}.json`, `content/pages/${locale}/home.md`];
 }
 
 // A pure plan over a pinned repository snapshot. No I/O and no partial mutations.
 // `paths` is a complete tree listing; `texts` contains the files from starterReadPaths.
-export function planStarter({ id, locale, look = "editorial", includeSamples = true, paths, texts }) {
+export function planStarter({ id, locale, look = "editorial", includeSamples = true, useAsHomepage = false, paths, texts }) {
   const starter = getStarter(id);
   if (!segment.test(locale)) throw new Error("Invalid language code.");
   const selected = starter.looks.find(item => item.id === look);
@@ -44,7 +45,8 @@ export function planStarter({ id, locale, look = "editorial", includeSamples = t
   const existingPages = schema.find(item => item.name === "pages");
   if (existingPages && (existingPages.folder !== "content/pages" || existingPages.localized !== true)) throw new Error("This starter needs the standard localized Pages collection at content/pages.");
   const homeExists = allPaths.has(`content/pages/${locale}/home.md`) || (locale === site.defaultLocale && allPaths.has("content/pages/home.md"));
-  const stem = homeExists ? starter.home.stem : "home";
+  const stem = homeExists && !useAsHomepage ? starter.home.stem : "home";
+  let homeBackup = null;
   const prefix = locale === site.defaultLocale ? "" : `/${locale}`;
   const overview = `${prefix}/${stem === "home" ? "" : stem + "/"}`;
   const listingUrl = `${prefix}/${starter.contentType.route.base}/`;
@@ -52,8 +54,8 @@ export function planStarter({ id, locale, look = "editorial", includeSamples = t
   if (locale === site.defaultLocale && allPaths.has(`content/pages/${stem}.md`)) throw new Error("A legacy page already exists at the overview URL.");
   const pageSlug = stem === "home" ? "" : stem;
   const urlMap = site.urls ?? {};
-  if (Object.entries(urlMap).some(([key,value]) => key.startsWith(`pages/${locale}/`) && value === pageSlug)) throw new Error("A page already claims the starter overview URL.");
-  if (urlMap[`pages/${locale}/${stem}`] !== undefined) throw new Error("A saved URL mapping exists for this page. Resolve it before installing the starter.");
+  if (Object.entries(urlMap).some(([key,value]) => key.startsWith(`pages/${locale}/`) && value === pageSlug && !(useAsHomepage && key === `pages/${locale}/home`))) throw new Error("A page already claims the starter overview URL.");
+  if (urlMap[`pages/${locale}/${stem}`] !== undefined && !(useAsHomepage && stem === "home" && urlMap[`pages/${locale}/home`] === "")) throw new Error("A saved URL mapping exists for this page. Resolve it before installing the starter.");
   if (allPaths.has(`content/pages/${locale}/${starter.contentType.route.base}.md`) || (locale === site.defaultLocale && allPaths.has(`content/pages/${starter.contentType.route.base}.md`)) || Object.entries(urlMap).some(([key,value]) => key.startsWith(`pages/${locale}/`) && value === starter.contentType.route.base)) throw new Error("A page already claims the starter listing URL.");
   const redirects = read("data/redirects.json", {redirects:[]});
   if (!Array.isArray(redirects.redirects)) throw new Error("Redirect settings could not be read.");
@@ -87,8 +89,20 @@ export function planStarter({ id, locale, look = "editorial", includeSamples = t
   add("data/schema.json",json(schema),"update");
   // JSON is a YAML subset. This preserves nested values without a second serializer.
   const document=(data,body="")=>`---\n${json(data)}---\n\n${body}\n`;
+  if (useAsHomepage && homeExists) {
+    const original = texts[`content/pages/${locale}/home.md`];
+    if (typeof original !== "string") throw new Error("The existing homepage could not be read. Nothing will be replaced.");
+    const match = /^---\r?\n([\s\S]*?)\r?\n---(?:\r?\n|$)([\s\S]*)$/.exec(original);
+    if (!match) throw new Error("The existing homepage has invalid frontmatter. Nothing will be replaced.");
+    const data = yaml.load(match[1]);
+    if (!data || typeof data !== "object" || Array.isArray(data)) throw new Error("The existing homepage has invalid frontmatter.");
+    let backupStem = `home-before-${id}`;
+    for (let n = 2; allPaths.has(`content/pages/${locale}/${backupStem}.md`) || urlMap[`pages/${locale}/${backupStem}`] !== undefined; n++) backupStem = `home-before-${id}-${n}`;
+    homeBackup = `content/pages/${locale}/${backupStem}.md`;
+    add(homeBackup, document({...data, draft:true}, match[2]));
+  }
   const slots={...clone(starter.home.slots),browseUrl:listingUrl};
-  add(`content/pages/${locale}/${stem}.md`,document({title:starter.home.title,draft:false,template:"landing",preset:starter.home.preset,slots}));
+  add(`content/pages/${locale}/${stem}.md`,document({title:starter.home.title,draft:false,template:"landing",preset:starter.home.preset,slots}), useAsHomepage ? "update" : "create");
   if(includeSamples) for(const sample of starter.samples) add(`content/${collection.name}/${locale}/${sample.stem}.md`,document({...sample.data,draft:false,contactLabel:"Get in touch",contactUrl:"",demoNote:"Example content. Replace with your own before publishing."},sample.body));
   const styleData=read("data/styles.json",{variants:[]});
   if(!Array.isArray(styleData.variants)) throw new Error("Existing style options could not be read.");
@@ -119,5 +133,5 @@ export function planStarter({ id, locale, look = "editorial", includeSamples = t
   if(!Array.isArray(installed.installed))throw new Error("Starter history could not be read.");
   installed.installed.push({id,version:starter.version,locale,look,overview,collection:collection.name,sampleContent:includeSamples});
   add("data/starters.json",json(installed),"update");
-  return {id,label:starter.label,locale,look,overview,listingUrl,homePreserved:homeExists,files,notes:["Installation is staged, not published.","Existing content, brand settings and redirects are preserved.","Starter styling is scoped to its own templates.","The introductory page and included examples contain English sample copy. Replace or translate it before publishing.","Contact links are empty until you supply an address or contact page."],notIncluded:starter.notIncluded};
+  return {id,label:starter.label,locale,look,overview,listingUrl,homePreserved:homeExists && !useAsHomepage,homeBackup,files,notes:["Installation is staged, not published.",homeBackup ? `The previous homepage is preserved as an unpublished page at ${homeBackup}.` : "Existing content, brand settings and redirects are preserved.","Starter styling is scoped to its own templates.","The introductory page and included examples contain English sample copy. Replace or translate it before publishing.","Contact links are empty until you supply an address or contact page."],notIncluded:starter.notIncluded};
 }
