@@ -1,3 +1,40 @@
+# CMS co-admin management — October 13, 2026
+
+Implemented locally on `feat/cms-coadmins`, prepared **0.1.28**, not committed,
+pushed, published or deployed. Public npm latest and onboarding template remain
+**0.1.27** (verified live). Previous release checkpoints below remain historical.
+
+Settings → People now embeds CoAdmins: owner-only add/remove, save and deploy,
+load current policy, check deployment, and retry deployment without rewriting it.
+The `/admin/api/people` endpoint checks raw GitHub admin identity (never delegated
+role alone), same-origin POSTs, bounded input, configured-credential target pinning
+and the Cloudflare project's repository binding. It changes only the Production
+LANZA_SITE_ADMINS key. Stale forms are refused; saved policy and active deployment
+access are explicitly separate. It reuses a complete configured hosting connection,
+or accepts the owner's Pages Edit token/account/project in the CMS for the current
+tab and request only. It creates no token store or GitHub invitations. Delegates
+see an explanation, not management controls. Vite uses the same handler.
+
+Verified 511 server/script tests, 646 CMS tests, CMS typecheck/build, Astro check
+(0 errors/warnings, 99 existing hints), site checker (0 errors/warnings), product
+build and legacy Pages Functions compilation. Rebuilt CMS before packing with
+scripts disabled. `/tmp/lanza-site-0.1.28.tgz` installed and built in fresh template
+tenant `/tmp/lanza-people-tenant-20261013`; its Functions compilation passed too.
+No real Cloudflare write/deployment or authenticated browser pass was performed.
+Existing empty-taxonomy and large-chunk build warnings remain.
+
+Known limits: Cloudflare PATCH has no atomic compare-and-swap, so two simultaneous
+owner saves can race despite the stale-form check. Encrypted/malformed existing
+policy needs correction in Cloudflare before CMS editing. The separate optional
+OAuth Worker still needs its own matching setting. Writers capable of deploying
+arbitrary repository code remain outside the CMS role boundary. See security-model.
+
+The user authorized publishing 0.1.28 and updating the template, and plans to create
+a new site. Leave the old tenant untouched. Next: reconcile main/staging,
+run trusted publishing, verify a public npm tenant install/build, update template,
+and record exact receipts. The private DefineMG tenant remains inaccessible and
+unchanged; its owner must upgrade before these controls appear.
+
 # Delegated site administration — October 13, 2026
 
 Public npm `latest` is now **0.1.27**, published with signed provenance from

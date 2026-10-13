@@ -3,6 +3,16 @@
 `lanza-site` on npm. Tenants pin a version, so nothing here reaches a live site until
 that site updates (Settings → Software).
 
+## 0.1.28 — 2026-10-13
+
+- Settings → People lets repository administrators add and remove co-admins, save
+  the hosting configuration, start a production deployment and check or retry it.
+- Reuses configured hosting access, or accepts an owner-provided Cloudflare token
+  for the current tab only. Co-admins cannot manage grants. No repository policy
+  file, standing broker credential or automatic GitHub invitation is introduced.
+- Saved grants and active deployment access are shown separately; stale edits,
+  invalid usernames and unrelated Pages projects are rejected.
+
 ## 0.1.27 — 2026-10-13
 
 - Optional delegated site administration for GitHub collaborators via the tenant's

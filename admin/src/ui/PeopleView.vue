@@ -1,19 +1,7 @@
 <script setup lang="ts">
 import SettingsHeader from "./SettingsHeader.vue";
-// Settings → People. Who can get into this site, and at what level.
-//
-// This screen used to BE the invite mechanism: a list of GitHub usernames kept in
-// lanza.config.json, saved to staging, live only after a publish and a rebuild. It
-// was removed, and the reason is worth keeping. That list was a second answer to a
-// question GitHub already answers, and it was the weaker one — it could disagree
-// with who can actually write the repository, and removing someone from it never
-// took their access away.
-//
-// So access is granted where it is real: GitHub's own collaborator settings. The
-// role here comes from `permissions` on this repo, re-read at most 60 seconds old,
-// which is also how long a removal now takes to bite. This screen's job is to say
-// that clearly and get out of the way.
 import { computed } from "vue";
+import CoAdmins from "./CoAdmins.vue";
 import { access } from "../backend/access";
 
 defineEmits<{ (e: "back"): void }>();
@@ -72,21 +60,8 @@ const roleLabel = computed(() => {
         </p>
       </section>
 
-      <section class="mb-10">
-        <h2 class="mb-1 text-sm font-semibold text-zinc-900"><span data-lanza-origin="agent">Delegated site administrators</span></h2>
-        <p class="mb-3 max-w-prose text-sm text-zinc-600"><span data-lanza-origin="agent">
-          The person managing this site's Cloudflare project can grant site administration
-          to selected GitHub collaborators. Each person must retain write access to this
-          repository. Delegation allows site settings, publishing, software updates and
-          agent tools; it does not grant hosting access or permission to change delegation.
-        </span></p>
-        <ol class="list-decimal pl-5 space-y-2 text-sm text-zinc-600">
-          <li><span data-lanza-origin="agent">In Cloudflare, open this Pages project's Settings → Variables and Secrets, for Production.</span></li>
-          <li><span data-lanza-origin="agent">Add </span><code>LANZA_SITE_ADMINS</code><span data-lanza-origin="agent"> with the exact GitHub usernames, separated by commas (without @). For example: </span><code>alice,bob</code><span data-lanza-origin="agent">. Usernames are case-insensitive.</span></li>
-          <li><span data-lanza-origin="agent">Redeploy the project, then refresh the CMS. To revoke delegation, remove the username and redeploy. Removing GitHub repository access takes effect within a minute.</span></li>
-        </ol>
-        <p class="mt-3 text-sm text-zinc-600"><span data-lanza-origin="agent">This setting is managed in Cloudflare. Saving or publishing website content does not change it. An optional OAuth Worker needs the same setting in its own deployment.</span></p>
-      </section>
+      <CoAdmins v-if="access.role === 'owner' && !access.delegated" />
+      <p v-else class="mb-10 text-sm text-zinc-600" data-lanza-origin="agent">Only the GitHub repository owner or an administrator can add or remove co-admins. Co-admin access does not grant hosting access.</p>
 
       <section>
         <h2 class="mb-1 text-sm font-semibold text-zinc-900">What each level can do</h2>
@@ -119,7 +94,7 @@ const roleLabel = computed(() => {
       <aside class="mt-10 border-l-2 border-emerald-600 bg-emerald-50 px-4 py-3">
         <p class="text-sm leading-relaxed text-emerald-950">
           <span data-lanza-origin="agent"><strong class="font-semibold">GitHub access changes take effect within a minute.</strong>
-          Changes to the Cloudflare delegation setting require a new deployment.</span>
+          Co-admin changes take effect after the deployment succeeds.</span>
         </p>
       </aside>
     </main>

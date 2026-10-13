@@ -10,8 +10,7 @@ it('explains delegated access without claiming a GitHub owner role or a saved gr
   Object.assign(access, { login: 'alice', role: 'owner', repo: 'owner/site', loaded: true, delegated: true });
   const view = mount(PeopleView);
   expect(view.text()).toContain('Site administrator');
-  expect(view.text()).toContain('LANZA_SITE_ADMINS');
-  expect(view.text()).toContain('Redeploy');
+  expect(view.text()).toContain('Only the GitHub repository owner');
   expect(view.text()).toContain('does not grant hosting access');
   expect(view.find('input').exists()).toBe(false);
   expect(view.find('a').attributes('href')).toBe('https://github.com/owner/site/settings/access');

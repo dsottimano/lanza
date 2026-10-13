@@ -91,6 +91,34 @@ agent flow; changing accounts and refreshing the same session are distinct.
 
 ### Explicit delegated site administration
 
+Settings → People now provides an owner-only management interface at
+`/admin/api/people`. The endpoint rechecks the raw GitHub administrator identity,
+requires exact same-origin POSTs, bounds payloads and validates the Pages project's
+GitHub repository before changing anything. Delegated owners are refused. It changes
+only Production `LANZA_SITE_ADMINS` with a narrow Cloudflare PATCH, then starts a
+production-branch deployment. The UI distinguishes saved configuration from active
+access and exposes deployment status and a retry without rewriting the setting.
+
+It uses the tenant's existing complete Cloudflare proxy credentials when available.
+Otherwise the owner enters an account ID, Pages project and Pages Edit API token in
+the CMS. The supplied token exists in component memory until leaving People and in
+the immediate same-origin request; no browser storage, cookies, repository write or
+broker credential storage is used. A configured server token cannot be redirected
+to browser-supplied account/project names. Raw Cloudflare project data, other
+variables and upstream errors are never returned to the browser. An encrypted or
+malformed existing delegation variable requires correction before CMS editing.
+
+The loaded setting is checked before saving to refuse stale edits. Cloudflare does
+not expose an atomic compare-and-swap for this PATCH: simultaneous saves from two
+owners can still race. Avoid concurrent access-management edits. GitHub repository
+write access is still checked at sign-in, not granted by adding a username here.
+Inviting GitHub collaborators remains on GitHub; this screen manages CMS privileges.
+The optional separate OAuth Worker is not updated by a Pages deployment.
+No grant-management MCP tool exists; managing access requires the owner's CMS action.
+
+API contracts: [project update](https://developers.cloudflare.com/api/resources/pages/subresources/projects/methods/edit/)
+and [create deployment](https://developers.cloudflare.com/api/resources/pages/subresources/projects/subresources/deployments/methods/create/).
+
 The hosting operator may set `LANZA_SITE_ADMINS` in the tenant's Cloudflare Pages
 Production Variables and Secrets, then redeploy. It is a comma-separated list of
 exact GitHub usernames, case-insensitive, without `@`. Malformed lists grant no

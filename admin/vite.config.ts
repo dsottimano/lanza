@@ -1,3 +1,4 @@
+import { onRequest as peopleRequests } from "../functions/admin/api/people";
 import { onRequest as pluginRequests } from "../functions/admin/api/plugins";
 import { defineConfig, loadEnv, type Plugin } from "vite";
 import vue from "@vitejs/plugin-vue";
@@ -157,7 +158,7 @@ function agentRequestsDev(token: string | undefined, env: SiteAccessEnv, handler
           for (const [key, value] of Object.entries(incoming.headers)) if (typeof value === "string") headers.set(key, value);
           const query = suffix.includes("?") ? suffix.slice(suffix.indexOf("?")) : "";
           const url = new URL(`/admin/api/${endpoint}${query}`, `http://${incoming.headers.host ?? "localhost"}`);
-          const response = await handler({ request: new Request(url, { method, headers, ...(size ? { body: bytes } : {}) }), data: { ...identity.identity, token } });
+          const response = await handler({ request: new Request(url, { method, headers, ...(size ? { body: bytes } : {}) }), data: { ...identity.identity, token }, env } as Parameters<typeof handler>[0]);
           outgoing.statusCode = response.status;
           response.headers.forEach((value, name) => outgoing.setHeader(name, value));
           outgoing.end(await response.text());
@@ -320,6 +321,7 @@ export default defineConfig(({ mode }) => {
       authBypassDev(),
       githubProxyDev(env.GITHUB_TOKEN, env),
       agentRequestsDev(env.GITHUB_TOKEN, env),
+      agentRequestsDev(env.GITHUB_TOKEN, env, peopleRequests, "people"),
       agentRequestsDev(env.GITHUB_TOKEN, env, pluginRequests, "plugins"),
       cloudflareProxyDev({
         githubToken: env.GITHUB_TOKEN,

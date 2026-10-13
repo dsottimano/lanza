@@ -28,6 +28,10 @@ access. CMS, direct MCP and agent-token readiness use the same check. Hosting an
 delegation changes are not granted through MCP. The optional OAuth Worker needs the
 same setting in its own runtime and preserves per-tool scope checks; its generic
 `run_plugin` tool is explicitly unsupported until per-action scopes are defined.
+Owners can now manage Pages co-admins in CMS Settings → People. Grant/revoke and
+Cloudflare deployment operations are intentionally unavailable through MCP. The
+separate OAuth Worker still requires its own matching runtime configuration.
+
 See [delegation setup and revocation](security-model.md#explicit-delegated-site-administration).
 
 ## Working together in the CMS
