@@ -28,7 +28,9 @@ async function fixture(path = "content/posts/en/article.md") {
 function button(wrapper: VueWrapper, text: string) { return wrapper.findAll("button").find(node => node.text() === text)!; }
 async function openDialog(wrapper: VueWrapper, action = "Verify") {
   await button(wrapper, action).trigger("pointerdown"); await button(wrapper, action).trigger("click");
-  for (let n = 0; n < 4 && !wrapper.find("dialog").exists(); n++) await flushPromises();
+  // Capturing the anchor awaits Web Crypto, which can outlast a fixed number
+  // of event-loop flushes on CI. Wait for the actual user-visible state.
+  await vi.waitFor(() => expect(button(wrapper, "Save request")).toBeDefined());
 }
 it("preserves the highlighted text across toolbar and dialog focus; saves default verification without invoking an AI", async () => {
   const { wrapper, editor } = await fixture(); const original = editor.getHTML(); await openDialog(wrapper);
