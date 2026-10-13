@@ -9,7 +9,7 @@
     }
   },
   "include": [".astro/types.d.ts", "**/*"],
-  // admin/ is the Vue CMS — a separate package with its own tsconfig + vue-tsc
-  // check; exclude it so `astro check` only validates the Astro front-end.
-  "exclude": ["dist", "public/admin", "admin"]
+  // The CMS and optional Worker integrations are separate packages with their
+  // own typecheck commands and runtime types. They are not Astro source.
+  "exclude": ["dist", "public/admin", "admin", "integrations"]
 }

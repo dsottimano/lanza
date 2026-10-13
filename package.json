@@ -2,6 +2,10 @@
   "name": "lanza-site",
   "version": "0.1.26",
   "private": false,
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/dsottimano/lanza.git"
+  },
   "type": "module",
   "bin": {
     "lanza": "bin/lanza.mjs"

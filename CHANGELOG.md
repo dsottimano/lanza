@@ -3,6 +3,18 @@
 `lanza-site` on npm. Tenants pin a version, so nothing here reaches a live site until
 that site updates (Settings → Software).
 
+## 0.1.26 — 2026-10-13
+
+- CMS requests and replies anchored to selected text, clearer publication controls,
+  clipboard image uploads, translation tools and starter homepage installation.
+- Site-owned plugins and a private Research workspace with reviewed editor proposals.
+- Agent text provenance preserved through editing and public rendering.
+- Release configuration separates optional Worker projects from Astro typechecking
+  and declares the source repository required for npm provenance.
+
+Saved requests do not invoke an assistant. Optional OAuth and scheduled research
+Workers require separate setup; this package does not deploy them.
+
 ## 0.1.12 — 2026-07-26
 
 ### Fixed
