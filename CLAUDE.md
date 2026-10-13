@@ -99,6 +99,15 @@ Read `AGENTS.md` for the mandatory schema and public-page authoring contract.
 
 ## Before you commit
 
+- **Shared software changed? Check npm and ask about release.** Compare the intended
+  source version with live `npm view lanza-site version dist-tags` and the onboarding
+  template's dependency pin. Never leave an npm delivery gap unstated. If a release
+  is not already authorized, prepare and validate it, then explicitly ask whether
+  to publish and update the template. Do not ask again when already authorized.
+  Follow `AGENTS.md` → Delivery evidence: a green publishing job or private tarball
+  is insufficient. Verify the public package can be downloaded and built in a clean
+  tenant, verify the updated template pin, and record exact release checkpoints.
+  Authentication failures and npm processing remain pending until resolved.
 - New public page? → keep it static/cacheable; no catch-all cache rule.
 - New content query (D1/R2)? → can it be cached or avoided?
 - Touching the bot? → secrets stay out of the repo; keep it fail-closed.

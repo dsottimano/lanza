@@ -1,10 +1,37 @@
-# Current provenance delivery — October 11, 2026
+# Public release recovery — October 13, 2026
+
+Product main and staging now contain the integrated feature work at `ab9d01b`.
+Tag `v0.1.26` completed the trusted-publishing workflow successfully:
+https://github.com/dsottimano/lanza/actions/runs/38425473067.
+npm `latest` is verified as **0.1.26**, with signed provenance. A clean tenant
+downloaded the public registry tarball, built successfully and passed legacy Pages
+Functions compilation. Its integrity matches the locally tested tarball exactly.
+The onboarding template now pins 0.1.26 at `dsottimano/lanza-template` commit
+`41153bfb2040e7c84d8417dc0d2b69da340c8a58`, verified on remote main. npm processing
+took several minutes after CI succeeded; the template was updated only after the
+public download/build passed.
+
+Next release action: the friend's existing 0.1.16 site needs its owner to stage the
+0.1.26 software update, review/publish it and verify its deployment. Its URL and
+repository were not provided; no existing tenant was automatically upgraded.
+AGENTS.md and CLAUDE.md now require live npm/template checks and an explicit release
+question when publication is not already authorized.
+
+Current checks: 491 server/script tests and 639 CMS tests passed; CMS build and
+typecheck, Astro check (0 errors, 99 hints), site checker (0 errors/warnings),
+public build, packed fresh-tenant build, draft exclusion and legacy Pages Functions
+compilation passed. Existing empty-taxonomy and large-chunk warnings remain.
+Optional Worker integrations have separate typechecks and are excluded from the
+Astro project; they are not shipped in the npm package. Browser interaction and a
+friend's existing-site upgrade are not established by these checks.
+
+# Previous provenance delivery — October 11, 2026
 
 Shared source now implements agent text provenance; see [contract](agent-provenance.md).
 Verified 491 server/script tests and 639 CMS tests, CMS typecheck/build, site checker
 (0 errors/warnings), public build, legacy Pages Functions compilation and a real
 browser editor round-trip. Private package 0.1.26 is installed and built in Pananómica.
-Public npm release and merging this feature branch into product main are still separate.
+Public npm release and product main integration were pending at that checkpoint.
 The existing task queue follows; these checks do not claim unrelated backlog completion.
 
 # Lanza work list
@@ -76,14 +103,13 @@ old standalone collector cron drives the CMS refresh or its disable switch.
 
 ## Release and integration
 
-- [ ] Reconcile `feat/agent-requests` with current product main/staging and retained
-  work in the original checkout. Do not overwrite or blindly reapply those changes.
-- [ ] Run the full current suite and validate the final packed artifact before a
-  shared release. Rebuild CMS assets explicitly before packing when lifecycle
-  scripts are disabled. Run legacy Pages Functions compilation for Functions edits.
-- [ ] Release the shared npm package through the normal authenticated flow. Tenant
-  0.1.25 is a private tarball dependency; public npm publication previously hit
-  EOTP. Source branch, package, Git push and live deployment are distinct states.
+- [x] Reconcile the integrated feature work with product main/staging and retained
+  local work. Both remote branches now contain `ab9d01b`; no content conflicts.
+- [x] Run the current suite, explicitly rebuild CMS assets, validate the packed
+  fresh tenant and compile Pages Functions. See the October 13 checkpoint above.
+- [x] Release shared npm 0.1.26 through GitHub trusted publishing, verify the public
+  package in a clean tenant and update the onboarding template. Existing private
+  tarball tenants remain separate upgrades; source, package and deployment differ.
 - [ ] Verify each intended deployment against its commit and actual URL, including
   staging and production. Preserve CMS edits through every reconciliation.
 

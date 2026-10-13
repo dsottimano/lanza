@@ -24,6 +24,24 @@ existing local work. Read `docs/review-surface.md` before changing CMS previews.
 
 ## Delivery evidence
 
+- **Always check npm delivery after shared Lanza software changes.** Query the live
+  `lanza-site` registry version/dist-tags and inspect the onboarding template's
+  dependency pin; compare them with the intended source version. Local builds,
+  private tenant tarballs, Git pushes and successful CI do not establish public
+  availability. State any gap explicitly at handoff.
+- **Ask about npm publication instead of silently leaving changes unreleased.**
+  If publication is not already authorized, finish release preparation and checks,
+  then explicitly ask whether to publish the prepared version and update the
+  onboarding template. Existing release authorization persists; do not ask again.
+  If authentication blocks publication, identify the exact action needed from the
+  owner and keep the release marked pending.
+- **A release is complete only when new installs can obtain it.** Verify npm
+  `latest` and the downloadable package, build a clean tenant from that public
+  package, then update and verify the onboarding template's exact version pin.
+  npm's "being processed" response is pending, even with a green publishing job.
+  Record the version, source commit, publish run, template commit and verification
+  result. Existing tenants need their own reviewed upgrade; do not imply that
+  npm publication upgrades them automatically.
 - Distinguish source implementation, tests, package release, Git push and deployment.
   Verify the intended branch/commit and actual URL before claiming a live fix.
 - Fixing an installer does not migrate an already-installed tenant. Inspect actual
