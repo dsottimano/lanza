@@ -1,8 +1,12 @@
 # CMS co-admin management — October 13, 2026
 
-Implemented locally on `feat/cms-coadmins`, prepared **0.1.28**, not committed,
-pushed, published or deployed. Public npm latest and onboarding template remain
-**0.1.27** (verified live). Previous release checkpoints below remain historical.
+Public npm latest is **0.1.28**, verified downloadable with a fresh public-registry
+install/build and legacy Functions compile in `/tmp/lanza-public-0.1.28-20261013`.
+Released from `36821bcf9caeb29b61552620dfd9c321386c677f`, tag `v0.1.28`, via
+[successful run 38449852277](https://github.com/dsottimano/lanza/actions/runs/38449852277).
+Template main `fdc4720022a7bbee52c3bd5a5e7653b6120d4a1e` pins 0.1.28, verified remotely.
+Public integrity: `sha512-IrPicizkIV+pGVCTvvzTLeJCAJ8hAXYjTDT5WuBuv+mfbNJjajchmpQDyvLObHYVkWicbZ/7BZI+kIWTT0M0iQ==`.
+npm needed several minutes of processing after CI green. Existing tenants unchanged.
 
 Settings → People now embeds CoAdmins: owner-only add/remove, save and deploy,
 load current policy, check deployment, and retry deployment without rewriting it.
@@ -29,11 +33,21 @@ policy needs correction in Cloudflare before CMS editing. The separate optional
 OAuth Worker still needs its own matching setting. Writers capable of deploying
 arbitrary repository code remain outside the CMS role boundary. See security-model.
 
-The user authorized publishing 0.1.28 and updating the template, and plans to create
-a new site. Leave the old tenant untouched. Next: reconcile main/staging,
-run trusted publishing, verify a public npm tenant install/build, update template,
-and record exact receipts. The private DefineMG tenant remains inaccessible and
-unchanged; its owner must upgrade before these controls appear.
+The user plans a new site but hit `setup_failed` before seeing repository creation.
+The broker previously swallowed OAuth, identity, generate, config and staging errors
+under that one code with no useful diagnostics. No historical root cause is proven.
+In isolated worktree `/tmp/lanza-broker-auth-20261013`, branch
+`fix/onboarding-account-errors`, commit `c90588e55c1ccf3320ad56c64938fc59cbe2d49f`
+adds GitHub `prompt=select_account`, an explicit disconnected identity label, a
+proper hidden-attribute CSS rule and stage-specific safe errors/logging. Eight
+broker tests, TypeScript and legacy Functions compilation pass; pushed broker main.
+Original `../lanza-broker` index/state/test local edits were preserved and not shipped.
+Broker Cloudflare Pages deployment `e4da5db2-af56-4cc7-a6bb-db133437c462` succeeded.
+Verified actual `https://connect.lanzacms.com/` HTML contains the new controls and
+errors; live OAuth-start redirect contains `prompt=select_account`. No authenticated
+OAuth/repository-creation test was performed. Next: user retries account selection.
+The private DefineMG tenant remains untouched; co-admin Cloudflare writes remain
+unverified on that real tenant. The wizard cannot enumerate GitHub browser sessions.
 
 # Delegated site administration — October 13, 2026
 
