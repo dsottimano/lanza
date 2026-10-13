@@ -1,9 +1,20 @@
 # Delegated site administration — October 13, 2026
 
-Prepared local version **0.1.27** on `feat/delegated-admins`; not committed, pushed,
-published or deployed at this checkpoint. Public npm latest remains **0.1.26**;
-onboarding template main remains `41153bfb2040e7c84d8417dc0d2b69da340c8a58` (0.1.26).
-Remote product main/staging were fetched and both remain `cba08f4`.
+Public npm `latest` is now **0.1.27**, published with signed provenance from
+`2380ac202d3ac43313c9d27876a06683b6a0a300`, tag `v0.1.27`, successful
+[run 38447165456](https://github.com/dsottimano/lanza/actions/runs/38447165456).
+Main and staging contain that release. Onboarding template main is now
+`d56f5ca24b8e945b592001192703a4a36867e8dc`, verified remotely, and pins 0.1.27.
+A clean tenant downloaded the public registry package, built and compiled legacy
+Pages Functions successfully at `/tmp/lanza-public-0.1.27-20261013`.
+Public integrity matches the prepared tarball exactly:
+`sha512-1FYMrWnaS1LqJsmCTjAOMpCicLxr88KPbrCW4CZumx8rxveLzcIkViVFoFpKMnSZRMcZI2PeUkucxDW8wUhFXg==`.
+
+The first workflow (38446708869) failed twice before publication on the existing
+request-dialog test's fixed event-loop flush count. The test helper now waits for
+actual dialog readiness; all 501 server/script and 642 CMS tests passed in CI.
+The unpublished tag was moved to include that test-only correction. npm then
+processed the successful publish before public download became available.
 
 Shared CMS and MCP now accept hosting-configured `LANZA_SITE_ADMINS`: exact,
 comma-separated GitHub logins, only when GitHub already grants repository write
@@ -23,11 +34,10 @@ disabled. `/tmp/lanza-site-0.1.27.tgz` installed into a fresh template tenant at
 compilation passed. Existing empty-taxonomy/large-chunk warnings remain.
 Browser interaction and the real private tenant are unverified.
 
-The user authorized public 0.1.27 publication and the template update. Next: reconcile
-main/staging again, publish via trusted publishing, verify public download/build,
-then update the onboarding template. After release, the site's owner must upgrade
-and publish its software, set Production `LANZA_SITE_ADMINS` in Cloudflare Pages
-Variables & Secrets, and redeploy. Existing collaborators then refresh the CMS.
+Next action: the site's owner must upgrade and publish its software to 0.1.27,
+set Production `LANZA_SITE_ADMINS` in Cloudflare Pages Variables & Secrets to the
+exact collaborator GitHub usernames separated by commas, and redeploy. Existing
+collaborators then refresh the CMS. Hosting access remains owner-only.
 `DefineMG/define-media-group` is personal/private and unavailable to the current
 GitHub credentials; the user declined further tenant details. Do not retry access
 or invent delegated usernames. This work does not upgrade that tenant.
