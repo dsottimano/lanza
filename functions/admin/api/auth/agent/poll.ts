@@ -23,10 +23,10 @@ import {
 } from "../../../../_lib/device-flow";
 import { AGENT_CLIENT_ID } from "../../../../_lib/tenant-config";
 import { roleMayUseCloudflare, type Role } from "../../../../_lib/roles";
-import { identityFor } from "../../../../_lib/gh-identity";
+import { siteIdentityFor, type SiteAccessEnv } from "../../../../_lib/site-access";
 import repo from "../../../../../lanza.config.json";
 
-interface Env {
+interface Env extends SiteAccessEnv {
   AGENT_CLIENT_ID?: string;
 }
 
@@ -67,7 +67,7 @@ export const onRequest = async (context: {
   // is well-formed, accepted by GitHub, and useless here — it would fail at the
   // agent's first call with a 404 that reads like the site is missing. Ask the
   // question now, while the person is still on the screen that can fix it.
-  const check = await identityFor(result.tokens.accessToken, repo.owner, repo.name);
+  const check = await siteIdentityFor(result.tokens.accessToken, repo.owner, repo.name, env);
   const ready = check.status === "ok" && check.identity.role === "owner";
   const headers = new Headers({
     "content-type": "application/json",

@@ -106,9 +106,11 @@ function encodePath(path: string): string {
 export class ContentClient {
   private repo: Repo;
   private token: string;
-  constructor(repo: Repo, token: string) {
+  readonly delegatedAdmin: boolean;
+  constructor(repo: Repo, token: string, delegatedAdmin = false) {
     this.repo = repo;
     this.token = token;
+    this.delegatedAdmin = delegatedAdmin;
   }
 
   // Internal transport for the private request archive. It deliberately cannot

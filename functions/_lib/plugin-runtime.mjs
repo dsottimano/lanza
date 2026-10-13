@@ -1,5 +1,5 @@
 import { GitHubError } from './lanza-content';
-import { roleFromPermissions } from './roles';
+import { mayAdministerSite } from './roles';
 import { plugins } from './plugin-registry.mjs';
 import { pluginId, validatePlugin, validateSettings } from './plugin-contract.mjs';
 export const PLUGIN_BODY_LIMIT = 64 * 1024;
@@ -23,7 +23,7 @@ export class PluginRuntime {
     const guard = async () => {
       if (!/^[A-Za-z0-9-]{1,100}$/.test(this.actor || '')) throw new GitHubError(401,'Sign in again.');
       const repo = await api('GET','');
-      if (!repo || repo.private !== true || roleFromPermissions(repo.permissions) !== 'owner') throw new GitHubError(403,'This plugin requires a private repository and owner access.');
+      if (!repo || repo.private !== true || !mayAdministerSite(repo.permissions, this.client.delegatedAdmin === true)) throw new GitHubError(403,'This plugin requires a private repository and site administration access.');
       return repo.full_name;
     };
     const repository = await guard();

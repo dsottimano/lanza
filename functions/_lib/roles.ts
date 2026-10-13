@@ -9,7 +9,9 @@
 //             most — may not edit the file that says who is an owner.
 //   viewer  — reads /admin, writes nothing.
 //
-// WHERE A ROLE COMES FROM: GitHub's own `permissions` booleans, and nowhere else
+// BASE ROLE: GitHub's own `permissions` booleans. site-access.ts can explicitly
+// promote an existing writer using tenant runtime policy; hosting is never delegated.
+// Historical background: GitHub-only roles replaced repository-maintained lists
 // (roleFromPermissions, below). There used to be a second source — `adminLogin` and
 // `editors` lists in lanza.config.json — and it was deleted rather than kept as a
 // fallback: two answers to "may this person write" can disagree, and the list was
@@ -52,6 +54,12 @@ export function roleFromPermissions(permissions: unknown): Role | null {
   if (p.push === true || p.maintain === true) return "editor";
   if (p.pull === true) return "viewer";
   return null;
+}
+
+/** Delegation is trusted request context, never a submitted role or repo field. */
+export function mayAdministerSite(permissions: unknown, delegated = false): boolean {
+  const role = roleFromPermissions(permissions);
+  return role === "owner" || (role === "editor" && delegated === true);
 }
 
 /**

@@ -27,7 +27,7 @@
 
 import repo from "../../lanza.config.json";
 import { ContentClient } from "../_lib/lanza-content";
-import { identityFor } from "../_lib/gh-identity";
+import { siteIdentityFor, type SiteAccessEnv } from "../_lib/site-access";
 import { handleMessage, rpcError, type RpcMessage } from "../_lib/mcp-core";
 import { stagingUrlFor } from "../_lib/pages-project";
 import { WORKING_BRANCH } from "../_lib/gh-proxy";
@@ -90,7 +90,7 @@ async function readPayload(request: Request): Promise<unknown> {
   }
 }
 
-export const onRequest = async (context: { request: Request }): Promise<Response> => {
+export const onRequest = async (context: { request: Request; env?: SiteAccessEnv }): Promise<Response> => {
   const { request } = context;
   const origin = new URL(request.url).origin;
 
@@ -111,14 +111,14 @@ export const onRequest = async (context: { request: Request }): Promise<Response
     return jsonResponse(rpcError(null, -32600, "MCP body too large (maximum 2 MiB)."), 413);
   }
 
-  const identity = await identityFor(githubToken, repo.owner, repo.name);
+  const identity = await siteIdentityFor(githubToken, repo.owner, repo.name, context.env);
   if (identity.status === "expired") {
     return unauthorized("Token expired: get a fresh one from /admin → Connect an agent.");
   }
   if (identity.status === "unavailable") {
     return jsonResponse(rpcError(null, -32000, "GitHub could not be reached to check this token."), 502);
   }
-  // MCP is owner-only, as it has always been. An editor's write rules live in the
+  // MCP requires site administration (native or delegated). Editor write rules live in the
   // gh proxy, which this endpoint does not go through — so rather than reimplement
   // them here, the lesser role simply does not get an agent surface yet.
   if (identity.status === "denied" || identity.identity.role !== "owner") {
@@ -138,7 +138,7 @@ export const onRequest = async (context: { request: Request }): Promise<Response
     return jsonResponse(rpcError(null, -32700, "Parse error: body is not valid JSON."), 400);
   }
 
-  const client = new ContentClient(repo, githubToken);
+  const client = new ContentClient(repo, githubToken, identity.identity.delegated === true);
 
   // `origin` is this site's own address (the broker router forwards to the tenant, so
   // it stays the tenant's). The staging URL is resolved HERE rather than in mcp-core,

@@ -21,7 +21,7 @@ import {
 } from "../_lib/admin-gate";
 import { signInPage } from "../_lib/signin-page";
 import { roleMayUseCloudflare, type Role } from "../_lib/roles";
-import { identityFor } from "../_lib/gh-identity";
+import { siteIdentityFor, type SiteAccessEnv } from "../_lib/site-access";
 import {
   ACCESS_COOKIE,
   REFRESH_COOKIE,
@@ -38,7 +38,7 @@ import {
 // names the repo, not the people — GitHub answers who may touch it.
 import repo from "../../lanza.config.json";
 
-interface Env {
+interface Env extends SiteAccessEnv {
   GITHUB_CLIENT_ID?: string;
 }
 
@@ -90,8 +90,8 @@ export const onRequest = async (context: {
   const cookies = request.headers.get("Cookie");
 
   // ── Family 1 (incoming): a GitHub user token, and GitHub answers both questions.
-  // Identity is "whose token is this", role is `permissions` on this repo — no list
-  // of people is consulted, and removal of access takes effect within 60s.
+  // Identity and base role come from GitHub. site-access applies optional runtime
+  // delegation only to existing writers; GitHub removal takes effect within 60s.
   const gh = await githubAuth(cookies, env);
 
   // GitHub is the ONLY way in. The broker's RS256 session was a second family here
@@ -127,14 +127,17 @@ export const onRequest = async (context: {
   // authorization of its own and carries an ACCOUNT-scoped token, so this is the
   // whole gate for it (I1). Everything else an editor may reach is gated per
   // request by the gh proxy, which re-asks rather than trusting this admission.
-  if (url.pathname.startsWith("/admin/api/cf/") && !roleMayUseCloudflare(role)) {
-    return deny(url, "Only an owner can change hosting settings.");
+  if (url.pathname.startsWith("/admin/api/cf/") &&
+    (!roleMayUseCloudflare(role) || (gh.kind === "ok" && gh.delegated))) {
+    return deny(url, "Only a GitHub repository admin can change hosting settings.", 403);
   }
 
   // The gh proxy attaches this to its GitHub calls. It is handed over here rather
   // than re-read from the cookie downstream for the reason above: after a refresh
   // the cookie in the request is already dead.
-  context.data = { ...(context.data ?? {}), role, login, token: gh.kind === "ok" ? gh.token : null };
+  context.data = { ...(context.data ?? {}), role, login,
+    delegated: gh.kind === "ok" && gh.delegated === true,
+    token: gh.kind === "ok" ? gh.token : null };
   const response = withAdminSecurityHeaders(await next());
   // A refresh happened while answering this request. The gate is where it belongs:
   // it runs on EVERY /admin request — the SPA's own navigations included — and it
@@ -152,7 +155,7 @@ export const onRequest = async (context: {
  */
 type GhAuth =
   | { kind: "none" | "expired" | "denied" | "unavailable"; setCookies: string[] }
-  | { kind: "ok"; login: string; role: Role; token: string; setCookies: string[] };
+  | { kind: "ok"; login: string; role: Role; delegated?: boolean; token: string; setCookies: string[] };
 
 async function githubAuth(cookies: string | null, env: Env): Promise<GhAuth> {
   const access = readCookie(cookies, ACCESS_COOKIE);
@@ -166,7 +169,7 @@ async function githubAuth(cookies: string | null, env: Env): Promise<GhAuth> {
   // for the request in hand.
   let token = access;
   let result = access
-    ? await identityFor(access, repo.owner, repo.name)
+    ? await siteIdentityFor(access, repo.owner, repo.name, env)
     : ({ status: "expired" } as const);
 
   // The access token lives 8 hours; the refresh token 184 days and rotating, so this
@@ -177,7 +180,7 @@ async function githubAuth(cookies: string | null, env: Env): Promise<GhAuth> {
     if (refreshed.status === "ok") {
       setCookies = authCookies(refreshed.tokens);
       token = refreshed.tokens.accessToken;
-      result = await identityFor(token, repo.owner, repo.name);
+      result = await siteIdentityFor(token, repo.owner, repo.name, env);
     } else if (refreshed.status === "error" && refreshed.error === "bad_refresh_token") {
       // The refresh token is spent or revoked. Drop all auth cookies so the browser
       // stops presenting a credential that can never work again — leaving them would
@@ -191,7 +194,7 @@ async function githubAuth(cookies: string | null, env: Env): Promise<GhAuth> {
   }
 
   if (result.status === "ok") {
-    // `token` is the very argument identityFor just answered about, so it is set.
+    // `token` is the very argument siteIdentityFor just answered about, so it is set.
     return { kind: "ok", ...result.identity, token: token as string, setCookies };
   }
   return { kind: result.status, setCookies };

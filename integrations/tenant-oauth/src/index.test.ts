@@ -2,7 +2,7 @@ import { createExecutionContext, waitOnExecutionContext } from "cloudflare:test"
 import { env as bindings } from "cloudflare:workers";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import worker, { type Env } from "./index";
-import { OAUTH_TOOLS, TOOL_SCOPES, missingScopes } from "./policy";
+import { OAUTH_TOOLS, TOOL_SCOPES, UNSUPPORTED_OAUTH_TOOLS, missingScopes } from "./policy";
 import { TOOL_LIST } from "../../../functions/_lib/mcp-core";
 import { resetIdentityCache } from "../../../functions/_lib/gh-identity";
 import repo from "../../../lanza.config.json";
@@ -35,12 +35,13 @@ const fetchMock = {
 };
 
 class Browser {
+  constructor(private overrides?: Partial<Env>) {}
   cookies = new Map<string, string>();
   async request(path: string, options: RequestInit = {}): Promise<Response> {
     const headers = new Headers(options.headers);
     headers.set("Cookie", [...this.cookies].map(([key, value]) => `${key}=${value}`).join("; "));
     const ctx = createExecutionContext();
-    const response = await worker.fetch(new Request(`${ORIGIN}${path}`, { ...options, headers }), env, ctx);
+    const response = await worker.fetch(new Request(`${ORIGIN}${path}`, { ...options, headers }), this.overrides ? { ...env, ...this.overrides } : env, ctx);
     await waitOnExecutionContext(ctx);
     for (const cookie of response.headers.getSetCookie()) {
       const [pair] = cookie.split(";");
@@ -136,6 +137,27 @@ beforeEach(async () => {
 afterEach(() => { fetchMock.assertNoPendingInterceptors(); fetchMock.deactivate(); vi.restoreAllMocks(); });
 
 describe("tenant OAuth MCP service in workerd", () => {
+  it("accepts a delegated writer at consent and MCP, then refuses the same connection after delegation removal", async () => {
+    const delegation = { LANZA_SITE_ADMINS: 'tenant-owner' };
+    const browser = new Browser(delegation);
+    const auth = await authorize(browser);
+    const state = await start(browser, auth);
+    const approved = await finish(browser, state, 'editor');
+    expect(approved.status).toBe(302);
+    const code = new URL(approved.headers.get('Location')!).searchParams.get('code')!;
+    const response = await exchange(browser, auth, code);
+    expect(response.status).toBe(200);
+    const tokens = await response.json() as { access_token: string };
+    expect((await call(browser, tokens.access_token, 'tools/list')).status).toBe(200);
+    delegation.LANZA_SITE_ADMINS = '';
+    expect((await call(browser, tokens.access_token, 'tools/list')).status).toBe(403);
+  });
+
+  it("refuses unscoped plugin execution even with all supported consent scopes", async () => {
+    const { browser, tokens } = await connected('content.read content.write site.design site.publish offline_access');
+    const response = await call(browser, tokens.access_token, 'tools/call', { name: 'run_plugin', arguments: { plugin: 'research', action: 'refresh' } });
+    expect(response.status).toBe(400);
+  });
   it("publishes issuer/resource metadata, S256 and CIMD and challenges missing tokens", async () => {
     const browser = new Browser();
     const metadata = await (await browser.request("/.well-known/oauth-authorization-server")).json() as Record<string, unknown>;
@@ -166,7 +188,8 @@ describe("tenant OAuth MCP service in workerd", () => {
   });
 
   it("classifies every existing tool and advertises explicit scopes and read hints", () => {
-    expect(Object.keys(TOOL_SCOPES).sort()).toEqual(TOOL_LIST.map((t) => t.name).sort());
+    expect([...Object.keys(TOOL_SCOPES), ...UNSUPPORTED_OAUTH_TOOLS].sort()).toEqual(TOOL_LIST.map((t) => t.name).sort());
+    expect(OAUTH_TOOLS.some(t => t.name === "run_plugin")).toBe(false);
     expect(OAUTH_TOOLS.find((t) => t.name === "get_schema")?.annotations.readOnlyHint).toBe(true);
     expect(OAUTH_TOOLS.find((t) => t.name === "publish")?.securitySchemes).toEqual([{ type: "oauth2", scopes: ["content.read", "site.publish"] }]);
   });

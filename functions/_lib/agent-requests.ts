@@ -1,5 +1,5 @@
 import { ContentClient, GitHubError } from "./lanza-content";
-import { roleFromPermissions } from "./roles";
+import { mayAdministerSite } from "./roles";
 
 export const REQUEST_BRANCH = "lanza-agent-requests";
 export const REQUEST_BODY_LIMIT = 64 * 1024;
@@ -44,7 +44,7 @@ export class AgentRequests {
     if (!/^[A-Za-z0-9-]{1,100}$/.test(this.actor)) throw new GitHubError(401, "Authenticated GitHub identity required.");
     const metadata = await this.api("GET", "");
     if (!metadata || object(metadata).private !== true) throw new GitHubError(403, "Private repository required for agent requests. Published pages can remain public.");
-    if (roleFromPermissions(object(metadata).permissions) !== "owner") throw new GitHubError(403, "Agent requests are available to the site owner only.");
+    if (!mayAdministerSite(object(metadata).permissions, this.client.delegatedAdmin === true)) throw new GitHubError(403, "Agent requests require site administration access.");
   }
   private async ensureBranch(): Promise<void> {
     if (await this.api("GET", `git/ref/heads/${REQUEST_BRANCH}`)) return;

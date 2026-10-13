@@ -99,13 +99,15 @@ export class GitHubClient {
     login: string;
     role: "owner" | "editor" | "viewer" | null;
     repo: string | null;
+    delegated?: boolean;
   }> {
-    const user = (await this.req("/user")) as { login: string; role?: string; repo?: string };
+    const user = (await this.req("/user")) as { login: string; role?: string; repo?: string; delegated?: boolean };
     const role = user.role;
     return {
       login: user.login,
       role: role === "owner" || role === "editor" || role === "viewer" ? role : null,
       repo: typeof user.repo === "string" ? user.repo : null,
+      delegated: user.delegated === true,
     };
   }
 

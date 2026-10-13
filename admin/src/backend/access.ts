@@ -16,6 +16,7 @@ import type { GitHubClient } from "./github";
 // list of our own is a second, drifting answer to a question GitHub already answers,
 // and removing someone from it never actually took their access away. Collaborators
 // are managed on GitHub, and a removal takes effect within 60 seconds.
+// Explicit site delegation is runtime policy and cannot override GitHub access.
 
 export type Role = "owner" | "editor" | "viewer";
 
@@ -25,6 +26,7 @@ export interface AccessState {
   /** `owner/name` of the repository this CMS edits, for links into GitHub. */
   repo: string | null;
   loaded: boolean;
+  delegated: boolean;
 }
 
 export const access = reactive<AccessState>({
@@ -32,6 +34,7 @@ export const access = reactive<AccessState>({
   role: null,
   repo: null,
   loaded: false,
+  delegated: false,
 });
 
 /** True when the signed-in user may publish and change settings. */
@@ -51,10 +54,12 @@ export async function loadAccess(client: GitHubClient): Promise<void> {
     access.login = identity.login;
     access.role = identity.role;
     access.repo = identity.repo;
+    access.delegated = identity.delegated === true;
   } catch {
     access.login = null;
     access.role = null;
     access.repo = null;
+    access.delegated = false;
   }
   access.loaded = true;
 }

@@ -10,7 +10,7 @@ Companions: `keys-and-secrets.md` (every credential and who holds it),
 work this file now describes), `mcp-server.md` (the agent surface). **This file is
 authoritative where they disagree.**
 
-**Current as of 2026-08-29.** The zero-secret migration is complete. If you are
+**Updated 2026-10-13 for delegated site administration.** The zero-secret migration is complete. If you are
 reading a doc that mentions `HANDOFF_PRIVATE_KEY`, `adminLogin`, `lanza_session`,
 `/api/token`, an audience claim, or the fan-out, that doc is stale and this one wins.
 
@@ -19,9 +19,10 @@ reading a doc that mentions `HANDOFF_PRIVATE_KEY`, `adminLogin`, `lanza_session`
 ## 0. The shape, in one paragraph
 
 A tenant site is a static Cloudflare Pages deployment of the customer's own repo, in
-the customer's own Cloudflare account. **Who you are and what you may do are both
-answered by GitHub**, per request: a device-flow user token in an HttpOnly cookie says
-who, and `permissions` on the repo says what. Nothing signs a session. The broker
+the customer's own Cloudflare account. GitHub verifies identity and repository access
+using the person's own token in an HttpOnly cookie. By default repository permissions
+determine the CMS role. The tenant's hosting operator may explicitly delegate site
+administration to existing writers (see below). Nothing signs a session. The broker
 (`connect.lanzacms.com`) automates onboarding and then has nothing further to do with
 the site: it holds no key that can read or write a tenant repository, and a tenant
 accepts nothing the broker signs.
@@ -33,7 +34,7 @@ change against.
 opt-in OAuth/MCP Worker in the customer's own Cloudflare account. The default Pages
 installation remains store-free. The optional Worker uses encrypted customer KV
 for upstream GitHub credentials and OAuth state; the broker holds none of it and
-Pages accepts no new broker proof. It reuses the existing owner-only MCP handler
+Pages accepts no new broker proof. It reuses the existing site-administrator MCP handler
 and separately enforces consented read/content/design/publish scopes. Its exact
 deployment requirements, GitHub nonexpiring-token constraint, KV consistency and
 revocation limits are in [its setup](../integrations/tenant-oauth/README.md).
@@ -49,14 +50,16 @@ A token proves identity. Whether that identity may touch *this* site is a second
 separate question, and both must be asked. GitHub answers both, but they are different
 calls: `GET /user` is who, `GET /repos/{owner}/{name}` → `permissions` is what
 (`functions/_lib/gh-identity.ts`, cached 60s per repository and token hash).
+`site-access.ts` then applies the deployment's optional delegation policy. It never
+overrides a GitHub denial, outage, expired credential or read-only role.
 
 | Gate | File | Identity | Authorization |
 |---|---|---|---|
 | `/admin/*` (SPA + both proxies) | `functions/admin/_middleware.ts` | ✅ | ✅ |
 | `/admin/api/gh/*` | `functions/admin/api/gh/[[path]].ts` | inherited | ✅ re-asked per request |
-| `/admin/api/auth/agent/*` | `agent/{start,poll}.ts` | inherited | ✅ owner only |
-| `/api/mcp` | `functions/api/mcp.ts` | ✅ | ✅ owner only |
-| optional OAuth Worker `/mcp` | `integrations/tenant-oauth/src/index.ts` | ✅ tenant OAuth plus upstream GitHub | ✅ owner only, plus per-tool OAuth scopes |
+| `/admin/api/auth/agent/*` | `agent/{start,poll}.ts` | inherited | ✅ site administration |
+| `/api/mcp` | `functions/api/mcp.ts` | ✅ | ✅ site administration |
+| optional OAuth Worker `/mcp` | `integrations/tenant-oauth/src/index.ts` | ✅ tenant OAuth plus upstream GitHub | ✅ site administration, plus per-tool OAuth scopes |
 
 `functions/admin/api/cf/[[path]].ts` performs **no check of its own** — it trusts the
 middleware completely and then attaches an account-scoped Cloudflare API token.
@@ -85,6 +88,33 @@ Logout clears pending agent-authorization cookies as well as the CMS session.
 A new sign-in also cancels any old agent flow and removes the previous refresh
 cookie if GitHub did not issue a replacement. Ordinary refresh retains an active
 agent flow; changing accounts and refreshing the same session are distinct.
+
+### Explicit delegated site administration
+
+The hosting operator may set `LANZA_SITE_ADMINS` in the tenant's Cloudflare Pages
+Production Variables and Secrets, then redeploy. It is a comma-separated list of
+exact GitHub usernames, case-insensitive, without `@`. Malformed lists grant no
+delegation; there are no wildcards. Remove a username and redeploy to revoke it.
+The default is empty, so existing sites retain their current roles.
+
+Only a GitHub `editor` (write/maintain) can be promoted, after identity verification.
+Internally this is `role: owner, delegated: true`; it means **site administrator**,
+not GitHub repository owner. Delegation is applied outside the GitHub-only cache,
+never read from repository files, requests, cookies or frontend configuration.
+Native GitHub administrators remain independent of this list.
+
+Delegates can manage settings, content, publishing, software updates, private requests,
+Research and agent tools using their own token. Archive guards recheck GitHub write
+access and private visibility before reads/writes. Hosting `/admin/api/cf/*` remains
+restricted to native GitHub administrators; delegates cannot edit their grant through
+that proxy. The optional OAuth Worker needs its own identical runtime setting and
+redeployment; Pages configuration is not automatically copied to it. Existing OAuth
+connections are rechecked on each MCP request. No delegation-write MCP tool exists.
+
+This is a CMS authorization boundary, not protection against hostile repository code
+writers: a collaborator able to replace and deploy application code can replace its
+checks. Use GitHub branch protection and Cloudflare account permissions for that
+separate boundary. No central credential, additional storage or broker trust is added.
 
 ### I2 — Validate the URL you are about to fetch, not the string you were given
 
@@ -239,7 +269,8 @@ and hyphens, 58 chars max, start and end alphanumeric. The base slug is capped a
 The MCP tools run on behalf of an **agent**, which may be acting on prompt-injected
 input. Auth is the owner's own GitHub token, pasted from `/admin` → Connect an agent
 (`AGENT_CLIENT_ID`, the `lanza-agents` App, Contents-only). The endpoint validates it
-by asking GitHub the same question the `/admin` gate asks, and requires `owner`.
+through the same site-administration check as the `/admin` gate. A delegated writer
+uses their own token; delegation does not increase that token's GitHub permissions.
 
 The tools are confined twice:
 
@@ -276,6 +307,7 @@ author: an agent-authored template is a proposal, not a deployment.
 |---|---|---|---|
 | `GITHUB_CLIENT_ID` | tenant (optional) | overrides the committed `lanza-cms` client id | falls back to `tenant-config.ts` — correct for every normal tenant |
 | `AGENT_CLIENT_ID` | tenant (optional) | overrides the committed `lanza-agents` client id | same |
+| `LANZA_SITE_ADMINS` | tenant runtime (optional) | exact comma-separated GitHub writers allowed to administer the site | no delegated administrators; redeploy after changes |
 | `CLOUDFLARE_API_TOKEN` | tenant (opt-in) | the Site Health panel and KV/D1/R2 provisioning | those features 503 and say so. **This is the default state** |
 | `OAUTH_CLIENT_ID` / `OAUTH_CLIENT_SECRET` | broker | classic OAuth App, `public_repo`, creates the tenant repo | onboarding cannot start |
 | `CLOUDFLARE_OAUTH_CLIENT_ID` / `_SECRET` | broker | the Pages deploy step | onboarding step 3 fails |

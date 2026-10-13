@@ -3,6 +3,18 @@
 `lanza-site` on npm. Tenants pin a version, so nothing here reaches a live site until
 that site updates (Settings → Software).
 
+## 0.1.27 — 2026-10-13
+
+- Optional delegated site administration for GitHub collaborators via the tenant's
+  `LANZA_SITE_ADMINS` runtime setting. Delegates retain required GitHub write access
+  and use their own credentials for CMS settings, publishing, updates and agent tools.
+- Hosting remains restricted to native GitHub repository administrators. Private
+  requests and Research retain live privacy/access checks. Invalid or absent settings
+  grant no delegation; changing the list requires redeployment.
+- People explains setup and distinguishes a site administrator from a repository
+  owner. The optional OAuth Worker applies the same policy and still checks scopes;
+  generic plugin execution is explicitly unsupported there.
+
 ## 0.1.26 — 2026-10-13
 
 - CMS requests and replies anchored to selected text, clearer publication controls,

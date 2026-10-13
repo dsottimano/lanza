@@ -1,3 +1,37 @@
+# Delegated site administration — October 13, 2026
+
+Prepared local version **0.1.27** on `feat/delegated-admins`; not committed, pushed,
+published or deployed at this checkpoint. Public npm latest remains **0.1.26**;
+onboarding template main remains `41153bfb2040e7c84d8417dc0d2b69da340c8a58` (0.1.26).
+Remote product main/staging were fetched and both remain `cba08f4`.
+
+Shared CMS and MCP now accept hosting-configured `LANZA_SITE_ADMINS`: exact,
+comma-separated GitHub logins, only when GitHub already grants repository write
+access. Native owners retain access; delegates get site administration, publishing,
+software updates and private requests/Research, using their own GitHub token.
+Hosting-token access remains restricted to native GitHub repository admins.
+Grants are applied after the raw identity cache; malformed settings fail closed.
+The optional OAuth Worker needs its own matching deployment variable; plugin
+listing has a read scope and plugin execution remains explicitly unsupported there.
+
+Verified: 501 server/script tests, 642 CMS tests and 24 optional OAuth tests passed;
+CMS build/typecheck, optional Worker typecheck, site checker (0 errors/warnings),
+Astro check (0 errors/warnings, 99 hints), public build and legacy Pages Functions
+compilation passed. Explicitly rebuilt CMS before packing with lifecycle scripts
+disabled. `/tmp/lanza-site-0.1.27.tgz` installed into a fresh template tenant at
+`/tmp/lanza-delegation-tenant-20261013`; its public build and legacy Functions
+compilation passed. Existing empty-taxonomy/large-chunk warnings remain.
+Browser interaction and the real private tenant are unverified.
+
+The user authorized public 0.1.27 publication and the template update. Next: reconcile
+main/staging again, publish via trusted publishing, verify public download/build,
+then update the onboarding template. After release, the site's owner must upgrade
+and publish its software, set Production `LANZA_SITE_ADMINS` in Cloudflare Pages
+Variables & Secrets, and redeploy. Existing collaborators then refresh the CMS.
+`DefineMG/define-media-group` is personal/private and unavailable to the current
+GitHub credentials; the user declined further tenant details. Do not retry access
+or invent delegated usernames. This work does not upgrade that tenant.
+
 # Public release recovery — October 13, 2026
 
 Product main and staging now contain the integrated feature work at `ab9d01b`.

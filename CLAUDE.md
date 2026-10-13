@@ -49,8 +49,10 @@ Read `AGENTS.md` for the mandatory schema and public-page authoring contract.
    Device Flow, with no secret anywhere**: an unauthenticated `/admin` renders a
    sign-in screen, the person approves a code at github.com, and the tokens live in
    HttpOnly cookies. **GitHub answers both questions** — identity is whose token it
-   is, and the role is `permissions` on the repo, so there is no list of people to
-   consult and a removal takes effect within 60 seconds. The gh proxy
+   is, and repository access comes from `permissions`; removal takes effect within
+   60 seconds. Optional `LANZA_SITE_ADMINS` runtime configuration can delegate site
+   administration to existing GitHub writers, never hosting access. See the security
+   model before changing this intersection. The gh proxy
    (`functions/admin/api/gh/[[path]].ts` in prod, Vite middleware in dev) attaches
    **the signed-in person's own token**; there is no mint and no standing PAT. Dev
    uses a PAT from `admin/.env`. The proxy enforces a method+path allowlist

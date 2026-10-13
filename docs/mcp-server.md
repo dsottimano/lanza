@@ -22,6 +22,14 @@ for a multi-site broker OAuth endpoint described the retired implementation.
 Protocol and tools live in `functions/_lib/mcp-core.ts`. Repository operations live in
 `functions/_lib/lanza-content.ts`. The endpoint ships with the site package.
 
+Delegated site administrators may use their own agent token when their GitHub login
+is listed in the tenant runtime's `LANZA_SITE_ADMINS` and still has repository write
+access. CMS, direct MCP and agent-token readiness use the same check. Hosting and
+delegation changes are not granted through MCP. The optional OAuth Worker needs the
+same setting in its own runtime and preserves per-tool scope checks; its generic
+`run_plugin` tool is explicitly unsupported until per-action scopes are defined.
+See [delegation setup and revocation](security-model.md#explicit-delegated-site-administration).
+
 ## Working together in the CMS
 
 There are two distinct surfaces. Browser site tools use the open, signed-in CMS

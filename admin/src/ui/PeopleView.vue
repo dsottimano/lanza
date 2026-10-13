@@ -23,6 +23,7 @@ const collaboratorsUrl = computed(() =>
 );
 
 const roleLabel = computed(() => {
+  if (access.role === "owner" && access.delegated) return "Site administrator";
   if (access.role === "owner") return "Owner";
   if (access.role === "editor") return "Editor";
   if (access.role === "viewer") return "Viewer";
@@ -53,8 +54,9 @@ const roleLabel = computed(() => {
       <section class="mb-10">
         <h2 class="mb-1 text-sm font-semibold text-zinc-900">Adding someone</h2>
         <p class="mb-3 max-w-prose text-sm text-zinc-600">
-          Access is managed on GitHub, not here. Whoever can write the repository can edit
-          this site; whoever administers it can also publish and change settings.
+          <span data-lanza-origin="agent">GitHub write access allows content editing. GitHub
+          repository admins can publish and change settings. On a personal repository,
+          collaborators need explicit delegation to administer the site.</span>
         </p>
         <a
           v-if="collaboratorsUrl"
@@ -70,6 +72,22 @@ const roleLabel = computed(() => {
         </p>
       </section>
 
+      <section class="mb-10">
+        <h2 class="mb-1 text-sm font-semibold text-zinc-900"><span data-lanza-origin="agent">Delegated site administrators</span></h2>
+        <p class="mb-3 max-w-prose text-sm text-zinc-600"><span data-lanza-origin="agent">
+          The person managing this site's Cloudflare project can grant site administration
+          to selected GitHub collaborators. Each person must retain write access to this
+          repository. Delegation allows site settings, publishing, software updates and
+          agent tools; it does not grant hosting access or permission to change delegation.
+        </span></p>
+        <ol class="list-decimal pl-5 space-y-2 text-sm text-zinc-600">
+          <li><span data-lanza-origin="agent">In Cloudflare, open this Pages project's Settings → Variables and Secrets, for Production.</span></li>
+          <li><span data-lanza-origin="agent">Add </span><code>LANZA_SITE_ADMINS</code><span data-lanza-origin="agent"> with the exact GitHub usernames, separated by commas (without @). For example: </span><code>alice,bob</code><span data-lanza-origin="agent">. Usernames are case-insensitive.</span></li>
+          <li><span data-lanza-origin="agent">Redeploy the project, then refresh the CMS. To revoke delegation, remove the username and redeploy. Removing GitHub repository access takes effect within a minute.</span></li>
+        </ol>
+        <p class="mt-3 text-sm text-zinc-600"><span data-lanza-origin="agent">This setting is managed in Cloudflare. Saving or publishing website content does not change it. An optional OAuth Worker needs the same setting in its own deployment.</span></p>
+      </section>
+
       <section>
         <h2 class="mb-1 text-sm font-semibold text-zinc-900">What each level can do</h2>
         <ul class="card divide-y divide-[var(--border)]">
@@ -78,6 +96,10 @@ const roleLabel = computed(() => {
             <p class="text-sm text-zinc-600">
               Everything: write, publish, change settings and hosting.
             </p>
+          </li>
+          <li class="px-4 py-3">
+            <p class="text-sm font-medium text-zinc-900"><span data-lanza-origin="agent">Delegated site administrator</span></p>
+            <p class="text-sm text-zinc-600"><span data-lanza-origin="agent">Write, publish, change site settings, update software and connect agents. Hosting and delegation remain with the site operator.</span></p>
           </li>
           <li class="px-4 py-3">
             <p class="text-sm font-medium text-zinc-900">Write on GitHub, editor here</p>
@@ -96,9 +118,8 @@ const roleLabel = computed(() => {
 
       <aside class="mt-10 border-l-2 border-emerald-600 bg-emerald-50 px-4 py-3">
         <p class="text-sm leading-relaxed text-emerald-950">
-          <strong class="font-semibold">Changes take effect within a minute.</strong>
-          Access is read from GitHub, not from the deployed site, so adding or removing
-          someone does not need a publish or a rebuild.
+          <span data-lanza-origin="agent"><strong class="font-semibold">GitHub access changes take effect within a minute.</strong>
+          Changes to the Cloudflare delegation setting require a new deployment.</span>
         </p>
       </aside>
     </main>

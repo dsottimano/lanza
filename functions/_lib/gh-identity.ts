@@ -17,6 +17,8 @@ const GITHUB_API = "https://api.github.com";
 export interface Identity {
   login: string;
   role: Role;
+  /** Set only by site-access after GitHub has confirmed repository write access. */
+  delegated?: boolean;
 }
 
 // Four outcomes, deliberately distinct. Collapsing `expired` into `denied` would

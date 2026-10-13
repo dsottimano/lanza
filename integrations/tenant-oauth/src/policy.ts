@@ -12,6 +12,7 @@ export const SCOPE_LABELS: Record<string, string> = {
 // Exhaustive, fail closed. A new upstream tool must be classified before this
 // adapter will expose or execute it. Scopes do not replace GitHub owner checks.
 export const TOOL_SCOPES: Record<string, string> = {
+  list_plugins: "content.read",
   get_site: "content.read", list_collections: "content.read",
   get_schema: "content.read", list_content: "content.read", read_content: "content.read",
   list_changes: "content.read", list_translations: "content.read", create_translation: "content.write",
@@ -24,6 +25,10 @@ export const TOOL_SCOPES: Record<string, string> = {
   set_brand: "site.design", set_menu: "site.design", set_seo: "site.design",
   update_drafts: "site.publish", publish: "site.publish",
 };
+
+// Plugin actions can have different read/write effects. Do not treat the generic
+// runner as read-only or grant every plugin capability through one OAuth scope.
+export const UNSUPPORTED_OAUTH_TOOLS = ["run_plugin"];
 
 export const OAUTH_TOOLS = TOOL_LIST.filter((tool) => TOOL_SCOPES[tool.name]).map((tool) => {
   const scope = TOOL_SCOPES[tool.name];

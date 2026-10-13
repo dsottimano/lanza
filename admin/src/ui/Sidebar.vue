@@ -309,7 +309,7 @@ const itemActive = "nav-item--active";
               <button v-if="isOwner" :class="[item, agentOpen ? itemActive : '']" :aria-current="agentOpen ? 'page' : undefined" @click="emit('agent')">
                 <SidebarIcon name="agent" />Connect an agent
               </button>
-              <button :class="[item, healthOpen ? itemActive : '']" :aria-current="healthOpen ? 'page' : undefined" @click="emit('health')">
+              <button v-if="!access.delegated" :class="[item, healthOpen ? itemActive : '']" :aria-current="healthOpen ? 'page' : undefined" @click="emit('health')">
                 <SidebarIcon name="health" />Site health
               </button>
               <button :class="[item, updatesOpen ? itemActive : '']" :aria-current="updatesOpen ? 'page' : undefined" @click="emit('updates')">

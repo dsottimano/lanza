@@ -143,3 +143,12 @@ Official references:
   [private connection setup](https://developers.openai.com/api/docs/guides/custom-mcp-server),
   [plugin packaging](https://developers.openai.com/plugins/build/plugins),
   [public submission](https://developers.openai.com/plugins/deploy/submission).
+# Delegated site administration
+
+Optional: set `LANZA_SITE_ADMINS` on this Worker to the same comma-separated GitHub
+logins configured on the tenant's Pages project, then redeploy both. The setting is
+read from each runtime independently. Listed users must retain GitHub write access;
+read-only and removed users are refused. Removing a name and redeploying also blocks
+that user's existing OAuth connection. No shared credential or delegation-write tool
+is introduced. `list_plugins` is read-scoped; generic `run_plugin` is deliberately
+unsupported in OAuth until plugin actions have explicit scope mappings.

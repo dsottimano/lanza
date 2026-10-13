@@ -7,6 +7,7 @@ import tailwindcss from "@tailwindcss/vite";
 import { crossOriginBlocked, isAllowed } from "../functions/_lib/gh-proxy";
 import repo from "../lanza.config.json";
 import { identityFor } from "../functions/_lib/gh-identity";
+import { siteIdentityFor, type SiteAccessEnv } from "../functions/_lib/site-access";
 import { onRequest as githubProxy } from "../functions/admin/api/gh/[[path]]";
 import { onRequest as agentRequests } from "../functions/admin/api/agent-requests";
 import { REQUEST_BODY_LIMIT } from "../functions/_lib/agent-requests";
@@ -30,7 +31,7 @@ import {
 // cannot run the device flow itself: there is no gate under Vite, so there are no
 // cookies to hold tokens in. Sign-in is verified against `wrangler pages dev`,
 // which runs the real Functions (§10.8).
-function githubProxyDev(token: string | undefined): Plugin {
+function githubProxyDev(token: string | undefined, env: SiteAccessEnv): Plugin {
   return {
     name: "lanza-github-proxy-dev",
     configureServer(server) {
@@ -88,7 +89,7 @@ function githubProxyDev(token: string | undefined): Plugin {
             return;
           }
 
-          const identity = await identityFor(token, repo.owner, repo.name);
+          const identity = await siteIdentityFor(token, repo.owner, repo.name, env);
           if (identity.status !== "ok") {
             reject(identity.status === "unavailable" ? 503 : 403, "GitHub could not authorize this repository access.");
             return;
@@ -124,7 +125,7 @@ function githubProxyDev(token: string | undefined): Plugin {
 
 // Use the production private-request handler in dev too: the server-held user's
 // token still faces repository privacy, owner, Origin and archive-path checks.
-function agentRequestsDev(token: string | undefined, handler = agentRequests, endpoint = "agent-requests"): Plugin {
+function agentRequestsDev(token: string | undefined, env: SiteAccessEnv, handler = agentRequests, endpoint = "agent-requests"): Plugin {
   return {
     name: `lanza-${endpoint}-dev`,
     configureServer(server) {
@@ -139,7 +140,7 @@ function agentRequestsDev(token: string | undefined, handler = agentRequests, en
           if (!token) { reject(503, "Dev GitHub token is missing from admin/.env."); return; }
           const suffix = incoming.url ?? "/";
           if (suffix !== "/" && !suffix.startsWith("?" ) && !suffix.startsWith("/?")) { reject(404, "Unknown request endpoint."); return; }
-          const identity = await identityFor(token, repo.owner, repo.name);
+          const identity = await siteIdentityFor(token, repo.owner, repo.name, env);
           if (identity.status !== "ok") { reject(identity.status === "unavailable" ? 503 : 403, "GitHub could not authorize this repository access."); return; }
           const method = incoming.method ?? "GET";
           const chunks: Uint8Array[] = []; let size = 0;
@@ -172,6 +173,7 @@ function agentRequestsDev(token: string | undefined, handler = agentRequests, en
 // (NON-VITE-prefixed → never bundled): CLOUDFLARE_API_TOKEN, CLOUDFLARE_ACCOUNT_ID,
 // PAGES_PROJECT. Same client code, same 503 "not configured" shape, as prod.
 function cloudflareProxyDev(cfg: {
+  githubToken: string | undefined;
   token: string | undefined;
   accountId: string | undefined;
   project: string | undefined;
@@ -202,6 +204,12 @@ function cloudflareProxyDev(cfg: {
         };
 
         try {
+          const identity = cfg.githubToken
+            ? await identityFor(cfg.githubToken, repo.owner, repo.name) : null;
+          if (identity?.status !== "ok" || identity.identity.role !== "owner") {
+            send(403, { message: "Only a GitHub repository admin can change hosting settings." });
+            return;
+          }
           const missing: string[] = [];
           if (!cfg.token) missing.push("CLOUDFLARE_API_TOKEN");
           if (!cfg.accountId) missing.push("CLOUDFLARE_ACCOUNT_ID");
@@ -310,10 +318,11 @@ export default defineConfig(({ mode }) => {
       vue(),
       tailwindcss(),
       authBypassDev(),
-      githubProxyDev(env.GITHUB_TOKEN),
-      agentRequestsDev(env.GITHUB_TOKEN),
-      agentRequestsDev(env.GITHUB_TOKEN, pluginRequests, "plugins"),
+      githubProxyDev(env.GITHUB_TOKEN, env),
+      agentRequestsDev(env.GITHUB_TOKEN, env),
+      agentRequestsDev(env.GITHUB_TOKEN, env, pluginRequests, "plugins"),
       cloudflareProxyDev({
+        githubToken: env.GITHUB_TOKEN,
         token: env.CLOUDFLARE_API_TOKEN,
         accountId: env.CLOUDFLARE_ACCOUNT_ID,
         project: env.PAGES_PROJECT,

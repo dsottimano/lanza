@@ -16,7 +16,7 @@ async function payload(request: Request): Promise<unknown> {
     try { return JSON.parse(text+decoder.decode()); } catch { throw new GitHubError(400,"Invalid JSON body."); }
   } finally { reader.releaseLock(); }
 }
-export const onRequest = async (context: {request:Request;data?:{role?:Role;login?:string;token?:string|null}}): Promise<Response> => {
+export const onRequest = async (context: {request:Request;data?:{role?:Role;login?:string;token?:string|null;delegated?:boolean}}): Promise<Response> => {
   const {request,data} = context;
   if (!data?.token || !data.login) return json(401,{error:"Sign in with GitHub again.",code:"unauthorized"});
   if(data.role !== "owner") return json(403,{error:"Plugins are available to the site owner only.",code:"owner_required"});
@@ -24,7 +24,7 @@ export const onRequest = async (context: {request:Request;data?:{role?:Role;logi
   if(!["GET","POST"].includes(request.method)) return json(405,{error:"Method not allowed.",code:"method_not_allowed"});
   // Cookie-authenticated writes need an exact Origin including scheme/port.
   if(request.method !== "GET" && request.headers.get("Origin") !== url.origin) return json(403,{error:"Same-origin request required.",code:"cross_origin"});
-  const client = new ContentClient(repo,data.token);
+  const client = new ContentClient(repo,data.token,data.delegated === true);
   const runtime = new PluginRuntime(client,data.login,(path: string) => assertEntryPath(client,path));
   try {
     if(request.method === "GET") {

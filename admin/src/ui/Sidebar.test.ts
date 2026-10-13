@@ -1,6 +1,7 @@
 import { beforeEach, describe, expect, it } from "vitest";
 import { mount } from "@vue/test-utils";
 import Sidebar from "./Sidebar.vue";
+import { access } from "../backend/access";
 
 const defaults = {
   activeCollection: "posts", activeSettings: null,
@@ -10,9 +11,18 @@ const defaults = {
   isOwner: true, publishOpen: false, pendingOpen: false, helpOpen: false,
 };
 
-beforeEach(() => localStorage.clear());
+beforeEach(() => { localStorage.clear(); access.delegated = false; });
 
 describe("Sidebar navigation", () => {
+  it("offers site settings and publishing to delegates but omits hosting", () => {
+    access.delegated = true;
+    const wrapper = mount(Sidebar, { props: { ...defaults, pendingCount: 1 } });
+    expect(wrapper.text()).toContain("Site settings");
+    expect(wrapper.text()).toContain("Software updates");
+    expect(wrapper.text()).toContain("Connect an agent");
+    expect(wrapper.text()).toContain("Review & publish");
+    expect(wrapper.text()).not.toContain("Site health");
+  });
   it.each([
     "brandThemesOpen", "headerFooterOpen", "blocksOpen", "languagesOpen",
     "contentTypesOpen", "peopleOpen", "agentOpen", "healthOpen",

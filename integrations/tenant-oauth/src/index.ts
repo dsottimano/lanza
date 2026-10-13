@@ -6,11 +6,11 @@ import {
 import repo from "../../../lanza.config.json";
 import { AGENT_CLIENT_ID } from "../../../functions/_lib/tenant-config";
 import { startDeviceFlow, pollDeviceFlow, type DeviceView } from "../../../functions/_lib/device-flow";
-import { identityFor } from "../../../functions/_lib/gh-identity";
+import { siteIdentityFor, type SiteAccessEnv } from "../../../functions/_lib/site-access";
 import { onRequest as mcp, MAX_MCP_BODY_BYTES } from "../../../functions/api/mcp";
 import { SCOPES, SCOPE_LABELS, OAUTH_TOOLS, TOOL_SCOPES, missingScopes } from "./policy";
 
-export interface Env extends Cloudflare.Env {
+export interface Env extends Cloudflare.Env, SiteAccessEnv {
   AGENT_CLIENT_ID?: string;
   OAUTH_PROVIDER: OAuthHelpers;
 }
@@ -151,7 +151,7 @@ export async function authHandler(request: Request, env: Env): Promise<Response>
       // This first version supports the nonexpiring Agents App. Do not lose or
       // attempt uncoordinated refresh of a rotating upstream credential.
       if (result.tokens.refreshToken) return page("<p>This GitHub app uses expiring tokens. Use the nonexpiring Lanza Agents app and reconnect.</p>", headers, 400);
-      const check = await identityFor(result.tokens.accessToken, repo.owner, repo.name);
+      const check = await siteIdentityFor(result.tokens.accessToken, repo.owner, repo.name, env);
       if (check.status === "unavailable") return page("<p>GitHub could not verify repository access. Reconnect when it is available.</p>", headers, 503);
       if (check.status !== "ok" || check.identity.role !== "owner") return page("<p>Only this repository's owner can connect it. Check the Lanza Agents installation and reconnect.</p>", headers, 403);
       const { redirectTo } = await oauth.completeAuthorization({
@@ -196,7 +196,7 @@ export async function mcpHandler(request: Request, env: Env, context: McpContext
   // checks. SITE_ORIGIN is fixed tenant config, never a client URL or fetch target.
   const response = await mcp({ request: new Request(`${env.SITE_ORIGIN}/api/mcp`, {
     method: "POST", body, headers: { "Content-Type": "application/json", Authorization: `Bearer ${githubToken}` },
-  }) });
+  }), env });
   if (response.status === 401) return Response.json({ error: "GitHub authorization expired or was revoked. Reconnect this tenant." }, {
     status: 401, headers: { "Cache-Control": "no-store", "WWW-Authenticate": `Bearer resource_metadata="${env.OAUTH_ORIGIN}/.well-known/oauth-protected-resource/mcp", error="invalid_token"` },
   });

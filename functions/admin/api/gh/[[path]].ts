@@ -42,7 +42,7 @@ export const onRequest = async (context: {
   // Set by functions/admin/_middleware.ts, which is the only thing that can reach
   // this route. Absent role = read-only, never as
   // an owner — a missing claim must not be the permissive case.
-  data?: { role?: Role; login?: string; token?: string | null };
+  data?: { role?: Role; login?: string; token?: string | null; delegated?: boolean };
 }): Promise<Response> => {
   const { request, params } = context;
   const url = new URL(request.url);
@@ -66,7 +66,8 @@ export const onRequest = async (context: {
   if (request.method === "GET" && subPath.replace(/[?#].*$/, "").replace(/^\/+/, "") === "user") {
     const login = context.data?.login;
     if (!login) return json(401, { message: "Not authenticated." });
-    return json(200, { login, role, repo: `${repo.owner}/${repo.name}` });
+    return json(200, { login, role, repo: `${repo.owner}/${repo.name}`,
+      ...(context.data?.delegated === true ? { delegated: true } : {}) });
   }
 
   // Enforce the method+path allowlist BEFORE attaching a token: only the endpoints
