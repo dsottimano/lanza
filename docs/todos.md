@@ -1,17 +1,23 @@
-# GitHub co-admin redesign — October 14, 2026
+# GitHub co-admin release — October 14, 2026
 
-Prepared 0.1.29 on local `feat/github-coadmins` at `07137374047d283a70de843632f315c3eea7481d`.
-People now manages the separate GitHub access policy without Cloudflare credentials
-or deployments. Legacy grants migrate on Save; CMS/MCP share live revocation.
-512 server/script + 646 CMS + 24 OAuth tests pass, as do builds/typechecks,
-site validation and source/fresh-packed-tenant legacy Functions compilation.
+**0.1.29 is publicly released and verified.** Tag/source
+`6f358900a19287b83da46f3ced2d31c3ecc562af`, successful trusted-publishing
+[run 38592469032](https://github.com/dsottimano/lanza/actions/runs/38592469032).
+Product main/staging contain the release. npm latest is 0.1.29, signed provenance
+present, and the public download exactly matches the tested tarball. Fresh
+public-registry tenant build and legacy Functions compilation passed at
+`/tmp/lanza-public-0.1.29-20261014`. Onboarding remote main
+`aadcc22beb322cc5456f963a0952bd49c6164d64` now pins 0.1.29, verified remotely.
 
-**Release pending approval:** npm latest and the remote onboarding pin remain
-0.1.28. Local package and template update are prepared; nothing pushed/deployed.
-Next: obtain publication approval, reconcile remote main/staging, release and verify
-the public npm package, then update the onboarding pin. Real tenant/browser testing
-remains unverified. See [current handoff](handoff-2026-10-14.md) for exact checkpoints,
-package integrity, template commit and security/migration limits.
+People manages its separate GitHub access policy without Cloudflare credentials or
+deployment. Legacy grants migrate on Save; CMS/MCP share live revocation. Verified
+512 server/script + 646 CMS + 24 OAuth tests and the builds/typechecks described in
+[current handoff](handoff-2026-10-14.md). Existing warnings remain. No real tenant
+upgrade, authenticated browser pass or separate OAuth Worker deployment occurred.
+
+Next: owner reviews/publishes an intended tenant's 0.1.29 update and saves its People
+list to migrate; verify real access and revocation. No pending npm/template release
+action. Existing tenants are not automatically upgraded.
 
 # CMS co-admin management — October 13, 2026
 
