@@ -2,42 +2,44 @@ import { mount, flushPromises } from '@vue/test-utils';
 import { afterEach, expect, it, vi } from 'vitest';
 import CoAdmins from './CoAdmins.vue';
 afterEach(() => vi.unstubAllGlobals());
-function fixture(configured = true, failure = false) {
+function fixture(source = 'github') {
  const calls: any[] = [];
  vi.stubGlobal('fetch', vi.fn(async (_url, init) => {
-  if (!init?.body) return Response.json({ configured, active: ['alice'], project: 'site' });
+  if (!init?.body) return Response.json({ logins: ['alice'], revision: 'initial', source });
   const body = JSON.parse(init.body); calls.push(body);
-  if (body.action === 'read') return Response.json({ logins: ['alice'], revision: 'alice' });
-  if (body.action === 'status') return Response.json({ deployment: { id: 'build', environment: 'production', stage: 'deploy', status: 'success' } });
-  return Response.json({ saved: true, logins: body.logins, revision: body.logins.join(','), deployment: failure ? null : { id: 'build', stage: 'build', status: 'active' }, warning: failure ? 'Co-admins are saved, but the deployment could not start.' : undefined });
- }));
- return calls;
+  return Response.json({ saved: true, logins: body.logins, revision: 'saved', source: 'github' });
+ })); return calls;
 }
 const button = (view: ReturnType<typeof mount>, label: string) => view.findAll('button').find(b => b.text() === label)!;
-it('owner adds and removes co-admins, saves and distinguishes pending from successful deployment', async () => {
+it('owner adds and removes co-admins and saves directly with GitHub', async () => {
  const calls = fixture(); const view = mount(CoAdmins); await flushPromises();
+ expect(view.find('input[type="password"]').exists()).toBe(false); expect(view.text()).not.toContain('Cloudflare');
  await view.find('input').setValue('bob'); await view.find('form').trigger('submit');
- expect(view.text()).toContain('bob'); await view.find('[aria-label="Remove alice"]').trigger('click');
- await button(view, 'Save and deploy').trigger('click'); await flushPromises();
- expect(calls.at(-1)).toMatchObject({ action: 'save', expectedRevision: 'alice', logins: ['bob'] });
- expect(view.text()).toContain('Deployment started'); expect(view.text()).toContain('Active on this deployment: alice');
- await button(view, 'Check deployment').trigger('click'); await flushPromises(); expect(view.text()).toContain('Deployment succeeded'); view.unmount();
+ await view.find('[aria-label="Remove alice"]').trigger('click');
+ expect(view.text()).toContain('Unsaved co-admin changes');
+ await button(view, 'Save co-admins').trigger('click'); await flushPromises();
+ expect(calls.at(-1)).toEqual({ action: 'save', expectedRevision: 'initial', logins: ['bob'] });
+ expect(view.text()).toContain('Access changes on the next request'); expect(view.text()).not.toContain('Unsaved co-admin changes');
+ expect(button(view, 'Save co-admins').attributes('disabled')).toBeDefined(); view.unmount();
 });
-it('failed deployment offers a retry that does not save again', async () => {
- const calls = fixture(true, true); const view = mount(CoAdmins); await flushPromises();
- await button(view, 'Save and deploy').trigger('click'); await flushPromises();
- expect(view.text()).toContain('saved, but the deployment could not start');
- await button(view, 'Retry deployment').trigger('click'); await flushPromises(); expect(calls.at(-1).action).toBe('deploy'); view.unmount();
+it('legacy list is preserved and can be migrated without changing usernames', async () => {
+ const calls = fixture('legacy'); const view = mount(CoAdmins); await flushPromises();
+ expect(view.text()).toContain('Your existing co-admins');
+ await button(view, 'Save co-admins').trigger('click'); await flushPromises();
+ expect(calls[0].logins).toEqual(['alice']); expect(view.text()).not.toContain('Your existing co-admins'); view.unmount();
 });
-it('unconfigured owner connects in the CMS with a password field and no browser persistence', async () => {
- const calls = fixture(false); const view = mount(CoAdmins); await flushPromises();
- expect(view.find('input[type="password"]').exists()).toBe(true); expect(view.text()).not.toContain('Save and deploy');
- const inputs = view.findAll('input'); await inputs[0]!.setValue('a'.repeat(32)); await inputs[2]!.setValue('temporary');
- await view.find('form').trigger('submit'); await flushPromises(); expect(calls[0].connection.token).toBe('temporary');
- expect(view.text()).toContain('Save and deploy'); view.unmount();
-});
-it('API refusals remain errors and do not show a saved state', async () => {
+it('API conflicts preserve edits without claiming they were saved', async () => {
  fixture(); const view = mount(CoAdmins); await flushPromises();
+ await view.find('[aria-label="Remove alice"]').trigger('click');
  vi.stubGlobal('fetch', vi.fn(async () => Response.json({ error: 'Co-admins changed. Reload.' }, { status: 409 })));
- await button(view, 'Save and deploy').trigger('click'); await flushPromises(); expect(view.get('[role="alert"]').text()).toContain('Reload'); expect(view.text()).not.toContain('Co-admins saved'); view.unmount();
+ await button(view, 'Save co-admins').trigger('click'); await flushPromises();
+ expect(view.get('[role="alert"]').text()).toContain('Reload'); expect(view.text()).not.toContain('Co-admins saved');
+ expect(view.text()).toContain('Unsaved co-admin changes'); expect(view.text()).toContain('No co-admins selected'); view.unmount();
+});
+it('failed initial load offers retry and does not present an empty saved list', async () => {
+ vi.stubGlobal('fetch', vi.fn(async () => Response.json({ error: 'GitHub unavailable' }, { status: 503 })));
+ const view = mount(CoAdmins); await flushPromises();
+ expect(view.text()).toContain('GitHub unavailable'); expect(view.text()).not.toContain('No co-admins selected');
+ fixture(); await button(view, 'Retry loading co-admins').trigger('click'); await flushPromises();
+ expect(view.text()).toContain('alice'); view.unmount();
 });

@@ -80,6 +80,7 @@ function startGithub() {
   fetchMock.get("https://github.com").intercept({ path: "/login/device/code", method: "POST" }).reply(200, { device_code: "fixture-secret-device-code", user_code: "ABCD-EFGH", verification_uri: "https://github.com/login/device", expires_in: 900, interval: 5 });
 }
 function owner(role: "owner" | "editor" = "owner") {
+  if (role === "editor") fetchMock.get("https://api.github.com").intercept({ path: `${REPO_PATH}/git/ref/heads/lanza-access` }).reply(404, {});
   fetchMock.get("https://api.github.com").intercept({ path: "/user" }).reply(200, { login: "tenant-owner" });
   fetchMock.get("https://api.github.com").intercept({ path: REPO_PATH }).reply(200, { permissions: { admin: role === "owner", push: true, pull: true } });
 }
@@ -148,8 +149,14 @@ describe("tenant OAuth MCP service in workerd", () => {
     const response = await exchange(browser, auth, code);
     expect(response.status).toBe(200);
     const tokens = await response.json() as { access_token: string };
+    const policy = (admins: string[]) => {
+      const sha = 'a'.repeat(40);
+      fetchMock.get('https://api.github.com').intercept({ path: `${REPO_PATH}/git/ref/heads/lanza-access` }).reply(200, { ref: 'refs/heads/lanza-access', object: { type: 'commit', sha } });
+      fetchMock.get('https://api.github.com').intercept({ path: `${REPO_PATH}/contents/policy.json?ref=${sha}` }).reply(200, { type: 'file', encoding: 'base64', content: btoa(JSON.stringify({ version: 1, admins })) });
+    };
+    policy(['tenant-owner']);
     expect((await call(browser, tokens.access_token, 'tools/list')).status).toBe(200);
-    delegation.LANZA_SITE_ADMINS = '';
+    policy([]); // GitHub revocation overrides the retained legacy variable.
     expect((await call(browser, tokens.access_token, 'tools/list')).status).toBe(403);
   });
 

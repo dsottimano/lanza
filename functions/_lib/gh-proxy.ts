@@ -168,3 +168,15 @@ export function crossOriginBlocked(
     return true; // malformed Origin on a write → reject
   }
 }
+
+// The browser proxy edits website branches only, including for native/delegated
+// owners. Access policy and private archive branches have dedicated handlers.
+export function websiteWriteAllowed(method: string, path: string, body: unknown): boolean {
+  const m = method.toUpperCase();
+  const p = path.replace(/[?#].*$/, "").replace(/^\/+/, "");
+  const value = body && typeof body === "object" ? body as Record<string, unknown> : null;
+  if ((m === "PUT" || m === "DELETE") && p.startsWith("contents/")) return BRANCHES.includes(String(value?.branch));
+  if (m === "POST" && p === "git/refs") return BRANCHES.some(branch => value?.ref === `refs/heads/${branch}`);
+  if (m === "POST" && p === "merges") return BRANCHES.includes(String(value?.base));
+  return true;
+}

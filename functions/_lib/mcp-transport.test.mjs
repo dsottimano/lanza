@@ -16,6 +16,7 @@ function github(role = "owner") {
     calls.push(String(url));
     assert.ok(!init?.method || init.method === "GET", "transport refusal must not write");
     if (String(url).endsWith("/user")) return Response.json({ login: "test" });
+    if (String(url).endsWith("/git/ref/heads/lanza-access")) return new Response(null, { status: 404 });
     if (String(url).includes("/repos/")) return Response.json({ permissions: { admin: role === "owner", push: true, pull: true } });
     throw new Error(`Unexpected fetch ${url}`);
   };

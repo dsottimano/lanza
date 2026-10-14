@@ -145,10 +145,14 @@ Official references:
   [public submission](https://developers.openai.com/plugins/deploy/submission).
 # Delegated site administration
 
-Optional: set `LANZA_SITE_ADMINS` on this Worker to the same comma-separated GitHub
-logins configured on the tenant's Pages project, then redeploy both. The setting is
-read from each runtime independently. Listed users must retain GitHub write access;
-read-only and removed users are refused. Removing a name and redeploying also blocks
-that user's existing OAuth connection. No shared credential or delegation-write tool
-is introduced. `list_plugins` is read-scoped; generic `run_plugin` is deliberately
-unsupported in OAuth until plugin actions have explicit scope mappings.
+The updated Worker reads the same live GitHub `lanza-access` policy as the CMS.
+Manage co-admins in Settings → People with the owner's GitHub login. A saved change
+applies to subsequent OAuth/MCP requests without redeploying or copying settings.
+Users must still have GitHub write access. Upgrade and deploy this Worker once to
+get that behavior; updating the Pages package does not deploy a separate Worker.
+
+Before the policy branch exists, `LANZA_SITE_ADMINS` remains a legacy fallback on
+each runtime. Save the list in the updated CMS to migrate it. Do not delete the
+policy branch to revoke access; save an empty list. No shared credential or
+delegation-write MCP tool is introduced. `list_plugins` is read-scoped; generic
+`run_plugin` is unsupported until plugin actions have explicit scope mappings.

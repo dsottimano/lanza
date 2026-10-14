@@ -1,73 +1,134 @@
 import { test, afterEach } from 'node:test';
 import assert from 'node:assert/strict';
 import { onRequest } from '../functions/admin/api/people.ts';
+import { onRequest as proxy } from '../functions/admin/api/gh/[[path]].ts';
+import { siteIdentityFor } from '../functions/_lib/site-access.ts';
+import { ContentClient } from '../functions/_lib/lanza-content.ts';
 import { resetIdentityCache } from '../functions/_lib/gh-identity.ts';
 import { readFileSync } from 'node:fs';
 const repo = JSON.parse(readFileSync(new URL('../lanza.config.json', import.meta.url)));
 const original = globalThis.fetch;
 afterEach(() => { globalThis.fetch = original; resetIdentityCache(); });
-const env = { CLOUDFLARE_API_TOKEN: 'secret-cf', CLOUDFLARE_ACCOUNT_ID: 'a'.repeat(32), PAGES_PROJECT: 'site', LANZA_SITE_ADMINS: 'alice' };
-function fixture({ permission = true, mismatch = false, deploymentFails = false, encrypted = false } = {}) {
- const calls = []; let value = 'alice';
+const env = { LANZA_SITE_ADMINS: 'alice' };
+const native = { token: 'github-owner', role: 'owner' };
+function fixture({ permission = true, admins, broken = false, refStatus, conflict = false } = {}) {
+ const calls = [], trees = new Map(), commits = new Map(); let serial = 1;
+ const sha = () => (serial++).toString(16).padStart(40, '0');
+ let head = admins === undefined ? null : sha();
+ if (head) commits.set(head, { content: JSON.stringify({ version: 1, admins }) });
+ const ref = () => ({ ref: 'refs/heads/lanza-access', object: { type: 'commit', sha: head } });
  globalThis.fetch = async (url, init = {}) => {
-  calls.push({ url, ...init });
-  if (String(url).includes('api.github.com')) return Response.json(String(url).endsWith('/user') ? { login: 'owner' } : { permissions: { admin: permission, push: true } });
-  if (init.method === 'PATCH') { const patch = JSON.parse(init.body); assert.deepEqual(Object.keys(patch.deployment_configs), ['production']); assert.deepEqual(Object.keys(patch.deployment_configs.production.env_vars), ['LANZA_SITE_ADMINS']); value = patch.deployment_configs.production.env_vars.LANZA_SITE_ADMINS.value; return Response.json({ success: true, result: {} }); }
-  if (init.method === 'POST') {
-   assert.equal(init.body.get('branch'), 'main');
-   if (deploymentFails) return new Response('secret-cf raw failure', { status: 403 });
-   return Response.json({ success: true, result: { id: 'build-1', environment: 'production', latest_stage: { name: 'build', status: 'active' } } });
+  const u = new URL(url), path = u.pathname;
+  const body = init.body ? JSON.parse(init.body) : null;
+  calls.push({ url: String(url), method: init.method || 'GET', body, headers: init.headers });
+  assert.equal(u.origin, 'https://api.github.com', 'no Cloudflare request');
+  if (path === '/user') return Response.json({ login: init.headers.Authorization.includes('writer') ? 'alice' : 'owner' });
+  if (/^\/repos\/[^/]+\/[^/]+$/.test(path)) return Response.json({ permissions: { admin: permission && !init.headers.Authorization.includes('writer'), push: true } });
+  assert.ok(path.startsWith(`/repos/${repo.owner}/${repo.name}/`), 'fixed tenant repository');
+  if (path.endsWith('/git/ref/heads/lanza-access')) return refStatus ? new Response(null, { status: refStatus }) : head ? Response.json(ref()) : new Response(null, { status: 404 });
+  if (path.endsWith('/contents/policy.json')) {
+   assert.equal(u.searchParams.get('ref'), head);
+   return Response.json({ type: 'file', encoding: 'base64', content: btoa(broken ? '{' : commits.get(head).content) });
   }
-  if (String(url).endsWith('/deployments/build-1')) return Response.json({ success: true, result: { id: 'build-1', environment: 'production', latest_stage: { name: 'deploy', status: 'success' } } });
-  return Response.json({ success: true, result: { source: { type: 'github', config: { owner: mismatch ? 'other' : repo.owner, repo_name: repo.name } }, production_branch: 'main', deployment_configs: { production: { env_vars: { SECRET: { type: 'secret_text', value: 'never-return' }, LANZA_SITE_ADMINS: { type: encrypted ? 'secret_text' : 'plain_text', value } } } } } });
+  if (path.endsWith('/git/trees')) { const id = sha(); assert.equal(body.base_tree, undefined); assert.equal(body.tree[0].path, 'policy.json'); trees.set(id, body.tree[0].content); return Response.json({ sha: id }); }
+  if (path.endsWith('/git/commits')) { const id = sha(); commits.set(id, { content: trees.get(body.tree), parents: body.parents }); return Response.json({ sha: id }); }
+  if (path.endsWith('/git/refs') || path.endsWith('/git/refs/heads/lanza-access')) {
+   if (conflict || (init.method === 'POST' ? head !== null : commits.get(body.sha).parents[0] !== head)) return new Response(null, { status: 422 });
+   if (init.method === 'PATCH') assert.equal(body.force, false); else { assert.equal(body.ref, 'refs/heads/lanza-access'); assert.deepEqual(commits.get(body.sha).parents, []); }
+   head = body.sha; return Response.json(ref());
+  }
+  throw new Error(`Unexpected request ${url}`);
  };
- return calls;
+ return { calls, current: () => head && JSON.parse(commits.get(head).content) };
 }
-function request(body, data = { token: 'github', role: 'owner' }, options = {}) {
- const method = body ? 'POST' : 'GET';
- return onRequest({ env, data, request: new Request('https://site.test/admin/api/people', { method, headers: { Origin: 'https://site.test', ...options.headers }, ...(body ? { body: JSON.stringify(body) } : {}) }), ...options.context });
+function request(body, data = native, options = {}) {
+ return onRequest({ env, data, request: new Request('https://site.test/admin/api/people', {
+  method: body ? 'POST' : 'GET', headers: { Origin: 'https://site.test', ...options.headers }, ...(body ? { body: JSON.stringify(body) } : {}) }), ...options.context });
 }
-test('native owner reads configured and active lists without exposing credentials or unrelated secrets', async () => {
- fixture(); const initial = await request(); assert.equal(initial.status, 200); assert.deepEqual((await initial.json()).active, ['alice']);
- const response = await request({ action: 'read' }); assert.equal(response.headers.get('cache-control'), 'no-store'); assert.deepEqual(await response.json(), { logins: ['alice'], revision: 'alice' });
+const writes = state => state.calls.filter(c => c.method !== 'GET');
+test('owner loads legacy co-admins using only GitHub and migrates with one save', async () => {
+ const state = fixture(); const initial = await request();
+ assert.equal(initial.headers.get('cache-control'), 'no-store');
+ assert.deepEqual(await initial.json(), { logins: ['alice'], revision: 'legacy:alice', source: 'legacy' });
+ const response = await request({ action: 'save', expectedRevision: 'legacy:alice', logins: ['BOB', 'alice', 'bob'] });
+ assert.equal(response.status, 200); const result = await response.json();
+ assert.equal(result.saved, true); assert.equal(result.source, 'github'); assert.deepEqual(state.current().admins, ['alice', 'bob']);
+ assert.ok(state.calls.every(c => c.headers.Authorization === 'Bearer github-owner'));
+ assert.equal(result.deployment, undefined);
 });
-test('delegates, editors, absent sessions and forged owner contexts cannot access Cloudflare', async () => {
- const calls = fixture({ permission: false });
- for (const data of [{ token: 'github', role: 'owner', delegated: true }, { token: 'github', role: 'editor' }, {}, { token: 'github', role: 'owner' }]) assert.ok([401,403].includes((await request({ action: 'read' }, data)).status));
- assert.equal(calls.filter(c => c.url.includes('cloudflare')).length, 0);
+test('empty GitHub policy overrides legacy grants and subsequent saves preserve history', async () => {
+ const state = fixture({ admins: ['alice'] }); const initial = await (await request()).json();
+ const saved = await (await request({ action: 'save', expectedRevision: initial.revision, logins: [] })).json();
+ assert.equal(saved.saved, true); assert.deepEqual((await (await request()).json()).logins, []);
+ const identity = await siteIdentityFor('writer', repo.owner, repo.name, env);
+ assert.equal(identity.identity.role, 'editor'); assert.deepEqual(state.current().admins, []);
+ assert.equal(writes(state).at(-1).body.force, false);
 });
-test('rejects cross-origin writes before using credentials', async () => {
- const calls = fixture(); assert.equal((await request({ action: 'read' }, undefined, { headers: { Origin: 'https://evil.test' } })).status, 403); assert.equal(calls.length, 0);
+test('policy changes apply to existing sessions without waiting for identity cache expiry', async () => {
+ fixture({ admins: ['alice'] });
+ assert.equal((await siteIdentityFor('writer', repo.owner, repo.name)).identity.delegated, true);
+ const initial = await (await request()).json();
+ await request({ action: 'save', expectedRevision: initial.revision, logins: [] });
+ assert.equal((await siteIdentityFor('writer', repo.owner, repo.name, env)).identity.role, 'editor');
 });
-test('save updates only production delegation and starts production deployment; empty list revokes all', async () => {
- const calls = fixture(); const response = await request({ action: 'save', expectedRevision: 'alice', logins: [] });
- const result = await response.json(); assert.equal(result.saved, true); assert.deepEqual(result.logins, []); assert.equal(result.deployment.status, 'active'); assert.equal(calls.filter(c => c.method === 'PATCH').length, 1);
+test('delegates, editors, absent sessions and forged owner contexts cannot write policy', async () => {
+ const state = fixture({ permission: false });
+ for (const data of [{ ...native, delegated: true }, { ...native, role: 'editor' }, {}, native]) assert.ok([401,403].includes((await request({ action: 'save', expectedRevision: 'legacy:alice', logins: ['eve'] }, data)).status));
+ assert.equal(writes(state).length, 0);
 });
-test('stale revision, malformed usernames and oversized bodies never write', async () => {
- const calls = fixture();
- for (const body of [{ action: 'save', expectedRevision: 'stale', logins: [] }, { action: 'save', expectedRevision: 'alice', logins: ['@bob'] }, { action: 'save', expectedRevision: 'alice', logins: ['bob,eve'] }, { action: 'read', padding: 'x'.repeat(9000) }]) assert.ok([400,409,413].includes((await request(body)).status));
- assert.equal(calls.filter(c => c.method === 'PATCH' || c.method === 'POST').length, 0);
+test('cross-origin and absent-origin writes are refused before using credentials', async () => {
+ const state = fixture();
+ for (const Origin of ['https://evil.test', 'null', '']) assert.equal((await request({ action: 'save' }, native, { headers: { Origin } })).status, 403);
+ assert.equal(state.calls.length, 0);
 });
-test('mismatched repository and encrypted config refuse changes without writes', async () => {
- for (const options of [{ mismatch: true }, { encrypted: true }]) { const calls = fixture(options); assert.ok([403,409].includes((await request({ action: 'save', expectedRevision: 'alice', logins: [] })).status)); assert.equal(calls.filter(c => c.method === 'PATCH').length, 0); }
+test('stale forms, invalid lists and oversized input never write', async () => {
+ const state = fixture();
+ for (const body of [{ action: 'save', expectedRevision: 'stale', logins: [] }, ...[['@bob'], ['bob,eve'], ['b--ob'], Array(51).fill('bob')].map(logins => ({ action: 'save', expectedRevision: 'legacy:alice', logins })), { action: 'save', padding: 'x'.repeat(9000) }, { action: 'deploy' }]) assert.ok([400,409,413].includes((await request(body)).status));
+ assert.equal(writes(state).length, 0);
 });
-test('server token cannot be redirected to client account or project', async () => {
- const calls = fixture(); await request({ action: 'read', connection: { account: 'b'.repeat(32), project: 'evil', token: 'evil' } });
- assert.ok(calls.filter(c => c.url.includes('cloudflare')).every(c => c.url.includes(`/accounts/${'a'.repeat(32)}/pages/projects/site`) && c.headers.Authorization === 'Bearer secret-cf'));
+test('concurrent initialization or updates cannot overwrite another owner save', async () => {
+ for (const admins of [undefined, ['alice']]) {
+  const state = fixture({ admins, conflict: true }); const initial = await (await request()).json();
+  const response = await request({ action: 'save', expectedRevision: initial.revision, logins: ['bob'] });
+  assert.equal(response.status, 409); assert.equal((await response.json()).saved, undefined);
+  assert.deepEqual(state.current(), admins ? { version: 1, admins } : null);
+ }
 });
-test('unconfigured owner can use request-scoped credential; path injection is rejected', async () => {
- const calls = fixture(); const context = { env: {} };
- const good = await request({ action: 'read', connection: { account: 'b'.repeat(32), project: 'site', token: 'temporary' } }, undefined, { context }); assert.equal(good.status, 200);
- const bad = await request({ action: 'read', connection: { account: '../escape', project: 'site', token: 'temporary' } }, undefined, { context }); assert.equal(bad.status, 400);
- assert.equal(calls.filter(c => c.url.includes('cloudflare')).length, 1);
+test('broken policy and upstream outages never restore legacy grants or admit writers', async () => {
+ for (const options of [{ admins: ['alice'], broken: true }, { admins: ['@alice'] }, { refStatus: 403 }, { refStatus: 429 }, { refStatus: 500 }]) {
+  resetIdentityCache(); const state = fixture(options);
+  assert.equal((await siteIdentityFor('writer', repo.owner, repo.name, env)).status, 'unavailable');
+  assert.notEqual((await request({ action: 'save', expectedRevision: 'legacy:alice', logins: [] })).status, 200);
+  assert.equal(writes(state).length, 0);
+  assert.equal((await siteIdentityFor(native.token, repo.owner, repo.name, env)).identity.role, 'owner', 'native owner can still recover');
+ }
 });
-test('deployment failure reports saved but inactive; retry does not rewrite policy', async () => {
- const calls = fixture({ deploymentFails: true });
- const result = await (await request({ action: 'save', expectedRevision: 'alice', logins: ['bob'] })).json();
- assert.equal(result.saved, true); assert.equal(result.deployment, null); assert.match(result.warning, /not changed yet/); assert.ok(!JSON.stringify(result).includes('secret-cf'));
- await request({ action: 'deploy', expectedRevision: 'bob' }); assert.equal(calls.filter(c => c.method === 'PATCH').length, 1);
+test('generic proxy cannot mutate access branch through any ref-changing API, including for delegates', async () => {
+ const state = fixture();
+ for (const delegated of [false, true]) for (const [method, path, body] of [
+  ['PUT', 'contents/policy.json', { branch: 'lanza-access', content: 'e30=' }],
+  ['DELETE', 'contents/policy.json', { branch: 'lanza-access' }],
+  ['POST', 'git/refs', { ref: 'refs/heads/lanza-access', sha: 'a'.repeat(40) }],
+  ['POST', 'merges', { base: 'lanza-access', head: 'staging' }],
+  ['PATCH', 'git/refs/heads/lanza-access', { sha: 'a'.repeat(40), force: true }],
+ ]) {
+  const result = await proxy({ env: {}, params: { path }, data: { ...native, delegated }, request: new Request(`https://site.test/admin/api/gh/${path}`, { method, body: JSON.stringify(body) }) });
+  assert.equal(result.status, 403);
+ }
+ assert.equal(state.calls.length, 0);
 });
-test('deployment status returns only safe status fields', async () => {
- fixture(); const result = await (await request({ action: 'status', deploymentId: 'build-1' })).json(); assert.equal(result.deployment.status, 'success');
- assert.equal((await request({ action: 'status', deploymentId: '../escape' })).status, 400);
+test('internal transport rejects arbitrary branches, paths and forced updates without network calls', async () => {
+ const state = fixture(), client = new ContentClient(repo, 'github-owner');
+ for (const [method, path, body] of [ ['GET', 'contents/policy.json?ref=main'], ['PATCH', 'git/refs/heads/lanza-access', { sha: 'a'.repeat(40), force: true }], ['POST', 'git/refs', { ref: 'refs/heads/main', sha: 'a'.repeat(40) }], ['POST', 'git/trees', { base_tree: 'a'.repeat(40), tree: [] }] ]) await assert.rejects(client.siteAccessPolicy(method, path, body));
+ assert.equal(state.calls.length, 0);
+});
+
+test('two simultaneous saves leave exactly one complete policy and return a conflict for the other', async () => {
+ for (const admins of [undefined, ['alice']]) {
+  const state = fixture({ admins }); const initial = await (await request()).json();
+  const results = await Promise.all(['bob', 'eve'].map(login => request({ action: 'save', expectedRevision: initial.revision, logins: [login] })));
+  assert.deepEqual(results.map(response => response.status).sort(), [200, 409]);
+  assert.ok(['bob', 'eve'].includes(state.current().admins[0]));
+  assert.equal(state.current().admins.length, 1);
+ }
 });

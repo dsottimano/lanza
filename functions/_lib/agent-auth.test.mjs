@@ -47,6 +47,7 @@ function stubGitHub({ device, token, repoPermissions, repoStatus = 200 } = {}) {
       return Response.json(token ?? { access_token: "ghu_agent_token" });
     }
     if (u.endsWith("/user")) return Response.json({ login: "dsottimano" });
+    if (u.endsWith("/git/ref/heads/lanza-access")) return new Response(null, { status: 404 });
     if (u.includes("/repos/")) {
       if (repoStatus !== 200) return new Response("{}", { status: repoStatus });
       return Response.json({ permissions: repoPermissions ?? { admin: true, push: true, pull: true } });

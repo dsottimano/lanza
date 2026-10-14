@@ -10,7 +10,7 @@
 //   viewer  — reads /admin, writes nothing.
 //
 // BASE ROLE: GitHub's own `permissions` booleans. site-access.ts can explicitly
-// promote an existing writer using tenant runtime policy; hosting is never delegated.
+// promote an existing writer using the dedicated GitHub access policy; hosting is never delegated.
 // Historical background: GitHub-only roles replaced repository-maintained lists
 // (roleFromPermissions, below). There used to be a second source — `adminLogin` and
 // `editors` lists in lanza.config.json — and it was deleted rather than kept as a

@@ -22,6 +22,7 @@ beforeEach(() => {
   globalThis.fetch = async (url, init = {}) => {
     const path = new URL(url).pathname;
     calls.push({ path, init });
+    if (path.endsWith('/git/ref/heads/lanza-access')) return new Response(null, { status: 404 });
     if (path === '/user') return Response.json({ login: 'Alice' });
     if (/^\/repos\/[^/]+\/[^/]+$/.test(path)) return Response.json({ permissions, private: privateRepo, full_name: 'dsottimano/lanza' }, { status: repoStatus });
     if (path.endsWith('/contents/requests') || path.endsWith('/contents/plugins/research/state.json')) return Response.json({}, { status: 404 });
@@ -109,7 +110,7 @@ test('policy changes are applied outside the cache and never contaminate another
   const removed = await siteIdentityFor(TOKEN, 'o', 'r', {});
   assert.equal(removed.identity.role, 'editor');
   assert.equal(removed.identity.delegated, undefined);
-  assert.equal(calls.length, 2, 'GitHub answer is cached, elevated answer is not');
+  assert.equal(calls.filter(call => !call.path.endsWith('/git/ref/heads/lanza-access')).length, 2, 'GitHub identity is cached, policy is not');
 });
 
 test('removed GitHub access overrides a retained delegation after the existing cache expires', async () => {

@@ -107,7 +107,9 @@ export class ContentClient {
   private repo: Repo;
   private token: string;
   readonly delegatedAdmin: boolean;
-  constructor(repo: Repo, token: string, delegatedAdmin = false) {
+  private fetchImpl?: typeof fetch;
+  constructor(repo: Repo, token: string, delegatedAdmin = false, fetchImpl?: typeof fetch) {
+    this.fetchImpl = fetchImpl;
     this.repo = repo;
     this.token = token;
     this.delegatedAdmin = delegatedAdmin;
@@ -164,8 +166,50 @@ export class ContentClient {
     return JSON.parse(text + decoder.decode());
   }
 
+  // Internal access-policy transport. No user-selected branch, path or repository.
+  // Kept separate from content/MCP operations and the browser GitHub proxy.
+  async siteAccessPolicy(method: string, path: string, body?: unknown): Promise<unknown> {
+    const branch = "lanza-access";
+    const value = body as Record<string, any> | undefined;
+    const sha = /^[a-f0-9]{40}$/;
+    const allowed = method === "GET"
+      ? path === `git/ref/heads/${branch}` || /^contents\/policy\.json\?ref=[a-f0-9]{40}$/.test(path)
+      : method === "POST" ? ["git/trees", "git/commits", "git/refs"].includes(path)
+      : method === "PATCH" && path === `git/refs/heads/${branch}`;
+    if (!allowed || !/^[a-zA-Z0-9-]+$/.test(this.repo.owner) ||
+        !/^[a-zA-Z0-9_.-]+$/.test(this.repo.name) || [".", ".."].includes(this.repo.name)) throw new GitHubError(403, "Invalid access policy operation.");
+    if (method === "POST" && path === "git/trees" &&
+        (value?.base_tree || !Array.isArray(value?.tree) || value.tree.length !== 1 ||
+         value.tree[0]?.path !== "policy.json" || value.tree[0]?.mode !== "100644" ||
+         value.tree[0]?.type !== "blob" || typeof value.tree[0]?.content !== "string")) throw new GitHubError(403, "Invalid access policy tree.");
+    if (method === "POST" && path === "git/commits" &&
+        (!sha.test(value?.tree) || !Array.isArray(value?.parents) || value.parents.length > 1 ||
+         value.parents.some((parent: unknown) => typeof parent !== "string" || !sha.test(parent)))) throw new GitHubError(403, "Invalid access policy commit.");
+    if (path === "git/refs" && (value?.ref !== `refs/heads/${branch}` || !sha.test(value?.sha))) throw new GitHubError(403, "Invalid access policy ref.");
+    if (method === "PATCH" && (value?.force !== false || !sha.test(value?.sha))) throw new GitHubError(403, "Invalid access policy update.");
+    const response = await this.gh(path, { method, redirect: "manual", signal: AbortSignal.timeout(15000),
+      headers: { "Cache-Control": "no-cache" }, ...(body === undefined ? {} : { body: JSON.stringify(body) }) });
+    if (method === "GET" && response.status === 404) { await response.body?.cancel(); return null; }
+    if (!response.ok) {
+      await response.body?.cancel();
+      throw new GitHubError(response.status, "GitHub could not access the co-admin policy.");
+    }
+    const reader = response.body?.getReader();
+    if (!reader) throw new GitHubError(502, "Empty co-admin policy response.");
+    let text = "", size = 0; const decoder = new TextDecoder();
+    try {
+      for (;;) {
+        const { done, value } = await reader.read(); if (done) break;
+        size += value.byteLength;
+        if (size > 32768) { await reader.cancel(); throw new GitHubError(502, "Co-admin policy response exceeds its limit."); }
+        text += decoder.decode(value, { stream: true });
+      }
+      return JSON.parse(text + decoder.decode());
+    } finally { reader.releaseLock(); }
+  }
+
   private async gh(path: string, init?: RequestInit): Promise<Response> {
-    return fetch(`${GITHUB_API}/repos/${this.repo.owner}/${this.repo.name}${path ? `/${path}` : ""}`, {
+    return (this.fetchImpl ?? globalThis.fetch)(`${GITHUB_API}/repos/${this.repo.owner}/${this.repo.name}${path ? `/${path}` : ""}`, {
       ...init,
       headers: {
         Authorization: `Bearer ${this.token}`,

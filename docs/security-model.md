@@ -21,7 +21,7 @@ reading a doc that mentions `HANDOFF_PRIVATE_KEY`, `adminLogin`, `lanza_session`
 A tenant site is a static Cloudflare Pages deployment of the customer's own repo, in
 the customer's own Cloudflare account. GitHub verifies identity and repository access
 using the person's own token in an HttpOnly cookie. By default repository permissions
-determine the CMS role. The tenant's hosting operator may explicitly delegate site
+determine the CMS role. A GitHub repository administrator may explicitly delegate site
 administration to existing writers (see below). Nothing signs a session. The broker
 (`connect.lanzacms.com`) automates onboarding and then has nothing further to do with
 the site: it holds no key that can read or write a tenant repository, and a tenant
@@ -91,58 +91,62 @@ agent flow; changing accounts and refreshing the same session are distinct.
 
 ### Explicit delegated site administration
 
-Settings → People now provides an owner-only management interface at
-`/admin/api/people`. The endpoint rechecks the raw GitHub administrator identity,
-requires exact same-origin POSTs, bounds payloads and validates the Pages project's
-GitHub repository before changing anything. Delegated owners are refused. It changes
-only Production `LANZA_SITE_ADMINS` with a narrow Cloudflare PATCH, then starts a
-production-branch deployment. The UI distinguishes saved configuration from active
-access and exposes deployment status and a retry without rewriting the setting.
+Settings → People provides owner-only management at `/admin/api/people`. It checks
+raw GitHub repository administrator identity, rejects delegated administrators,
+requires same-origin POSTs and bounds input. It uses only the signed-in person's
+GitHub token. No Cloudflare credential, hosting configuration write or deployment
+is required. GitHub invitations remain on GitHub; the list does not grant repository
+access. Only existing GitHub writers can receive delegated CMS administration.
 
-It uses the tenant's existing complete Cloudflare proxy credentials when available.
-Otherwise the owner enters an account ID, Pages project and Pages Edit API token in
-the CMS. The supplied token exists in component memory until leaving People and in
-the immediate same-origin request; no browser storage, cookies, repository write or
-broker credential storage is used. A configured server token cannot be redirected
-to browser-supplied account/project names. Raw Cloudflare project data, other
-variables and upstream errors are never returned to the browser. An encrypted or
-malformed existing delegation variable requires correction before CMS editing.
+The policy is `{ "version": 1, "admins": ["login"] }` in `policy.json` on the
+orphan `lanza-access` branch. It is outside main/staging, public builds, website
+Publish and Discard, request archives and plugin data. The list is repository data:
+on a public repository the usernames are public. Commits record history, not proof
+of a human author. Do not merge this branch into a website branch.
 
-The loaded setting is checked before saving to refuse stale edits. Cloudflare does
-not expose an atomic compare-and-swap for this PATCH: simultaneous saves from two
-owners can still race. Avoid concurrent access-management edits. GitHub repository
-write access is still checked at sign-in, not granted by adding a username here.
-Inviting GitHub collaborators remains on GitHub; this screen manages CMS privileges.
-The optional separate OAuth Worker is not updated by a Pages deployment.
-No grant-management MCP tool exists; managing access requires the owner's CMS action.
+The server reads the exact policy commit on every writer authorization, after the
+60-second GitHub identity cache. CMS, direct MCP, agent-token readiness and the
+updated optional OAuth Worker share this resolver. Revocation applies on the next
+request; in-flight requests can finish and the CMS needs a refresh to update its
+controls. Native GitHub administrators do not depend on a readable policy, allowing
+recovery. A malformed, unreadable or unavailable policy refuses writer access with
+503; it never falls back to an older grant on an upstream error.
 
-API contracts: [project update](https://developers.cloudflare.com/api/resources/pages/subresources/projects/methods/edit/)
-and [create deployment](https://developers.cloudflare.com/api/resources/pages/subresources/projects/subresources/deployments/methods/create/).
+For existing installations, **only a missing access branch** permits the legacy
+`LANZA_SITE_ADMINS` runtime setting. People displays those names and the first Save
+migrates the reviewed list. Once the branch exists, GitHub is authoritative even
+when the list is empty. Never delete the branch to revoke grants: save an empty
+list. Deleting the branch can reactivate a retained legacy variable. After all
+runtimes have upgraded and migration is verified, the hosting operator can remove
+the legacy variable as optional cleanup. Older deployments still use it until they
+are upgraded; this software change does not update deployed tenants automatically.
 
-The hosting operator may set `LANZA_SITE_ADMINS` in the tenant's Cloudflare Pages
-Production Variables and Secrets, then redeploy. It is a comma-separated list of
-exact GitHub usernames, case-insensitive, without `@`. Malformed lists grant no
-delegation; there are no wildcards. Remove a username and redeploy to revoke it.
-The default is empty, so existing sites retain their current roles.
+Saves compare the loaded revision, create a child of that exact commit and move
+the ref with `force: false`. A simultaneous save cannot overwrite a competing branch
+head; it returns a conflict to reload. First-time saves create the orphan branch
+atomically with its complete policy; a creation race also conflicts. Failed writes
+may leave unreachable Git objects but never a partially initialized policy branch.
+An ambiguous network failure requires reloading to determine whether the save
+succeeded. GitHub branch restrictions are respected, not bypassed.
 
-Only a GitHub `editor` (write/maintain) can be promoted, after identity verification.
-Internally this is `role: owner, delegated: true`; it means **site administrator**,
-not GitHub repository owner. Delegation is applied outside the GitHub-only cache,
-never read from repository files, requests, cookies or frontend configuration.
-Native GitHub administrators remain independent of this list.
+The browser GitHub proxy confines Contents writes, ref creation and merge targets
+to main/staging for **all** roles. Its PATCH allowlist is also limited to those refs.
+Access policy uses a separate server-internal transport; no grant-management MCP
+tool or arbitrary branch argument is exposed. Site administration still includes
+publishing, settings, software updates, private requests, Research and agent tools;
+Cloudflare hosting remains restricted to native GitHub administrators.
 
-Delegates can manage settings, content, publishing, software updates, private requests,
-Research and agent tools using their own token. Archive guards recheck GitHub write
-access and private visibility before reads/writes. Hosting `/admin/api/cf/*` remains
-restricted to native GitHub administrators; delegates cannot edit their grant through
-that proxy. The optional OAuth Worker needs its own identical runtime setting and
-redeployment; Pages configuration is not automatically copied to it. Existing OAuth
-connections are rechecked on each MCP request. No delegation-write MCP tool exists.
+This is a CMS authorization boundary, **not an owner-only GitHub branch guarantee**.
+GitHub writers can edit repository files directly, including this policy, unless
+GitHub branch rules restrict them. This intentionally replaces hosting-only grant
+storage to remove the Cloudflare requirement. The existing ability of writers to
+replace and deploy application code is also outside the CMS role boundary. Use
+GitHub branch protection/rulesets for enforcement outside Lanza; commit authorship
+is not an authorization check. No central credential or broker trust is added.
 
-This is a CMS authorization boundary, not protection against hostile repository code
-writers: a collaborator able to replace and deploy application code can replace its
-checks. Use GitHub branch protection and Cloudflare account permissions for that
-separate boundary. No central credential, additional storage or broker trust is added.
+GitHub API contracts: [Git references](https://docs.github.com/en/rest/git/refs)
+and [Git trees](https://docs.github.com/en/rest/git/trees).
+
 
 ### I2 — Validate the URL you are about to fetch, not the string you were given
 
@@ -335,7 +339,7 @@ author: an agent-authored template is a proposal, not a deployment.
 |---|---|---|---|
 | `GITHUB_CLIENT_ID` | tenant (optional) | overrides the committed `lanza-cms` client id | falls back to `tenant-config.ts` — correct for every normal tenant |
 | `AGENT_CLIENT_ID` | tenant (optional) | overrides the committed `lanza-agents` client id | same |
-| `LANZA_SITE_ADMINS` | tenant runtime (optional) | exact comma-separated GitHub writers allowed to administer the site | no delegated administrators; redeploy after changes |
+| `LANZA_SITE_ADMINS` | tenant runtime (legacy) | fallback only when `lanza-access` is absent | empty legacy list; use People to migrate to live GitHub policy |
 | `CLOUDFLARE_API_TOKEN` | tenant (opt-in) | the Site Health panel and KV/D1/R2 provisioning | those features 503 and say so. **This is the default state** |
 | `OAUTH_CLIENT_ID` / `OAUTH_CLIENT_SECRET` | broker | classic OAuth App, `public_repo`, creates the tenant repo | onboarding cannot start |
 | `CLOUDFLARE_OAUTH_CLIENT_ID` / `_SECRET` | broker | the Pages deploy step | onboarding step 3 fails |

@@ -50,10 +50,12 @@ Read `AGENTS.md` for the mandatory schema and public-page authoring contract.
    sign-in screen, the person approves a code at github.com, and the tokens live in
    HttpOnly cookies. **GitHub answers both questions** — identity is whose token it
    is, and repository access comes from `permissions`; removal takes effect within
-   60 seconds. Optional `LANZA_SITE_ADMINS` runtime configuration can delegate site
-   administration to existing GitHub writers, never hosting access. Settings → People
-   manages this setting through an owner-only Cloudflare operation; supplied tokens
-   remain request/tab-scoped and never enter repository or broker storage. See the security
+   60 seconds. Settings → People lets repository administrators delegate site
+   administration to existing GitHub writers, never hosting access. The list lives
+   in `policy.json` on the separate `lanza-access` branch and is read live by CMS
+   and MCP. Saving requires only the owner's GitHub login, no Cloudflare token or
+   deployment. Legacy `LANZA_SITE_ADMINS` is used only until that branch exists.
+   The generic proxy cannot change non-website branches. See the security
    model before changing this intersection. The gh proxy
    (`functions/admin/api/gh/[[path]].ts` in prod, Vite middleware in dev) attaches
    **the signed-in person's own token**; there is no mint and no standing PAT. Dev

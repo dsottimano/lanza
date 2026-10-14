@@ -94,7 +94,7 @@ const roleLabel = computed(() => {
       <aside class="mt-10 border-l-2 border-emerald-600 bg-emerald-50 px-4 py-3">
         <p class="text-sm leading-relaxed text-emerald-950">
           <span data-lanza-origin="agent"><strong class="font-semibold">GitHub access changes take effect within a minute.</strong>
-          Co-admin changes take effect after the deployment succeeds.</span>
+          Co-admin changes apply on the next request after saving. Refresh the CMS to update its controls.</span>
         </p>
       </aside>
     </main>

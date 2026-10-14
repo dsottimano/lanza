@@ -123,7 +123,9 @@ The token lands in `lanza_cf` — HttpOnly, `Max-Age=3600`, carrying no refresh 
 hosting features (Site Health, KV/D1/R2 provisioning) are **opt-in and off by default**:
 the tenant creates their own API token and sets `CLOUDFLARE_API_TOKEN`,
 `CLOUDFLARE_ACCOUNT_ID` and `PAGES_PROJECT` on their own Pages project. Until they do,
-those panels 503 and say why.
+those panels 503 and say why. Co-admin management in Settings → People uses the
+owner's existing GitHub login and needs no Cloudflare token. Its policy is on the
+separate `lanza-access` branch; see [security model](security-model.md).
 
 That was a decision, not an omission. A broker-held token store would have made one
 namespace custodian of `page.write` on the entire fleet. The store-nothing alternative

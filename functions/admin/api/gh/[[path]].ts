@@ -18,6 +18,7 @@ import {
   STRIP_RESPONSE_HEADERS,
   crossOriginBlocked,
   isAllowed,
+  websiteWriteAllowed,
   upstreamPath,
   upstreamTargetAllowed,
   BRANCH,
@@ -101,16 +102,18 @@ export const onRequest = async (context: {
   }
 
   let parsed: unknown = null;
-  if (role === "editor") {
-    if (bodyBytes && bodyBytes.byteLength) {
-      try {
-        parsed = JSON.parse(new TextDecoder().decode(bodyBytes));
-      } catch {
-        // Unparseable body on a write: refuse rather than check nothing. Every
-        // write the CMS makes is JSON, so this is malformed or hostile either way.
-        return json(403, { message: "Blocked: unreadable request body." });
-      }
+  if (bodyBytes && bodyBytes.byteLength) {
+    try {
+      parsed = JSON.parse(new TextDecoder().decode(bodyBytes));
+    } catch {
+      // Every write is JSON; never skip branch validation on an unreadable body.
+      return json(403, { message: "Blocked: unreadable request body." });
     }
+  }
+  if (!websiteWriteAllowed(request.method, subPath, parsed)) {
+    return json(403, { message: "The content proxy can only change website branches. Use People to manage co-admins." });
+  }
+  if (role === "editor") {
     const decision = editorMayCall(request.method, subPath, parsed, {
       workingBranch: WORKING_BRANCH,
       productionBranch: BRANCH,
