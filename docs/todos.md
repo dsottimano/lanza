@@ -1,3 +1,18 @@
+# GitHub co-admin redesign — October 14, 2026
+
+Prepared 0.1.29 on local `feat/github-coadmins` at `07137374047d283a70de843632f315c3eea7481d`.
+People now manages the separate GitHub access policy without Cloudflare credentials
+or deployments. Legacy grants migrate on Save; CMS/MCP share live revocation.
+512 server/script + 646 CMS + 24 OAuth tests pass, as do builds/typechecks,
+site validation and source/fresh-packed-tenant legacy Functions compilation.
+
+**Release pending approval:** npm latest and the remote onboarding pin remain
+0.1.28. Local package and template update are prepared; nothing pushed/deployed.
+Next: obtain publication approval, reconcile remote main/staging, release and verify
+the public npm package, then update the onboarding pin. Real tenant/browser testing
+remains unverified. See [current handoff](handoff-2026-10-14.md) for exact checkpoints,
+package integrity, template commit and security/migration limits.
+
 # CMS co-admin management — October 13, 2026
 
 Public npm latest is **0.1.28**, verified downloadable with a fresh public-registry
@@ -137,7 +152,7 @@ Updated 2026-10-10. Start here after clearing conversation context.
 
 1. [Product vision](product-vision.md): agreed direction and v1 boundaries.
 2. [Thoughts v1](thoughts-v1.md): implementation contract and unresolved mechanics.
-3. [Current handoff](handoff-2026-10-10.md): worktrees, tenant state and next session.
+3. [Current handoff](handoff-2026-10-14.md): prepared release, checkpoints and next action; links to prior tenant work.
 4. [Delivery evidence](agent-requests-delivery-2026-10-10.md): shipped CMS fixes and limits.
 5. [Security model](security-model.md) before touching auth, repository access or MCP.
 
