@@ -1,3 +1,11 @@
+# Preview indexing default — October 15, 2026
+
+Shared staging/preview robots meta noindex is prepared locally in **0.1.30**.
+Source and packed-tenant staging/production builds verified; 512 server/script
+tests and site/Astro checks pass. npm latest and onboarding pin remain **0.1.29**.
+Publication approval and release verification are pending; no deployment claimed.
+See [current handoff](handoff-2026-10-15.md) for exact checks and next steps.
+
 # GitHub co-admin release — October 14, 2026
 
 **0.1.29 is publicly released and verified.** Tag/source

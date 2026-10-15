@@ -27,6 +27,13 @@ const { seo = {}, article = null, locale = DEFAULT_LOCALE, alternates = [] } = A
 const siteUrl = (Astro.site ?? new URL("/", Astro.url)).href.replace(/\/$/, "");
 const s = resolveSeo(seo, Astro.url.pathname, siteUrl, locale);
 
+// Lanza publishes main; every other Cloudflare Pages branch is a preview.
+// Use the build branch, not the canonical/domain: previews share production's
+// canonical origin and CF_PAGES_URL is a hash URL even for production builds.
+// A page-level noindex:false must not make a preview indexable.
+const branch = import.meta.env.CF_PAGES_BRANCH;
+const noindex = s.noindex || Boolean(branch && branch !== "main");
+
 // hreflang only helps when a page has more than one language. x-default points at
 // the default locale's version when present.
 const hreflangs = alternates.length > 1 ? alternates : [];
@@ -45,7 +52,7 @@ const graph = buildGraph([
 
 {hreflangs.map((a) => <link rel="alternate" hreflang={a.locale} href={absUrl(a.url, siteUrl)} />)}
 {xDefault && <link rel="alternate" hreflang="x-default" href={absUrl(xDefault.url, siteUrl)} />}
-{s.noindex && <meta name="robots" content="noindex, nofollow" />}
+{noindex && <meta name="robots" content="noindex, nofollow" />}
 
 <meta property="og:type" content={s.ogType} />
 <meta property="og:title" content={s.title} />

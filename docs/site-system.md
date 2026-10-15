@@ -292,6 +292,21 @@ for compatibility and do not determine page layout.
 
 ## Publishing a reviewed draft
 
+### Search indexing of previews
+
+The shared SEO component emits `noindex, nofollow` in a robots meta tag on
+Cloudflare Pages builds whose `CF_PAGES_BRANCH` is set to anything other than
+`main`. This includes `staging` and feature previews, regardless of theme,
+canonical domain or a page's `seo.noindex: false`. Lanza's publishing contract
+uses `main` for production. Production and local builds without that variable
+retain each page's existing indexing setting (including noindex on 404 pages).
+Custom build pipelines must supply the branch variable to get the same behavior.
+
+This complements Cloudflare's preview response header and does not depend on a
+tenant's `_headers` file. Do not add a global robots.txt crawl block as a substitute:
+crawlers need to fetch pages to see the noindex directive. Noindex is search-engine
+guidance, not access control. Existing tenants need a package upgrade and rebuild.
+
 See [Publishing and reconciliation](publishing.md) for the incident, recovery,
 repository-agent workflow, and the remaining MCP/deployment limits.
 
