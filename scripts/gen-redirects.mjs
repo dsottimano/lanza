@@ -6,6 +6,7 @@
 // otherwise inject arbitrary redirect rules (e.g. one shadowing /admin/*).
 import { mkdirSync, readFileSync, writeFileSync } from "node:fs";
 import { dirname, join } from "node:path";
+import { postsRoute, rootPostRedirects } from "../functions/_lib/post-route.mjs";
 
 // Input is TENANT data (redirect rules) and output is the tenant's built public
 // dir → both resolve against the project root (cwd). In the monorepo dogfood
@@ -61,6 +62,25 @@ for (const r of redirects) {
     continue;
   }
   lines.push(`${r.from} ${r.to} ${r.status ?? 301}`);
+}
+
+// Posts served at the site root (posts `route.base: ""`, see functions/_lib/post-route.mjs)
+// no longer exist under /posts/. Old links 301 to the root. Appended AFTER the owner's
+// rules, so an explicit redirect for one of those addresses still wins (first match).
+// Missing or unreadable model/site data adds nothing; gen-routes.mjs fails the build on
+// an invalid posts route.
+function readJson(rel) {
+  try {
+    return JSON.parse(readFileSync(join(process.cwd(), rel), "utf8"));
+  } catch {
+    return null;
+  }
+}
+const postsAtRoot = postsRoute(readJson("data/schema.json"));
+if (postsAtRoot.base === "" && !postsAtRoot.errors.length) {
+  const site = readJson("data/site.json") ?? {};
+  const locales = Array.isArray(site.locales) ? site.locales.map((l) => l?.code) : [];
+  lines.push(...rootPostRedirects(site.defaultLocale, locales));
 }
 
 // A thin tenant that has never uploaded media has no public/ at all — the

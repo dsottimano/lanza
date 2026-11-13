@@ -2,7 +2,7 @@
 // (the llms.txt convention: like robots.txt, but a content index for LLMs).
 // An Astro endpoint, not a node script, so it reuses the content collections
 // and the exact same draft filter as the public pages. Static + cacheable.
-import { contentUrl } from "../lib/public-urls";
+import { contentUrl, postUrl } from "../lib/public-urls";
 import type { APIRoute } from "astro";
 import { splitId, localeUrl, isLocale, DEFAULT_LOCALE } from "../lib/i18n";
 import { getSeoDefaults } from "../lib/site";
@@ -93,7 +93,7 @@ export const GET: APIRoute = async ({ site }) => {
     for (const p of posts) {
       const { locale, slug } = splitId(p.id);
       if (!isLocale(locale)) continue; // skip content for disabled locales
-      const url = `${origin}${contentUrl("posts", p.id, "posts")}`;
+      const url = `${origin}${postUrl(p.id)}`;
       sections.push(item(p.data.title, url, p.data.description));
     }
   }

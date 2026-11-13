@@ -13,7 +13,8 @@ import { computed, ref } from "vue";
 import type { GitHubClient } from "./github";
 import { REPO } from "./config";
 import { site } from "./site";
-import { getCollection } from "../schema";
+import { COLLECTIONS, getCollection } from "../schema";
+import { postsRoute } from "../../../functions/_lib/post-route.mjs";
 
 // Mirrors the broker's slug()/repoHash() budget. Kept as literals rather than shared
 // constants because the SPA and the broker are separate deployables.
@@ -98,6 +99,7 @@ export async function resolveStagingOrigin(client: GitHubClient): Promise<void> 
 
 // Built-in routes mirror frontend/pages/. Custom routes come from the same schema
 // declaration consumed by gen-routes.mjs; routeless collections have no View link.
+// Posts move to "/" when their route serves them at the site root (postsPath).
 const ROUTES: Record<string, string> = {
   posts: "/posts/",
   pages: "/",
@@ -105,6 +107,11 @@ const ROUTES: Record<string, string> = {
   tags: "/tag/",
   authors: "/author/",
 };
+
+/** Where posts live: "/posts/", or "/" when the posts route sets `base: ""`. Same rule as frontend/lib/public-urls.ts. */
+export function postsPath(): string {
+  return postsRoute(COLLECTIONS).base === "" ? "/" : ROUTES.posts;
+}
 
 // THE prefix rule for the whole CMS. Non-default locales are served under a
 // /<locale> prefix; the default locale sits at the root (astro-config.mjs sets
@@ -139,7 +146,7 @@ export function entryPathFrame(
   slugName: string,
   locale: string,
 ): { prefix: string; suffix: string } | null {
-  let route = ROUTES[collection];
+  let route = collection === "posts" ? postsPath() : ROUTES[collection];
   let prefix = localePrefix(locale);
   if (!route) {
     const declared = getCollection(collection);

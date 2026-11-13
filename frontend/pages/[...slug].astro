@@ -1,14 +1,18 @@
 ---
 import type { CollectionEntry } from "astro:content";
 import PagePage from "../components/PagePage.astro";
+import PostPage from "../components/PostPage.astro";
 import FixedPage from "../components/FixedPage.astro";
 import { DEFAULT_LOCALE } from "../lib/i18n";
 import { getCollection } from "astro:content";
 import { publishedPages } from "../lib/routing";
 import { splitEntries } from "../lib/paths";
 import { FIXED_PAGES } from "../lib/fixed-pages";
+import { rootPosts } from "../lib/root-posts";
 
 // CMS entries own their URLs, including drafts (no fallback may resurrect them).
+// Posts join this URL space only when the posts route serves them at the site root;
+// rootPosts fails the build on any slug two of these would share.
 export async function getStaticPaths() {
   const { root } = splitEntries(await publishedPages());
   const cms = root
@@ -20,14 +24,20 @@ export async function getStaticPaths() {
     params: { slug: p.slug },
     props: { fixed: p.slug },
   }));
-  return [...cms, ...fixed];
+  const posts = (await rootPosts(null, owned.root, fixed.map((f) => f.params.slug))).map(({ entry, slug }) => ({
+    params: { slug },
+    props: { post: entry },
+  }));
+  return [...cms, ...fixed, ...posts];
 }
 
-const { page, fixed } = Astro.props;
+const { page, fixed, post } = Astro.props;
 ---
 
 {
-  fixed ? (
+  post ? (
+    <PostPage post={post as CollectionEntry<"posts">} locale={DEFAULT_LOCALE} />
+  ) : fixed ? (
     <FixedPage slug={fixed} locale={DEFAULT_LOCALE} />
   ) : (
     <PagePage page={page as CollectionEntry<"pages">} locale={DEFAULT_LOCALE} />

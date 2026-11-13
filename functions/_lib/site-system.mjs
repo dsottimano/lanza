@@ -43,6 +43,7 @@ import { humanEditingGuide } from "./agent-authoring.mjs";
 // layer above is allowed to reference. This list is the doc (docs/site-system.md)
 // in machine-readable form; the checks below are its enforcement.
 import { dangerousConstructs } from "./dangerous-constructs.mjs";
+import { postsRoute } from "./post-route.mjs";
 
 export const LAYERS = [
   {
@@ -602,6 +603,7 @@ export const CHECKS = [
   { code: "missing-template", level: "error", failure: "A template folder with no template.html." },
   { code: "missing-fields", level: "error", failure: "A template folder with no fields.json: the CMS would show no inputs." },
   { code: "route-template-missing", level: "error", failure: 'A live URL rendering "Unknown template".' },
+  { code: "posts-route-invalid", level: "error", failure: "A posts `route` the build refuses: the deploy fails and the live site keeps the old version." },
 ];
 
 // ── The published contract ───────────────────────────────────────────────────
@@ -978,6 +980,11 @@ export async function checkSite(io, opts = {}) {
   for (const part of ["header", "footer"]) {
     const html = await readText(`templates/parts/${part}.html`);
     if (html !== null) problems.push(...checkPart(part, html));
+  }
+
+  // ── The posts route (root URLs and/or a template). Same rule gen-routes.mjs dies on.
+  for (const message of postsRoute(folders).errors) {
+    problems.push(problem("error", "posts-route-invalid", "data/schema.json", message));
   }
 
   // ── Routes. Checked against the FULL listing, not the capped one: a route into a

@@ -2,6 +2,7 @@ import { GitHubError, type GitHubClient } from "./github";
 import { serializeFrontmatter } from "./frontmatter";
 import { site, SITE_CONFIG_PATH } from "./site";
 import { ruleError, type RedirectRule } from "./redirect-rules";
+import { postsRoute, ROOT_RESERVED_SLUGS } from "../../../functions/_lib/post-route.mjs";
 
 const REDIRECTS = "data/redirects.json";
 const canonical = (path: string) => path === "/" ? path : path.replace(/\/$/, "");
@@ -63,23 +64,30 @@ export async function saveUrlChange(client: GitHubClient, change: UrlSave): Prom
   if (change.slug && !/^[a-z0-9]+(?:-[a-z0-9]+)*$/.test(change.slug)) throw new Error("Use letters, numbers and hyphens in the slug.");
   if (!change.slug && !(change.collection === "pages" && change.stem === "home")) throw new Error("Only the homepage can have an empty slug.");
   const locales = config.data.locales as { code: string }[];
-  const reserved = new Set(["404", "style-preview", "admin", "posts", "blog", "category", "tag", "author", "images", "assets", "fonts", "brand", "favicon", "social", "home", ...locales.map(l => l.code)]);
-  if (config.data.productSite) for (const value of ["how-it-works", "start", "agents", "architecture"]) reserved.add(value);
-  if (change.collection === "pages" && reserved.has(change.slug)) throw new Error("That URL is reserved by the site. Choose another slug.");
-  const tree = await client.getTree(head);
-  if (tree.truncated) throw new Error("The site is too large to check URL availability. No changes were saved.");
-  for (const file of tree.tree) {
-    const match = new RegExp(`^content/${change.collection}/(?:(${change.locale})/)?([^/]+)\\.md$`).exec(file.path);
-    if (!match || file.path === change.path || (!match[1] && change.locale !== site.defaultLocale)) continue;
-    const stem = match[2];
-    const used = urls[`${change.collection}/${change.locale}/${stem}`] ?? (change.collection === "pages" && stem === "home" ? "" : stem);
-    if (used === change.slug) throw new Error("Another entry already uses that URL. Choose another slug.");
-  }
-  // Custom collection route prefixes also reserve page slugs.
+  // Posts served at the site root (posts `route.base: ""`) share the page URL space, so
+  // they are held to the page rules and checked against pages, and pages against them.
+  // Read from the same head as everything else this save checks.
   const schema = await client.loadJson("data/schema.json", head);
   const collections = Array.isArray(schema.data) ? schema.data : [];
-  if (change.collection === "pages" && collections.some((c: { route?: { base?: string } }) => c.route?.base === change.slug)) throw new Error("That URL belongs to a content type.");
-  const base = `${change.locale === site.defaultLocale ? "" : "/" + change.locale}/${change.collection === "posts" ? "posts/" : ""}`;
+  const postsAtRoot = postsRoute(collections).base === "";
+  const rootLevel = change.collection === "pages" || (change.collection === "posts" && postsAtRoot);
+  const reserved = new Set(["404", "style-preview", "admin", "posts", "blog", "category", "tag", "author", "images", "assets", "fonts", "brand", "favicon", "social", "home", ...(change.collection === "posts" ? ROOT_RESERVED_SLUGS : []), ...locales.map(l => l.code)]);
+  if (config.data.productSite) for (const value of ["how-it-works", "start", "agents", "architecture"]) reserved.add(value);
+  if (rootLevel && reserved.has(change.slug)) throw new Error("That URL is reserved by the site. Choose another slug.");
+  const tree = await client.getTree(head);
+  if (tree.truncated) throw new Error("The site is too large to check URL availability. No changes were saved.");
+  const sharing = rootLevel && postsAtRoot ? ["pages", "posts"] : [change.collection];
+  for (const file of tree.tree) {
+    const match = /^content\/(pages|posts|[^/]+)\/(?:([^/]+)\/)?([^/]+)\.md$/.exec(file.path);
+    if (!match || !sharing.includes(match[1]) || file.path === change.path) continue;
+    if (match[2] ? match[2] !== change.locale : change.locale !== site.defaultLocale) continue;
+    const [, collection, , stem] = match;
+    const used = urls[`${collection}/${change.locale}/${stem}`] ?? (collection === "pages" && stem === "home" ? "" : stem);
+    if (used === change.slug) throw new Error("Another entry already uses that URL. Choose another slug.");
+  }
+  // Custom collection route prefixes also reserve root-level slugs.
+  if (rootLevel && collections.some((c: { name?: string; route?: { base?: string } }) => c.name !== "posts" && c.route?.base === change.slug)) throw new Error("That URL belongs to a content type.");
+  const base = `${change.locale === site.defaultLocale ? "" : "/" + change.locale}/${change.collection === "posts" && !postsAtRoot ? "posts/" : ""}`;
   const pathFor = (slug: string) => `${base}${slug ? slug + "/" : ""}`;
   let redirects: { data: Record<string, unknown>; sha?: string };
   try { redirects = await client.loadJson(REDIRECTS, head); }

@@ -1,13 +1,16 @@
 ---
 import type { CollectionEntry } from "astro:content";
 import PagePage from "../../components/PagePage.astro";
+import PostPage from "../../components/PostPage.astro";
 import FixedPage from "../../components/FixedPage.astro";
 import { getCollection } from "astro:content";
 import { publishedPages } from "../../lib/routing";
 import { splitEntries, otherLocales } from "../../lib/paths";
 import { FIXED_PAGES } from "../../lib/fixed-pages";
+import { rootPosts } from "../../lib/root-posts";
 
-// CMS entries own their URLs in every enabled locale.
+// CMS entries own their URLs in every enabled locale. Posts join this URL space only
+// when the posts route serves them at the site root (/<locale>/<slug>/).
 export async function getStaticPaths() {
   const { localized } = splitEntries(await publishedPages());
   const cms = localized
@@ -24,14 +27,24 @@ export async function getStaticPaths() {
       props: { fixed: p.slug, locale },
     })),
   );
-  return [...cms, ...fixed];
+  const posts = [];
+  for (const locale of otherLocales()) {
+    const pages = owned.localized.filter((entry) => entry.locale === locale);
+    const fixedHere = fixed.filter((f) => f.params.locale === locale).map((f) => f.params.slug);
+    for (const { entry, slug } of await rootPosts(locale, pages, fixedHere)) {
+      posts.push({ params: { locale, slug }, props: { post: entry, locale } });
+    }
+  }
+  return [...cms, ...fixed, ...posts];
 }
 
-const { page, fixed, locale } = Astro.props;
+const { page, fixed, post, locale } = Astro.props;
 ---
 
 {
-  fixed ? (
+  post ? (
+    <PostPage post={post as CollectionEntry<"posts">} locale={locale} />
+  ) : fixed ? (
     <FixedPage slug={fixed} locale={locale} />
   ) : (
     <PagePage page={page as CollectionEntry<"pages">} locale={locale} />

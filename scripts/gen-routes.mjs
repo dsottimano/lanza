@@ -25,6 +25,7 @@ import { readFileSync, writeFileSync, mkdirSync, rmSync, rmdirSync, existsSync, 
 import { fileURLToPath } from "node:url";
 import { join, dirname } from "node:path";
 import { ROUTE_SEGMENT, RESERVED_ROUTE_BASES } from "../functions/_lib/site-system.mjs";
+import { postsRoute } from "../functions/_lib/post-route.mjs";
 
 // Input is TENANT data; output is CODE inside this package's srcDir (frontend/).
 // Same split as gen-content-config.mjs — in the monorepo the two coincide.
@@ -53,6 +54,9 @@ const localeCodes = new Set((site.locales || []).map((l) => l.code));
 function routeOf(collection) {
   const r = collection.route;
   if (!r) return null;
+  // Posts have hand-written routes; their `route` only moves them to the root and/or
+  // names a template. Validated below, never generated here.
+  if (collection.name === "posts" && collection.kind === "folder") return null;
   const at = `collection "${collection.name}"`;
 
   if (collection.kind !== "folder") die(`${at} declares a route but is not a folder collection.`);
@@ -182,6 +186,17 @@ const { locale, entries } = Astro.props;
 
 <CollectionList entries={entries} locale={locale} base=${lit(r.base)} label=${lit(r.label)} list={${jsExpr(r.list)}} />
 `;
+}
+
+// ── posts ────────────────────────────────────────────────────────────────────
+// The built-in posts routes read this at build time (frontend/lib/public-urls.ts); an
+// invalid block or a missing template must stop the build here, not render quietly.
+{
+  const posts = postsRoute(schema);
+  if (posts.errors.length) die(posts.errors.join(" "));
+  if (posts.template && !existsSync(join(CWD, "templates", posts.template, "template.html"))) {
+    die(`collection "posts" route.template "${posts.template}" has no templates/${posts.template}/template.html.`);
+  }
 }
 
 // ── emit ─────────────────────────────────────────────────────────────────────

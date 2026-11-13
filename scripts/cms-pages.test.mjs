@@ -68,11 +68,20 @@ for (const localized of [false, true]) test(`${localized ? 'localized' : 'root'}
       getCollection:async()=>entries,
       splitEntries:items=>({root:items.map(entry=>({entry,locale,slug:entry.slug})),localized:items.map(entry=>({entry,locale,slug:entry.slug}))}),
       otherLocales:()=>['es'], FIXED_PAGES:[{slug:'posts'}],
+      // Posts join this URL space only at the site root; rootPosts (frontend/lib/root-posts.ts)
+      // owns the collision check and gets every page plus the fixed slugs emitted here.
+      rootPosts:async(_locale,pages,fixed)=>{seen={pages,fixed};return [{entry:{id:`${locale}/launch`},locale,slug:'launch'}];},
     };
+    let seen;
     const paths = await vm.runInNewContext(source+'\ngetStaticPaths()', context);
     assert.equal(paths.filter(p=>p.props.fixed).length, state === 'absent' ? 1 : 0, state);
     assert.equal(paths.filter(p=>p.props.page).length, ['published','moved'].includes(state) ? 1 : 0, state);
     if (state === 'moved') assert.equal(paths[0].params.slug, 'journal');
+    const posts = paths.filter(p=>p.props.post);
+    // JSON round-trip: the objects come from another vm realm.
+    assert.deepEqual(JSON.parse(JSON.stringify(posts.map(p=>p.params))), [localized ? {locale, slug:'launch'} : {slug:'launch'}], state);
+    assert.equal(seen.pages.length, entries.length, `${state}: drafts still own their URLs`);
+    assert.deepEqual([...seen.fixed], state === 'absent' ? ['posts'] : [], state);
   }
 });
 

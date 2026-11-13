@@ -28,4 +28,5 @@ name is the same in every language — so they don't have a language switcher.
 
 Each entry is one Markdown file in your repo. The **filename is the slug** (the
 URL). For example a post titled "Hello World" is saved as `hello-world.md` and
-appears at `/posts/hello-world/`.
+appears at `/posts/hello-world/`, or at `/hello-world/` when your site serves posts
+at the root of its address.

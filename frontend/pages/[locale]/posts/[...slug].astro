@@ -2,9 +2,12 @@
 import PostPage from "../../../components/PostPage.astro";
 import { publishedPosts } from "../../../lib/routing";
 import { splitEntries } from "../../../lib/paths";
+import { POSTS_BASE } from "../../../lib/public-urls";
 
 // Localized posts (/es/posts/x/, /fr/posts/x/). Non-default locales only.
+// At the site root they are emitted by [locale]/[...slug].astro instead.
 export async function getStaticPaths() {
+  if (POSTS_BASE !== "posts") return [];
   const { localized } = splitEntries(await publishedPosts());
   return localized.map(({ entry, locale, slug }) => ({
     params: { locale, slug },

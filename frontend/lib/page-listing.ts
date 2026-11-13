@@ -5,7 +5,7 @@ import { fieldRecords } from "./provenance/text.mjs";
 import { getCollection } from "astro:content";
 import { splitId, type Locale } from "./i18n";
 import { isPublished } from "./routing";
-import { contentUrl } from "./public-urls";
+import { contentUrl, POSTS_BASE } from "./public-urls";
 import schema from "/data/schema.json";
 
 const declarations = import.meta.glob<{ listing?: {
@@ -17,8 +17,10 @@ export async function pageListingScope(name: string, locale: Locale, slots: Reco
   if (!listing) return slots;
   const collection = schema.find((c) => c.kind === "folder" && c.name === listing.of);
   if (!collection) throw new Error(`Template ${name}: unknown listing collection ${listing.of}`);
-  const base = (collection as { route?: { base: string } }).route?.base
-    ?? (listing.of === "pages" ? "" : listing.of);
+  // Posts carry a `route` too, but theirs is not a generated base: POSTS_BASE is the
+  // validated answer ("posts", or "" at the root).
+  const base = listing.of === "posts" ? POSTS_BASE
+    : (collection as { route?: { base: string } }).route?.base ?? (listing.of === "pages" ? "" : listing.of);
   const key = listing.sortBy ?? "title";
   const direction = listing.order === "desc" ? -1 : 1;
   const entries = (await getCollection(listing.of as "posts", ({ data }) => isPublished(data)))

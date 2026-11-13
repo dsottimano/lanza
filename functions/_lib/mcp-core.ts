@@ -35,6 +35,7 @@ import {
   RESERVED_ROUTE_BASES,
   COLLECTION_NAME,
 } from "./site-system.mjs";
+import { postsRoute } from "./post-route.mjs";
 
 export const SERVER_INFO = { name: "lanza-cms", title: "Lanza CMS", version: "0.1.0" };
 export const SUPPORTED_PROTOCOL = "2025-06-18";
@@ -500,6 +501,16 @@ async function normalizeRoute(client: ContentClient, raw: unknown): Promise<Reco
   return out;
 }
 
+/**
+ * The built-in posts collection's route: only `base` ("posts" or "" for the site root)
+ * and `template`. Same rule gen-routes.mjs dies on (functions/_lib/post-route.mjs).
+ */
+function normalizePostsRoute(raw: unknown): Record<string, unknown> {
+  const { base, template, errors } = postsRoute([{ kind: "folder", name: "posts", route: raw ?? {} }]);
+  if (errors.length) throw new GitHubError(400, `Refusing the posts route: ${errors.join(" ")}`);
+  return { base, ...(template ? { template } : {}) };
+}
+
 /** The template folders a collection's route references, for scoping a check. */
 function routeTemplates(collection: Record<string, unknown>): string[] {
   const route = collection.route as { template?: unknown; list?: { template?: unknown } } | undefined;
@@ -930,7 +941,9 @@ export const TOOLS: ToolDef[] = [
           type: "object",
           description:
             "Replace the route: { base, template, list: { template, sortBy, order } }. " +
-            "Pass it to give an unrouted type its URLs, or to add a listing page.",
+            "Pass it to give an unrouted type its URLs, or to add a listing page. " +
+            "For the built-in 'posts' type only { base, template } apply: base 'posts' (default) " +
+            "or '' to serve posts at the site root, and an optional detail template.",
           additionalProperties: true,
         },
         body: str("'rich' to give entries an HTML body canvas, 'none' for frontmatter only."),
@@ -980,7 +993,9 @@ export const TOOLS: ToolDef[] = [
         updated.fields = decl.fields;
       }
 
-      if (args.route !== undefined) updated.route = await normalizeRoute(client, args.route);
+      if (args.route !== undefined) {
+        updated.route = name === "posts" ? normalizePostsRoute(args.route) : await normalizeRoute(client, args.route);
+      }
 
       const pending = existing.map((c, i) => (i === index ? updated : c));
       const problems = await checkPendingModel(client, pending, [
@@ -996,7 +1011,7 @@ export const TOOLS: ToolDef[] = [
         updated: name,
         label: updated.label,
         fields: (updated.fields as Array<{ name?: string }>).map((f) => f.name),
-        ...(route ? { url: `/${route.base}/` } : {}),
+        ...(route ? { url: route.base ? `/${route.base}/` : "/<slug>/" } : {}),
         warnings: problems.filter((p) => p.level === "warning").map((p) => `[${p.code}] ${p.message}`),
         ...stagedNote(site),
       };

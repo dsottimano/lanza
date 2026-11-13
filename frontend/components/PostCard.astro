@@ -1,16 +1,16 @@
 ---
-// Journal teaser card. Posts aren't translated — both locales link to the ES
-// post detail at /posts/<stem>/ (see project rules; EN is UI-only). Posts are a
-// localized collection, so `id` is "<locale>/<stem>"; the route serves the stem.
+// Journal teaser card. Posts are a localized collection, so `id` is
+// "<locale>/<stem>"; postUrl resolves the public slug and the posts base
+// (/posts/<slug>/, or /<slug>/ when posts are served at the root).
 import { fieldAgentHtml } from "../lib/provenance/text.mjs";
-import { contentUrl } from "../lib/public-urls";
+import { postUrl } from "../lib/public-urls";
 import { splitId } from "../lib/i18n";
 interface Props {
   post: { id: string; data: Record<string, any> };
 }
 const { post } = Astro.props;
 const d = post.data;
-const href = contentUrl("posts", post.id, "posts");
+const href = postUrl(post.id);
 ---
 
 <a class="post-card" href={href}>

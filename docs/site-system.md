@@ -222,6 +222,35 @@ change the mapping and add a 301 in `data/redirects.json` together; do not renam
 translation file. The CMS performs that transaction and checks URL availability.
 
 
+## Posts at the site root, and through a template
+
+The built-in `posts` collection keeps `/posts/<slug>/` and the plain post layout unless
+its entry in `data/schema.json` carries a `route` block — the same block a content type
+uses, restricted to two keys (`functions/_lib/post-route.mjs` is the one rule):
+
+```json
+{ "name": "posts", "...": "...", "route": { "base": "", "template": "article" } }
+```
+
+- `base`: `"posts"` (default) or `""`. With `""` the default locale's posts are served at
+  `/<slug>/` and other locales' at `/<locale>/<slug>/`, emitted by the root catch-alls
+  next to pages. Every post link follows: cards, archives, category/tag/author listings,
+  page listings, hreflang, canonical, Article JSON-LD, `llms.txt` and CMS View links.
+  The `/posts/` archive stays. `scripts/gen-redirects.mjs` appends
+  `/posts/:slug/ → /:slug/` 301s (per locale) after the owner's own rules.
+- `template`: optional. `templates/<name>/` renders each post in the **detail**
+  position — scope is the post's frontmatter plus `url`, `slug`, `indexUrl` and, with
+  `"body": true`, the sanitized `{{{ body }}}`. Frontmatter fields the template prints
+  must also be declared in the posts collection's `fields`, or the build drops them.
+  SEO, hreflang, `ogType: article` and Article JSON-LD are unchanged. Byline, featured
+  image and taxonomy chips are the template's job.
+- Anything else (`list`, another base, a bad template name, a missing template) fails
+  `gen-routes.mjs`, `check:site` (`posts-route-invalid`, `route-template-missing`) and
+  the MCP `update_content_type` tool. A root-level post whose public slug is reserved,
+  a language code, a content-type base, a page's slug (drafts included) or another
+  post's fails the build with both entries named (`frontend/lib/root-posts.ts`), and the
+  CMS URL control refuses the same slugs.
+
 ## Agent guidance for human editing
 
 `siteSystemContract().humanEditing` carries the authoring workflow, division of work,

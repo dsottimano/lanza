@@ -3,10 +3,14 @@ import PostPage from "../../components/PostPage.astro";
 import { DEFAULT_LOCALE } from "../../lib/i18n";
 import { publishedPosts } from "../../lib/routing";
 import { splitEntries } from "../../lib/paths";
+import { POSTS_BASE } from "../../lib/public-urls";
 
 // Default-locale (EN) posts only — they live at the root /posts/<stem>/.
 // ES/FR posts are emitted by frontend/pages/[locale]/posts/[...slug].astro.
+// Posts served at the site root are emitted by [...slug].astro instead; their old
+// /posts/<slug>/ addresses 301 there (scripts/gen-redirects.mjs).
 export async function getStaticPaths() {
+  if (POSTS_BASE !== "posts") return [];
   const { root } = splitEntries(await publishedPosts());
   return root.map(({ entry, slug }) => ({ params: { slug }, props: { post: entry } }));
 }

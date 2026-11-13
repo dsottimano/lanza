@@ -1,11 +1,22 @@
 ---
-// Shared render for a single post — used by both the root route (/posts/x/) and
-// the localized mirror (/es/posts/x/). The route files only differ in
+// Shared render for a single post — used by the default-locale route (/posts/x/) and
+// the localized mirror (/es/posts/x/), or by the root catch-alls (/x/, /es/x/) when the
+// posts route serves them at the site root. The route files only differ in
 // getStaticPaths (see frontend/lib/paths.ts); everything below is identical.
+//
+// A posts `route.template` (functions/_lib/post-route.mjs) swaps the plain PostArticle
+// <main> for a tenant template whose scope is the post's frontmatter, exactly like a
+// routed collection's detail page (CollectionDetail). SEO, hreflang and Article
+// JSON-LD stay here, so they hold either way.
 import type { CollectionEntry } from "astro:content";
 import { getEntry } from "astro:content";
 import Base from "../layouts/Base.astro";
 import PostArticle from "./PostArticle.astro";
+import HtmlTemplate from "./HtmlTemplate.astro";
+import { sanitizeBody } from "../lib/sanitize";
+import { assertSanitizedSafe } from "../lib/assert-rendered-safe";
+import { postScope } from "../lib/collection-routes";
+import { POSTS_BASE, POSTS_TEMPLATE } from "../lib/public-urls";
 import { splitId, type Locale } from "../lib/i18n";
 import { entryAlternates } from "../lib/alternates";
 import { resolveTemplate } from "../lib/templates";
@@ -17,7 +28,7 @@ interface Props {
 }
 
 const { post, locale } = Astro.props;
-const alternates = await entryAlternates("posts", splitId(post.id).slug, "posts");
+const alternates = await entryAlternates("posts", splitId(post.id).slug, POSTS_BASE);
 const template = resolveTemplate(post.data);
 
 const siteUrl = (Astro.site ?? new URL("/", Astro.url)).href.replace(/\/$/, "");
@@ -57,12 +68,24 @@ const article: ArticleInput = {
   }}
   article={article}
 >
-  <PostArticle
-    post={post}
-    locale={locale}
-    template={template}
-    author={authorName
-      ? { name: authorName, slug: authorEntry ? post.data.author : undefined }
-      : undefined}
-  />
+  {
+    POSTS_TEMPLATE ? (
+      // Same sanitize-then-verify posture as PostArticle: the body is attacker-reachable.
+      <main>
+        <HtmlTemplate
+          name={POSTS_TEMPLATE}
+          data={postScope(post, locale, assertSanitizedSafe(sanitizeBody(post.body ?? ""), "post body"))}
+        />
+      </main>
+    ) : (
+      <PostArticle
+        post={post}
+        locale={locale}
+        template={template}
+        author={authorName
+          ? { name: authorName, slug: authorEntry ? post.data.author : undefined }
+          : undefined}
+      />
+    )
+  }
 </Base>

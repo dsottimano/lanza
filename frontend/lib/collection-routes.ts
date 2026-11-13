@@ -17,6 +17,7 @@ import { fieldRecords } from "./provenance/text.mjs";
 import { getCollection, type CollectionEntry } from "astro:content";
 import { splitId, localeUrl, type Locale } from "./i18n";
 import { isPublished } from "./routing";
+import { postUrl } from "./public-urls";
 
 /** How a collection reaches the public web. Mirrored in scripts/gen-routes.mjs. */
 export interface CollectionRoute {
@@ -78,6 +79,17 @@ export function detailScope(entry: AnyEntry, base: string, locale: Locale, body:
     indexUrl: localeUrl(locale, `${base}/`),
     body,
   };
+}
+
+/**
+ * The data scope for a POST rendered through the posts route template (the posts
+ * collection's `route.template`, see functions/_lib/post-route.mjs). The same names a
+ * routed collection's detail template gets, so the checker's "detail" position holds;
+ * only `url` differs, because a post's address follows the posts base and the
+ * data/site.json `urls` map. `indexUrl` is the posts archive.
+ */
+export function postScope(entry: AnyEntry, locale: Locale, body: string): Record<string, unknown> {
+  return { ...detailScope(entry, "posts", locale, body), url: postUrl(entry.id) };
 }
 
 /**
