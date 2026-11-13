@@ -44,6 +44,7 @@ import { humanEditingGuide } from "./agent-authoring.mjs";
 // in machine-readable form; the checks below are its enforcement.
 import { dangerousConstructs } from "./dangerous-constructs.mjs";
 import { postsRoute } from "./post-route.mjs";
+import { listingOptionErrors, LISTING_DATE_NAMES, LISTING_SPLIT_LISTS, LISTING_SPLIT_FLAGS } from "./listing-scope.mjs";
 
 export const LAYERS = [
   {
@@ -150,7 +151,10 @@ export const POSITION_INFO = {
       "Each item inside {{#each entries}} also gets " +
       LIST_ITEM_RESERVED.map((n) => `\`${n}\``).join(" and ") +
       ". `isEmpty` exists because the engine has no {{else}}, an empty state needs " +
-      "a second, opposite {{#if}}.",
+      "a second, opposite {{#if}}. A PAGE preset's listing may also set `date` " +
+      "(a date field: each item gets `date` YYYY-MM-DD and `dateLong`, e.g. 'June 9, 2026' " +
+      "in the page's language) and `latest` (N: `latest` holds the first N, `rest` the " +
+      "others, each with the same item names, plus `latestIsEmpty`/`restIsEmpty`).",
   },
 };
 
@@ -591,6 +595,7 @@ export const CHECKS = [
   // Listings
   { code: "listing-undeclared", level: "error", failure: "A list template with no `listing` block: nothing can check what {{#each entries}} prints." },
   { code: "listing-unknown-field", level: "error", failure: "A listing prints a field its collection does not declare." },
+  { code: "listing-invalid", level: "error", failure: "A listing option the build refuses (bad `date`/`latest`, or one a route.list template cannot use): the deploy fails." },
   { code: "listing-unknown-collection", level: "error", failure: "`listing.of` names a collection that does not exist." },
   // Template safety — who wrote it decides the severity (see checkTemplateSafety)
   { code: "template-executes-js", level: "warning", failure: "A template runs JS on the origin that serves /admin and carries the session cookie." },
@@ -782,23 +787,35 @@ export function checkTemplate(t, world) {
         ),
       );
     }
-    extra.add("entries");
-    extraChildren.set("entries", {
-      names: new Set([...item, ...LIST_ITEM_RESERVED]),
-      children: new Map(),
-    });
+    // `date` and `latest` are PAGE-listing options (listing-scope.mjs). A routed
+    // collection's index (listScope) does not supply them, so there they would render
+    // empty; refuse rather than bless that.
+    const optionErrors = listingOptionErrors(listing);
+    if (t.position === "list" && (listing.date !== undefined || listing.latest !== undefined)) {
+      optionErrors.push('"date" and "latest" are supported on a page preset\'s listing, not on a content type\'s route.list template.');
+    }
+    for (const message of optionErrors) {
+      problems.push(problem("error", "listing-invalid", `${where}fields.json`, message));
+    }
+    const itemNames = new Set([...item, ...LIST_ITEM_RESERVED, ...(listing.date ? LISTING_DATE_NAMES : [])]);
+    const lists = ["entries", ...(listing.latest !== undefined ? LISTING_SPLIT_LISTS : [])];
+    for (const name of lists) {
+      extra.add(name);
+      extraChildren.set(name, { names: itemNames, children: new Map() });
+    }
+    if (listing.latest !== undefined) for (const n of LISTING_SPLIT_FLAGS) extra.add(n);
 
     // The item fields must actually exist on the collection being listed.
     const known = world?.collections?.get(listing.of);
     if (known) {
-      for (const f of item) {
+      for (const f of [...item, ...(typeof listing.date === "string" ? [listing.date] : [])]) {
         if (!known.has(f)) {
           problems.push(
             problem(
               "error",
               "listing-unknown-field",
               `${where}fields.json`,
-              `listing.item names "${f}", which collection "${listing.of}" does not declare.`,
+              `listing names field "${f}", which collection "${listing.of}" does not declare.`,
             ),
           );
         }

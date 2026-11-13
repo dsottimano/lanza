@@ -1,11 +1,14 @@
 import type { GitHubClient } from './github';
 import { getCollection } from '../schema';
 import { entryPath } from './site-urls';
+import { listingOptionErrors, listingItem, listingParts } from '../../../functions/_lib/listing-scope.mjs';
 
 export async function loadPageListing(client: GitHubClient, preset: string, locale: string): Promise<Record<string, unknown>> {
   const { data } = await client.loadJson(`templates/${preset}/fields.json`);
-  const listing = data.listing as { of: string; item: string[]; sortBy?: string; order?: string } | undefined;
+  const listing = data.listing as { of: string; item: string[]; sortBy?: string; order?: string; date?: string; latest?: number } | undefined;
   if (!listing) return {};
+  const invalid = listingOptionErrors(listing);
+  if (invalid.length) throw new Error(invalid.join(' '));
   const collection = getCollection(listing.of);
   if (!collection || collection.kind !== 'folder') throw new Error('Unknown listing collection');
   const folder = collection.folder + (collection.localized ? `/${locale}` : '');
@@ -20,10 +23,8 @@ export async function loadPageListing(client: GitHubClient, preset: string, loca
       return direction * (left instanceof Date && right instanceof Date ? +left - +right : String(left ?? '').localeCompare(String(right ?? '')));
     }).map(({ file, entry }) => {
       const slug = file.name.replace(/\.md$/, '');
-      return { ...Object.fromEntries(listing.item.map(field => {
-        const value = entry.data[field];
-        return [field, value instanceof Date ? value.toISOString().slice(0, 10) : value];
-      })), slug, url: entryPath(collection.name, slug, locale) };
+      return { ...listingItem(entry.data, listing, locale), slug, url: entryPath(collection.name, slug, locale) };
     });
-  return { entries, count: entries.length, isEmpty: entries.length === 0 };
+  // Same scope keys as the build (frontend/lib/page-listing.ts); provenance stays the page's.
+  return listingParts(entries, listing, () => ({})).scope;
 }

@@ -1,15 +1,17 @@
 // Page presets may declare a listing using the same fields.json contract as
 // routed collection indexes. Copy stays in the page; entries remain in their
 // schema collection and use the shared publish gate and public URL resolver.
+// The optional `date` / `latest` keys are functions/_lib/listing-scope.mjs.
 import { fieldRecords } from "./provenance/text.mjs";
 import { getCollection } from "astro:content";
 import { splitId, type Locale } from "./i18n";
 import { isPublished } from "./routing";
 import { contentUrl, POSTS_BASE } from "./public-urls";
+import { listingOptionErrors, listingItem, listingParts } from "../../functions/_lib/listing-scope.mjs";
 import schema from "/data/schema.json";
 
 const declarations = import.meta.glob<{ listing?: {
-  of: string; item: string[]; sortBy?: string; order?: "asc" | "desc";
+  of: string; item: string[]; sortBy?: string; order?: "asc" | "desc"; date?: string; latest?: number;
 } }>("/templates/*/fields.json", { eager: true, import: "default" });
 
 export async function pageListingScope(name: string, locale: Locale, slots: Record<string, unknown>) {
@@ -17,6 +19,8 @@ export async function pageListingScope(name: string, locale: Locale, slots: Reco
   if (!listing) return slots;
   const collection = schema.find((c) => c.kind === "folder" && c.name === listing.of);
   if (!collection) throw new Error(`Template ${name}: unknown listing collection ${listing.of}`);
+  const invalid = listingOptionErrors(listing);
+  if (invalid.length) throw new Error(`templates/${name}/fields.json: ${invalid.join(" ")}`);
   // Posts carry a `route` too, but theirs is not a generated base: POSTS_BASE is the
   // validated answer ("posts", or "" at the root).
   const base = listing.of === "posts" ? POSTS_BASE
@@ -32,15 +36,11 @@ export async function pageListingScope(name: string, locale: Locale, slots: Reco
         ? +left - +right : String(left ?? "").localeCompare(String(right ?? "")));
     })
     .map((entry) => ({
-      ...Object.fromEntries(listing.item.map((field) => {
-        const value = (entry.data as Record<string, unknown>)[field];
-        return [field, value instanceof Date ? value.toISOString().slice(0, 10) : value];
-      })),
+      ...listingItem(entry.data as Record<string, unknown>, listing, locale),
       lanzaProvenance: (entry.data as Record<string, unknown>).lanzaProvenance,
       slug: splitId(entry.id).slug,
       url: contentUrl(listing.of, entry.id, base),
     }));
-  const fields = { ...fieldRecords(slots) };
-  entries.forEach((entry,index) => Object.entries(fieldRecords(entry)).forEach(([path,value]) => { fields[`entries.${index}.${path}`] = value; }));
-  return { ...slots, lanzaProvenance: {version:1,fields}, entries, count: entries.length, isEmpty: entries.length === 0 };
+  const { scope, fields } = listingParts(entries, listing, fieldRecords);
+  return { ...slots, lanzaProvenance: { version: 1, fields: { ...fieldRecords(slots), ...fields } }, ...scope };
 }

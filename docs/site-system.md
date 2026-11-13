@@ -76,6 +76,7 @@ position is derived from the routes that reference the template — never guesse
 | `page` | a page's freeform `slots` | `body` if `fields.json` sets `"body": true` |
 | `detail` | **the entry's frontmatter** | `url`, `slug`, `indexUrl`, `body` |
 | `list` | the listing's own slots | `entries` (each item + `url`/`slug`), `count`, `isEmpty` |
+| page `listing` | the page's slots | as `list`; with `listing.date` each item adds `date`/`dateLong`; with `listing.latest: N`, `latest`/`rest` and `latestIsEmpty`/`restIsEmpty` |
 
 The generalisation worth understanding: the engine does not care where its data came
 from. Handing it an entry's frontmatter instead of a page's slots is what makes a content
@@ -287,6 +288,13 @@ The product guides, Architecture, and Blog now live in Pages in English and Span
 Their presets are `product-guide`, `architecture`, and `journal`. The journal
 preset declares `listing.of: "posts"`, item fields, and optional `sortBy`/`order`;
 page rendering and the CMS preview supply published entries for the page language.
+Two more optional keys (`functions/_lib/listing-scope.mjs`, page presets only):
+`date` names a date field, and each item gains `date` (YYYY-MM-DD) and `dateLong`
+("June 9, 2026", in the page's language, UTC); `latest: N` (1–50) adds `latest` (the
+first N after sorting) and `rest` (the remainder), each looped like `entries`, with
+`latestIsEmpty`/`restIsEmpty` because the engine has no `{{else}}`. Item URLs follow
+the posts base and the `urls` map. A bad option, or either option on a `route.list`
+template (whose scope does not supply them), is `listing-invalid` and fails the build.
 A CMS blog entry owns its URL even when drafted or moved; only sites without that
 entry use the generic archive fallback.
 
