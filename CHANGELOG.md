@@ -3,6 +3,16 @@
 `lanza-site` on npm. Tenants pin a version, so nothing here reaches a live site until
 that site updates (Settings → Software).
 
+## 0.1.31 — 2026-11-13
+
+- Posts can be served at the site root and rendered through a tenant template, opted
+  in with the posts collection's `route` block in `data/schema.json`
+  (`{ "base": "", "template": "<name>" }`). Default sites are unchanged.
+- Every post URL follows the setting (cards, archives, listings, hreflang, canonical,
+  JSON-LD, `llms.txt`, CMS View links); old `/posts/<slug>/` addresses 301 to the root.
+- Root-level post slugs that collide with pages, reserved routes, locales, content-type
+  bases or other posts fail the build; the CMS URL control refuses them too.
+
 ## 0.1.28 — 2026-10-13
 
 - Settings → People lets repository administrators add and remove co-admins, save

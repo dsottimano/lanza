@@ -1176,6 +1176,32 @@ test("update_content_type applies the same route rules as creation", async () =>
   }
 });
 
+// The built-in posts type takes only { base: "posts" | "", template }, the rule in
+// post-route.mjs that gen-routes.mjs dies on — not the custom-route rules above.
+const postsSite = () => fakeGitHub({
+  ...withTemplate(),
+  "data/schema.json": JSON.stringify([
+    { kind: "folder", name: "posts", label: "Posts", folder: "content/posts", localized: true, body: "rich", fields: [{ name: "title", label: "Title", widget: "string" }] },
+  ]),
+});
+
+test("update_content_type serves posts at the site root through a template", async () => {
+  const gh = postsSite();
+  const r = await callData("update_content_type", { name: "posts", route: { base: "", template: "property" } });
+  assert.equal(r.url, "/<slug>/");
+  assert.deepEqual(schemaIn(gh)[0].route, { base: "", template: "property" });
+});
+
+test("update_content_type refuses a posts route the build would refuse", async () => {
+  for (const route of [{ base: "blog" }, { base: "", list: { template: "property" } }, { base: "", template: "nosuch" }]) {
+    const gh = postsSite();
+    const before = gh.files.get("data/schema.json");
+    const r = await callRaw("update_content_type", { name: "posts", route });
+    assert.ok(isError(r), `should refuse ${JSON.stringify(route)}`);
+    assert.equal(gh.files.get("data/schema.json"), before);
+  }
+});
+
 test("update_content_type refuses an unknown type and a settings collection", async () => {
   const gh = routedSite();
   const before = gh.files.get("data/schema.json");
