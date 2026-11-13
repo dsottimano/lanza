@@ -3,6 +3,14 @@
 `lanza-site` on npm. Tenants pin a version, so nothing here reaches a live site until
 that site updates (Settings → Software).
 
+## 0.1.32 — 2026-11-13
+
+- A page preset's `listing` (templates/<preset>/fields.json) may set `date` (each item
+  gains `date` and a long, locale-formatted `dateLong`) and `latest: N` (the template
+  gets `latest` and `rest` lists with `latestIsEmpty`/`restIsEmpty`). The page keeps its
+  own URL, editable slots and SEO, e.g. a `/blog/` index that lists new posts itself.
+- Invalid listing options fail `check:site` and the build (`listing-invalid`).
+
 ## 0.1.31 — 2026-11-13
 
 - Posts can be served at the site root and rendered through a tenant template, opted
