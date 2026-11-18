@@ -952,6 +952,9 @@ export function checkPart(name, html) {
  *   Repo-relative read. Null (not a throw) when the file does not exist.
  * @param {() => Promise<string[]>|string[]} io.listTemplates
  *   Every folder name under templates/, EXCLUDING `parts`.
+ * @param {() => Promise<string[]>|string[]} [io.pagePresets]
+ *   Template folders that pages select as their preset, when known; such templates are
+ *   also checked as pages even if a route references them.
  * @param {object} [opts]
  * @param {number} [opts.maxTemplates]
  *   Read at most this many template folders. Exists because a Cloudflare Worker gets

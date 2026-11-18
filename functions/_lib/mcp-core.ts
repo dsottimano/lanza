@@ -1,7 +1,7 @@
-import { markAgentHtml, markAgentPaths } from "./agent-provenance";
+import { markAgentHtml, markAgentPaths, migrateFieldRecord } from "./agent-provenance";
 import { PRESET_NAME, presetProblems } from "./page-content.mjs";
 import { RICH_TEXT_WIDGET, richTextFields } from "./rich-text.mjs";
-import { recordAgentFields } from "../../frontend/lib/provenance/text.mjs";
+import { fieldRecords, recordAgentFields } from "../../frontend/lib/provenance/text.mjs";
 import { PluginRuntime, catalog } from "./plugin-runtime.mjs";
 import { AGENT_INSTRUCTIONS } from "./agent-authoring.mjs";
 import { AgentRequests } from "./agent-requests";
@@ -197,6 +197,31 @@ async function designedPage(client: ContentClient, data: Record<string, unknown>
   return fieldsJson;
 }
 
+/**
+ * Which templates pages select, read within a budget: MCP has no content index and a
+ * Worker gets ~50 subrequests per request. `complete: false` means some pages went
+ * unread, so a page-use check is not proof; the filesystem check:site is.
+ */
+async function pagePresetScan(client: ContentClient, limit: number): Promise<{ uses: Map<string, string[]>; complete: boolean }> {
+  const uses = new Map<string, string[]>();
+  const pages = (await getCollections(client)).find((c) => c.name === "pages");
+  if (!pages) return { uses, complete: true };
+  const files: string[] = [];
+  const walk = async (dir: string, depth: number): Promise<void> => {
+    for (const item of await client.listAll(dir)) {
+      if (item.type === "dir" && depth < 1) await walk(item.path, depth + 1);
+      else if (item.type === "file" && item.name.endsWith(".md")) files.push(item.path);
+    }
+  };
+  await walk(pages.folder.replace(/\/+$/, ""), 0);
+  for (const path of files.slice(0, limit)) {
+    const preset = (await client.read(path)).data.preset;
+    if (typeof preset === "string") uses.set(preset, [...(uses.get(preset) ?? []), path]);
+  }
+  return { uses, complete: files.length <= limit };
+}
+const PAGE_SCAN_INCOMPLETE = "This site has more pages than one MCP call can read, so page use of templates was not fully checked. Run `npm run check:site` (or `lanza build`) in a checkout before publishing; it reads every page.";
+
 /** A designed page has no free body; its prose belongs in a richtext slot. */
 function refuseDesignedBody(designed: unknown, body: unknown): void {
   if (designed && typeof body === "string" && body.trim()) {
@@ -214,7 +239,22 @@ function richPaths(col: CollectionDef | undefined, designed: { fields?: unknown 
   return (col?.fields ?? []).filter((f) => f.widget === RICH_TEXT_WIDGET && typeof f.name === "string").map((f) => [f.name as string]);
 }
 function recordAgentWrite(before: Record<string, unknown>, after: Record<string, unknown>, paths: string[][]): void {
-  markAgentPaths(before, after, paths);
+  // A legacy plain-field record on a richtext path becomes inline markers first, so
+  // dropping the record below never drops the attribution.
+  const records = fieldRecords(before) as Record<string, { origin?: unknown; text?: unknown }>;
+  const baseline = structuredClone(before);
+  const parentOf = (root: unknown, keys: string[]) =>
+    keys.slice(0, -1).reduce<unknown>((o, k) => (o && typeof o === "object" ? (o as Record<string, unknown>)[k] : undefined), root) as Record<string, unknown> | undefined;
+  for (const path of paths) {
+    const record = Object.hasOwn(records, path.join(".")) ? records[path.join(".")] : undefined;
+    const key = path[path.length - 1];
+    const stored = parentOf(before, path)?.[key];
+    if (record?.origin !== "agent" || typeof record.text !== "string" || typeof stored !== "string") continue;
+    const migrated = migrateFieldRecord(record.text, stored);
+    const base = parentOf(baseline, path); if (base) base[key] = migrated;
+    const next = parentOf(after, path); if (next && next[key] === stored) next[key] = migrated;
+  }
+  markAgentPaths(baseline, after, paths);
   const record = recordAgentFields(before, after);
   for (const path of paths) delete record.fields[path.join(".")];
   after.lanzaProvenance = record;
@@ -870,7 +910,7 @@ export const TOOLS: ToolDef[] = [
           type: "object",
           description:
             'The fields.json body: {"name": "<same as name>", "fields": [{name,label,widget}, …]}. ' +
-            'Detail templates only: set "body": true to give the entry a rich-text canvas, and render it as {{{ body }}}. ' +
+            'Detail templates only: set "body": true to render the entry\'s body as {{{ body }}} (the CMS canvas comes from the collection\'s body:"rich", not this flag). ' +
             'A page preset never sets "body": true (page-body error); use a top-level "richtext" field, rendered as {{{ name }}}, for formatted prose. ' +
             'A listing template also needs "listing": {"of": "<collection>", "item": [<field names>]}.',
           additionalProperties: true,
@@ -948,6 +988,18 @@ export const TOOLS: ToolDef[] = [
         );
       }
 
+      // A detail/list template may declare a body, but not one a page selects as its
+      // preset: that page is a designed page with no free body (page-body).
+      let pageUse: { complete: boolean } | null = null;
+      if ((fields as Record<string, unknown>).body === true && position !== "page") {
+        const scan = await pagePresetScan(client, 12);
+        const pages = scan.uses.get(name);
+        if (pages?.length) {
+          throw new GitHubError(422, `Refused — nothing was written.\n  • [page-body] ${pages.join(", ")} use${pages.length === 1 ? "s" : ""} "${name}" as a page preset, and a designed page has no free body. Give the pages their own template, or keep "${name}" without "body": true.`);
+        }
+        pageUse = scan;
+      }
+
       await client.ensureWorkingBranch();
       const dir = `templates/${name}`;
       await client.saveText(`${dir}/template.html`, html, `Write template ${name} via MCP`);
@@ -964,6 +1016,7 @@ export const TOOLS: ToolDef[] = [
       return {
         written: [`${dir}/template.html`, `${dir}/fields.json`],
         position,
+        ...(pageUse ? { pageUseChecked: pageUse.complete, ...(pageUse.complete ? {} : { warning: PAGE_SCAN_INCOMPLETE }) } : {}),
         ...(warnings.length ? { warnings: warnings.map((p) => `[${p.code}] ${p.message}`) } : {}),
         next: deferred.length
           ? "That collection does not exist yet — call create_content_type to create it, " +
@@ -1449,8 +1502,13 @@ export const TOOLS: ToolDef[] = [
     ),
     run: async (args, client) => {
       const only = args.template === undefined ? undefined : [String(args.template)];
+      // A routed template that pages also select is checked as a page too (check:site
+      // does this from its full content inventory; here the read is bounded).
+      const routed = (await getCollections(client)).some((c) => (c as { route?: { template?: unknown } }).route?.template);
+      const scan = routed ? await pagePresetScan(client, 10) : { uses: new Map<string, string[]>(), complete: true };
       const { problems, templates, skipped } = await checkSite(
         {
+          pagePresets: () => [...scan.uses.keys()],
           readText: (path: string) => client.readRaw(path),
           listTemplates: async () =>
             (await client.listAll("templates"))
@@ -1465,7 +1523,8 @@ export const TOOLS: ToolDef[] = [
       );
       const errors = problems.filter((p) => p.level === "error");
       return {
-        ok: errors.length === 0,
+        ok: errors.length === 0 && scan.complete,
+        ...(scan.complete ? {} : { complete: false, note: PAGE_SCAN_INCOMPLETE }),
         checked: templates,
         ...(skipped.length
           ? {

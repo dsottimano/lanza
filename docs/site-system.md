@@ -337,7 +337,11 @@ click and highlight, preview-only.
 `page-body` applies to every page use of a template: any template no route references
 (including a page preset with a `listing` block), and a routed detail template that a
 page also selects. The filesystem checker (`check:site`, `lanza build`) knows which
-templates pages select. MCP `validate_site` cannot afford to read every page, so the MCP
+templates pages select. Over MCP, `validate_site` and `write_template` (when it gives a
+detail or list template `"body": true`) read the pages' presets within a fixed budget:
+a page found using the template is `page-body` (the template write is refused); a site
+with more pages than the budget gets `ok: false, complete: false` from `validate_site`
+and a warning from `write_template`, meaning run `check:site` in a checkout. The MCP
 content writes (`create_content`, `update_content`, `create_translation`) apply the same
 page-content rules (`functions/_lib/page-content.mjs`, shared with `check:site`) and
 refuse the write: a preset whose template sets `"body": true`, a missing or invalid

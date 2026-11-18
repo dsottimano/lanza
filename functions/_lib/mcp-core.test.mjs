@@ -1541,3 +1541,77 @@ test("an MCP write to a richtext slot marks the added text and keeps existing ma
   const story = await callData("read_content", { path: created.created });
   assert.equal(story.frontmatter.slots.intro, '<p><span data-lanza-origin="agent">All agent</span></p>');
 });
+
+// R1: a legacy lanzaProvenance record on a richtext path is migrated into inline
+// markers, never silently dropped.
+const page = (data) => `---\n${JSON.stringify(data)}\n---\n`;
+const agentText = (html) => [...html.matchAll(/<span data-lanza-origin="agent">([^<]*)<\/span>/g)].map((m) => m[1]).join("|");
+const legacy = (intro, recorded) => page({ title: "About", preset: "about", slots: { heading: "H", intro },
+  lanzaProvenance: { version: 1, fields: { "slots.intro": { origin: "agent", text: recorded } } } });
+
+test("an unrelated update keeps a legacy-attributed richtext field's agent origin", async () => {
+  fakeGitHub(designedSite({ "content/pages/en/about.md": legacy("<p>Agent original</p>", "<p>Agent original</p>") }));
+  await callData("update_content", { path: "content/pages/en/about.md", frontmatter: { title: "About us" } });
+  const { frontmatter } = await callData("read_content", { path: "content/pages/en/about.md" });
+  assert.equal(frontmatter.slots.intro, '<p><span data-lanza-origin="agent">Agent original</span></p>');
+  assert.ok(!Object.hasOwn(frontmatter.lanzaProvenance.fields, "slots.intro"));
+});
+
+test("editing a legacy-attributed richtext field keeps recorded agent words and human edits apart", async () => {
+  fakeGitHub(designedSite({ "content/pages/en/about.md": legacy("<p>Agent original human words</p>", "<p>Agent original words</p>") }));
+  await callData("update_content", { path: "content/pages/en/about.md", frontmatter: { slots: { intro: "<p>Agent original human words. More from the agent.</p>" } } });
+  const { frontmatter } = await callData("read_content", { path: "content/pages/en/about.md" });
+  const marked = agentText(frontmatter.slots.intro);
+  assert.match(marked, /Agent original/); assert.match(marked, /More from the agent/);
+  assert.doesNotMatch(marked, /human/);
+  assert.match(frontmatter.slots.intro, /human/);
+});
+
+test("a plain field migrated to richtext carries its recorded agent origin inline", async () => {
+  fakeGitHub(designedSite({ "content/pages/en/about.md": legacy("Plain agent text", "Plain agent text") }));
+  await callData("update_content", { path: "content/pages/en/about.md", frontmatter: { title: "Renamed" } });
+  const { frontmatter } = await callData("read_content", { path: "content/pages/en/about.md" });
+  assert.equal(agentText(frontmatter.slots.intro), "Plain agent text");
+});
+
+// R2: a template write cannot quietly put a free body on a template that pages use.
+const mixedUse = (extra = {}) => ({
+  "data/schema.json": JSON.stringify([...JSON.parse(SCHEMA), { kind: "folder", name: "events", folder: "content/events", body: "rich",
+    fields: [{ name: "title", widget: "string" }], route: { base: "events", template: "event" } }]),
+  "templates/event/template.html": "<h1>{{ title }}</h1>",
+  "templates/event/fields.json": JSON.stringify({ name: "event", fields: [{ name: "title", label: "Title", widget: "string" }] }),
+  "content/events/launch.md": page({ title: "Launch" }),
+  "content/pages/en/launch.md": page({ title: "Launch page", preset: "event", slots: { title: "x" } }),
+  ...extra,
+});
+
+test("valid site -> detail template gains body:true -> refused because a page uses it; validate_site stays clean", async () => {
+  const gh = fakeGitHub(mixedUse());
+  assert.equal((await callData("validate_site")).ok, true);
+  const r = await callRaw("write_template", { name: "event", position: "detail", template_html: "<h1>{{ title }}</h1>{{{ body }}}",
+    fields: { body: true, fields: [{ name: "title", label: "Title", widget: "string" }] } });
+  assert.ok(isError(r)); assert.match(errText(r), /page-body/); assert.match(errText(r), /content\/pages\/en\/launch\.md/);
+  assert.doesNotMatch(gh.files.get("templates/event/fields.json"), /"body"/);
+  assert.equal((await callData("validate_site")).ok, true);
+});
+
+test("validate_site reports an existing page using a body:true detail template", async () => {
+  fakeGitHub(mixedUse({
+    "templates/event/template.html": "<h1>{{ title }}</h1>{{{ body }}}",
+    "templates/event/fields.json": JSON.stringify({ name: "event", body: true, fields: [{ name: "title", label: "Title", widget: "string" }] }),
+  }));
+  const r = await callData("validate_site");
+  assert.equal(r.ok, false);
+  assert.ok(r.problems.some((p) => p.code === "page-body"), JSON.stringify(r.problems));
+});
+
+test("when pages exceed the lookup budget, validation says it is incomplete instead of clean", async () => {
+  const many = Object.fromEntries(Array.from({ length: 40 }, (_, i) => [`content/pages/en/p${i}.md`, page({ title: `P${i}` })]));
+  fakeGitHub(mixedUse({ ...many, "content/pages/en/launch.md": page({ title: "Plain page" }) }));
+  const r = await callData("validate_site");
+  assert.equal(r.ok, false); assert.equal(r.complete, false);
+  assert.match(r.note, /check:site/);
+  const w = await callData("write_template", { name: "event", position: "detail", template_html: "<h1>{{ title }}</h1>{{{ body }}}",
+    fields: { body: true, fields: [{ name: "title", label: "Title", widget: "string" }] } });
+  assert.equal(w.pageUseChecked, false); assert.match(w.warning, /check:site/);
+});

@@ -2,7 +2,7 @@ import { parseFragment, serialize } from 'parse5';
 import { agentFlags, markedText } from '../../frontend/lib/provenance/text.mjs';
 
 /** Server adapter. Parse HTML without executing it; sanitization remains separate. */
-export function markAgentHtml(before: string, after: string): string {
+export function markAgentHtml(before: string, after: string, additionsAreAgent = true): string {
   if (before === after) return before;
   const collect = (root:any) => {
     const leaves:any[] = []; const flags:boolean[] = []; let text = "";
@@ -17,7 +17,7 @@ export function markAgentHtml(before: string, after: string): string {
   };
   const previous = collect(parseFragment(before));
   const doc = parseFragment(after); const next = collect(doc);
-  const flags = agentFlags(previous.text,next.text,previous.flags);
+  const flags = agentFlags(previous.text,next.text,previous.flags,additionsAreAgent);
   for (const {node,start:offset} of next.leaves) {
     const local = flags.slice(offset,offset+node.value.length).map((f:boolean,i:number) => f || next.flags[offset+i]);
     if (!local.some(Boolean)) continue;
@@ -51,4 +51,14 @@ export function markAgentPaths(before: Record<string, unknown>, after: Record<st
     const record = parent as Record<string, unknown>;
     record[key] = markAgentHtml(typeof previous === "string" ? previous : "", record[key] as string);
   }
+}
+
+/**
+ * A legacy plain-field record (`lanzaProvenance.fields[path] = {origin:"agent", text}`)
+ * on a richtext value, as inline markers: text still matching the recorded agent text
+ * keeps agent origin; text that differs from it (a later human edit) stays unmarked.
+ * Markers already in `current` are kept.
+ */
+export function migrateFieldRecord(recorded: string, current: string): string {
+  return markAgentHtml(`<span data-lanza-origin="agent">${recorded}</span>`, current, false);
 }
