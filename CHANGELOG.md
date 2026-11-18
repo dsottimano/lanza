@@ -3,6 +3,19 @@
 `lanza-site` on npm. Tenants pin a version, so nothing here reaches a live site until
 that site updates (Settings → Software).
 
+## 0.1.33 — 2026-11-18
+
+- Agent requests are now the built-in private plugin **Agent requests**, **off by
+  default**. Until an owner enables it in Administration → Plugins, the post, page and
+  Saved snippets editors show no dotted agent highlights, no provenance notices, no
+  Requests panel, no select-text-to-ask menu and no translation request, and the
+  API/MCP refuse new captures and responses (409). Sites that used the feature must
+  enable the plugin after updating.
+- Existing requests stay readable and `lanzaProvenance` is still recorded while off.
+  The switch is stored on the existing `lanza-agent-requests` branch. See
+  docs/agent-requests.md → "Plugin switch".
+- A private plugin that declares no operations no longer needs a `server.mjs`.
+
 ## 0.1.32 — 2026-11-13
 
 - A page preset's `listing` (templates/<preset>/fields.json) may set `date` (each item
