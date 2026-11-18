@@ -3,11 +3,14 @@
 // fixed size and theme-font classes from functions/_lib/rich-text.mjs. The editor's
 // schema allows nothing else, so stored HTML outside that set is dropped on load; the
 // build sanitizes again (frontend/lib/sanitize.ts) because files can be edited directly.
-import { onBeforeUnmount, watch } from "vue";
+import { inject, onBeforeUnmount, onMounted, ref, watch } from "vue";
 import { Mark } from "@tiptap/core";
 import { useEditor, EditorContent } from "@tiptap/vue-3";
 import StarterKit from "@tiptap/starter-kit";
 import { RICH_TEXT_CSS, RICH_TEXT_FONTS, RICH_TEXT_SIZES, richTextClass } from "../../../functions/_lib/rich-text.mjs";
+import { AgentOrigin } from "../editor/extensions/AgentOrigin";
+import { CLIENT_KEY } from "./context";
+import { addFontStylesheet, fontVars, tenantBrand } from "../backend/tenant-brand";
 
 // The same size/font rules the public site emits, so the editor shows what publishes.
 if (typeof document !== "undefined" && !document.getElementById("lz-rich-text-css")) {
@@ -25,7 +28,8 @@ function classMark(name: string, kind: "size" | "font", values: string[]) {
   return Mark.create({
     name,
     addAttributes() { return { value: { default: null, parseHTML: el => valueOf(el), renderHTML: () => ({}) } }; },
-    parseHTML() { return [{ tag: "span", consuming: false, getAttrs: el => (valueOf(el as HTMLElement) ? null : false) }]; },
+    // Ahead of AgentOrigin's consuming span rule, so a span may carry origin and classes.
+    parseHTML() { return [{ tag: "span", consuming: false, priority: 60, getAttrs: el => (valueOf(el as HTMLElement) ? null : false) }]; },
     renderHTML({ mark }) { return ["span", { class: richTextClass(kind, String(mark.attrs.value)) }, 0]; },
   });
 }
@@ -41,6 +45,9 @@ const editor = useEditor({
       codeBlock: false, code: false, horizontalRule: false, strike: false, link: false,
     }),
     TextSize, TextFont,
+    // Recorded agent origin (docs/agent-provenance.md): kept on load and save; typing
+    // inside it inserts unmarked text.
+    AgentOrigin,
   ],
   editorProps: { attributes: { ...(props.inputId ? { id: props.inputId } : {}), ...(props.labelledBy ? { "aria-labelledby": props.labelledBy } : {}),
     role: "textbox", "aria-multiline": "true", class: "rich-text-input__doc" } },
@@ -56,6 +63,16 @@ function setClass(name: "textSize" | "textFont", value: string) {
 }
 const current = (name: "textSize" | "textFont") => String(editor.value?.getAttributes(name).value ?? "");
 defineExpose({ editor });
+
+// The tenant's heading/body fonts, scoped to the document area: admin chrome keeps its own.
+const client = inject(CLIENT_KEY, null);
+const tenantFonts = ref("");
+onMounted(async () => {
+  if (!client) return;
+  const brand = await tenantBrand(client);
+  tenantFonts.value = fontVars(brand);
+  addFontStylesheet(brand?.fontHref ?? null);
+});
 </script>
 
 <template>
@@ -73,7 +90,7 @@ defineExpose({ editor });
         <option v-for="f in RICH_TEXT_FONTS" :key="f.value" :value="f.value">{{ f.label }}</option>
       </select>
     </div>
-    <EditorContent :editor="editor" />
+    <div class="rich-text-input__body" :style="tenantFonts || undefined"><EditorContent :editor="editor" /></div>
   </div>
 </template>
 

@@ -119,7 +119,9 @@ async function focusField(path: string): Promise<boolean> {
     if (request !== focusRequest || !root.value) return false;
     const fields = [...root.value.querySelectorAll<HTMLElement>("[data-field-path]")];
     const field = fields.find(el => el.dataset.fieldPath === path);
-    const control = field?.querySelector<HTMLElement>('input:not([type="hidden"]), textarea, select');
+    // A richtext field's editable document, not its toolbar's first control.
+    const control = field?.querySelector<HTMLElement>('[contenteditable="true"]')
+      ?? field?.querySelector<HTMLElement>('input:not([type="hidden"]), textarea, select');
     if (control) {
       control.focus({ preventScroll: true });
       control.scrollIntoView?.({ block: "nearest" });

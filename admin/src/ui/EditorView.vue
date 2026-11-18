@@ -252,6 +252,13 @@ const showBody = computed(
   () => props.collection.body === "rich" && !(hasTemplate.value && data.preset),
 );
 
+// Leaving the canvas (a preset was chosen) unmounts the Editor; keep what was typed,
+// since getBody falls back to bodyHtml once there is no Editor. `sync` runs before
+// the unmount.
+watch(showBody, (show, was) => {
+  if (was && !show && editorRef.value) bodyHtml.value = editorRef.value.getHTML();
+}, { flush: "sync" });
+
 // The live-preview shape: a template is chosen and it isn't using the writing canvas.
 const templated = computed(() => hasTemplate.value && !!data.preset && !showBody.value);
 

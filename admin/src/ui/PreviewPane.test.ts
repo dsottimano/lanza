@@ -1,5 +1,6 @@
 import { describe, it, expect } from "vitest";
 import { mount, flushPromises } from "@vue/test-utils";
+import { render } from "../../../frontend/lib/template-render";
 import PreviewPane, {
   fieldPathMatches,
   toEntryPath,
@@ -488,9 +489,40 @@ describe("PreviewPane — rich-text fields", () => {
     } });
     await flushPromises();
     const doc = w.find("iframe").attributes("srcdoc") ?? "";
-    expect(doc).toContain('<section><p><strong>Hi</strong><span class="lz-size-lg">L</span></p></section>');
+    expect(doc).toContain('<section><div data-lanza-field="intro"><p><strong>Hi</strong><span class="lz-size-lg">L</span></p></div></section>');
     expect(doc).not.toContain("onerror"); expect(doc).not.toContain("onclick");
     expect(doc).toContain(".lz-size-lg{font-size:1.25em}");
     expect(doc).toContain("&lt;b&gt;t&lt;/b&gt;");
+  });
+});
+
+describe("PreviewPane — richtext addressing, fields and fonts", () => {
+  const rich = { client: clientWith("<section>{{{ intro }}}</section><h1>{{ heading }}</h1>"), preset: "about",
+    slots: { intro: '<p><strong>Hi</strong><img src=x onerror=alert(1)></p>', heading: "H" },
+    fields: [{ name: "intro", label: "Intro", widget: "richtext" as const }, { name: "heading", label: "Heading", widget: "string" as const }] };
+  it("marks a richtext region for the preview only", async () => {
+    const w = await mountPane(rich);
+    expect(w.find("iframe").attributes("srcdoc")).toContain('<div data-lanza-field="intro"><p><strong>Hi</strong></p></div>');
+    expect(render("<section>{{{ intro }}}</section>", { intro: "<p>x</p>" })).not.toContain("data-lanza-field");
+  });
+  it("selects the richtext field when its region is clicked", async () => {
+    const { w, doc } = await paintedPane(rich);
+    clickIn(doc, '[data-lanza-field="intro"] strong');
+    expect(w.emitted("select")).toEqual([["slots.intro"]]);
+  });
+  it("never paints a raw value before the fields are known, then re-renders", async () => {
+    const { w, doc } = await paintedPane({ ...rich, fields: undefined });
+    expect(w.find("iframe").attributes("srcdoc")).not.toContain("<strong>Hi</strong>");
+    expect(w.find("iframe").attributes("srcdoc")).not.toContain("onerror");
+    await w.setProps({ fields: rich.fields });
+    await new Promise((r) => setTimeout(r, 250));
+    expect(doc.body.innerHTML).toContain('<div data-lanza-field="intro"><p><strong>Hi</strong></p></div>');
+  });
+  it("applies the tenant's brand fonts and variables", async () => {
+    const client = { ...(rich.client as object), loadJson: async () => ({ data: { brand: { fonts: { heading: "playfair-display" } } }, sha: "a" }) };
+    const w = await mountPane({ ...rich, client });
+    const doc = w.find("iframe").attributes("srcdoc") ?? "";
+    expect(doc).toContain('<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Playfair');
+    expect(doc).toMatch(/<html style="[^"]*--font-heading:/);
   });
 });

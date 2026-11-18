@@ -97,6 +97,16 @@ export function bodyForPreview(body: string, templateHtml: string): string {
 }
 
 /**
+ * The same preview-only wrapper for a SANITIZED richtext field (balanced DOMPurify
+ * output), so its region is clickable and highlightable like any other field. The
+ * production build never wraps it.
+ */
+export function richForPreview(value: string, name: string, templateHtml: string): string {
+  const placed = new RegExp(`\\{\\{\\{\\s*${name.replace(/[^A-Za-z0-9_]/g, "")}\\s*\\}\\}\\}`).test(templateHtml);
+  return placed && /^[A-Za-z_][A-Za-z0-9_]*$/.test(name) ? `<div data-lanza-field="${name}">${value}</div>` : value;
+}
+
+/**
  * What a click on this element means: the entry path to select, or null if it missed
  * every marker. `closest` picks the INNERMOST marker, so clicking a slot nested inside a
  * marked container selects the specific field.
@@ -167,6 +177,8 @@ import { sanitizeRichFields } from "../../../frontend/lib/sanitize";
 import { RICH_TEXT_CSS, richTextFields } from "../../../functions/_lib/rich-text.mjs";
 import type { Field } from "../schema";
 import { loadPageListing } from "../backend/page-listing";
+import { tenantBrand } from "../backend/tenant-brand";
+import type { ResolvedBrand } from "../../../frontend/lib/appearance";
 import { templateHtmlPath } from "../backend/templates";
 import type { GitHubClient } from "../backend/github";
 
@@ -203,6 +215,7 @@ function loadSiteCss(client: GitHubClient): Promise<string> {
 const listingData = ref<Record<string, unknown>>({});
 const templateHtml = ref<string | null>(null);
 const siteCss = ref("");
+const brand = ref<ResolvedBrand | null>(null);
 const loading = ref(true);
 const missing = ref(false);
 const srcdoc = ref("");
@@ -219,8 +232,14 @@ const HIGHLIGHT_STYLE_ID = "lz-preview-highlight";
 
 // What the engine renders: the same root production builds — slots plus the reserved
 // `body` key (frontend/components/PageArticle.astro:35).
+// Richtext values are sanitized exactly as the build does. Until the template's fields
+// are known no slot is treated as richtext, and renderBody's rawNames renders any other
+// raw placeholder empty, so an unsanitized value is never painted.
+const richNames = (): string[] => richTextFields(props.fields);
 function renderData(): Record<string, unknown> {
-  const data: Record<string, unknown> = { ...sanitizeRichFields(props.slots, { fields: props.fields }), ...listingData.value, lanzaProvenance: scopedProvenance({lanzaProvenance:props.provenance}, "slots.") };
+  const rich = sanitizeRichFields(props.slots, { fields: props.fields });
+  if (templateHtml.value !== null) for (const name of richNames()) rich[name] = richForPreview(String(rich[name]), name, templateHtml.value);
+  const data: Record<string, unknown> = { ...rich, ...listingData.value, lanzaProvenance: scopedProvenance({lanzaProvenance:props.provenance}, "slots.") };
   if (typeof props.body === "string" && templateHtml.value !== null) {
     data.body = bodyForPreview(props.body, templateHtml.value);
   }
@@ -232,7 +251,7 @@ function renderData(): Record<string, unknown> {
 // back to the field that produced it. The Astro build calls render() without it and gets
 // byte-identical output (frontend/lib/template-render.ts).
 function renderBody(): string {
-  return templateHtml.value === null ? "" : render(templateHtml.value, renderData(), { markers: true });
+  return templateHtml.value === null ? "" : render(templateHtml.value, renderData(), { markers: true, rawNames: new Set([BODY_FIELD, ...richNames()]) });
 }
 
 // The marker stylesheet: the affordance, plus whatever is currently highlighted.
@@ -245,12 +264,17 @@ function markerCss(): string {
 // the frame. A neutral page background keeps the frame from flashing.
 function buildDoc(): string {
   lastBody = renderBody();
-  return `<!doctype html><html><head><meta charset="utf-8">
+  // The tenant's Brand as the public page applies it (Base.astro): variables on <html>,
+  // plus its font stylesheet.
+  const attr = (v: string) => v.replace(/&/g, "&amp;").replace(/"/g, "&quot;").replace(/</g, "&lt;");
+  const vars = brand.value?.styleVars ? ` style="${attr(brand.value.styleVars)}"` : "";
+  const fonts = brand.value?.fontHref ? `\n<link rel="stylesheet" href="${attr(brand.value.fontHref)}">` : "";
+  return `<!doctype html><html${vars}><head><meta charset="utf-8">${fonts}
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <meta name="lz-preview-version" content="${loadVersion}">
 <base target="_blank">
 <style>${siteCss.value}
-html,body{margin:0;background:var(--paper,#f3f1ea)}${richTextFields(props.fields).length ? RICH_TEXT_CSS : ""}</style>
+html,body{margin:0;background:var(--paper,#f3f1ea)}${RICH_TEXT_CSS}</style>
 <style id="${HIGHLIGHT_STYLE_ID}">${markerCss()}</style>
 </head><body>${lastBody}</body></html>`;
 }
@@ -296,12 +320,14 @@ async function loadTemplate(): Promise<void> {
   try {
     // Commit a complete document once both resources are ready. Late responses
     // from a previously selected template must never replace the current page.
-    const [file, css, listing] = await Promise.all([
+    const [file, css, listing, resolved] = await Promise.all([
       props.client.loadText(templateHtmlPath(props.preset)),
       loadSiteCss(props.client),
       props.locale ? loadPageListing(props.client, props.preset, props.locale) : Promise.resolve({}),
+      tenantBrand(props.client),
     ]);
     if (version !== loadVersion) return;
+    brand.value = resolved;
     listingData.value = listing;
     templateHtml.value = file.text;
     siteCss.value = css;
@@ -406,6 +432,8 @@ watch(() => [props.preset, props.locale], loadTemplate, { immediate: true });
 watch(() => props.slots, scheduleBodyUpdate, { deep: true });
 watch(() => props.provenance, scheduleBodyUpdate, { deep: true });
 watch(() => props.body, scheduleBodyUpdate);
+// The template's fields arrive separately; richtext slots render once they are known.
+watch(() => props.fields, scheduleBodyUpdate, { deep: true });
 </script>
 
 <template>
