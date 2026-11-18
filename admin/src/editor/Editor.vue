@@ -26,8 +26,8 @@ import { uploadImage } from "../backend/media";
 import { pasteImage } from "./paste-image";
 
 const props = withDefaults(
-  defineProps<{ initialHtml?: string; client?: GitHubClient; showInspector?: boolean }>(),
-  { initialHtml: "<p></p>", client: undefined },
+  defineProps<{ initialHtml?: string; client?: GitHubClient; showInspector?: boolean; showAgentOrigin?: boolean }>(),
+  { initialHtml: "<p></p>", client: undefined, showAgentOrigin: true },
 );
 const emit = defineEmits<{ (e: "change"): void; (e: "invalid", message: string): void }>();
 const contentProblem = ref("");
@@ -230,7 +230,7 @@ function link() {
 <template>
   <div class="sheet" @paste.capture="onPaste">
     <p v-if="pasteError" role="alert" class="paste-error">{{ pasteError }}</p>
-    <EditorContent :editor="editor" class="prose" />
+    <EditorContent :editor="editor" class="prose" :class="{ 'prose--agent-origin': showAgentOrigin }" />
 
     <SlashMenu
       v-if="slashOpen"
@@ -429,5 +429,5 @@ function link() {
 </style>
 
 <style scoped>
-.prose :deep([data-lanza-origin="agent"]) { background-color: #eef0ff; text-decoration: underline dotted #7770a5; text-underline-offset: 4px; }
+.prose--agent-origin :deep([data-lanza-origin="agent"]) { background-color: #eef0ff; text-decoration: underline dotted #7770a5; text-underline-offset: 4px; }
 </style>

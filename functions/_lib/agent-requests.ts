@@ -1,5 +1,6 @@
 import { ContentClient, GitHubError } from "./lanza-content";
 import { mayAdministerSite } from "./roles";
+import { PluginRuntime } from "./plugin-runtime.mjs";
 
 export const REQUEST_BRANCH = "lanza-agent-requests";
 export const REQUEST_BODY_LIMIT = 64 * 1024;
@@ -45,6 +46,12 @@ export class AgentRequests {
     const metadata = await this.api("GET", "");
     if (!metadata || object(metadata).private !== true) throw new GitHubError(403, "Private repository required for agent requests. Published pages can remain public.");
     if (!mayAdministerSite(object(metadata).permissions, this.client.delegatedAdmin === true)) throw new GitHubError(403, "Agent requests require site administration access.");
+  }
+  // The feature is the opt-in Agent requests plugin. Disabled refuses new captures
+  // and responses; existing requests stay readable and are never deleted.
+  private async assertEnabled(): Promise<void> {
+    const plugin = await new PluginRuntime(this.client, this.actor, this.assertEntry).run("agent-requests", "read") as { state?: { enabled?: unknown } };
+    if (plugin.state?.enabled !== true) throw new GitHubError(409, "Agent requests are disabled. Enable them in Plugins first.");
   }
   private async ensureBranch(): Promise<void> {
     if (await this.api("GET", `git/ref/heads/${REQUEST_BRANCH}`)) return;
@@ -99,7 +106,7 @@ export class AgentRequests {
     const id = requestId(data.id);
     const instruction = string(data.instruction,"instruction",4000,true); const entryPath = string(data.entryPath,"entry path",500);
     const requestedAction = action(data.action);
-    await this.guard(); await this.assertEntry(entryPath);
+    await this.guard(); await this.assertEnabled(); await this.assertEntry(entryPath);
     const sameCapture = (stored: RequestEnvelope): RequestEnvelope => {
       if (stored.task.createdBy !== this.actor || stored.task.entryPath !== entryPath || stored.task.action !== data.action || stored.task.instruction !== instruction || JSON.stringify(stored.task.anchor) !== JSON.stringify(selection)) throw new GitHubError(409,"This request ID already belongs to a different capture.");
       return stored;
@@ -117,7 +124,7 @@ export class AgentRequests {
     const data = object(input); const id = requestId(data.id);
     if (typeof data.expectedSha !== "string" || !SHA.test(data.expectedSha)) throw new GitHubError(400,"Expected the SHA returned when reading this request.");
     if ((data.response === undefined) === (data.status !== "resolved")) throw new GitHubError(400,"Pass either a response or status resolved.");
-    await this.guard(); const existing = await this.readStored(id);
+    await this.guard(); await this.assertEnabled(); const existing = await this.readStored(id);
     if (existing.sha !== data.expectedSha) throw new GitHubError(409,"This request changed. Reload before responding or resolving.");
     if (existing.task.status === "resolved") throw new GitHubError(409,"This request has already been resolved.");
     const task = { ...existing.task, updatedAt:new Date().toISOString() };

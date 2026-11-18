@@ -23,6 +23,7 @@ function fixture(options={}) {
   if(method==='POST'&&route==='git/trees')return respond(201,{sha:'c'.repeat(40)});
   if(method==='POST'&&route==='git/commits')return respond(201,{sha:'d'.repeat(40)});
   if(method==='POST'&&route==='git/refs'){if(options.branchRace){branch=!options.failedRace;return respond(422,{message:'Already exists'});}branch=true;return respond(201,{object:{sha:'d'.repeat(40)}});}
+  if(route==='contents/plugins/agent-requests/state.json')return options.disabled?respond(404,{}):respond(200,{content:b64(JSON.stringify({version:1,enabled:true,settings:{}})),sha:'e'.repeat(40)});
   if(route==='contents/requests')return files.size?respond(200,[...files.keys()].map(id=>({name:`${id}.json`,type:'file',path:`requests/${id}.json`}))):respond(404,{});
   const id=/^contents\/requests\/([a-f0-9-]+)\.json$/.exec(route)?.[1];
   if(id){
@@ -86,7 +87,7 @@ test('directory at GitHub truncation boundary is refused before reading task bod
  await assert.rejects(()=>f.archive.list(ENTRY),e=>e.status===413);assert.equal(f.calls.filter(c=>c.route.startsWith('contents/requests/')).length,0);assert.equal(f.writes().length,0);
 });
 test('persisted request reads fail after visibility changes without disclosing content',async()=>{
- const f=fixture({publicAfter:3});await f.archive.create(INPUT);const before=f.calls.length;await assert.rejects(()=>f.archive.read(ID),e=>e.status===403);assert.equal(f.calls.length,before+1);
+ const f=fixture({publicAfter:4});await f.archive.create(INPUT);const before=f.calls.length;await assert.rejects(()=>f.archive.read(ID),e=>e.status===403);assert.equal(f.calls.length,before+1);
 });
 test('tampered archived response fails validation rather than reaching UI',async()=>{
  const f=fixture();await f.archive.create(INPUT);const file=f.files.get(ID);const task=JSON.parse(file.text);task.status='answered';task.response={message:42,createdAt:task.createdAt,createdBy:'owner',origin:'assistant'};file.text=JSON.stringify(task);file.sha=sha(file.text);await assert.rejects(()=>f.archive.read(ID));
@@ -108,4 +109,14 @@ test('real cookie endpoint and persisted MCP tools share same archive',async()=>
 });
 test('archive transport cannot target other branches or arbitrary repository endpoints',async()=>{
  const f=fixture();for(const [method,path,body] of [['PUT',`contents/requests/${ID}.json`,{branch:'main'}],['GET','contents/secrets.json?ref=lanza-agent-requests'],['POST','git/refs',{ref:'refs/heads/main'}],['PATCH','git/refs/heads/main',{sha:'x'}]])await assert.rejects(()=>f.client.agentRequestArchive(method,path,body));assert.equal(f.calls.length,0);
+});
+test('disabled Agent requests plugin refuses capture and response but keeps existing requests readable',async()=>{
+ const off=fixture({disabled:true});await assert.rejects(()=>off.archive.create(INPUT),e=>e.status===409&&/Enable them in Plugins/.test(e.message));assert.equal(off.writes().length,0);assert.equal(off.files.size,0);
+ const f=fixture();const created=await f.archive.create(INPUT);
+ const plugin=f.calls.find(c=>c.route==='contents/plugins/agent-requests/state.json');assert.match(plugin.url,/ref=lanza-agent-requests/);
+ const disabled=fixture({disabled:true});disabled.files.set(ID,f.files.get(ID));
+ assert.equal((await disabled.archive.read(ID)).sha,created.sha);assert.equal((await disabled.archive.list(ENTRY)).requests.length,1);
+ await assert.rejects(()=>disabled.archive.update({id:ID,expectedSha:created.sha,response:{message:'Evidence'}}),e=>e.status===409);
+ await assert.rejects(()=>disabled.archive.update({id:ID,expectedSha:created.sha,status:'resolved'}),e=>e.status===409);
+ assert.equal(disabled.writes().length,0);assert.equal(disabled.files.get(ID),f.files.get(ID));
 });

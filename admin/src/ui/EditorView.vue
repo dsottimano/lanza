@@ -41,7 +41,7 @@ import AgentBodyReview from "./AgentBodyReview.vue";
 import AgentRequests from "./AgentRequests.vue";
 import { prepareRequestReplacement, type RequestAnchor } from "../backend/agent-requests";
 import { access } from "../backend/access";
-import { pluginRequest } from "../backend/plugins";
+import { agentRequestsEnabled, pluginRequest } from "../backend/plugins";
 import { useEntryReview } from "./useEntryReview";
 import { refreshPending } from "./staging";
 
@@ -138,6 +138,8 @@ const urlFrame = computed(() =>
 const urlPrefix = computed(() => urlFrame.value?.prefix ?? "");
 const urlSuffix = computed(() => urlFrame.value?.suffix ?? "");
 const agentRequestsRef = ref<InstanceType<typeof AgentRequests>>();
+const agentRequestsOn = ref(false);
+watch(isOwner, async owner => { agentRequestsOn.value = owner && await agentRequestsEnabled(); }, { immediate: true });
 const translationPreparing = ref(false);
 const translationIssue = ref("");
 async function askForTranslation(code: Locale, label: string) {
@@ -563,7 +565,7 @@ onMounted(async () => {
           </div>
           <div class="page-inspector__body">
             <div v-show="pagePanel === 'content'">
-              <p v-if="Object.keys(fieldRecords(data)).length" class="writing-notice">Agent-origin fields are recorded in this entry’s provenance. Human acceptance does not change authorship.</p>
+              <p v-if="agentRequestsOn && Object.keys(fieldRecords(data)).length" class="writing-notice">Agent-origin fields are recorded in this entry’s provenance. Human acceptance does not change authorship.</p>
               <p class="page-edit-hint">Choose a section, or click text in the preview to edit it here.</p>
               <TemplateEditor ref="templateEditor" content-only :client="client" :data="data" :locale="locale"
                 :templates="templates" :loading="templatesLoading" :changed="review.changed.value" @focus-field="onFocusField" />
@@ -615,15 +617,15 @@ onMounted(async () => {
           <div v-else class="editor-paper w-full">
             <div class="writing-document-bar">
               <EntryLocaleBar v-if="collection.localized && site.locales.length > 1 && entryStem" :client="client" :collection="collection" :locale="locale" :slug="entryStem" :data="data"
-                :request-translation="isOwner()" :locked="deleting || !!bodyReview || loading || !!recovery" @translate="askForTranslation" />
+                :request-translation="isOwner() && agentRequestsOn" :locked="deleting || !!bodyReview || loading || !!recovery" @translate="askForTranslation" />
               <span v-else>{{ languageLabel }} <span aria-hidden="true">·</span> {{ collection.labelSingular }}</span>
               <button type="button" class="writing-format-toggle" :aria-expanded="focusFormatting"
                 aria-controls="writing-formatting" @click="focusFormatting = !focusFormatting">
                 <span aria-hidden="true">Aa</span> {{ focusFormatting ? "Hide formatting" : "Format" }}
               </button>
             </div>
-            <p class="writing-notice">Dotted highlights identify agent-written text. Unmarked text has no recorded origin; it is not certified human-written.</p>
-            <details v-if="Object.keys(fieldRecords(data)).length" class="writing-notice"><summary>Agent-origin fields</summary><ul><li v-for="(_, path) in fieldRecords(data)" :key="path">{{ path }}</li></ul></details>
+            <p v-if="agentRequestsOn" class="writing-notice">Dotted highlights identify agent-written text. Unmarked text has no recorded origin; it is not certified human-written.</p>
+            <details v-if="agentRequestsOn && Object.keys(fieldRecords(data)).length" class="writing-notice"><summary>Agent-origin fields</summary><ul><li v-for="(_, path) in fieldRecords(data)" :key="path">{{ path }}</li></ul></details>
             <p v-if="translationPreparing" role="status" class="writing-notice">Saving your latest edits for translation…</p>
             <p v-if="translationIssue" role="alert" class="writing-notice">{{ translationIssue }}</p>
             <div v-if="editorRef?.editor && focusFormatting" id="writing-formatting">
@@ -641,7 +643,7 @@ onMounted(async () => {
                 @input="markDirty(); growTitle()"
               />
             </label>
-            <AgentRequests ref="agentRequestsRef" :editor="editorRef?.editor" :path="currentPath" :enabled="isOwner()"
+            <AgentRequests v-if="agentRequestsOn" ref="agentRequestsRef" :editor="editorRef?.editor" :path="currentPath" :enabled="isOwner()"
               :locked="editorLoading || loadFailed || saving || deleting || preparingPublication || !!recovery || !!editorProblem || !!saveError || !!bodyReview"
               :review-replacement="reviewRequestReplacement" @busy="requestBusy = $event" />
             <div v-if="isOwner() && currentPath && collection.name === 'posts'" class="my-3 text-sm">
@@ -649,7 +651,7 @@ onMounted(async () => {
               <p>Select the facts section to replace it, or leave the selection empty to add facts at the end.</p>
               <p v-if="researchIssue" role="alert">{{ researchIssue }}</p>
             </div>
-            <Editor ref="editorRef" :initial-html="bodyHtml" :client="client" :show-inspector="false" @change="markDirty" @invalid="editorProblem = $event" />
+            <Editor ref="editorRef" :initial-html="bodyHtml" :client="client" :show-inspector="false" :show-agent-origin="agentRequestsOn" @change="markDirty" @invalid="editorProblem = $event" />
           </div>
         </div>
 

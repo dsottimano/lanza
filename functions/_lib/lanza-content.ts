@@ -143,7 +143,7 @@ export class ContentClient {
   // Server-internal plugin transport. No website branches or caller-supplied paths.
   async pluginArchive(id: string, method: string, path: string, body?: unknown): Promise<unknown> {
     if (!/^[a-z][a-z0-9-]{0,47}$/.test(id)) throw new GitHubError(400, "Invalid plugin ID.");
-    const branch = id === "research" ? "lanza-research" : `lanza-plugin-${id}`;
+    const branch = id === "research" ? "lanza-research" : id === "agent-requests" ? "lanza-agent-requests" : `lanza-plugin-${id}`;
     const file = `plugins/${id}/state.json`;
     const allowed = method === "GET" ? ["", `git/ref/heads/${branch}`, `contents/${file}?ref=${branch}`].includes(path)
       : method === "POST" ? ["git/trees", "git/commits", "git/refs"].includes(path)

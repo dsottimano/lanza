@@ -1,0 +1,13 @@
+{
+  "apiVersion": 1,
+  "version": "1.0.0",
+  "role": "owner",
+  "settings": [],
+  "workspace": "settings",
+  "id": "agent-requests",
+  "name": "Agent requests",
+  "description": "Highlight agent-written text in the editor and ask your agent about selected text.",
+  "scope": "private",
+  "runtime": "request",
+  "operations": []
+}

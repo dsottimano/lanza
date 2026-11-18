@@ -14,11 +14,14 @@ vi.mock("../errors", () => ({ reportError: vi.fn(), clearError: vi.fn() }));
 const wrappers: VueWrapper[] = [];
 let records: SavedRequest[];
 let fetcher: ReturnType<typeof vi.fn>;
+let pluginEnabled: boolean;
 const respond = (body: unknown) => new Response(JSON.stringify(body), { headers: { "Content-Type": "application/json" } });
 beforeEach(() => {
-  vi.useFakeTimers(); sessionStorage.clear(); records = [];
+  vi.useFakeTimers(); sessionStorage.clear(); records = []; pluginEnabled = true;
   Object.assign(access, { loaded: true, role: "owner", login: "fixture", repo: "fixture/site" });
-  fetcher = vi.fn(async (_url, options) => options?.method === "PATCH"
+  fetcher = vi.fn(async (url, options) => String(url).startsWith("/admin/api/plugins?id=agent-requests")
+    ? respond({ sha: null, state: { version: 1, enabled: pluginEnabled, settings: {} } })
+    : options?.method === "PATCH"
     ? respond({ ...records[0], task: { ...records[0]!.task, status: "resolved" } }) : respond({ requests: records, truncated: false }));
   vi.stubGlobal("fetch", fetcher); vi.stubGlobal("confirm", vi.fn().mockReturnValue(true));
 });
@@ -67,4 +70,27 @@ it("rejects an old response before review when any article content has changed",
   await button(wrapper, "Review & apply").trigger("click"); for (let n = 0; n < 4; n++) await flushPromises();
   expect(wrapper.findComponent(AgentBodyReview).exists()).toBe(false); expect(wrapper.text()).toContain("older article");
   expect(fetcher.mock.calls.some(([, options]) => options?.method === "PATCH")).toBe(false);
+});
+const agentUi = (wrapper: VueWrapper) => ({
+  requests: wrapper.findAll("button").some(node => node.text() === "Requests"),
+  hint: wrapper.text().includes("Select text to ask your agent."),
+  notice: wrapper.text().includes("Dotted highlights identify agent-written text."),
+  highlights: wrapper.find(".prose--agent-origin").exists(),
+});
+it("hides agent highlights, notices and requests until the Agent requests plugin is enabled", async () => {
+  pluginEnabled = false;
+  const { wrapper } = await fixture();
+  expect(agentUi(wrapper)).toEqual({ requests: false, hint: false, notice: false, highlights: false });
+  expect(fetcher.mock.calls.some(([url]) => String(url).startsWith("/admin/api/agent-requests"))).toBe(false);
+});
+it("shows agent highlights, notices and requests when the Agent requests plugin is enabled", async () => {
+  const { wrapper } = await fixture(); wrapper.findComponent(Editor).vm.editor!.commands.setTextSelection(1);
+  await flushPromises();
+  expect(agentUi(wrapper)).toEqual({ requests: true, hint: true, notice: true, highlights: true });
+});
+it("keeps the agent UI hidden when the plugin state cannot be read", async () => {
+  fetcher.mockImplementation(async (url: string) => String(url).startsWith("/admin/api/plugins")
+    ? new Response(JSON.stringify({ error: "Private repository required." }), { status: 403 }) : respond({ requests: [], truncated: false }));
+  const { wrapper } = await fixture();
+  expect(agentUi(wrapper)).toEqual({ requests: false, hint: false, notice: false, highlights: false });
 });

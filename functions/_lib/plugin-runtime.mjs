@@ -17,7 +17,7 @@ export class PluginRuntime {
     const manifest = validatePlugin(plugin.manifest);
     if (manifest.scope !== 'private') throw new GitHubError(400,'Manage this website feature through its staging settings.');
     if (!['read','set-enabled','settings',...manifest.operations].includes(operation)) throw new GitHubError(400,'Unknown plugin operation.');
-    const branch = id === 'research' ? 'lanza-research' : `lanza-plugin-${id}`;
+    const branch = id === 'research' ? 'lanza-research' : id === 'agent-requests' ? 'lanza-agent-requests' : `lanza-plugin-${id}`;
     const path = `plugins/${id}/state.json`;
     const api = (method,path,body) => this.client.pluginArchive(id,method,path,body);
     const guard = async () => {

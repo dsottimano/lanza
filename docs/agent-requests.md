@@ -5,6 +5,18 @@ agent. The capture is a saved request, not a background agent invocation or a
 notification delivered to ChatGPT. The assistant retrieves it through MCP when
 asked; no inference service or scheduled assistant work is started by submission.
 
+## Plugin switch
+
+The whole feature is the built-in private plugin `agent-requests`
+(`plugins/agent-requests/plugin.json`), disabled by default like every private
+plugin. Enable it in Administration → Plugins. While it is disabled the editor shows
+no dotted agent highlights, no provenance notices, no Requests panel, no
+selection-to-request menu and no translation request, and the API/MCP refuse new
+captures and responses (409). Existing requests stay readable and `lanzaProvenance`
+is still recorded and preserved in entries; only the UI and new requests are gated.
+Its switch is stored at `plugins/agent-requests/state.json` on the same
+`lanza-agent-requests` branch, so no new branch needs a Pages exclusion.
+
 ## Persistence and access
 
 Requests require an authenticated repository owner and a private repository. They

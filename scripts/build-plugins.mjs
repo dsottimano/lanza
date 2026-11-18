@@ -20,7 +20,8 @@ export async function buildPlugins(tenantRoot, outputRoot = tenantRoot) {
       let handler = null;
       if (m.scope === 'private') {
         if (builtin && m.id === 'research') handler = './research-plugin.mjs';
-        else {
+        // An enable switch with no declared operations has nothing to run.
+        else if (m.operations.length) {
           const entry = path.join(dir,name,'server.mjs');
           if (!(await lstat(entry)).isFile() || await realpath(entry) !== entry) throw new Error('Plugin server must be a regular file.');
           handler = '../../plugins/'+name+'/server.mjs';
