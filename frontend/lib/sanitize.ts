@@ -68,9 +68,27 @@ export function sanitizeBody(html: string): string {
 // links, no data/aria attributes, no other classes (a template's own class names would
 // let a value restyle the page). The class filter runs only inside sanitizeRichText.
 let richTextPass = false;
+// Only `data-lanza-origin="agent"` on a span survives, so recorded agent origin
+// (docs/agent-provenance.md) is kept. A size inside an already-sized span is dropped:
+// em sizes would otherwise compound without limit. DOMPurify walks parents first, so
+// an ancestor's class is already filtered when a child is checked.
+const sizedAncestor = (node: Element): boolean => {
+  for (let p = node.parentElement; p; p = p.parentElement) {
+    if (p.nodeName === "SPAN" && (p.getAttribute("class") ?? "").split(/\s+/).some((c) => c.startsWith("lz-size-"))) return true;
+  }
+  return false;
+};
 DOMPurify.addHook("uponSanitizeAttribute", (node, data) => {
-  if (!richTextPass || data.attrName !== "class") return;
-  const kept = node.nodeName === "SPAN" ? data.attrValue.split(/\s+/).filter((c) => RICH_TEXT_CLASSES.has(c)) : [];
+  if (!richTextPass) return;
+  if (data.attrName === "data-lanza-origin") {
+    if (node.nodeName !== "SPAN" || data.attrValue !== "agent") data.keepAttr = false;
+    return;
+  }
+  if (data.attrName !== "class") return;
+  const nested = node.nodeName === "SPAN" && sizedAncestor(node);
+  const kept = node.nodeName === "SPAN"
+    ? data.attrValue.split(/\s+/).filter((c) => RICH_TEXT_CLASSES.has(c) && !(nested && c.startsWith("lz-size-")))
+    : [];
   if (kept.length) data.attrValue = kept.join(" ");
   else data.keepAttr = false;
 });
@@ -81,7 +99,7 @@ export function sanitizeRichText(html: unknown): string {
   try {
     return DOMPurify.sanitize(html, {
       ALLOWED_TAGS: RICH_TEXT_TAGS,
-      ALLOWED_ATTR: ["class"],
+      ALLOWED_ATTR: ["class", "data-lanza-origin"],
       ALLOW_DATA_ATTR: false,
       ALLOW_ARIA_ATTR: false,
     });

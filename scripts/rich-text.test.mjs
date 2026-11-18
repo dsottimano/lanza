@@ -2,7 +2,7 @@
 // assert what survives (the fixed allowlist) and that everything else is removed.
 import { test } from "node:test";
 import assert from "node:assert/strict";
-import { sanitizeRichText, sanitizeRichFields } from "../frontend/lib/sanitize.ts";
+import { sanitizeRichText, sanitizeRichFields, sanitizeBody } from "../frontend/lib/sanitize.ts";
 import { renderChecked, assertSanitizedSafe } from "../frontend/lib/assert-rendered-safe.ts";
 import { RICH_TEXT_CLASSES, RICH_TEXT_CSS, richTextFields } from "../functions/_lib/rich-text.mjs";
 
@@ -22,7 +22,8 @@ test("anything outside the allowlist is removed, keeping only text", () => {
     ['<img src=x onerror=alert(1)>y', "y"],
     ['<script>alert(1)</script>z', "z"],
     ['<h1>t</h1><ul><li>i</li></ul>', "ti"],
-    ['<span data-lanza-origin="agent" onclick="x()">a</span>', "<span>a</span>"],
+    ['<span data-lanza-origin="agent" onclick="x()" title="Agent-written text">a</span>', '<span data-lanza-origin="agent">a</span>'],
+    ['<span data-lanza-origin="human">a</span><p data-lanza-origin="agent">b</p><span data-lanza-origin="agent " data-other="1">c</span>', '<span>a</span><p>b</p><span data-lanza-origin="agent">c</span>'],
     ['<style>body{display:none}</style>q', "q"],
     ['<iframe src="https://example.com"></iframe>w', "w"],
   ];
@@ -49,4 +50,18 @@ test("a sanitized rich field renders verbatim through the checked engine", () =>
   const value = sanitizeRichFields({ intro: '<p><strong>Hi</strong><a href="javascript:x">y</a></p>' }, { fields: [{ name: "intro", widget: "richtext" }] }).intro;
   assertSanitizedSafe(value, "rich field");
   assert.equal(renderChecked("<section>{{{ intro }}}</section>", { intro: value }), "<section><p><strong>Hi</strong>y</p></section>");
+});
+
+test("nested size spans do not compound: only the outermost size survives", () => {
+  assert.equal(
+    sanitizeRichText('<span class="lz-size-xl"><span class="lz-size-xl lz-font-heading"><span class="lz-size-lg">x</span></span></span>'),
+    '<span class="lz-size-xl"><span class="lz-font-heading"><span>x</span></span></span>',
+  );
+  assert.equal(sanitizeRichText('<span class="lz-size-sm">a</span><span class="lz-size-lg">b</span>'), '<span class="lz-size-sm">a</span><span class="lz-size-lg">b</span>');
+});
+
+test("agent origin survives sanitize and render; body sanitization is unaffected", () => {
+  const value = sanitizeRichFields({ intro: '<p>Human <span data-lanza-origin="agent">agent words</span></p>' }, { fields: [{ name: "intro", widget: "richtext" }] }).intro;
+  assert.equal(renderChecked("<section>{{{ intro }}}</section>", { intro: value }), '<section><p>Human <span data-lanza-origin="agent">agent words</span></p></section>');
+  assert.equal(sanitizeBody('<p class="hero" data-callout="x"><span class="any">b</span></p>'), '<p class="hero" data-callout="x"><span class="any">b</span></p>');
 });
