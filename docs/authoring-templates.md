@@ -51,9 +51,10 @@ Omit it and the field renders loose and never collapses, exactly as before. Grou
 open themselves when a review reports a change inside them, so collapsing costs a
 reviewer nothing.
 
-Only `template.html` and the page's `slots` reach the render engine. `fields.json` is
-the authoring/CMS side — it tells the editor what to collect. Keep the field `name`s
-identical to the `{{placeholders}}` in `template.html`; the engine matches by name.
+`template.html` and the page's `slots` are what the engine renders. `fields.json` tells
+the CMS what to collect, and the build also reads it to find `richtext` fields, which it
+sanitizes before rendering. Keep the field `name`s identical to the `{{placeholders}}`
+in `template.html`; the engine matches by name.
 
 ## The engine — authoritative syntax
 
@@ -98,11 +99,10 @@ may use the entry's long-form body:
 2. Place `{{{ body }}}` (triple-brace — the body is already-sanitized HTML) where the
    article should render in `template.html`.
 
-With the flag on, the CMS shows the writing canvas again and the build injects the
-sanitized body into the reserved `body` slot. The flag is the single source of truth:
-the CMS reads it to decide whether to show the canvas, and the render side supplies
-`{{{ body }}}` regardless — so a mismatch just means an unused body, never a broken
-page.
+The flag puts the reserved `body` slot in the template's scope for the checker, and
+the build injects the sanitized entry body there. Whether the CMS shows a writing
+canvas is decided by the collection (`body: "rich"`), not by this flag; a page with a
+preset never shows one.
 
 ### Not supported — will fail silently
 
@@ -115,9 +115,10 @@ page.
   (`{{! …}}`).**
 - **No raw interpolation of a SLOT.** `{{{ … }}}` exists, but only for the reserved
   `body` (see "The main body") and top-level `richtext` fields outside loops; both
-  are sanitized by the build. Every slot value is escaped;
-  if a slot must carry markup, that is a design change, not a syntax one. The checker
-  reports `raw-non-body` for any other use.
+  are sanitized by the build. Every other slot value is escaped; if a slot must carry
+  formatting, make it a `richtext` field. The checker reports `raw-non-body` for any
+  other use, and `raw-unsafe-position` for any `{{{ }}}` inside `<script>`, `<style>`,
+  `<title>` or `<textarea>` (the engine renders it empty there).
 - Interpolating an **object or array** with `{{ x }}` yields an empty string (it will not
   print `[object Object]`). Only render leaf values.
 

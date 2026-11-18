@@ -168,6 +168,8 @@ What it catches, all of it otherwise silent:
 | `raw-non-body` | `{{{ x }}}` on anything but `body` or a top-level `richtext` field outside loops: emits user input unescaped |
 | `page-body` | a page preset with `"body": true`: the CMS opens it as a designed page, so canvas text is unreachable |
 | `richtext-nested` | a `richtext` field inside a list or object; only top-level ones are sanitized and rendered |
+| `richtext-reserved` | a `richtext` field named after an engine-supplied name (`body`, `entries`, `url`, …); its sanitized value would replace the engine's |
+| `raw-unsafe-position` | `{{{ x }}}` inside `<script>`, `<style>`, `<title>` or `<textarea>`; the engine renders it empty there |
 | `unused-field` | an input the owner fills that appears nowhere |
 | `listing-unknown-field` | a listing prints a field its collection does not have |
 | `route-template-missing` | a live URL rendering "Unknown template" |
@@ -327,9 +329,18 @@ named sizes and the site's heading/body theme fonts, stored as HTML with fixed
 preview and `frontend/lib/sanitize.ts`. Declare it at the top level of `fields.json`
 and render it as `{{{ name }}}` outside any `{{#each}}`; `HtmlTemplate.astro`
 sanitizes exactly those names and verifies the output before rendering. Anything
-else raw remains `raw-non-body`. Upgrading a tenant whose page preset still sets
-`"body": true` fails `check:site` and `lanza build` with `page-body`; the stored body
-is untouched (the CMS keeps it on save) until it is moved into slots.
+else raw remains `raw-non-body`. Recorded agent origin (`<span data-lanza-origin="agent">`)
+is kept through the editor, the sanitizer and the render; a size inside an already-sized
+span is dropped, so sizes never compound. The CMS preview marks rich regions for
+click and highlight, preview-only.
+
+`page-body` applies to every page use of a template: any template no route references
+(including a page preset with a `listing` block), and a routed detail template that a
+page also selects. The filesystem checker (`check:site`, `lanza build`) knows which
+templates pages select; MCP `validate_site` has no content inventory, so it cannot see
+that last case. Upgrading a tenant whose page preset still sets `"body": true` fails
+`check:site` and `lanza build` with `page-body`; the stored body is untouched (the CMS
+keeps it on save) until it is moved into slots.
 
 Agents can reuse section markup, CSS and field declarations from existing templates
 or recipes, then compose them into the target preset. Give fields human labels and
