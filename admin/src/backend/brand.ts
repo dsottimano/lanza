@@ -9,6 +9,7 @@
 // Google fragments MUST stay identical in both — edit both when adding a font.
 import type { GitHubClient } from "./github";
 import { GitHubError } from "./github";
+import { forgetTenantBrand } from "./tenant-brand";
 
 export const APPEARANCE_PATH = "data/appearance.json";
 
@@ -212,5 +213,7 @@ export async function saveBrand(client: GitHubClient, brand: BrandConfig, expect
     if (!(e instanceof GitHubError && e.status === 404)) throw e;
   }
   if (sha !== expectedSha) throw new GitHubError(409, "Appearance changed elsewhere. Reload before saving; your local changes have not been saved.");
-  return client.saveJson(APPEARANCE_PATH, { ...current, brand }, "lanza: update brand", sha);
+  const saved = await client.saveJson(APPEARANCE_PATH, { ...current, brand }, "lanza: update brand", sha);
+  forgetTenantBrand(client);
+  return saved;
 }

@@ -7,16 +7,25 @@ import { resolveBrand, type ResolvedBrand } from "../../../frontend/lib/appearan
 
 const cache = new WeakMap<object, Promise<ResolvedBrand | null>>();
 
-/** Loaded once per client; a missing or unreadable appearance means no overrides. */
+/**
+ * Loaded once per client until Brand is saved (forgetTenantBrand). A failed load means
+ * no overrides for now and is not cached, so the next caller retries.
+ */
 export function tenantBrand(client: GitHubClient): Promise<ResolvedBrand | null> {
   let brand = cache.get(client);
   if (!brand) {
-    brand = Promise.resolve().then(() => loadAppearance(client))
+    const loading = Promise.resolve().then(() => loadAppearance(client))
       .then((a) => resolveBrand({ brand: a.brand } as Parameters<typeof resolveBrand>[0]))
-      .catch(() => null);
+      .catch(() => { if (cache.get(client) === loading) cache.delete(client); return null; });
+    brand = loading;
     cache.set(client, brand);
   }
   return brand;
+}
+
+/** Called after a Brand save so the next richtext input or preview reads it. */
+export function forgetTenantBrand(client: GitHubClient): void {
+  cache.delete(client);
 }
 
 /** Only the font variables, for a scope inside admin chrome. */
