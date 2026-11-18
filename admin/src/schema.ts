@@ -30,6 +30,8 @@ export type Widget =
   | "relation"
   | "object"
   | "list"
+  // Basic rich text for a template field (bold/italic/underline/size/theme font).
+  | "richtext"
   // Page-template surface (rendered by ui/TemplateEditor.vue, not FieldInput):
   // `preset` picks a tenant template, `slots` holds its editable content.
   | "preset"

@@ -478,3 +478,19 @@ describe("PreviewPane — stable loading", () => {
     w.unmount();
   });
 });
+
+describe("PreviewPane — rich-text fields", () => {
+  it("renders declared richtext fields sanitized, with the size/font styles", async () => {
+    const w = mount(PreviewPane, { attachTo: document.body, props: {
+      client: clientWith("<section>{{{ intro }}}</section><p>{{ title }}</p>"), preset: "about",
+      slots: { intro: '<p onclick="x()"><strong>Hi</strong><span class="lz-size-lg evil">L</span><img src=x onerror=alert(1)></p>', title: "<b>t</b>" },
+      fields: [{ name: "intro", label: "Intro", widget: "richtext" }, { name: "title", label: "Title", widget: "string" }],
+    } });
+    await flushPromises();
+    const doc = w.find("iframe").attributes("srcdoc") ?? "";
+    expect(doc).toContain('<section><p><strong>Hi</strong><span class="lz-size-lg">L</span></p></section>');
+    expect(doc).not.toContain("onerror"); expect(doc).not.toContain("onclick");
+    expect(doc).toContain(".lz-size-lg{font-size:1.25em}");
+    expect(doc).toContain("&lt;b&gt;t&lt;/b&gt;");
+  });
+});

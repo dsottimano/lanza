@@ -115,3 +115,15 @@ it("record tools retain owner/editor authorization and preserve hidden body on S
   const viewer = await tools.get("get_editor_context")!.execute({}) as { revision: string };
   await expect(tools.get("propose_editor_change")!.execute({ fieldPath: "title", expectedRevision: viewer.revision, value: "Forbidden" })).rejects.toThrow("cannot edit");
 });
+
+it("opens a page preset that still declares body:true in the designed view and keeps its body on save", async () => {
+  const f = page();
+  f.client.loadJson.mockResolvedValue({ data: { ...manifesto, body: true } });
+  await flushPromises();
+  expect(f.wrapper.find(".page-editor").exists()).toBe(true);
+  expect(f.wrapper.find(".writing-main").exists()).toBe(false);
+  await f.wrapper.get(".page-inspector input").setValue("Edited in the designed view"); await flushPromises();
+  await f.wrapper.findAll("button").find(button => button.text() === "Save")!.trigger("click"); await flushPromises();
+  expect(f.client.saveEntry).toHaveBeenCalled();
+  expect(f.client.saveEntry.mock.calls.at(-1)![2]).toContain("Preserve the legal body");
+});

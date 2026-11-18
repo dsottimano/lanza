@@ -13,7 +13,9 @@
 // the build if a VALUE produced markup a browser would act on. See
 // frontend/lib/assert-rendered-safe.ts.
 import { pageListingScope } from "../lib/page-listing";
-import { renderChecked } from "../lib/assert-rendered-safe";
+import { renderChecked, assertSanitizedSafe } from "../lib/assert-rendered-safe";
+import { sanitizeRichFields } from "../lib/sanitize";
+import { RICH_TEXT_CSS, richTextFields } from "../../functions/_lib/rich-text.mjs";
 
 interface Props {
   name: string;
@@ -30,13 +32,23 @@ const templates = import.meta.glob<string>("/templates/*/template.html", {
   eager: true,
 });
 const source = templates[`/templates/${name}/template.html`];
-const scope = Astro.props.locale ? await pageListingScope(name, Astro.props.locale, data) : data;
+// Richtext fields are the one slot value rendered raw ({{{ name }}}), so they are
+// sanitized here, at the single public render sink, and the result is verified.
+const declarations = import.meta.glob<unknown>("/templates/*/fields.json", { import: "default", eager: true });
+const fieldsJson = declarations[`/templates/${name}/fields.json`] ?? null;
+const richNames = richTextFields((fieldsJson as { fields?: unknown } | null)?.fields);
+const listed = Astro.props.locale ? await pageListingScope(name, Astro.props.locale, data) : data;
+const scope = sanitizeRichFields(listed, fieldsJson);
+for (const field of richNames) assertSanitizedSafe(String(scope[field]), `templates/${name} field "${field}"`);
 const html = source ? renderChecked(source, scope, `templates/${name}/template.html`) : null;
 ---
 
 {
   html !== null ? (
-    <Fragment set:html={html} />
+    <>
+      {richNames.length > 0 && <style is:inline set:html={RICH_TEXT_CSS} />}
+      <Fragment set:html={html} />
+    </>
   ) : (
     // Unknown/removed template — never break the render; surface it plainly instead.
     <p class="preset-missing">Unknown template “{name}”.</p>

@@ -7,6 +7,7 @@ import type { Field } from "../schema";
 import ListInput from "./ListInput.vue";
 import RelationInput from "./RelationInput.vue";
 import ImageInput from "./ImageInput.vue";
+import RichTextInput from "./RichTextInput.vue";
 import { inputCls } from "./styles";
 import { childPath } from "./field-paths";
 
@@ -142,6 +143,13 @@ const singular = computed(() => (props.field.labelSingular ?? "item").toLowerCas
   <div v-else-if="field.widget === 'relation'" class="mb-4" :data-field-path="path">
     <label :id="`${inputId}-label`" :for="inputId" class="mb-1.5 block text-xs font-semibold text-zinc-600">{{ field.label }}</label>
     <RelationInput :field="field" :input-id="inputId" v-model="model" />
+    <p v-if="field.hint" class="mt-1.5 text-xs text-zinc-500">{{ field.hint }}</p>
+  </div>
+
+  <!-- richtext: basic formatting only (functions/_lib/rich-text.mjs) -->
+  <div v-else-if="field.widget === 'richtext'" class="mb-4" :data-field-path="path">
+    <label :id="`${inputId}-label`" class="mb-1.5 block text-xs font-semibold text-zinc-600">{{ field.label }}</label>
+    <RichTextInput :input-id="inputId" :labelled-by="`${inputId}-label`" v-model="model" />
     <p v-if="field.hint" class="mt-1.5 text-xs text-zinc-500">{{ field.hint }}</p>
   </div>
 

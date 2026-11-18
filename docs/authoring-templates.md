@@ -64,7 +64,7 @@ empty — do **not** reach for Handlebars features that aren't here.
 | Syntax | Meaning |
 | --- | --- |
 | `{{ name }}` | Interpolate a value. The value is **HTML-escaped**. Whitespace inside the braces is ignored. |
-| `{{{ name }}}` | Interpolate a value **verbatim** (not escaped). Only for values that are already safe HTML — in practice just `{{{ body }}}` (the sanitized page body). Don't point it at user-entered slots. |
+| `{{{ name }}}` | Interpolate a value **verbatim** (not escaped). Only for values the build sanitizes: `{{{ body }}}` in a detail template, and top-level `richtext` fields outside loops. Never any other slot. |
 | `{{ a.b.c }}` | Dotted path — resolves `a`, then walks into `.b.c`. Missing → empty string. |
 | `{{#each list}} … {{/each}}` | Repeat the body once per array item. Inside, the item's own fields resolve **by bare name**. Non-array or empty → renders nothing. |
 | `{{#if cond}} … {{/if}}` | Render the body only if `cond` is truthy. |
@@ -86,13 +86,13 @@ it does not sanitize your template.
 
 ## The main body
 
-Every template owns the **whole** page and normally builds it entirely from `slots` —
-so the page's rich body (the CMS writing canvas) is unused, and the CMS **hides the
-body editor** so it isn't dead real estate on a landing page. That is the default
-(`"body": false`, or omitted).
+A **page** preset never has a body: a designed page is built entirely from `slots`,
+the CMS always opens it in the designed view, and `"body": true` on a page preset is
+the `page-body` checker error. For formatted prose on a designed page, declare a
+top-level `richtext` field and render it as `{{{ name }}}` (see `docs/site-system.md`).
 
-If your design genuinely needs the long-form article body (e.g. a doc page whose hero
-is templated but whose content is prose the owner writes in the canvas):
+A **detail** template (a post template or a custom content type's `route.template`)
+may use the entry's long-form body:
 
 1. Set `"body": true` at the top level of `fields.json`.
 2. Place `{{{ body }}}` (triple-brace — the body is already-sanitized HTML) where the
@@ -114,7 +114,8 @@ page.
 - **No partials (`{{> …}}`), no helpers, no inline expressions/operators, no comments
   (`{{! …}}`).**
 - **No raw interpolation of a SLOT.** `{{{ … }}}` exists, but only for the reserved
-  `body` (see "The main body") — it is already sanitized. Every slot value is escaped;
+  `body` (see "The main body") and top-level `richtext` fields outside loops; both
+  are sanitized by the build. Every slot value is escaped;
   if a slot must carry markup, that is a design change, not a syntax one. The checker
   reports `raw-non-body` for any other use.
 - Interpolating an **object or array** with `{{ x }}` yields an empty string (it will not
@@ -134,7 +135,9 @@ page.
    - an optional block → `{{#if fieldName}} … {{/if}}`.
 4. **Write `fields.json`** to match. Pick widgets:
    - `string` — short single-line text (headline, label, URL, button text).
-   - `text` — multi-line prose (subheading, body copy).
+   - `text`: multi-line plain prose (subheading, body copy).
+   - `richtext`: formatted prose (bold, italic, underline, a named size, a theme
+     font). Top-level only; render it as `{{{ name }}}` outside any loop.
    - `list` with nested `fields` — a repeater; the sub-`fields` are the item's bare
      names used inside `{{#each}}`.
    - Other CMS widgets exist (`image`, `boolean`, `number`, `select`, …) — see the

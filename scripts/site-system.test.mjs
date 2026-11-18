@@ -134,13 +134,13 @@ describe("the body slot", () => {
   });
 
   test("body:true without {{{ body }}} is a warning", () => {
-    const problems = checkTemplate({ name: "t", html: `<article>nothing</article>`, fields: { name: "t", body: true, fields: [] } });
+    const problems = checkTemplate({ name: "t", html: `<article>nothing</article>`, fields: { name: "t", body: true, fields: [] }, position: "detail" });
     assert.ok(codes(problems).includes("body-declared-unused"));
     assert.equal(errors(problems).length, 0, "a canvas that goes nowhere is wrong, not fatal");
   });
 
-  test("the matched pair is clean", () => {
-    assert.deepEqual(checkTemplate({ name: "t", html: `<article>{{{ body }}}</article>`, fields: { name: "t", body: true, fields: [] } }), []);
+  test("the matched pair is clean in the detail position", () => {
+    assert.deepEqual(checkTemplate({ name: "t", html: `<article>{{{ body }}}</article>`, fields: { name: "t", body: true, fields: [] }, position: "detail" }), []);
   });
 
   test("a triple-brace on any other slot is an error — it emits unescaped input", () => {
@@ -174,7 +174,7 @@ describe("dead inputs", () => {
 
 describe("fields.json structure", () => {
   test("an unknown widget is an error", () => {
-    assert.ok(codes(checkFieldsJson([{ name: "a", label: "A", widget: "richtext" }], "x")).includes("unknown-widget"));
+    assert.ok(codes(checkFieldsJson([{ name: "a", label: "A", widget: "wysiwyg" }], "x")).includes("unknown-widget"));
   });
 
   test("a select with no options is an error", () => {
@@ -368,5 +368,47 @@ describe("template safety", () => {
   test("every refusal code is a code the registry documents", () => {
     const registered = new Set(CHECKS.map((c) => c.code));
     for (const c of UNTRUSTED_AUTHOR_CODES) assert.ok(registered.has(c), `${c} missing from CHECKS`);
+  });
+});
+
+describe("a designed page has no free body", () => {
+  test('a page-position preset with "body": true is an error', () => {
+    const problems = checkTemplate({ name: "about", html: `<h1>{{ title }}</h1><article>{{{ body }}}</article>`, fields: { name: "about", body: true, fields: [{ name: "title", label: "Title", widget: "string" }] } });
+    assert.ok(errors(problems).some((p) => p.code === "page-body"));
+    assert.ok(codes(checkTemplate({ name: "about", html: `<h1>x</h1>`, fields: { name: "about", body: true, fields: [] }, position: "page" })).includes("page-body"));
+  });
+  test("detail templates keep their body", () => {
+    for (const position of ["detail"]) {
+      const problems = checkTemplate({ name: "event", html: `<article>{{{ body }}}</article>`, fields: { name: "event", body: true, fields: [] }, position });
+      assert.ok(!codes(problems).includes("page-body"));
+    }
+  });
+  test("the published page position no longer offers a body", () => {
+    const page = siteSystemContract().positions.find((p) => p.id === "page");
+    assert.doesNotMatch(page.note, /Also gets `body`/);
+    assert.match(page.note, /page-body/);
+  });
+});
+
+describe("rich-text fields", () => {
+  const rich = (html, fields) => checkTemplate({ name: "t", html, fields: { name: "t", fields } });
+  const intro = { name: "intro", label: "Introduction", widget: "richtext" };
+  test("richtext is a widget the CMS renders", () => assert.ok(WIDGETS.has("richtext")));
+  test("{{{ field }}} on a top-level richtext field is allowed", () => {
+    assert.deepEqual(rich(`<section>{{{ intro }}}</section>`, [intro]), []);
+    assert.deepEqual(rich(`{{#if intro}}<section>{{{ intro }}}</section>{{/if}}`, [intro]), []);
+  });
+  test("raw interpolation stays an error for every other field", () => {
+    assert.ok(codes(rich(`<div>{{{ intro }}}</div>`, [{ ...intro, widget: "text" }])).includes("raw-non-body"));
+    assert.ok(codes(rich(`<div>{{{ intro.x }}}</div>`, [intro])).includes("raw-non-body"));
+  });
+  test("a richtext field inside a loop is not sanitized, so raw there is an error", () => {
+    const problems = rich(`{{#each cards}}<div>{{{ intro }}}</div>{{/each}}`, [intro, { name: "cards", label: "Cards", widget: "list", fields: [{ name: "heading", label: "Heading", widget: "string" }] }]);
+    assert.ok(codes(problems).includes("raw-non-body"));
+  });
+  test("richtext nested in a list or object is an error", () => {
+    const ps = checkFieldsJson([{ name: "cards", label: "Cards", widget: "list", fields: [intro] }], "x");
+    assert.ok(errors(ps).some((p) => p.code === "richtext-nested"));
+    assert.ok(codes(checkFieldsJson([{ name: "box", label: "Box", widget: "object", fields: [intro] }], "x")).includes("richtext-nested"));
   });
 });

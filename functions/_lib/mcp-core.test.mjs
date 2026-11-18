@@ -639,6 +639,19 @@ test("write_template refuses a misspelled placeholder and writes NOTHING", async
   assert.equal(gh.files.size, before, "a refused write must leave the repo untouched");
 });
 
+test("write_template refuses a page preset with a free body, keeps detail bodies, and accepts richtext", async () => {
+  const gh = fakeGitHub({ "data/schema.json": SCHEMA });
+  const before = gh.files.size;
+  const page = await callRaw("write_template", { name: "about", template_html: "<h1>{{ venue }}</h1>{{{ body }}}", fields: { ...goodFields(), body: true } });
+  assert.ok(isError(page)); assert.match(errText(page), /page-body/);
+  assert.equal(gh.files.size, before, "a refused write must leave the repo untouched");
+  const detail = await callData("write_template", { name: "event", template_html: "<h1>{{ venue }}</h1>{{{ body }}}", fields: { ...goodFields(), body: true }, position: "detail" });
+  assert.ok(detail.written.includes("templates/event/fields.json"));
+  const rich = await callData("write_template", { name: "story", template_html: "<h1>{{ venue }}</h1><section>{{{ intro }}}</section>",
+    fields: { fields: [...goodFields().fields, { name: "intro", label: "Introduction", widget: "richtext" }] } });
+  assert.ok(rich.written.includes("templates/story/template.html"));
+});
+
 test("write_template refuses markup a browser would act on, and writes NOTHING", async () => {
   for (const html of [
     `<h1>{{ venue }}</h1><script>fetch("/admin/api/gh")</script>`,

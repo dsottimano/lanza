@@ -125,6 +125,7 @@ function base(field, depth) {
   switch (field.widget) {
     case "string":
     case "text":
+    case "richtext":
     case "image":
     case "file":
     case "preset":

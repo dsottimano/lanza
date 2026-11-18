@@ -244,15 +244,12 @@ const selectedTemplate = computed(() =>
   templates.value.find((t) => t.name === data.preset),
 );
 
-// Show the writing canvas when the collection has a rich body AND either no template
-// is chosen or the chosen template opts into the body ({{{ body }}}, fields.json
-// `"body": true`). A templated page that doesn't use the body hides the canvas.
-// While templates are still loading, a chosen preset is assumed body-less so the
-// canvas never flashes in.
+// The schema dictates the surface: a page with a preset is a designed page and always
+// opens in the template/live-preview view; it has no free body (the site checker's
+// page-body rule). Only entries without a preset get the writing canvas. A body
+// already stored on such a page is never shown but is kept on save (getBody).
 const showBody = computed(
-  () =>
-    props.collection.body === "rich" &&
-    (!data.preset || selectedTemplate.value?.body === true),
+  () => props.collection.body === "rich" && !(hasTemplate.value && data.preset),
 );
 
 // The live-preview shape: a template is chosen and it isn't using the writing canvas.
@@ -598,7 +595,7 @@ onMounted(async () => {
           </div>
         </aside>
         <PreviewPane ref="previewRef" class="page-preview" :client="client" :preset="(data.preset as string)"
-          :locale="locale" :slots="slotsData" :provenance="data.lanzaProvenance" :body="bodyHtml" @select="onPreviewSelect" />
+          :locale="locale" :slots="slotsData" :fields="selectedTemplate?.fields" :provenance="data.lanzaProvenance" :body="bodyHtml" @select="onPreviewSelect" />
       </div>
     </main>
 

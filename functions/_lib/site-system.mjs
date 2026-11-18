@@ -1,4 +1,5 @@
 import { humanEditingGuide } from "./agent-authoring.mjs";
+import { RICH_TEXT_WIDGET, richTextFields } from "./rich-text.mjs";
 
 // The SITE SYSTEM — the composition rules that make an agent-built site coherent,
 // expressed as code so they are checkable instead of remembered.
@@ -100,6 +101,7 @@ export const WIDGETS = new Set([
   "list",
   "preset",
   "slots",
+  "richtext",
 ]);
 
 // Widgets that carry a nested shape, and how the shape is reached.
@@ -137,7 +139,7 @@ export const POSITION_INFO = {
   page: {
     scope: "the page's freeform `slots`, as declared by fields.json",
     reserved: [],
-    note: 'Also gets `body` when fields.json sets "body": true.',
+    note: 'No `body`: a designed page has no free body, and "body": true here is the page-body error. Use a richtext field, rendered as {{{ name }}}, for formatted prose.',
   },
   detail: {
     scope: "one entry's FRONTMATTER: the collection's fields, not the template's slots",
@@ -581,7 +583,8 @@ export const CHECKS = [
   // The body slot
   { code: "body-used-undeclared", level: "error", failure: '{{{ body }}} without "body": true, the CMS hides the canvas, so it is always empty.' },
   { code: "body-declared-unused", level: "warning", failure: '"body": true with no {{{ body }}}, a writing canvas whose text goes nowhere.' },
-  { code: "raw-non-body", level: "error", failure: "A triple-brace on anything but `body` emits user input UNESCAPED." },
+  { code: "raw-non-body", level: "error", failure: "A triple-brace on anything but `body` or a top-level richtext field outside loops emits user input UNESCAPED." },
+  { code: "page-body", level: "error", failure: 'A page preset with "body": true. A designed page has no free body; the CMS opens it in the designed view, so canvas text is unreachable.' },
   // fields.json structure
   { code: "bad-field", level: "error", failure: "A fields.json entry is not an object." },
   { code: "bad-field-name", level: "error", failure: "A field name that is not a usable identifier." },
@@ -590,6 +593,7 @@ export const CHECKS = [
   { code: "missing-label", level: "warning", failure: "No label: the CMS shows the raw field name." },
   { code: "select-without-options", level: "error", failure: "A select with nothing to select." },
   { code: "object-without-fields", level: "error", failure: "An object widget with no nested shape." },
+  { code: "richtext-nested", level: "error", failure: "A richtext field inside a list or object: only top-level richtext fields are sanitized and rendered." },
   { code: "template-name-mismatch", level: "error", failure: "fields.json `name` disagrees with the folder. A page's `preset` names the FOLDER." },
   { code: "bad-position", level: "error", failure: "A position outside page/detail/list." },
   // Listings
@@ -721,6 +725,9 @@ export function checkFieldsJson(fields, where) {
       if (f.widget === "select" && !(Array.isArray(f.options) && f.options.length)) {
         problems.push(problem("error", "select-without-options", where, `"${at}" is a select with no options.`));
       }
+      if (f.widget === RICH_TEXT_WIDGET && prefix) {
+        problems.push(problem("error", "richtext-nested", where, `"${at}" is a richtext field inside a list or object. Only top-level richtext fields are sanitized and rendered.`));
+      }
       if (f.widget === "object" && !Array.isArray(f.fields)) {
         problems.push(problem("error", "object-without-fields", where, `"${at}" is an object with no nested fields.`));
       }
@@ -842,6 +849,11 @@ export function checkTemplate(t, world) {
   // fatal (the page renders) but it means the CMS shows a writing canvas whose text
   // appears nowhere — or hides one the template is asking for.
   const rawBody = JSON.stringify(nodes).includes('"t":"raw","path":"body"');
+  if (position === "page" && usesBody) {
+    problems.push(
+      problem("error", "page-body", `${where}fields.json`, `A page preset is a designed page with no free body, but fields.json sets "body": true. The CMS opens it as a designed page, so canvas text is unreachable. Move the prose into a richtext field, then remove "body": true and {{{ body }}}.`),
+    );
+  }
   if (usesBody && !rawBody) {
     problems.push(
       problem("warning", "body-declared-unused", where, `fields.json sets "body": true but the template never renders {{{ body }}}, the CMS shows a writing canvas that goes nowhere.`),
@@ -863,18 +875,21 @@ export function checkTemplate(t, world) {
     }
   }
 
-  // A triple-brace anywhere but `body` emits unescaped user input.
+  // A triple-brace anywhere but `body` emits unescaped user input. The exception is a
+  // top-level richtext field outside any loop: the build sanitizes exactly those names
+  // (frontend/lib/sanitize.ts sanitizeRichFields) before rendering.
+  const rich = new Set(richTextFields(decl.fields));
   const rawPaths = [];
-  const collectRaw = (ns) => {
+  const collectRaw = (ns, inEach) => {
     for (const n of ns) {
-      if (n.t === "raw" && n.path !== BODY_SLOT) rawPaths.push(n.path);
-      if (n.body) collectRaw(n.body);
+      if (n.t === "raw" && n.path !== BODY_SLOT && (inEach || !rich.has(n.path))) rawPaths.push(n.path);
+      if (n.body) collectRaw(n.body, inEach || n.t === "each");
     }
   };
-  collectRaw(nodes);
+  collectRaw(nodes, false);
   for (const p of rawPaths) {
     problems.push(
-      problem("error", "raw-non-body", `${where}template.html`, `{{{ ${p} }}} emits a slot value UNESCAPED. Only {{{ body }}} is safe, it is sanitized upstream. Use {{ ${p} }}.`),
+      problem("error", "raw-non-body", `${where}template.html`, `{{{ ${p} }}} emits a slot value UNESCAPED. Only {{{ body }}} and top-level richtext fields outside loops are sanitized upstream. Use {{ ${p} }}.`),
     );
   }
 

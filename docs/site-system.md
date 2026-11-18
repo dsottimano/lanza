@@ -73,7 +73,7 @@ position is derived from the routes that reference the template — never guesse
 
 | Position | Scope is | Also gets |
 |---|---|---|
-| `page` | a page's freeform `slots` | `body` if `fields.json` sets `"body": true` |
+| `page` | a page's freeform `slots` | nothing: a designed page has no free body, so `"body": true` is the `page-body` error |
 | `detail` | **the entry's frontmatter** | `url`, `slug`, `indexUrl`, `body` |
 | `list` | the listing's own slots | `entries` (each item + `url`/`slug`), `count`, `isEmpty` |
 | page `listing` | the page's slots | as `list`; with `listing.date` each item adds `date`/`dateLong`; with `listing.latest: N`, `latest`/`rest` and `latestIsEmpty`/`restIsEmpty` |
@@ -165,7 +165,9 @@ What it catches, all of it otherwise silent:
 | `unclosed-block` | the engine drops the rest of the page |
 | `body-used-undeclared` | `{{{ body }}}` without `"body": true` — canvas hidden, so always empty |
 | `body-declared-unused` | `"body": true` with no `{{{ body }}}` — a writing canvas that goes nowhere |
-| `raw-non-body` | `{{{ x }}}` on anything but `body` — emits user input unescaped |
+| `raw-non-body` | `{{{ x }}}` on anything but `body` or a top-level `richtext` field outside loops: emits user input unescaped |
+| `page-body` | a page preset with `"body": true`: the CMS opens it as a designed page, so canvas text is unreachable |
+| `richtext-nested` | a `richtext` field inside a list or object; only top-level ones are sanitized and rendered |
 | `unused-field` | an input the owner fills that appears nowhere |
 | `listing-unknown-field` | a listing prints a field its collection does not have |
 | `route-template-missing` | a live URL rendering "Unknown template" |
@@ -309,8 +311,25 @@ copy: route/renderer review and CMS edit-to-render regression tests remain requi
 ## Page sections, not a second page builder
 
 The top-level Pages `blocks` field is retired from this site's schema. The content
-inventory found no entries using it. Pages use either a rich-text body or a preset
-with declared slots, including ordinary lists for repeated content.
+inventory found no entries using it. The schema dictates the editing surface: a page
+without a preset is a rich-text writing canvas; a page with a preset is a designed
+page, opens in the template/live-preview view, and has only its declared slots
+(including ordinary lists for repeated content), never a free body. Formatted prose
+on a designed page is a `richtext` field. Detail templates (posts, custom types)
+keep `{{{ body }}}`.
+
+## Rich-text fields
+
+`"widget": "richtext"` is basic formatting only: bold, italic, underline, three
+named sizes and the site's heading/body theme fonts, stored as HTML with fixed
+`lz-size-*`/`lz-font-*` classes (never style attributes). The allowlist lives in
+`functions/_lib/rich-text.mjs` and is shared by the checker, the CMS editor, the
+preview and `frontend/lib/sanitize.ts`. Declare it at the top level of `fields.json`
+and render it as `{{{ name }}}` outside any `{{#each}}`; `HtmlTemplate.astro`
+sanitizes exactly those names and verifies the output before rendering. Anything
+else raw remains `raw-non-body`. Upgrading a tenant whose page preset still sets
+`"body": true` fails `check:site` and `lanza build` with `page-body`; the stored body
+is untouched (the CMS keeps it on save) until it is moved into slots.
 
 Agents can reuse section markup, CSS and field declarations from existing templates
 or recipes, then compose them into the target preset. Give fields human labels and

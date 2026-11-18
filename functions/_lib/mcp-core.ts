@@ -814,7 +814,8 @@ export const TOOLS: ToolDef[] = [
           type: "object",
           description:
             'The fields.json body: {"name": "<same as name>", "fields": [{name,label,widget}, …]}. ' +
-            'Set "body": true to give the entry a rich-text canvas, and render it as {{{ body }}}. ' +
+            'Detail templates only: set "body": true to give the entry a rich-text canvas, and render it as {{{ body }}}. ' +
+            'A page preset never sets "body": true (page-body error); use a top-level "richtext" field, rendered as {{{ name }}}, for formatted prose. ' +
             'A listing template also needs "listing": {"of": "<collection>", "item": [<field names>]}.',
           additionalProperties: true,
         },

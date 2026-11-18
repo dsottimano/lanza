@@ -192,3 +192,9 @@ test("collection identifiers cannot collide with generated bindings or keywords"
   assert.equal(r.imported, true, r.importError);
   assert.deepEqual(r.collectionKeys, names);
 });
+
+test("a richtext field is stored as a string", () => {
+  const r = run(collection({ fields: [{ name: "title", widget: "string" }, { name: "intro", widget: "richtext", required: false }] }));
+  assert.equal(r.status, 0, r.stderr);
+  assert.match(r.config, /"intro": z\.string\(\)/);
+});

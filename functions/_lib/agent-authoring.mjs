@@ -64,7 +64,7 @@ export function humanEditingGuide() {
       },
       designedPage: {
         chooseWhen: "Homepages, landing pages and other deliberately composed sections.",
-        model: "Use pages with frontmatter.preset naming the template folder, frontmatter.slots containing its declared fields, and fields.json body:false. Use template:'landing' only when the outer layout should omit normal site chrome; template and preset are different choices.",
+        model: "Use pages with frontmatter.preset naming the template folder, frontmatter.slots containing its declared fields. A designed page has no free body: never set body:true on a page preset (the checker reports page-body and the build fails); put formatted prose in a top-level richtext field rendered as {{{ name }}}. Use template:'landing' only when the outer layout should omit normal site chrome; template and preset are different choices.",
         humanExperience: "Content sections beside a preview. The human selects a section or clicks preview text to reach its field. Page details and Changes are separate. Agents add/remove/reorder structural sections; humans edit existing content and images.",
         fieldRule: "Use section groups in visual order (Hero, Services, Testimonials, Contact). Provide a field for each meaningful editable piece, not every styling detail. Keep related prose together. Render all declared content fields; avoid hard-coded human copy in the template.",
       },
@@ -77,7 +77,7 @@ export function humanEditingGuide() {
     fieldDesign: [
       "The separate top-level page blocks builder is retired. Compose reusable sections into a preset with fields.json and entry slots; do not add a second block catalog or recreate the page blocks field. Saved snippets are rich-text insertion shortcuts, not layouts. Preserve and migrate existing legacy block content before removing its schema field.",
       "Every public content page must be an entry in a collection declared by data/schema.json. Product and marketing pages have no exemption. Never bypass the CMS with copy in Astro/TypeScript or silently shadow a CMS URL. Declare designed-page fields in templates/<preset>/fields.json and store all copy in the entry slots. Validate and verify that editing a field changes its public render.",
-      "Use string for short text, text for paragraphs, image for replaceable images, and relation for references to actual entries. Follow the advertised widgets rather than inventing a rich-text field widget.",
+      "Use string for short text, text for plain paragraphs, richtext for formatted prose (bold, italic, underline, a fixed size and a theme font only; top-level fields only, rendered as {{{ name }}} outside loops, sanitized by the build), image for replaceable images, and relation for references to actual entries. Follow the advertised widgets rather than inventing others.",
       "Use concise human labels and helpful hints. Group by the section a person sees, not by HTML element or data type. Keep nesting shallow; use list only for genuine repeating items, with useful item labels.",
       "Keep CSS, classes, breakpoints, grid columns, template names and other implementation controls in agent-owned structure, not ordinary editing fields.",
       "Declare optional content required:false and conditionally render the whole optional element. Do not leave empty buttons, image URLs or headings on the page.",

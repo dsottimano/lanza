@@ -163,6 +163,9 @@ export function needsScroll(top: number, height: number, viewportHeight: number)
 import { ref, watch, onBeforeUnmount, shallowRef } from "vue";
 import { scopedProvenance } from "../../../frontend/lib/provenance/text.mjs";
 import { render } from "../../../frontend/lib/template-render";
+import { sanitizeRichFields } from "../../../frontend/lib/sanitize";
+import { RICH_TEXT_CSS, richTextFields } from "../../../functions/_lib/rich-text.mjs";
+import type { Field } from "../schema";
 import { loadPageListing } from "../backend/page-listing";
 import { templateHtmlPath } from "../backend/templates";
 import type { GitHubClient } from "../backend/github";
@@ -178,6 +181,8 @@ const props = defineProps<{
   // the editor holds it separately. Without it a `{{{ body }}}` template previews with an
   // empty article, which is what this pane did before markers existed.
   body?: string;
+  // The template's declared fields: richtext ones are sanitized exactly as the build does.
+  fields?: Field[];
 }>();
 
 // Clicking a marked region asks the parent to focus that field. The path is an ENTRY
@@ -215,7 +220,7 @@ const HIGHLIGHT_STYLE_ID = "lz-preview-highlight";
 // What the engine renders: the same root production builds — slots plus the reserved
 // `body` key (frontend/components/PageArticle.astro:35).
 function renderData(): Record<string, unknown> {
-  const data: Record<string, unknown> = { ...props.slots, ...listingData.value, lanzaProvenance: scopedProvenance({lanzaProvenance:props.provenance}, "slots.") };
+  const data: Record<string, unknown> = { ...sanitizeRichFields(props.slots, { fields: props.fields }), ...listingData.value, lanzaProvenance: scopedProvenance({lanzaProvenance:props.provenance}, "slots.") };
   if (typeof props.body === "string" && templateHtml.value !== null) {
     data.body = bodyForPreview(props.body, templateHtml.value);
   }
@@ -245,7 +250,7 @@ function buildDoc(): string {
 <meta name="lz-preview-version" content="${loadVersion}">
 <base target="_blank">
 <style>${siteCss.value}
-html,body{margin:0;background:var(--paper,#f3f1ea)}</style>
+html,body{margin:0;background:var(--paper,#f3f1ea)}${richTextFields(props.fields).length ? RICH_TEXT_CSS : ""}</style>
 <style id="${HIGHLIGHT_STYLE_ID}">${markerCss()}</style>
 </head><body>${lastBody}</body></html>`;
 }

@@ -1,4 +1,5 @@
 import DOMPurify from "isomorphic-dompurify";
+import { RICH_TEXT_CLASSES, RICH_TEXT_TAGS, richTextFields } from "../../functions/_lib/rich-text.mjs";
 
 // Post/page bodies are HTML (Lanza is the source of truth). We render them with
 // `set:html`, so sanitize at build time as defense-in-depth: the Telegram bot
@@ -60,4 +61,40 @@ export function sanitizeBody(html: string): string {
     ADD_TAGS: ["iframe"],
     ADD_ATTR: ["allowfullscreen", "frameborder", "loading", "sandbox"],
   });
+}
+
+// Rich-text template fields (widget "richtext"): a much smaller allowlist than a body.
+// Tags and size/font classes come from functions/_lib/rich-text.mjs; no style, no
+// links, no data/aria attributes, no other classes (a template's own class names would
+// let a value restyle the page). The class filter runs only inside sanitizeRichText.
+let richTextPass = false;
+DOMPurify.addHook("uponSanitizeAttribute", (node, data) => {
+  if (!richTextPass || data.attrName !== "class") return;
+  const kept = node.nodeName === "SPAN" ? data.attrValue.split(/\s+/).filter((c) => RICH_TEXT_CLASSES.has(c)) : [];
+  if (kept.length) data.attrValue = kept.join(" ");
+  else data.keepAttr = false;
+});
+
+export function sanitizeRichText(html: unknown): string {
+  if (typeof html !== "string") return "";
+  richTextPass = true;
+  try {
+    return DOMPurify.sanitize(html, {
+      ALLOWED_TAGS: RICH_TEXT_TAGS,
+      ALLOWED_ATTR: ["class"],
+      ALLOW_DATA_ATTR: false,
+      ALLOW_ARIA_ATTR: false,
+    });
+  } finally {
+    richTextPass = false;
+  }
+}
+
+/** A template's scope with every declared top-level richtext field sanitized. */
+export function sanitizeRichFields<T extends Record<string, unknown>>(data: T, fieldsJson: unknown): T {
+  const names = richTextFields((fieldsJson as { fields?: unknown } | null)?.fields);
+  if (!names.length) return data;
+  const out: Record<string, unknown> = { ...data };
+  for (const name of names) out[name] = sanitizeRichText(Object.hasOwn(data, name) ? data[name] : "");
+  return out as T;
 }
