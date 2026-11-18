@@ -1475,3 +1475,69 @@ test("translation refuses hostile locale declarations even if marked enabled", a
   translationFixture({"data/site.json":JSON.stringify({defaultLocale:"en",locales:[{code:"en"},{code:"../bad"}]})});
   assert.equal((await translationCall("create_translation",{...translationArgs(),target_locale:"../bad"})).result.isError,true);
 });
+
+// ---------------------------------------------------------------------------
+// Designed pages over MCP: content writes enforce check:site's page-content rules
+// (validate_site has no content inventory), and richtext slots carry agent origin.
+// ---------------------------------------------------------------------------
+const ABOUT_FIELDS = JSON.stringify({ name: "about", fields: [
+  { name: "heading", label: "Heading", widget: "string" }, { name: "intro", label: "Intro", widget: "richtext" }] });
+const designedSite = (extra = {}) => ({
+  "data/schema.json": SCHEMA,
+  "templates/about/template.html": "<h1>{{ heading }}</h1>{{{ intro }}}",
+  "templates/about/fields.json": ABOUT_FIELDS,
+  "templates/event/template.html": "<h1>{{ title }}</h1>{{{ body }}}",
+  "templates/event/fields.json": JSON.stringify({ name: "event", body: true, fields: [{ name: "title", label: "Title", widget: "string" }] }),
+  ...extra,
+});
+
+test("create_content refuses a page preset whose template has a free body, and writes nothing", async () => {
+  const gh = fakeGitHub(designedSite());
+  const before = gh.files.size;
+  const r = await callRaw("create_content", { collection: "pages", title: "Launch", locale: "en", frontmatter: { preset: "event", slots: { title: "x" } } });
+  assert.ok(isError(r)); assert.match(errText(r), /page-body/);
+  assert.equal(gh.files.size, before);
+});
+
+test("update_content refuses moving a page onto a body:true template", async () => {
+  const gh = fakeGitHub(designedSite({ "content/pages/en/a.md": "---\ntitle: A\n---\n\n<p>Body</p>\n" }));
+  const r = await callRaw("update_content", { path: "content/pages/en/a.md", frontmatter: { preset: "event" } });
+  assert.ok(isError(r)); assert.match(errText(r), /page-body/);
+  assert.doesNotMatch(gh.files.get("content/pages/en/a.md"), /preset/);
+});
+
+test("page-content rules from check:site apply to MCP writes", async () => {
+  fakeGitHub(designedSite());
+  for (const [frontmatter, code] of [
+    [{ preset: "missing" }, /content-template-missing/],
+    [{ preset: "../x" }, /invalid-preset/],
+    [{ preset: "about", slots: { heading: "H", nope: "x" } }, /undeclared-content-field/],
+    [{ preset: "about", slots: "text" }, /invalid-slots/],
+  ]) {
+    const r = await callRaw("create_content", { collection: "pages", title: `T ${code}`, locale: "en", frontmatter });
+    assert.ok(isError(r), String(code)); assert.match(errText(r), code);
+  }
+});
+
+test("body_html on a designed page is refused", async () => {
+  const gh = fakeGitHub(designedSite({ "content/pages/en/about.md": "---\ntitle: About\npreset: about\nslots:\n  heading: H\n---\n" }));
+  const created = await callRaw("create_content", { collection: "pages", title: "New", locale: "en", frontmatter: { preset: "about" }, body_html: "<p>x</p>" });
+  assert.ok(isError(created)); assert.match(errText(created), /designed page/);
+  const updated = await callRaw("update_content", { path: "content/pages/en/about.md", body_html: "<p>hidden</p>" });
+  assert.ok(isError(updated)); assert.match(errText(updated), /designed page/);
+  assert.doesNotMatch(gh.files.get("content/pages/en/about.md"), /hidden/);
+});
+
+test("an MCP write to a richtext slot marks the added text and keeps existing markers", async () => {
+  fakeGitHub(designedSite({ "content/pages/en/about.md": "---\ntitle: About\npreset: about\nslots:\n  heading: H\n  intro: '<p>Human text. <span data-lanza-origin=\"agent\">Old agent</span></p>'\n---\n" }));
+  await callData("update_content", { path: "content/pages/en/about.md", frontmatter: { slots: { intro: '<p>Human text. <span data-lanza-origin="agent">Old agent</span> New words</p>' } } });
+  const { frontmatter } = await callData("read_content", { path: "content/pages/en/about.md" });
+  // Human text stays unmarked; the old marker survives and the added words are marked.
+  assert.match(frontmatter.slots.intro, /^<p>Human text\. <span data-lanza-origin="agent">/);
+  assert.match(frontmatter.slots.intro, /<span data-lanza-origin="agent">(<span data-lanza-origin="agent">)?Old agent/);
+  assert.match(frontmatter.slots.intro, /<span data-lanza-origin="agent">\s*New words<\/span>/);
+  assert.ok(!Object.hasOwn(frontmatter.lanzaProvenance?.fields ?? {}, "slots.intro"), "richtext origin lives in the HTML, not a plain-field record");
+  const created = await callData("create_content", { collection: "pages", title: "Story", locale: "en", frontmatter: { preset: "about", slots: { heading: "S", intro: "<p>All agent</p>" } } });
+  const story = await callData("read_content", { path: created.created });
+  assert.equal(story.frontmatter.slots.intro, '<p><span data-lanza-origin="agent">All agent</span></p>');
+});

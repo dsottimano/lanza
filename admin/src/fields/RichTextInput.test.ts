@@ -70,3 +70,19 @@ it("focusField puts the caret in the richtext document, not the toolbar", async 
   expect(await (w.vm as unknown as { focusField: (p: string) => Promise<boolean> }).focusField("intro")).toBe(true);
   expect((document.activeElement as HTMLElement | null)?.getAttribute("contenteditable")).toBe("true");
 });
+it("MCP richtext write -> CMS load -> human edit -> save -> public render keeps agent origin", async () => {
+  const { markAgentPaths } = await import("../../../functions/_lib/agent-provenance");
+  // What update_content stores: the agent added a sentence to a human paragraph.
+  const before = { slots: { intro: "<p>Human text.</p>" } };
+  const after = { slots: { intro: "<p>Human text. Agent sentence.</p>" } };
+  markAgentPaths(before, after, [["slots", "intro"]]);
+  expect(after.slots.intro).toBe('<p>Human text.<span data-lanza-origin="agent"> Agent sentence.</span></p>');
+  const cms = await editor(after.slots.intro);
+  cms.tiptap.commands.setTextSelection(cms.tiptap.state.doc.content.size - 1);
+  cms.tiptap.commands.insertContent(" Human tail.");
+  const saved = cms.last();
+  const reloaded = await editor(saved);
+  const scope = sanitizeRichFields({ intro: reloaded.tiptap.getHTML() }, { fields: [{ name: "intro", widget: "richtext" }] });
+  expect(render("<section>{{{ intro }}}</section>", scope))
+    .toBe('<section><p>Human text.<span data-lanza-origin="agent"> Agent sentence.</span> Human tail.</p></section>');
+});

@@ -3,6 +3,7 @@
 import { existsSync, readdirSync, readFileSync } from 'node:fs';
 import { join } from 'node:path';
 import yaml from 'js-yaml';
+import { PRESET_NAME, presetProblems } from '../functions/_lib/page-content.mjs';
 
 const frontmatter = (root, file) =>
   yaml.load(readFileSync(join(root, file), 'utf8').match(/^---\r?\n([\s\S]*?)\r?\n---(?:\r?\n|$)/)?.[1] ?? '') ?? {};
@@ -51,21 +52,6 @@ export function checkContent(root) {
     error(file, 'route-outside-schema', 'Public content routes must use a CMS page or collection.route, not a handwritten route.');
   }
   const files = new Set([...walk('content'), ...folders.flatMap(c => walk(c.folder))]);
-  function slots(value, fields, where) {
-    if (!value || typeof value !== 'object' || Array.isArray(value)) {
-      error(where, 'invalid-slots', 'Template content must be an object.'); return;
-    }
-    for (const [name, entry] of Object.entries(value)) {
-      const field = fields.find(f => f.name === name);
-      if (!field) { error(`${where}.${name}`, 'undeclared-content-field', 'No template field declares this value; the CMS cannot edit it.'); continue; }
-      if (entry == null) continue;
-      if (field.widget === 'object') slots(entry, field.fields ?? [], `${where}.${name}`);
-      if (field.widget === 'list' && field.fields) {
-        if (!Array.isArray(entry)) error(`${where}.${name}`, 'invalid-slots', 'List content must be an array.');
-        else entry.forEach((item, i) => slots(item, field.fields, `${where}.${name}.${i}`));
-      }
-    }
-  }
   for (const file of files) {
     if (!/\.md$/.test(file)) continue;
     if (!folders.some(c => file.startsWith(`${c.folder}/`))) {
@@ -80,15 +66,15 @@ export function checkContent(root) {
       error(file, 'legacy-blocks-without-schema', 'Migrate existing page blocks to a preset and slots before removing their schema field; otherwise the build would discard their content.');
     }
     if (!data.preset) continue;
-    if (typeof data.preset !== 'string' || !/^[a-zA-Z0-9_-]+$/.test(data.preset)) {
-      error(file, 'invalid-preset', 'Preset must name a template folder.'); continue;
+    let fieldsJson = null;
+    if (typeof data.preset === 'string' && PRESET_NAME.test(data.preset)) {
+      const path = join(root, 'templates', data.preset);
+      if (existsSync(join(path, 'fields.json')) && existsSync(join(path, 'template.html'))) {
+        try { fieldsJson = JSON.parse(readFileSync(join(path, 'fields.json'), 'utf8')); }
+        catch (e) { error(file, 'invalid-template-fields', e.message); continue; }
+      }
     }
-    const path = join(root, 'templates', data.preset);
-    if (!existsSync(join(path, 'fields.json')) || !existsSync(join(path, 'template.html'))) {
-      error(file, 'content-template-missing', `Template ${data.preset} needs fields.json and template.html.`); continue;
-    }
-    try { slots(data.slots ?? {}, JSON.parse(readFileSync(join(path, 'fields.json'), 'utf8')).fields ?? [], `${file}:slots`); }
-    catch (e) { error(file, 'invalid-template-fields', e.message); }
+    problems.push(...presetProblems(data, fieldsJson, file));
   }
   return problems;
 }

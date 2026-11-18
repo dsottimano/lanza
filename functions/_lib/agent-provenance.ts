@@ -34,3 +34,21 @@ export function markAgentHtml(before: string, after: string): string {
   }
   return serialize(doc);
 }
+
+/**
+ * Richtext values (template `richtext` fields) are HTML too: mark the agent's added text
+ * at each path, as markAgentHtml does for a body, keeping existing markers. `after` is
+ * updated in place; an unchanged value is left as it was.
+ */
+export function markAgentPaths(before: Record<string, unknown>, after: Record<string, unknown>, paths: string[][]): void {
+  const at = (root: unknown, keys: string[]): unknown =>
+    keys.reduce<unknown>((o, k) => (o && typeof o === "object" ? (o as Record<string, unknown>)[k] : undefined), root);
+  for (const path of paths) {
+    const parent = at(after, path.slice(0, -1));
+    const key = path[path.length - 1];
+    if (!parent || typeof parent !== "object" || typeof (parent as Record<string, unknown>)[key] !== "string") continue;
+    const previous = at(before, path);
+    const record = parent as Record<string, unknown>;
+    record[key] = markAgentHtml(typeof previous === "string" ? previous : "", record[key] as string);
+  }
+}

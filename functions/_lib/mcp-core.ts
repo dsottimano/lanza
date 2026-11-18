@@ -1,4 +1,6 @@
-import { markAgentHtml } from "./agent-provenance";
+import { markAgentHtml, markAgentPaths } from "./agent-provenance";
+import { PRESET_NAME, presetProblems } from "./page-content.mjs";
+import { RICH_TEXT_WIDGET, richTextFields } from "./rich-text.mjs";
 import { recordAgentFields } from "../../frontend/lib/provenance/text.mjs";
 import { PluginRuntime, catalog } from "./plugin-runtime.mjs";
 import { AGENT_INSTRUCTIONS } from "./agent-authoring.mjs";
@@ -170,6 +172,52 @@ interface CollectionDef {
   localized?: boolean;
   body?: string;
   kind?: string;
+  fields?: Array<{ name?: unknown; widget?: unknown }>;
+}
+
+/**
+ * A designed page's template fields, after check:site's page-content rules
+ * (functions/_lib/page-content.mjs): validate_site cannot read every page, so a write
+ * the build would refuse is refused here instead. null when the entry has no preset.
+ */
+async function designedPage(client: ContentClient, data: Record<string, unknown>, where: string): Promise<{ fields?: unknown } | null> {
+  if (!data.preset) return null;
+  let fieldsJson: { fields?: unknown; body?: unknown } | null = null;
+  if (typeof data.preset === "string" && PRESET_NAME.test(data.preset)) {
+    const raw = await client.readRaw(`templates/${data.preset}/fields.json`);
+    if (raw !== null && (await client.readRaw(`templates/${data.preset}/template.html`)) !== null) {
+      try { fieldsJson = JSON.parse(raw); } catch { throw new GitHubError(422, `Refused, nothing was written: templates/${data.preset}/fields.json is not valid JSON.`); }
+    }
+  }
+  const problems = presetProblems(data, fieldsJson, where);
+  if (problems.length) {
+    throw new GitHubError(422, "Refused, nothing was written. This page would fail check:site:\n" +
+      problems.map((p: { code: string; where: string; message: string }) => `${p.code} ${p.where}: ${p.message}`).join("\n"));
+  }
+  return fieldsJson;
+}
+
+/** A designed page has no free body; its prose belongs in a richtext slot. */
+function refuseDesignedBody(designed: unknown, body: unknown): void {
+  if (designed && typeof body === "string" && body.trim()) {
+    throw new GitHubError(400, "Refused, nothing was written: this is a designed page (it has a preset), which has no free body. Put the prose in a richtext field of its template and write it under frontmatter.slots.");
+  }
+}
+
+/**
+ * Where an entry's richtext values live: the preset template's top-level richtext
+ * fields under `slots`, or the collection's own richtext fields. They are HTML, so
+ * agent origin is recorded inline (markAgentPaths), never as a plain-field record.
+ */
+function richPaths(col: CollectionDef | undefined, designed: { fields?: unknown } | null): string[][] {
+  if (designed) return richTextFields(designed.fields).map((name: string) => ["slots", name]);
+  return (col?.fields ?? []).filter((f) => f.widget === RICH_TEXT_WIDGET && typeof f.name === "string").map((f) => [f.name as string]);
+}
+function recordAgentWrite(before: Record<string, unknown>, after: Record<string, unknown>, paths: string[][]): void {
+  markAgentPaths(before, after, paths);
+  const record = recordAgentFields(before, after);
+  for (const path of paths) delete record.fields[path.join(".")];
+  after.lanzaProvenance = record;
 }
 
 // Memoized per ContentClient. functions/api/mcp.ts builds a fresh client per
@@ -682,18 +730,21 @@ export const TOOLS: ToolDef[] = [
       if (typeof args.target_locale !== "string" || !source.locales.includes(args.target_locale) || args.target_locale === source.locale) throw new GitHubError(400, "Choose a different enabled target locale.");
       if (!isMapping(args.frontmatter) || typeof args.frontmatter.title !== "string" || !args.frontmatter.title.trim()) throw new GitHubError(400, "Supply translated frontmatter with a non-empty title.");
       for (const key of ["preset", "template"]) if (Object.hasOwn(args.frontmatter, key) && args.frontmatter[key] !== source.entry.data[key]) throw new GitHubError(400, `Preserve the source ${key} when translating.`);
-      if (source.entry.body.trim() && typeof args.body_html !== "string") throw new GitHubError(400, "Supply the translated body_html; the source body must not be silently copied.");
+      const designedSource = !!source.entry.data.preset;
       if (args.body_html !== undefined && typeof args.body_html !== "string") throw new GitHubError(400, "body_html must be a string.");
-      if (source.entry.body.trim() && !String(args.body_html).trim()) throw new GitHubError(400, "The translated body must not be empty.");
+      refuseDesignedBody(designedSource, args.body_html);
+      if (!designedSource && source.entry.body.trim() && typeof args.body_html !== "string") throw new GitHubError(400, "Supply the translated body_html; the source body must not be silently copied.");
+      if (!designedSource && source.entry.body.trim() && !String(args.body_html).trim()) throw new GitHubError(400, "The translated body must not be empty.");
       const data = mergeTranslation(source.entry.data, args.frontmatter) as Record<string, unknown>;
       data.draft = true;
+      const designed = await designedPage(client, data, source.path);
       await preserveTranslationAssets(client, source.entry.data, data, source.col.name);
       const path = await assertEntryPath(client, `${source.col.folder.replace(/\/+$/, "")}/${args.target_locale}/${source.filename}`);
       if (await client.exists(path)) throw new GitHubError(409, "The target translation already exists. Read and review it instead of overwriting it.");
       // Recheck after schema/target lookups. GitHub Contents cannot atomically bind
       // a create to another file SHA; a subsequent source edit remains possible.
       if ((await client.read(source.path)).sha !== args.source_sha) throw new GitHubError(409, "The source changed during translation preparation. Reread it.");
-      data.lanzaProvenance = recordAgentFields(source.entry.data, data);
+      recordAgentWrite(source.entry.data, data, richPaths(source.col as CollectionDef, designed));
       const commit = await client.save(path, data, markAgentHtml("", String(args.body_html ?? "")), `Translate ${source.path} to ${args.target_locale} via MCP`, null);
       return { created: path, source_path: source.path, source_sha: args.source_sha, locale: args.target_locale, draft: true, commit, ...stagedNote(site) };
     },
@@ -713,7 +764,7 @@ export const TOOLS: ToolDef[] = [
             "Additional frontmatter fields per the collection's schema (e.g. description, seo, template). 'title' and 'draft:false' are set for you unless overridden.",
           additionalProperties: true,
         },
-        body_html: str("The entry body as HTML. Optional for body-less collections."),
+        body_html: str("The entry body as HTML. Optional for body-less collections. Refused for a page with a preset (a designed page has no body; write formatted prose to a richtext slot)."),
       },
       ["collection", "title"],
     ),
@@ -725,6 +776,8 @@ export const TOOLS: ToolDef[] = [
       const extra = (args.frontmatter as Record<string, unknown>) ?? {};
       const data: Record<string, unknown> = { draft: false, ...extra, title };
       const body = col.body && col.body !== "none" ? String(args.body_html ?? "") : "";
+      const designed = await designedPage(client, data, path);
+      refuseDesignedBody(designed, body);
       await client.ensureWorkingBranch();
       // "Create" must not silently overwrite: two titles that slugify alike, or a
       // retried call, would otherwise destroy an existing entry with no warning.
@@ -736,7 +789,7 @@ export const TOOLS: ToolDef[] = [
       }
       // exists() just proved there's no sha; passing null skips save()'s own lookup
       // of the same endpoint.
-      data.lanzaProvenance = recordAgentFields({}, data);
+      recordAgentWrite({}, data, richPaths(col, designed));
       const commit = await client.save(path, data, markAgentHtml("", body), `Create ${path} via MCP`, null);
       return { created: path, commit, ...stagedNote(site) };
     },
@@ -754,7 +807,7 @@ export const TOOLS: ToolDef[] = [
             "Frontmatter fields to set/override. Merged into the existing frontmatter, nested objects included. null removes a key.",
           additionalProperties: true,
         },
-        body_html: str("New HTML body. Omit to leave the body unchanged."),
+        body_html: str("New HTML body. Omit to leave the body unchanged. Refused for a page with a preset (a designed page has no body; write formatted prose to a richtext slot)."),
       },
       ["path"],
     ),
@@ -762,7 +815,10 @@ export const TOOLS: ToolDef[] = [
       const path = await assertEntryPath(client, String(args.path));
       const current = await client.read(path);
       const merged = mergeFrontmatter(current.data, (args.frontmatter as Record<string, unknown>) ?? {});
-      merged.lanzaProvenance = recordAgentFields(current.data, merged);
+      const designed = await designedPage(client, merged, path);
+      refuseDesignedBody(designed, args.body_html);
+      const col = (await getCollections(client)).find((c) => path.startsWith(`${c.folder.replace(/\/+$/, "")}/`));
+      recordAgentWrite(current.data, merged, richPaths(col, designed));
       const body = args.body_html !== undefined ? markAgentHtml(current.body, String(args.body_html)) : current.body;
       const commit = await client.save(path, merged, body, `Update ${path} via MCP`);
       return { updated: path, commit, ...stagedNote(site) };

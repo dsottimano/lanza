@@ -19,6 +19,10 @@ The writing canvas and review dialog highlight agent spans with a dotted underli
 and pale background. Markers survive editor serialization and public sanitization.
 Public styling is tenant-controlled; the attribute itself is intentionally neutral.
 
+Template `richtext` fields are HTML, so they follow the body contract: MCP writes mark
+added words inline, existing markers are kept, and the editor, sanitizer and public render
+preserve them. They get no `lanzaProvenance` record.
+
 Plain fields cannot contain HTML. System frontmatter `lanzaProvenance` stores
 `{version:1, fields:{"slots.heading":{origin:"agent",text:"Written value"}}}`.
 Changed fields supplied through agent tools are recorded; untouched field records
