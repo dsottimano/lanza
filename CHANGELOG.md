@@ -3,6 +3,23 @@
 `lanza-site` on npm. Tenants pin a version, so nothing here reaches a live site until
 that site updates (Settings → Software).
 
+## 0.1.34 — 2026-11-18
+
+- **Breaking for sites whose page templates use a body.** A page with a preset is a
+  designed page: it always opens in the template view with its declared fields, and its
+  template may not set `"body": true`. That is now the `page-body` error in `check:site`,
+  `lanza build` and MCP. A site with such a template fails its build after updating
+  until the body text is moved into template fields; the stored body stays in the files.
+  Detail templates (posts, custom types) keep `{{{ body }}}`.
+- New `richtext` template field: bold, italic, underline, three sizes and the site's
+  heading/body fonts. Rendered with `{{{ name }}}` (top-level fields only), sanitized on
+  the public site and in the preview, with agent-origin markers preserved.
+- MCP content writes refuse a page on a body template and body text on a designed page;
+  `write_template` refuses adding a body to a template a page uses. When a site is too
+  large to scan, `validate_site` reports `complete: false` instead of ok.
+- New checker codes: `page-body`, `richtext-nested`, `richtext-reserved`,
+  `raw-unsafe-position`. See docs/site-system.md and docs/authoring-templates.md.
+
 ## 0.1.33 — 2026-11-18
 
 - Agent requests are now the built-in private plugin **Agent requests**, **off by
