@@ -11,6 +11,7 @@ import { GitHubClient } from "../backend/github";
 import { loadBlocks, saveBlocks, type Block } from "../backend/blocks";
 import { reportError, clearError } from "../errors";
 import { isDirty } from "./dirty";
+import { useAgentRequestsEnabled } from "../backend/plugins";
 
 const props = defineProps<{ client: GitHubClient }>();
 const emit = defineEmits<{ (e: "back"): void }>();
@@ -20,6 +21,7 @@ const blocks = reactive<Block[]>([]);
 let sha: string | undefined;
 const activeId = ref<string | null>(null);
 const editorRef = useTemplateRef<InstanceType<typeof Editor>>("editorRef");
+const agentRequestsOn = useAgentRequestsEnabled();
 
 const activeBlock = computed(() => blocks.find((b) => b.id === activeId.value) ?? null);
 
@@ -190,6 +192,7 @@ function preview(html: string): string {
             :key="activeBlock.id"
             :initial-html="activeBlock.html"
             :client="client"
+            :show-agent-origin="agentRequestsOn"
             @change="markDirty"
           />
         </section>

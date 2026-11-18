@@ -6,6 +6,7 @@ import SaveButton from "./SaveButton.vue";
 import { GitHubError, type GitHubClient } from "../backend/github";
 import { loadBlocks } from "../backend/blocks";
 import { isDirty } from "./dirty";
+import { access } from "../backend/access";
 vi.mock("../errors", () => ({ reportError: vi.fn(), clearError: vi.fn() }));
 const original = { blocks: [{id:"one",name:"First",html:"<p>Before</p>"}] };
 const EditorStub = defineComponent({ props:["initialHtml"], emits:["change"], setup(props, {expose}) { expose({ getHTML: () => props.initialHtml }); }, template:`<button @click="$emit('change')">Edit text</button>` });
@@ -35,4 +36,14 @@ it.each([null,{}, {blocks:[{id:'bad',name:'Broken'}]}, {blocks:[...original.bloc
 });
 it("treats a missing file as an empty list",async()=>{
  await expect(loadBlocks({loadJson:vi.fn().mockRejectedValue(new GitHubError(404,'Not Found'))} as unknown as GitHubClient)).resolves.toEqual({blocks:[]});
+});
+it.each([false,true])("shows dotted agent highlights in snippets only when Agent requests is enabled (%s)",async enabled=>{
+ Object.assign(access,{loaded:true,role:"owner"});
+ vi.stubGlobal("fetch",vi.fn(async()=>new Response(JSON.stringify({sha:null,state:{version:1,enabled,settings:{}}}),{headers:{"Content-Type":"application/json"}})));
+ try{
+  const loadJson=vi.fn().mockResolvedValue({data:{blocks:[{id:"one",name:"First",html:'<p><span data-lanza-origin="agent">Agent text</span></p>'}]},sha:"old"});
+  const w=mount(BlocksView,{attachTo:document.body,props:{client:{loadJson,saveJson:vi.fn()} as unknown as GitHubClient}});await flushPromises();
+  expect(w.find('[data-lanza-origin="agent"]').exists()).toBe(true);
+  expect(w.find(".prose--agent-origin").exists()).toBe(enabled);w.unmount();
+ }finally{vi.unstubAllGlobals();Object.assign(access,{role:null});}
 });

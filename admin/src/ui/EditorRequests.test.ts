@@ -94,3 +94,14 @@ it("keeps the agent UI hidden when the plugin state cannot be read", async () =>
   const { wrapper } = await fixture();
   expect(agentUi(wrapper)).toEqual({ requests: false, hint: false, notice: false, highlights: false });
 });
+it("ignores an owner-time plugin answer that arrives after the role drops to editor", async () => {
+  let answer!: (enabled: boolean) => void;
+  const pending = new Promise<boolean>(resolve => { answer = resolve; });
+  const base = fetcher.getMockImplementation()! as (url: string, options?: RequestInit) => Promise<Response>;
+  fetcher.mockImplementation(async (url: string, options?: RequestInit) => String(url).startsWith("/admin/api/plugins?id=agent-requests")
+    ? respond({ sha: null, state: { version: 1, enabled: await pending, settings: {} } }) : base(url, options));
+  const { wrapper } = await fixture();
+  access.role = "editor"; await flushPromises();
+  answer(true); await flushPromises();
+  expect(agentUi(wrapper)).toEqual({ requests: false, hint: false, notice: false, highlights: false });
+});

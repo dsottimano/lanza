@@ -41,7 +41,7 @@ import AgentBodyReview from "./AgentBodyReview.vue";
 import AgentRequests from "./AgentRequests.vue";
 import { prepareRequestReplacement, type RequestAnchor } from "../backend/agent-requests";
 import { access } from "../backend/access";
-import { agentRequestsEnabled, pluginRequest } from "../backend/plugins";
+import { pluginRequest, useAgentRequestsEnabled } from "../backend/plugins";
 import { useEntryReview } from "./useEntryReview";
 import { refreshPending } from "./staging";
 
@@ -138,8 +138,7 @@ const urlFrame = computed(() =>
 const urlPrefix = computed(() => urlFrame.value?.prefix ?? "");
 const urlSuffix = computed(() => urlFrame.value?.suffix ?? "");
 const agentRequestsRef = ref<InstanceType<typeof AgentRequests>>();
-const agentRequestsOn = ref(false);
-watch(isOwner, async owner => { agentRequestsOn.value = owner && await agentRequestsEnabled(); }, { immediate: true });
+const agentRequestsOn = useAgentRequestsEnabled();
 const translationPreparing = ref(false);
 const translationIssue = ref("");
 async function askForTranslation(code: Locale, label: string) {

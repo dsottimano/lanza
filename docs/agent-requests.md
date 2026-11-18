@@ -14,6 +14,8 @@ no dotted agent highlights, no provenance notices, no Requests panel, no
 selection-to-request menu and no translation request, and the API/MCP refuse new
 captures and responses (409). Existing requests stay readable and `lanzaProvenance`
 is still recorded and preserved in entries; only the UI and new requests are gated.
+Off is a product switch, not a control against the owner's own agent: an MCP agent
+connected with the owner's token can re-enable it through `run_plugin`.
 Its switch is stored at `plugins/agent-requests/state.json` on the same
 `lanza-agent-requests` branch, so no new branch needs a Pages exclusion.
 

@@ -27,7 +27,7 @@ import { pasteImage } from "./paste-image";
 
 const props = withDefaults(
   defineProps<{ initialHtml?: string; client?: GitHubClient; showInspector?: boolean; showAgentOrigin?: boolean }>(),
-  { initialHtml: "<p></p>", client: undefined, showAgentOrigin: true },
+  { initialHtml: "<p></p>", client: undefined, showAgentOrigin: false },
 );
 const emit = defineEmits<{ (e: "change"): void; (e: "invalid", message: string): void }>();
 const contentProblem = ref("");

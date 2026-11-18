@@ -117,7 +117,10 @@ export class AgentRequests {
     const task: AgentRequestTask = { version:1,id,entryPath,action:requestedAction,instruction,anchor:selection,createdAt:now,createdBy:this.actor,updatedAt:now,status:"open" };
     try { return await this.write(task); } catch (error) {
       if (!(error instanceof GitHubError) || ![409,422].includes(error.status)) throw error;
-      return sameCapture(await this.readStored(id));
+      // Only a stored capture turns a conflict into success; otherwise keep the refusal.
+      const stored = await this.readStored(id).catch(missing => { if (missing instanceof GitHubError && missing.status === 404) return null; throw missing; });
+      if (!stored) throw error;
+      return sameCapture(stored);
     }
   }
   async update(input: unknown): Promise<RequestEnvelope> {
@@ -138,7 +141,8 @@ export class AgentRequests {
   private async write(task: AgentRequestTask, sha?: string): Promise<RequestEnvelope> {
     const text = JSON.stringify(task,null,2) + "\n";
     if (new TextEncoder().encode(text).byteLength > REQUEST_BODY_LIMIT) throw new GitHubError(413,"Agent request exceeds its limit.");
-    await this.guard();
+    // Re-check at the write boundary: a disable during this call refuses the write.
+    await this.guard(); await this.assertEnabled();
     const saved = object(await this.api("PUT",`contents/requests/${task.id}.json`,{ branch:REQUEST_BRANCH,message:`Agent request ${task.id}: ${task.status} [skip ci]`,content:encode(text),...(sha ? {sha} : {}) }));
     const resultSha = object(saved.content).sha;
     if (typeof resultSha !== "string" || !SHA.test(resultSha)) throw new GitHubError(502,"GitHub did not confirm the saved request SHA.");

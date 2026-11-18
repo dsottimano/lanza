@@ -114,3 +114,40 @@ test('MCP uses the same read and revision-checked mutation service as the CMS',a
  const enabled=await call('set-enabled',{expectedSha:null,enabled:true});assert.equal(enabled.result.isError,undefined);assert.equal(f.state.enabled,true);
  const stale=await call('set-enabled',{expectedSha:null,enabled:false});assert.equal(stale.result.isError,true);assert.equal(f.state.enabled,true);
 });
+
+test('agent-requests set-enabled writes only its state file on lanza-agent-requests',async()=>{
+ const previous=globalThis.fetch;const calls=[];
+ try{
+  globalThis.fetch=async(url,init={})=>{
+   const route=new URL(url).pathname.replace(/^\/repos\/[^/]+\/[^/]+\/?/,'');const method=init.method||'GET';const body=init.body?JSON.parse(init.body):null;calls.push({route,method,body});
+   if(route==='')return Response.json({private:true,permissions:{admin:true},full_name:'example/private'});
+   if(method==='GET')return new Response('',{status:404});
+   if(route==='git/refs')return Response.json({},{status:201});
+   if(method==='POST')return Response.json({sha:'a'.repeat(40)},{status:201});
+   return Response.json({content:{sha:'b'.repeat(40)}});
+  };
+  const client=new ContentClient({owner:'example',name:'private'},'test');
+  const saved=await new PluginRuntime(client,'owner',async p=>p).run('agent-requests','set-enabled',{expectedSha:null,enabled:true});
+  assert.equal(saved.state.enabled,true);
+  const reads=calls.filter(c=>c.method==='GET'&&c.route.startsWith('contents/'));assert.ok(reads.length);
+  for(const c of reads)assert.equal(c.route,'contents/plugins/agent-requests/state.json');
+  const puts=calls.filter(c=>c.method==='PUT');assert.equal(puts.length,1);
+  assert.equal(puts[0].route,'contents/plugins/agent-requests/state.json');assert.equal(puts[0].body.branch,'lanza-agent-requests');
+  assert.equal(calls.find(c=>c.route==='git/refs').body.ref,'refs/heads/lanza-agent-requests');
+  assert.ok(calls.every(c=>!c.route.startsWith('contents/requests')&&!JSON.stringify(c.body??'').match(/refs\/heads\/(main|staging)/)));
+ }finally{globalThis.fetch=previous;}
+});
+test('tenant private plugin without operations builds without a server module and refuses custom operations',async()=>{
+ const dir=await mkdtemp(path.join(os.tmpdir(),'lanza-plugins-'));
+ try{
+  await mkdir(path.join(dir,'plugins/inert'),{recursive:true});const m={...manifest,id:'inert',workspace:'settings',operations:[]};
+  await writeFile(path.join(dir,'plugins/inert/plugin.json'),JSON.stringify(m));
+  await buildPlugins(dir);
+  const line=(await readFile(path.join(dir,'functions/_lib/plugin-registry.mjs'),'utf8')).split('\n').find(l=>l.includes('"id":"inert"'));
+  assert.ok(line);assert.doesNotMatch(line,/,run:/);
+  const client={pluginArchive:async(_id,_method,route)=>route===''?{private:true,full_name:'example/private',permissions:{admin:true}}:null};
+  const runtime=new PluginRuntime(client,'owner',async p=>p,[{manifest:m}]);
+  for(const operation of ['check','configure','refresh'])await assert.rejects(runtime.run('inert',operation,{expectedSha:null}),e=>e.status===400);
+  await writeFile(path.join(dir,'plugins/inert/plugin.json'),JSON.stringify({...m,operations:['check']}));await assert.rejects(buildPlugins(dir));
+ }finally{await rm(dir,{recursive:true,force:true});}
+});

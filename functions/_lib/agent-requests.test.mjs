@@ -12,7 +12,7 @@ const INPUT={id:ID,entryPath:ENTRY,action:'verify',instruction:'',anchor:{quote:
 const b64=text=>Buffer.from(text).toString('base64');
 const sha=text=>createHash('sha1').update(text).digest('hex');
 function fixture(options={}) {
- const files=new Map();const calls=[];let branch=options.branch??true;let privacyChecks=0;let raced=false;
+ const files=new Map();const calls=[];let branch=options.branch??true;let privacyChecks=0;let raced=false;let pluginReads=0;
  const respond=(status,body)=>new Response(JSON.stringify(body),{status});
  globalThis.fetch=async(url,init={})=>{
   const u=new URL(url);const route=u.pathname.replace(/^\/repos\/[^/]+\/[^/]+\/?/,'');const method=init.method||'GET';const body=init.body?JSON.parse(init.body):null;
@@ -23,7 +23,7 @@ function fixture(options={}) {
   if(method==='POST'&&route==='git/trees')return respond(201,{sha:'c'.repeat(40)});
   if(method==='POST'&&route==='git/commits')return respond(201,{sha:'d'.repeat(40)});
   if(method==='POST'&&route==='git/refs'){if(options.branchRace){branch=!options.failedRace;return respond(422,{message:'Already exists'});}branch=true;return respond(201,{object:{sha:'d'.repeat(40)}});}
-  if(route==='contents/plugins/agent-requests/state.json')return options.disabled?respond(404,{}):respond(200,{content:b64(JSON.stringify({version:1,enabled:true,settings:{}})),sha:'e'.repeat(40)});
+  if(route==='contents/plugins/agent-requests/state.json')return options.disabled||(options.disableAt&&++pluginReads>=options.disableAt)?respond(404,{}):respond(200,{content:b64(JSON.stringify({version:1,enabled:true,settings:{}})),sha:'e'.repeat(40)});
   if(route==='contents/requests')return files.size?respond(200,[...files.keys()].map(id=>({name:`${id}.json`,type:'file',path:`requests/${id}.json`}))):respond(404,{});
   const id=/^contents\/requests\/([a-f0-9-]+)\.json$/.exec(route)?.[1];
   if(id){
@@ -63,7 +63,10 @@ test('branch creation race succeeds only after confirming actual branch',async()
  const bad=fixture({branch:false,branchRace:true,failedRace:true});await assert.rejects(()=>bad.archive.create(INPUT));assert.equal(bad.files.size,0);
 });
 test('visibility is rechecked before persistence and no capture is written after it becomes public',async()=>{
- const f=fixture({publicAfter:2});await assert.rejects(()=>f.archive.create(INPUT),e=>e.status===403);assert.equal(f.files.size,0);
+ // Checks 1-2 are the initial guard and plugin check; check 3 is write()'s guard.
+ const f=fixture({publicAfter:3});await assert.rejects(()=>f.archive.create(INPUT),e=>e.status===403&&/Private repository/.test(e.message));
+ assert.ok(f.calls.some(c=>c.route==='contents/plugins/agent-requests/state.json'));assert.ok(f.calls.some(c=>c.route===`contents/requests/${ID}.json`));
+ assert.equal(f.calls.filter(c=>c.method==='PUT').length,0);assert.equal(f.files.size,0);
 });
 test('schema path confinement and selection limits refuse before any write',async()=>{
  for(const input of [{...INPUT,entryPath:'content/posts/../../.github/x.md'},{...INPUT,entryPath:'data/site.json'},{...INPUT,entryPath:'content/pages/en/other.md'},{...INPUT,anchor:{...INPUT.anchor,quote:'x'.repeat(8001)}},{...INPUT,anchor:{...INPUT.anchor,to:0}}]){const f=fixture();await assert.rejects(()=>f.archive.create(input));assert.equal(f.writes().length,0);}
@@ -87,7 +90,7 @@ test('directory at GitHub truncation boundary is refused before reading task bod
  await assert.rejects(()=>f.archive.list(ENTRY),e=>e.status===413);assert.equal(f.calls.filter(c=>c.route.startsWith('contents/requests/')).length,0);assert.equal(f.writes().length,0);
 });
 test('persisted request reads fail after visibility changes without disclosing content',async()=>{
- const f=fixture({publicAfter:4});await f.archive.create(INPUT);const before=f.calls.length;await assert.rejects(()=>f.archive.read(ID),e=>e.status===403);assert.equal(f.calls.length,before+1);
+ const f=fixture({publicAfter:5});await f.archive.create(INPUT);const before=f.calls.length;await assert.rejects(()=>f.archive.read(ID),e=>e.status===403);assert.equal(f.calls.length,before+1);
 });
 test('tampered archived response fails validation rather than reaching UI',async()=>{
  const f=fixture();await f.archive.create(INPUT);const file=f.files.get(ID);const task=JSON.parse(file.text);task.status='answered';task.response={message:42,createdAt:task.createdAt,createdBy:'owner',origin:'assistant'};file.text=JSON.stringify(task);file.sha=sha(file.text);await assert.rejects(()=>f.archive.read(ID));
@@ -119,4 +122,15 @@ test('disabled Agent requests plugin refuses capture and response but keeps exis
  await assert.rejects(()=>disabled.archive.update({id:ID,expectedSha:created.sha,response:{message:'Evidence'}}),e=>e.status===409);
  await assert.rejects(()=>disabled.archive.update({id:ID,expectedSha:created.sha,status:'resolved'}),e=>e.status===409);
  assert.equal(disabled.writes().length,0);assert.equal(disabled.files.get(ID),f.files.get(ID));
+});
+test('a disable that lands while a capture or response is in flight refuses it at the write boundary',async()=>{
+ // Plugin read 1 is the initial check; read 2 is the write-boundary check.
+ const f=fixture({disableAt:2});await assert.rejects(()=>f.archive.create(INPUT),e=>e.status===409&&/disabled/.test(e.message));
+ assert.equal(f.calls.filter(c=>c.route==='contents/plugins/agent-requests/state.json').length,2);assert.equal(f.calls.filter(c=>c.method==='PUT').length,0);assert.equal(f.files.size,0);
+ // create uses reads 1-2; update's initial check is read 3 and its write check read 4.
+ const g=fixture({disableAt:4});const created=await g.archive.create(INPUT);
+ for(const change of [{response:{message:'Evidence'}},{status:'resolved'}]){
+  await assert.rejects(()=>g.archive.update({id:ID,expectedSha:created.sha,...change}),e=>e.status===409&&/disabled/.test(e.message));
+ }
+ assert.equal(g.calls.filter(c=>c.method==='PUT').length,1);assert.equal(g.files.get(ID).sha,created.sha);
 });
