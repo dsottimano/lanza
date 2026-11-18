@@ -735,3 +735,15 @@ test("markers do not weaken a single safety verdict", () => {
     assertNoLiveScheme(html);
   }
 });
+
+test("{{{raw}}} in a raw-text element emits nothing", () => {
+  for (const tag of ["script", "style", "title", "textarea"]) {
+    assert.equal(render(`<${tag}>a{{{ x }}}b</${tag}>`, { x: "alert(1)}" }), `<${tag}>ab</${tag}>`, tag);
+  }
+  assert.equal(render(`<div>{{{ x }}}</div>`, { x: "<p>ok</p>" }), "<div><p>ok</p></div>");
+});
+
+test("rawNames limits which {{{raw}}} values are emitted", () => {
+  const html = render(`{{{ a }}}|{{{ b }}}|{{ b }}`, { a: "<i>A</i>", b: "<i>B</i>" }, { rawNames: new Set(["a"]) });
+  assert.equal(html, "<i>A</i>||&lt;i&gt;B&lt;/i&gt;");
+});

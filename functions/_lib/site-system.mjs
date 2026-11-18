@@ -162,6 +162,17 @@ export const POSITION_INFO = {
 
 export const POSITIONS = new Set(Object.keys(POSITION_INFO));
 
+// Every name some position puts in scope beside the declared fields. A richtext field
+// with one of these names is sanitized over the engine's value (HtmlTemplate.astro).
+const RICH_TEXT_RESERVED = new Set([
+  BODY_SLOT, ...DETAIL_RESERVED, ...LIST_RESERVED, "entries", ...LIST_ITEM_RESERVED,
+  ...LISTING_SPLIT_LISTS, ...LISTING_SPLIT_FLAGS, ...LISTING_DATE_NAMES,
+  "lanzaProvenance", "__proto__", "constructor", "prototype",
+]);
+
+// Raw-text elements: a verbatim value there is literal text, JS or CSS, never markup.
+const RAW_TEXT_REGION = /<(script|style|title|textarea)\b[^>]*>[\s\S]*?(?:<\/\1\s*>|$)/gi;
+
 // Fields that exist to CONTROL publishing rather than to be printed. A template is
 // not expected to interpolate them, so they are exempt from the unused-field warning —
 // otherwise every content type nags about `draft` forever and the warning gets ignored,
@@ -593,6 +604,8 @@ export const CHECKS = [
   { code: "missing-label", level: "warning", failure: "No label: the CMS shows the raw field name." },
   { code: "select-without-options", level: "error", failure: "A select with nothing to select." },
   { code: "object-without-fields", level: "error", failure: "An object widget with no nested shape." },
+  { code: "richtext-reserved", level: "error", failure: "A richtext field named after an engine-supplied name (body, entries, url, …): its sanitized value would replace the engine's." },
+  { code: "raw-unsafe-position", level: "error", failure: "{{{ }}} inside <script>/<style>/<title>/<textarea>: the engine renders it empty, since a verbatim value there is not markup." },
   { code: "richtext-nested", level: "error", failure: "A richtext field inside a list or object: only top-level richtext fields are sanitized and rendered." },
   { code: "template-name-mismatch", level: "error", failure: "fields.json `name` disagrees with the folder. A page's `preset` names the FOLDER." },
   { code: "bad-position", level: "error", failure: "A position outside page/detail/list." },
@@ -725,6 +738,9 @@ export function checkFieldsJson(fields, where) {
       if (f.widget === "select" && !(Array.isArray(f.options) && f.options.length)) {
         problems.push(problem("error", "select-without-options", where, `"${at}" is a select with no options.`));
       }
+      if (f.widget === RICH_TEXT_WIDGET && !prefix && RICH_TEXT_RESERVED.has(f.name)) {
+        problems.push(problem("error", "richtext-reserved", where, `"${at}" is a richtext field named after a name the engine supplies; the sanitized value would replace it. Rename the field.`));
+      }
       if (f.widget === RICH_TEXT_WIDGET && prefix) {
         problems.push(problem("error", "richtext-nested", where, `"${at}" is a richtext field inside a list or object. Only top-level richtext fields are sanitized and rendered.`));
       }
@@ -849,7 +865,9 @@ export function checkTemplate(t, world) {
   // fatal (the page renders) but it means the CMS shows a writing canvas whose text
   // appears nowhere — or hides one the template is asking for.
   const rawBody = JSON.stringify(nodes).includes('"t":"raw","path":"body"');
-  if (position === "page" && usesBody) {
+  // An unrouted template (no explicit position, including one with a page `listing`)
+  // is a page preset: a designed page with no free body.
+  if ((!t.position || t.position === "page") && usesBody) {
     problems.push(
       problem("error", "page-body", `${where}fields.json`, `A page preset is a designed page with no free body, but fields.json sets "body": true. The CMS opens it as a designed page, so canvas text is unreachable. Move the prose into a richtext field, then remove "body": true and {{{ body }}}.`),
     );
@@ -887,6 +905,11 @@ export function checkTemplate(t, world) {
     }
   };
   collectRaw(nodes, false);
+  for (const [region] of t.html.matchAll(RAW_TEXT_REGION)) {
+    for (const [, p] of region.matchAll(/\{\{\{\s*(.*?)\s*\}\}\}/g)) {
+      problems.push(problem("error", "raw-unsafe-position", `${where}template.html`, `{{{ ${p} }}} sits inside <${/^<(\w+)/.exec(region)[1].toLowerCase()}>, where a verbatim value is text, JS or CSS rather than markup. The engine renders it empty; move it into the page markup.`));
+    }
+  }
   for (const p of rawPaths) {
     problems.push(
       problem("error", "raw-non-body", `${where}template.html`, `{{{ ${p} }}} emits a slot value UNESCAPED. Only {{{ body }}} and top-level richtext fields outside loops are sanitized upstream. Use {{ ${p} }}.`),
@@ -967,11 +990,16 @@ export async function checkSite(io, opts = {}) {
 
   // A template's POSITION comes from the routes that reference it — never guessed,
   // because the position decides what the engine puts in scope.
-  const position = new Map();
+  // A template may hold several positions (two routes, or a route plus page use), so
+  // each one is checked. `io.pagePresets` (optional) names the templates pages select;
+  // the filesystem CLI supplies it, MCP has no content inventory.
+  const positions = new Map();
+  const use = (name, p) => positions.set(name, new Set([...(positions.get(name) ?? []), p]));
   for (const c of folders) {
-    if (c.route?.template) position.set(c.route.template, "detail");
-    if (c.route?.list?.template) position.set(c.route.list.template, "list");
+    if (c.route?.template) use(c.route.template, "detail");
+    if (c.route?.list?.template) use(c.route.list.template, "list");
   }
+  const pagePresets = new Set(io.pagePresets ? await io.pagePresets() : []);
 
   // ── Templates.
   const all = (await io.listTemplates()).filter((n) => n !== "parts");
@@ -1005,7 +1033,16 @@ export async function checkSite(io, opts = {}) {
       problems.push(problem("error", "bad-field", `templates/${name}/fields.json`, `Not valid JSON: ${e.message}`));
       continue;
     }
-    problems.push(...checkTemplate({ name, html, fields, position: position.get(name) }, world));
+    // `undefined` is the page use: checkTemplate infers page, or a page listing.
+    const uses = [...(positions.get(name) ?? [])];
+    if (!uses.length || pagePresets.has(name)) uses.push(undefined);
+    const seen = new Set();
+    for (const p of uses) {
+      for (const found of checkTemplate({ name, html, fields, position: p }, world)) {
+        const key = JSON.stringify(found);
+        if (!seen.has(key)) { seen.add(key); problems.push(found); }
+      }
+    }
   }
 
   // ── Chrome. Parts have no fields.json; their contract is PART_DATA.

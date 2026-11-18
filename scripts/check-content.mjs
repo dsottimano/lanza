@@ -4,6 +4,24 @@ import { existsSync, readdirSync, readFileSync } from 'node:fs';
 import { join } from 'node:path';
 import yaml from 'js-yaml';
 
+const frontmatter = (root, file) =>
+  yaml.load(readFileSync(join(root, file), 'utf8').match(/^---\r?\n([\s\S]*?)\r?\n---(?:\r?\n|$)/)?.[1] ?? '') ?? {};
+
+/** Template folders that pages select as their preset (checkSite's page use). */
+export function pagePresets(root) {
+  let pages;
+  try { pages = JSON.parse(readFileSync(join(root, 'data/schema.json'), 'utf8')).find(c => c?.kind === 'folder' && c.name === 'pages'); }
+  catch { return []; }
+  const walk = dir => !existsSync(join(root, dir)) ? [] : readdirSync(join(root, dir), { withFileTypes: true })
+    .flatMap(e => e.isDirectory() ? walk(`${dir}/${e.name}`) : [`${dir}/${e.name}`]);
+  const out = new Set();
+  for (const file of pages ? walk(pages.folder) : []) {
+    if (!file.endsWith('.md')) continue;
+    try { const preset = frontmatter(root, file).preset; if (typeof preset === 'string') out.add(preset); } catch { /* reported by checkContent */ }
+  }
+  return [...out];
+}
+
 export function checkContent(root) {
   const problems = [];
   const error = (where, code, message) => problems.push({ level: 'error', where, code, message });
@@ -54,7 +72,7 @@ export function checkContent(root) {
       error(file, 'content-outside-schema', 'Declare this content folder in data/schema.json.'); continue;
     }
     let data;
-    try { data = yaml.load(readFileSync(join(root, file), 'utf8').match(/^---\r?\n([\s\S]*?)\r?\n---(?:\r?\n|$)/)?.[1] ?? '') ?? {}; }
+    try { data = frontmatter(root, file); }
     catch (e) { error(file, 'invalid-frontmatter', e.message); continue; }
     const owner = folders.find(c => file.startsWith(`${c.folder}/`));
     if (owner?.name === 'pages' && Array.isArray(data.blocks) && data.blocks.length

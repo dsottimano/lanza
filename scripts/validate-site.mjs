@@ -9,7 +9,7 @@
 // reads, it never writes.
 import { readFileSync, existsSync, readdirSync, statSync } from "node:fs";
 import { join } from "node:path";
-import { checkContent } from "./check-content.mjs";
+import { checkContent, pagePresets } from "./check-content.mjs";
 import { checkSite } from "../functions/_lib/site-system.mjs";
 
 const argv = process.argv.slice(2);
@@ -30,6 +30,7 @@ const { problems, templates } = await checkSite({
     existsSync(tplRoot)
       ? readdirSync(tplRoot).filter((n) => statSync(join(tplRoot, n)).isDirectory())
       : [],
+  pagePresets: () => pagePresets(ROOT),
 });
 
 problems.push(...checkContent(ROOT));

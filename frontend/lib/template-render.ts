@@ -683,7 +683,7 @@ function mark(html: string, path: string | null, pos: Position): string {
   return `<span data-lanza-field="${escapeHtml(path)}">${html}</span>`;
 }
 
-function renderNodes(nodes: Node[], stack: Frame[], markers: boolean): string {
+function renderNodes(nodes: Node[], stack: Frame[], markers: boolean, rawNames?: ReadonlySet<string>): string {
   let out = "";
   for (const node of nodes) {
     if (node.t === "text") {
@@ -697,6 +697,10 @@ function renderNodes(nodes: Node[], stack: Frame[], markers: boolean): string {
       }
       out += markers ? mark(value, qualify(node.path, stack), node.pos) : value;
     } else if (node.t === "raw") {
+      // A raw-text element (<script>/<style>/<title>/<textarea>) or an unknown position:
+      // a verbatim value there is JS/CSS or literal text, never markup. Emit nothing, as
+      // a var does. `rawNames`, when given, is the only set of names emitted at all.
+      if (node.pos.forbidden || (rawNames && !rawNames.has(node.path))) continue;
       const v = resolve(node.path, stack);
       if (v == null || typeof v === "object") continue;
       // "Emit verbatim" means "this is already-safe HTML", and that claim only makes
@@ -712,7 +716,7 @@ function renderNodes(nodes: Node[], stack: Frame[], markers: boolean): string {
       // page body — which a span is not a legal parent for.)
       out += inMarkup ? String(v) : stringify(v, node.pos);
     } else if (node.t === "if") {
-      if (truthy(resolve(node.path, stack))) out += renderNodes(node.body, stack, markers);
+      if (truthy(resolve(node.path, stack))) out += renderNodes(node.body, stack, markers, rawNames);
     } else {
       const items = resolve(node.path, stack);
       if (Array.isArray(items)) {
@@ -721,7 +725,7 @@ function renderNodes(nodes: Node[], stack: Frame[], markers: boolean): string {
         const base = qualify(node.path, stack);
         items.forEach((item, index) => {
           stack.push({ scope: item as Scope, index, base: base === null ? "" : `${base}.${index}` });
-          out += renderNodes(node.body, stack, markers);
+          out += renderNodes(node.body, stack, markers, rawNames);
           stack.pop();
         });
       }
@@ -741,9 +745,14 @@ export interface RenderOptions {
    * marker — see the note above renderNodes.
    */
   markers?: boolean;
+  /**
+   * Preview only: the {{{ name }}} paths that may be emitted verbatim (the body and the
+   * sanitized richtext fields). Any other raw renders empty. Omitted in production.
+   */
+  rawNames?: ReadonlySet<string>;
 }
 
 export function render(template: string, data: Record<string, unknown>, options: RenderOptions = {}): string {
   const { nodes } = parse(tokenize(template), 0, newCtx());
-  return renderNodes(nodes, [{ scope: data, index: 0, base: "" }], options.markers === true);
+  return renderNodes(nodes, [{ scope: data, index: 0, base: "" }], options.markers === true, options.rawNames);
 }

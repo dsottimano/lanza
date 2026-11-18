@@ -564,6 +564,17 @@ test("validate_site catches a misspelled placeholder", async () => {
   assert.ok(r.problems.some((p) => p.code === "unused-field" && p.message.includes("venue")));
 });
 
+test("validate_site refuses a listing page preset that still has a free body", async () => {
+  fakeGitHub({
+    "data/schema.json": JSON.stringify([...JSON.parse(SCHEMA), { kind: "folder", name: "posts", folder: "content/posts", fields: [{ name: "title", widget: "string" }] }]),
+    "templates/journal/template.html": "<section>{{{ body }}}{{#each entries}}<h2>{{ title }}</h2>{{/each}}</section>",
+    "templates/journal/fields.json": JSON.stringify({ name: "journal", body: true, fields: [], listing: { of: "posts", item: ["title"] } }),
+  });
+  const r = await callData("validate_site");
+  assert.equal(r.ok, false);
+  assert.ok(r.problems.some((p) => p.code === "page-body"), JSON.stringify(r.problems));
+});
+
 test("validate_site reports a clean site as ok", async () => {
   fakeGitHub({
     "data/schema.json": SCHEMA,

@@ -25,6 +25,7 @@ import {
   POSITIONS,
   WIDGETS,
   siteSystemContract,
+  checkSite,
 } from "../functions/_lib/site-system.mjs";
 import { render } from "../frontend/lib/template-render.ts";
 
@@ -411,4 +412,58 @@ describe("rich-text fields", () => {
     assert.ok(errors(ps).some((p) => p.code === "richtext-nested"));
     assert.ok(codes(checkFieldsJson([{ name: "box", label: "Box", widget: "object", fields: [intro] }], "x")).includes("richtext-nested"));
   });
+});
+
+describe("page-body follows where a template is actually used", () => {
+  const site = (files, pagePresets) => checkSite({
+    readText: (p) => files[p] ?? null,
+    listTemplates: () => [...new Set(Object.keys(files).filter((k) => k.startsWith("templates/")).map((k) => k.split("/")[1]))],
+    ...(pagePresets ? { pagePresets: () => pagePresets } : {}),
+  });
+  const schema = (extra = []) => JSON.stringify([{ kind: "folder", name: "posts", folder: "content/posts", body: "rich", fields: [{ name: "title", widget: "string" }] }, ...extra]);
+  const journal = {
+    "templates/journal/template.html": "<section>{{{ body }}}{{#each entries}}<h2>{{ title }}</h2>{{/each}}</section>",
+    "templates/journal/fields.json": JSON.stringify({ name: "journal", body: true, fields: [], listing: { of: "posts", item: ["title"] } }),
+  };
+  test("an unrouted listing preset with body:true is a page-body error", async () => {
+    const { problems } = await site({ "data/schema.json": schema(), ...journal });
+    assert.ok(errors(problems).some((p) => p.code === "page-body"), JSON.stringify(problems));
+  });
+  const eventFiles = {
+    "data/schema.json": schema([{ kind: "folder", name: "events", folder: "content/events", body: "rich", fields: [{ name: "title", widget: "string" }], route: { base: "events", template: "event" } }]),
+    "templates/event/template.html": "<h1>{{ title }}</h1>{{{ body }}}",
+    "templates/event/fields.json": JSON.stringify({ name: "event", body: true, fields: [{ name: "title", label: "Title", widget: "string" }] }),
+  };
+  test("a routed detail template keeps its body", async () => {
+    const { problems } = await site(eventFiles);
+    assert.ok(!codes(problems).includes("page-body"), JSON.stringify(problems));
+  });
+  test("a detail template that pages also select is checked as a page too", async () => {
+    const { problems } = await site(eventFiles, ["event"]);
+    assert.ok(errors(problems).some((p) => p.code === "page-body"), JSON.stringify(problems));
+    assert.equal(problems.filter((p) => p.code === "page-body").length, 1, "reported once");
+  });
+});
+
+describe("raw interpolation only in markup", () => {
+  for (const tag of ["script", "style", "title", "textarea"]) {
+    test(`{{{ }}} inside <${tag}> is refused for body and richtext`, () => {
+      const rich = checkTemplate({ name: "t", html: `<${tag}>{{{ intro }}}</${tag}>`, fields: { name: "t", fields: [{ name: "intro", label: "I", widget: "richtext" }] } });
+      assert.ok(errors(rich).some((p) => p.code === "raw-unsafe-position"), tag);
+      const body = checkTemplate({ name: "t", html: `<${tag} class="x">{{{ body }}}</${tag}>`, fields: { name: "t", body: true, fields: [] }, position: "detail" });
+      assert.ok(errors(body).some((p) => p.code === "raw-unsafe-position"), tag);
+    });
+  }
+  test("raw in ordinary markup is still fine", () => {
+    assert.deepEqual(checkTemplate({ name: "t", html: `<style>.a{}</style><section>{{{ intro }}}</section>`, fields: { name: "t", fields: [{ name: "intro", label: "I", widget: "richtext" }] } }), []);
+  });
+});
+
+describe("richtext names cannot shadow engine-supplied names", () => {
+  for (const name of ["body", "entries", "latest", "rest", "count", "isEmpty", "url", "slug", "indexUrl", "lanzaProvenance"]) {
+    test(`a richtext field named ${name} is refused`, () => {
+      assert.ok(codes(checkFieldsJson([{ name, label: "X", widget: "richtext" }], "x")).includes("richtext-reserved"), name);
+    });
+  }
+  test("ordinary names are fine", () => assert.ok(!codes(checkFieldsJson([{ name: "intro", label: "X", widget: "richtext" }], "x")).includes("richtext-reserved")));
 });
