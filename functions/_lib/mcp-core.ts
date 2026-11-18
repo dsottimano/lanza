@@ -202,23 +202,9 @@ async function designedPage(client: ContentClient, data: Record<string, unknown>
  * Worker gets ~50 subrequests per request. `complete: false` means some pages went
  * unread, so a page-use check is not proof; the filesystem check:site is.
  */
-async function pagePresetScan(client: ContentClient, limit: number): Promise<{ uses: Map<string, string[]>; complete: boolean }> {
-  const uses = new Map<string, string[]>();
+async function pagePresetScan(client: ContentClient, maxReads: number): Promise<{ uses: Map<string, string[]>; complete: boolean }> {
   const pages = (await getCollections(client)).find((c) => c.name === "pages");
-  if (!pages) return { uses, complete: true };
-  const files: string[] = [];
-  const walk = async (dir: string, depth: number): Promise<void> => {
-    for (const item of await client.listAll(dir)) {
-      if (item.type === "dir" && depth < 1) await walk(item.path, depth + 1);
-      else if (item.type === "file" && item.name.endsWith(".md")) files.push(item.path);
-    }
-  };
-  await walk(pages.folder.replace(/\/+$/, ""), 0);
-  for (const path of files.slice(0, limit)) {
-    const preset = (await client.read(path)).data.preset;
-    if (typeof preset === "string") uses.set(preset, [...(uses.get(preset) ?? []), path]);
-  }
-  return { uses, complete: files.length <= limit };
+  return pages ? client.pagePresets(pages.folder.replace(/\/+$/, ""), maxReads) : { uses: new Map(), complete: true };
 }
 const PAGE_SCAN_INCOMPLETE = "This site has more pages than one MCP call can read, so page use of templates was not fully checked. Run `npm run check:site` (or `lanza build`) in a checkout before publishing; it reads every page.";
 

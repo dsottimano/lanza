@@ -279,6 +279,29 @@ export class ContentClient {
     return [];
   }
 
+  /**
+   * Which template each page under `folder` selects as its preset, from ONE branch:
+   * staging, or main only while staging does not exist. A file missing from staging is
+   * deleted there, never read from main. Costs one tree request (two when staging is
+   * absent) plus at most `maxReads` file reads; `complete: false` when pages went unread.
+   */
+  async pagePresets(folder: string, maxReads: number): Promise<{ uses: Map<string, string[]>; complete: boolean }> {
+    let ref = WORKING_BRANCH;
+    let res = await this.gh(`git/trees/${ref}?recursive=1`);
+    if (res.status === 404) { await res.body?.cancel(); ref = BRANCH; res = await this.gh(`git/trees/${ref}?recursive=1`); }
+    if (!res.ok) throw await this.fail(res, "list pages");
+    const tree = (await res.json()) as { tree?: Array<{ path: string; type: string }>; truncated?: boolean };
+    const files = (tree.tree ?? []).filter((i) => i.type === "blob" && i.path.startsWith(`${folder}/`) && i.path.endsWith(".md")).map((i) => i.path);
+    const uses = new Map<string, string[]>();
+    for (const path of files.slice(0, maxReads)) {
+      const file = await this.gh(`contents/${encodePath(path)}?ref=${ref}`);
+      if (!file.ok) throw await this.fail(file, `read ${path}`);
+      const preset = parseFrontmatter(decodeBase64(((await file.json()) as { content: string }).content)).data.preset;
+      if (typeof preset === "string") uses.set(preset, [...(uses.get(preset) ?? []), path]);
+    }
+    return { uses, complete: !tree.truncated && files.length <= maxReads };
+  }
+
   // Read one entry (frontmatter + HTML body + sha) from staging.
   async read(path: string): Promise<Entry> {
     const res = await this.gh(`contents/${encodePath(path)}?ref=${WORKING_BRANCH}`);

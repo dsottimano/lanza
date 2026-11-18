@@ -26,9 +26,14 @@ const SCHEMA = JSON.stringify([
 ]);
 
 // A fresh fake GitHub per test: a Map of repo-path → file text, plus staging state.
-function fakeGitHub(seed = {}) {
+// `files` is staging. Optional `main` gives main its own contents (default: same map);
+// `noStaging` makes staging absent. Contents reads and git/trees honour the ref.
+function fakeGitHub(seed = {}, { main, noStaging = false } = {}) {
   const files = new Map(Object.entries(seed));
+  const mainFiles = main ? new Map(Object.entries(main)) : files;
+  const onRef = (ref) => (ref === "main" ? mainFiles : noStaging ? null : files);
   let published = false;
+  let requests = 0;
   const res = (status, body) =>
     new Response(body === undefined ? null : JSON.stringify(body), {
       status,
@@ -36,16 +41,26 @@ function fakeGitHub(seed = {}) {
     });
 
   globalThis.fetch = async (url, init = {}) => {
+    requests++;
     const method = (init.method || "GET").toUpperCase();
     const u = new URL(url);
     const path = decodeURIComponent(u.pathname.replace("/repos/o/n/", ""));
     const body = init.body ? JSON.parse(init.body) : {};
 
     // Branch head (ensureWorkingBranch): staging + main both exist.
-    if (method === "GET" && path.startsWith("git/ref/heads/")) return res(200, { object: { sha: path.endsWith("/main") ? "a".repeat(40) : "b".repeat(40) } });
+    if (method === "GET" && path.startsWith("git/ref/heads/")) {
+      if (noStaging && !path.endsWith("/main")) return res(404, { message: "Not Found" });
+      return res(200, { object: { sha: path.endsWith("/main") ? "a".repeat(40) : "b".repeat(40) } });
+    }
+    if (method === "GET" && path.startsWith("git/trees/")) {
+      const tree = onRef(path.slice("git/trees/".length));
+      return tree ? res(200, { tree: [...tree.keys()].map((k) => ({ path: k, type: "blob" })), truncated: false }) : res(404, { message: "Not Found" });
+    }
 
     if (method === "GET" && path.startsWith("contents/")) {
       const p = path.replace(/^contents\//, "");
+      const files = onRef(u.searchParams.get("ref"));
+      if (!files) return res(404, { message: "Not Found" });
       if (files.has(p)) return res(200, { content: b64(files.get(p)), sha: `sha-${p}` });
       // Directory listing. Faithful to the Contents API: immediate children only,
       // with `type: "dir"` for the ones that have children of their own — which is
@@ -86,6 +101,9 @@ function fakeGitHub(seed = {}) {
     files,
     get published() {
       return published;
+    },
+    get requests() {
+      return requests;
     },
   };
 }
@@ -1614,4 +1632,42 @@ test("when pages exceed the lookup budget, validation says it is incomplete inst
   const w = await callData("write_template", { name: "event", position: "detail", template_html: "<h1>{{ title }}</h1>{{{ body }}}",
     fields: { body: true, fields: [{ name: "title", label: "Title", widget: "string" }] } });
   assert.equal(w.pageUseChecked, false); assert.match(w.warning, /check:site/);
+});
+
+// N1: the page scan reads ONE branch. N2: it has a total request budget.
+const bodyEvent = {
+  "templates/event/template.html": "<h1>{{ title }}</h1>{{{ body }}}",
+  "templates/event/fields.json": JSON.stringify({ name: "event", body: true, fields: [{ name: "title", label: "Title", widget: "string" }] }),
+};
+
+test("a page deleted on staging is not resurrected from main by validate_site", async () => {
+  const site = mixedUse(bodyEvent);
+  const staged = Object.fromEntries(Object.entries(site).filter(([k]) => !k.startsWith("content/pages/")));
+  fakeGitHub(staged, { main: site });
+  const r = await callData("validate_site");
+  assert.equal(r.ok, true, JSON.stringify(r));
+});
+
+test("a main-only repository is scanned on main for listing and reads alike", async () => {
+  fakeGitHub(mixedUse(bodyEvent), { main: mixedUse(bodyEvent), noStaging: true });
+  const r = await callData("validate_site");
+  assert.equal(r.ok, false);
+  assert.ok(r.problems.some((p) => p.code === "page-body"), JSON.stringify(r.problems));
+});
+
+test("many language directories stay within the request budget and report incomplete", async () => {
+  const pages = Object.fromEntries(Array.from({ length: 45 }, (_, i) => [`content/pages/l${i}/p.md`, page({ title: `P${i}` })]));
+  const gh = fakeGitHub(mixedUse({ ...pages, "content/pages/en/launch.md": page({ title: "Plain page" }) }));
+  const inner = globalThis.fetch;
+  let calls = 0;
+  globalThis.fetch = (...a) => { if (++calls > 50) throw new Error("subrequest ceiling exceeded"); return inner(...a); };
+  const r = await callData("validate_site");
+  assert.equal(r.complete, false); assert.equal(r.ok, false);
+  assert.ok(calls <= 50, `validate_site used ${calls} requests`);
+  calls = 0;
+  const w = await callData("write_template", { name: "event", position: "detail", template_html: "<h1>{{ title }}</h1>{{{ body }}}",
+    fields: { body: true, fields: [{ name: "title", label: "Title", widget: "string" }] } });
+  assert.equal(w.pageUseChecked, false);
+  assert.ok(calls <= 50, `write_template used ${calls} requests`);
+  assert.ok(gh.requests > 0);
 });
